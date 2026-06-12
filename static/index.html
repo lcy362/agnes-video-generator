@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agnes Video Generator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .animate-spin { animation: spin 1s linear infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+  .step-line { transition: all 0.5s ease; }
+  pre { white-space: pre-wrap; word-break: break-all; }
+</style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen font-sans">
+
+<div class="max-w-4xl mx-auto px-4 py-8">
+
+  <!-- Header -->
+  <div class="text-center mb-10">
+    <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
+      Agnes Video Generator
+    </h1>
+    <p class="text-gray-400 mt-2">创意 → 视频，一键生成</p>
+  </div>
+
+  <!-- API Key -->
+  <div id="apikey-section" class="bg-gray-900 rounded-2xl p-6 mb-6 border border-gray-800">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-semibold text-purple-300">API Key 配置</h2>
+      <span id="apikey-status" class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400">未配置</span>
+    </div>
+    <div class="flex gap-3">
+      <input id="apikey-input" type="password" placeholder="输入 Agnes API Key" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+      <button id="apikey-save" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm font-medium transition">保存</button>
+    </div>
+  </div>
+
+  <!-- Main Tabs -->
+  <div class="flex gap-2 mb-6">
+    <button onclick="switchTab('create')" id="tab-create" class="tab-btn px-5 py-2.5 rounded-lg text-sm font-medium bg-purple-600 text-white transition">新建任务</button>
+    <button onclick="switchTab('list')" id="tab-list" class="tab-btn px-5 py-2.5 rounded-lg text-sm font-medium bg-gray-800 text-gray-300 hover:bg-gray-700 transition">任务列表</button>
+  </div>
+
+  <!-- Create Tab -->
+  <div id="panel-create">
+
+    <!-- Basic Config -->
+    <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+      <h2 class="text-lg font-semibold text-purple-300 mb-4">创意设置</h2>
+
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-1.5">任务名称</label>
+        <input id="creative_name" placeholder="可选，留空自动生成" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm text-gray-400 mb-1.5">创意描述 (idea) <span class="text-red-400">*</span></label>
+        <textarea id="idea" rows="4" placeholder="描述你心中的故事、场景和角色..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1.5">用户要求</label>
+          <input id="user_requirement" value="3个场景，每个场景5秒，电影质感" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1.5">视觉风格</label>
+          <input id="style" value="电影质感写实风格" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+        </div>
+      </div>
+    </div>
+
+    <!-- Advanced Config -->
+    <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+      <h2 class="text-lg font-semibold text-purple-300 mb-4">高级设置</h2>
+
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1.5">串联模式</label>
+          <select id="chaining_mode" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+            <option value="keyframes">keyframes (推荐)</option>
+            <option value="ti2vid">ti2vid (过渡帧)</option>
+            <option value="none">none (独立场景)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1.5">视频宽度</label>
+          <input id="video_width" type="number" value="768" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1.5">视频高度</label>
+          <input id="video_height" type="number" value="1152" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+        </div>
+      </div>
+    </div>
+
+    <!-- Reference Image -->
+    <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+      <h2 class="text-lg font-semibold text-purple-300 mb-4">参考图 (可选)</h2>
+      <div class="flex items-center gap-4">
+        <label class="cursor-pointer px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm transition inline-block">
+          <span id="ref-label">选择参考图</span>
+          <input id="reference_image" type="file" accept="image/*" class="hidden" onchange="updateRefLabel()">
+        </label>
+        <span id="ref-name" class="text-sm text-gray-500">未选择</span>
+      </div>
+      <p class="text-xs text-gray-500 mt-2">可选。提供后所有场景将以该图为视觉锚点；不提供则自动从故事中生成角色参考图</p>
+    </div>
+
+    <!-- End Frames -->
+    <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-purple-300">自定义尾帧 (可选)</h2>
+        <div class="flex gap-3">
+          <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+            <input type="checkbox" id="use_custom_end_frames" onchange="toggleEndFrames()" class="rounded bg-gray-800 border-gray-600">
+            启用自定义尾帧
+          </label>
+          <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+            <input type="checkbox" id="generate_end_frames_from_ref" onchange="toggleEndFrameMode()" class="rounded bg-gray-800 border-gray-600">
+            基于参考图生成尾帧 (i2i)
+          </label>
+        </div>
+      </div>
+      <div id="end-frames-container" class="hidden space-y-2">
+        <p class="text-xs text-gray-500 mb-2">每个场景一张尾帧图，按顺序对应。多余场景自动生成尾帧。</p>
+        <div id="end-frame-inputs">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-xs text-gray-500 w-16">场景 1</span>
+            <input type="file" accept="image/*" class="end-frame-file flex-1 text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-gray-700 file:text-gray-200 hover:file:bg-gray-600">
+          </div>
+        </div>
+        <button onclick="addEndFrameInput()" class="text-xs text-purple-400 hover:text-purple-300 mt-2">+ 添加尾帧</button>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <button id="btn-submit" onclick="createTask()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">
+      开始生成视频
+    </button>
+  </div>
+
+  <!-- List Tab -->
+  <div id="panel-list" class="hidden">
+    <div id="task-list-container" class="space-y-3">
+      <p class="text-gray-500 text-sm">加载中...</p>
+    </div>
+  </div>
+
+  <!-- Progress Panel -->
+  <div id="progress-panel" class="hidden bg-gray-900 rounded-2xl p-6 mt-6 border border-gray-800">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-purple-300">生成进度</h2>
+      <span id="progress-pct" class="text-sm text-gray-400">0%</span>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="w-full bg-gray-800 rounded-full h-2.5 mb-6">
+      <div id="progress-bar" class="bg-gradient-to-r from-purple-500 to-pink-500 h-2.5 rounded-full transition-all duration-500" style="width:0%"></div>
+    </div>
+
+    <!-- Steps -->
+    <div class="space-y-2" id="steps-container">
+      <div class="step-item flex items-center gap-3 text-sm" data-step="init">
+        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
+        <span class="step-label text-gray-500">初始化</span>
+      </div>
+      <div class="step-item flex items-center gap-3 text-sm" data-step="image_analysis">
+        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
+        <span class="step-label text-gray-500">图片分析</span>
+      </div>
+      <div class="step-item flex items-center gap-3 text-sm" data-step="story">
+        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
+        <span class="step-label text-gray-500">故事生成</span>
+      </div>
+      <div class="step-item flex items-center gap-3 text-sm" data-step="character_ref">
+        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
+        <span class="step-label text-gray-500">角色参考图</span>
+      </div>
+      <div class="step-item flex items-center gap-3 text-sm" data-step="script">
+        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
+        <span class="step-label text-gray-500">脚本编写</span>
+      </div>
+      <div class="step-item flex items-center gap-3 text-sm" data-step="end_frame_prompts">
+        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
+        <span class="step-label text-gray-500">尾帧提示词</span>
+      </div>
+      <div class="step-item flex items-center gap-3 text-sm" data-step="end_frame_gen">
+        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
+        <span class="step-label text-gray-500">尾帧生成</span>
+      </div>
+      <div class="step-item flex items-center gap-3 text-sm" data-step="video_gen">
+        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
+        <span class="step-label text-gray-500">视频生成</span>
+      </div>
+      <div class="step-item flex items-center gap-3 text-sm" data-step="concatenate">
+        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
+        <span class="step-label text-gray-500">视频拼接</span>
+      </div>
+    </div>
+
+    <!-- Message -->
+    <div id="progress-message" class="mt-4 text-sm text-gray-400"></div>
+
+    <!-- Result -->
+    <div id="result-area" class="hidden mt-4 p-4 bg-gray-800 rounded-lg">
+      <p class="text-green-400 text-sm font-medium mb-2">视频生成完成!</p>
+      <video id="result-video" controls class="w-full rounded-lg max-h-96"></video>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──
+let currentTaskId = null;
+let ws = null;
+let isTaskRunning = false;
+let taskListTimer = null;
+const STEP_MAP = {
+  init: 0, image_analysis: 1, story: 2, character_ref: 3,
+  script: 4, end_frame_prompts: 5, end_frame_gen: 6, video_gen: 7, concatenate: 8
+};
+const ALL_STEPS = ['init', 'image_analysis', 'story', 'character_ref', 'script', 'end_frame_prompts', 'end_frame_gen', 'video_gen', 'concatenate'];
+
+// ── Init ──
+(async function init() {
+  try {
+    const r = await fetch('/api/config');
+    const d = await r.json();
+    if (d.api_key) {
+      document.getElementById('apikey-input').value = '';
+      document.getElementById('apikey-input').placeholder = '已配置 (●●●)';
+      document.getElementById('apikey-status').textContent = '已配置';
+      document.getElementById('apikey-status').className = 'text-xs px-2 py-1 rounded-full bg-green-900 text-green-300';
+    }
+  } catch(e) {}
+
+  autoReconnectRunningTask();
+})();
+
+// ── Toast ──
+function showToast(msg, duration = 2500) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    el.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl text-sm font-medium shadow-lg transition-all duration-300 opacity-0 translate-y-4 z-50';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = el.className.replace(/opacity-0 translate-y-4/, 'opacity-100 translate-y-0');
+  el.className = el.className.replace(/bg-\S+ text-\S+/, '');
+  el.className += ' bg-yellow-600 text-white';
+  clearTimeout(el._timeout);
+  el._timeout = setTimeout(() => {
+    el.className = el.className.replace(/opacity-100 translate-y-0/, 'opacity-0 translate-y-4');
+  }, duration);
+}
+
+// ── Task lifecycle ──
+function setRunning(taskId) {
+  isTaskRunning = true;
+  currentTaskId = taskId;
+  document.getElementById('btn-submit').disabled = true;
+  document.getElementById('btn-submit').textContent = '任务进行中...';
+}
+
+function clearRunning() {
+  isTaskRunning = false;
+  currentTaskId = null;
+  document.getElementById('btn-submit').disabled = false;
+  document.getElementById('btn-submit').textContent = '开始生成视频';
+}
+
+async function autoReconnectRunningTask() {
+  try {
+    const r = await fetch('/api/tasks');
+    const d = await r.json();
+    const running = (d.tasks || []).find(t => t.status === 'running');
+    if (running) {
+      setRunning(running.task_id);
+      showProgress(running.task_id);
+      connectWS(running.task_id);
+      restoreProgressFromTask(running.task_id);
+    }
+  } catch(e) {}
+}
+
+async function restoreProgressFromTask(taskId) {
+  try {
+    const r = await fetch('/api/tasks/' + taskId);
+    const state = await r.json();
+    const stepStatus = {
+      'step_image_analysis': 'image_analysis',
+      'step_story': 'story',
+      'step_character_ref': 'character_ref',
+      'step_script': 'script',
+      'step_end_frame_prompts': 'end_frame_prompts',
+      'step_end_frame_generation': 'end_frame_gen',
+      'step_video_generation': 'video_gen',
+      'step_concatenation': 'concatenate',
+    };
+    let maxCompletedIdx = 0;
+    for (const [key, stepName] of Object.entries(stepStatus)) {
+      if (state[key] === 'completed') {
+        markStepCompleted(stepName);
+        const idx = STEP_MAP[stepName];
+        if (idx !== undefined && idx > maxCompletedIdx) maxCompletedIdx = idx;
+      }
+    }
+    if (state.status === 'completed') {
+      document.getElementById('progress-bar').style.width = '100%';
+      document.getElementById('progress-pct').textContent = '100%';
+      ALL_STEPS.forEach(s => markStepCompleted(s));
+      showResult(state.final_video_file);
+    } else if (maxCompletedIdx > 0) {
+      const pct = Math.round((maxCompletedIdx / ALL_STEPS.length) * 100);
+      document.getElementById('progress-bar').style.width = pct + '%';
+      document.getElementById('progress-pct').textContent = pct + '%';
+    }
+  } catch(e) {}
+}
+
+function markStepCompleted(stepName) {
+  const el = document.querySelector(`.step-item[data-step="${stepName}"]`);
+  if (el) {
+    el.querySelector('.step-icon').textContent = '✓';
+    el.querySelector('.step-icon').className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-green-900 text-green-300 text-xs';
+    el.querySelector('.step-label').className = 'step-label text-green-400';
+  }
+}
+
+function showResult(videoPath) {
+  document.getElementById('result-area').classList.remove('hidden');
+  const video = document.getElementById('result-video');
+  if (videoPath) {
+    video.src = '/api/video/' + currentTaskId;
+  }
+}
+
+// ── API Key ──
+document.getElementById('apikey-save').onclick = async () => {
+  const key = document.getElementById('apikey-input').value.trim();
+  if (!key) return alert('请输入 API Key');
+  const form = new FormData();
+  form.append('api_key', key);
+  await fetch('/api/config', { method: 'POST', body: form });
+  document.getElementById('apikey-input').value = '';
+  document.getElementById('apikey-input').placeholder = '已配置 (●●●)';
+  document.getElementById('apikey-status').textContent = '已配置';
+  document.getElementById('apikey-status').className = 'text-xs px-2 py-1 rounded-full bg-green-900 text-green-300';
+};
+
+// ── Tabs ──
+function switchTab(tab) {
+  if (tab === 'create' && isTaskRunning) {
+    showToast('任务正在运行中，请等待完成后再创建新任务');
+    return;
+  }
+  if (tab === 'list' && isTaskRunning) {
+    showToast('任务正在运行中，可在下方进度面板查看实时状态');
+  }
+  document.querySelectorAll('.tab-btn').forEach(b => b.className = b.className.replace(/bg-purple-600 text-white/, 'bg-gray-800 text-gray-300 hover:bg-gray-700'));
+  document.getElementById('tab-' + tab).className = 'tab-btn px-5 py-2.5 rounded-lg text-sm font-medium bg-purple-600 text-white transition';
+  document.getElementById('panel-create').classList.toggle('hidden', tab !== 'create');
+  document.getElementById('panel-list').classList.toggle('hidden', tab !== 'list');
+  if (tab === 'list') {
+    loadTaskList();
+    if (!taskListTimer) {
+      taskListTimer = setInterval(loadTaskList, 5000);
+    }
+  } else {
+    if (taskListTimer) {
+      clearInterval(taskListTimer);
+      taskListTimer = null;
+    }
+  }
+}
+
+// ── End Frames ──
+function toggleEndFrames() {
+  const on = document.getElementById('use_custom_end_frames').checked;
+  document.getElementById('end-frames-container').classList.toggle('hidden', !on);
+  if (!on) document.getElementById('generate_end_frames_from_ref').checked = false;
+}
+
+function toggleEndFrameMode() {
+  const on = document.getElementById('generate_end_frames_from_ref').checked;
+  if (on) {
+    document.getElementById('use_custom_end_frames').checked = false;
+    document.getElementById('end-frames-container').classList.add('hidden');
+  }
+}
+
+function addEndFrameInput() {
+  const container = document.getElementById('end-frame-inputs');
+  const idx = container.children.length + 1;
+  const div = document.createElement('div');
+  div.className = 'flex items-center gap-3 mb-2';
+  div.innerHTML = `<span class="text-xs text-gray-500 w-16">场景 ${idx}</span><input type="file" accept="image/*" class="end-frame-file flex-1 text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-gray-700 file:text-gray-200 hover:file:bg-gray-600">`;
+  container.appendChild(div);
+}
+
+function updateRefLabel() {
+  const f = document.getElementById('reference_image').files[0];
+  document.getElementById('ref-name').textContent = f ? f.name : '未选择';
+}
+
+// ── Create Task ──
+async function createTask() {
+  const idea = document.getElementById('idea').value.trim();
+  if (!idea) return alert('请输入创意描述');
+
+  if (isTaskRunning) {
+    showToast('已有任务正在运行中，请等待完成');
+    return;
+  }
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.textContent = '提交中...';
+
+  const form = new FormData();
+  form.append('idea', idea);
+  form.append('creative_name', document.getElementById('creative_name').value.trim());
+  form.append('user_requirement', document.getElementById('user_requirement').value);
+  form.append('style', document.getElementById('style').value);
+  form.append('chaining_mode', document.getElementById('chaining_mode').value);
+  form.append('video_width', document.getElementById('video_width').value);
+  form.append('video_height', document.getElementById('video_height').value);
+  form.append('use_custom_end_frames', document.getElementById('use_custom_end_frames').checked);
+  form.append('generate_end_frames_from_ref', document.getElementById('generate_end_frames_from_ref').checked);
+
+  const refFile = document.getElementById('reference_image').files[0];
+  if (refFile) form.append('reference_image', refFile);
+
+  try {
+    const r = await fetch('/api/tasks', { method: 'POST', body: form });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.detail || '创建失败');
+    setRunning(d.task_id);
+    showProgress(currentTaskId);
+    connectWS(currentTaskId);
+  } catch(e) {
+    alert('创建失败: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '开始生成视频';
+  }
+}
+
+// ── Task List ──
+async function loadTaskList() {
+  const container = document.getElementById('task-list-container');
+  try {
+    const r = await fetch('/api/tasks');
+    const d = await r.json();
+    const tasks = d.tasks || [];
+    if (!tasks.length) {
+      container.innerHTML = '<p class="text-gray-500 text-sm">暂无任务</p>';
+      return;
+    }
+    container.innerHTML = tasks.map(t => {
+      const statusColors = { completed: 'text-green-400', running: 'text-yellow-400', failed: 'text-red-400', pending: 'text-gray-400' };
+      const statusLabels = { completed: '已完成', running: '进行中', failed: '失败', pending: '待处理' };
+      const isCompleted = t.status === 'completed';
+      const isRunning = t.status === 'running';
+      const btnLabel = isCompleted ? '查看' : (isRunning ? '查看进度' : '续传');
+      const btnAction = isCompleted ? `viewTask('${t.task_id}')` : (isRunning ? `viewRunningTask('${t.task_id}')` : `resumeTask('${t.task_id}')`);
+      return `<div class="bg-gray-900 rounded-xl p-4 border border-gray-800 flex items-center justify-between">
+        <div>
+          <p class="text-sm font-medium">${t.creative_name || t.task_id}</p>
+          <p class="text-xs text-gray-500 mt-1">${t.task_id} · ${t.chaining_mode || 'none'}${t.scene_count ? ' · ' + t.scene_count + '个场景' : ''}</p>
+          ${t.idea ? `<p class="text-xs text-gray-600 mt-1 truncate max-w-xs">${t.idea}</p>` : ''}
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-xs ${statusColors[t.status] || 'text-gray-400'}">${statusLabels[t.status] || t.status}</span>
+          <button onclick="${btnAction}" class="text-xs px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg transition">${btnLabel}</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = '<p class="text-red-400 text-sm">加载失败</p>';
+  }
+}
+
+async function viewTask(taskId) {
+  try {
+    const r = await fetch('/api/tasks/' + taskId);
+    const state = await r.json();
+    showTaskDetail(taskId, state);
+  } catch(e) {
+    alert('加载任务详情失败: ' + e.message);
+  }
+}
+
+async function viewRunningTask(taskId) {
+  setRunning(taskId);
+  showProgress(taskId);
+  connectWS(taskId);
+  restoreProgressFromTask(taskId);
+}
+
+async function resumeTask(taskId) {
+  if (isTaskRunning) {
+    showToast('已有任务正在运行中，请等待完成');
+    return;
+  }
+  try {
+    const r = await fetch('/api/tasks/' + taskId + '/resume', { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.detail || '续传失败');
+    setRunning(taskId);
+    showProgress(taskId);
+    connectWS(taskId);
+    restoreProgressFromTask(taskId);
+  } catch(e) {
+    alert('续传失败: ' + e.message);
+  }
+}
+
+// ── Task Detail ──
+function showTaskDetail(taskId, state) {
+  const panel = document.getElementById('progress-panel');
+  panel.classList.remove('hidden');
+  document.getElementById('result-area').classList.add('hidden');
+
+  const stepsHtml = ALL_STEPS.map(step => {
+    const stepKey = {
+      'image_analysis': 'step_image_analysis', 'story': 'step_story',
+      'character_ref': 'step_character_ref', 'script': 'step_script',
+      'end_frame_prompts': 'step_end_frame_prompts', 'end_frame_gen': 'step_end_frame_generation',
+      'video_gen': 'step_video_generation', 'concatenate': 'step_concatenation',
+    };
+    const key = stepKey[step];
+    const isDone = key ? state[key] === 'completed' : (step === 'init');
+    const icon = isDone ? '✓' : '○';
+    const iconClass = isDone ? 'bg-green-900 text-green-300' : 'bg-gray-800 text-xs';
+    const labelClass = isDone ? 'text-green-400' : 'text-gray-500';
+    return `<div class="step-item flex items-center gap-3 text-sm" data-step="${step}">
+      <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full ${iconClass} text-xs">${icon}</span>
+      <span class="step-label ${labelClass}">${getStepLabel(step)}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('steps-container').innerHTML = stepsHtml;
+  document.getElementById('progress-bar').style.width = '100%';
+  document.getElementById('progress-pct').textContent = '100%';
+  document.getElementById('progress-message').innerHTML = `
+    <div class="space-y-2">
+      <p class="text-green-400 font-medium">任务已完成</p>
+      <p class="text-gray-500">任务ID: ${taskId}</p>
+      <p class="text-gray-500">创意: ${(state.idea || '').substring(0, 100)}</p>
+      <p class="text-gray-500">场景数: ${state.scene_count || 0}</p>
+      <p class="text-gray-500">串联模式: ${state.chaining_mode || 'none'}</p>
+      ${state.final_video_file ? `<p class="text-gray-500">产物: <code class="text-xs bg-gray-800 px-1 py-0.5 rounded">${state.final_video_file}</code></p>` : ''}
+    </div>`;
+
+  if (state.final_video_file) {
+    document.getElementById('result-area').classList.remove('hidden');
+    document.getElementById('result-video').src = '/api/video/' + taskId;
+  }
+}
+
+function getStepLabel(step) {
+  const labels = {
+    init: '初始化', image_analysis: '图片分析', story: '故事生成',
+    character_ref: '角色参考图', script: '脚本编写',
+    end_frame_prompts: '尾帧提示词', end_frame_gen: '尾帧生成',
+    video_gen: '视频生成', concatenate: '视频拼接',
+  };
+  return labels[step] || step;
+}
+
+// ── Progress ──
+function showProgress(taskId) {
+  document.getElementById('progress-panel').classList.remove('hidden');
+  document.getElementById('result-area').classList.add('hidden');
+  document.getElementById('progress-bar').style.width = '0%';
+  document.getElementById('progress-pct').textContent = '0%';
+  document.getElementById('progress-message').textContent = '任务: ' + taskId;
+  document.getElementById('steps-container').innerHTML = ALL_STEPS.map(step => `
+    <div class="step-item flex items-center gap-3 text-sm" data-step="${step}">
+      <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
+      <span class="step-label text-gray-500">${getStepLabel(step)}</span>
+    </div>
+  `).join('');
+}
+
+function connectWS(taskId) {
+  if (ws) { ws.close(); ws = null; }
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto + '//' + location.host + '/ws/' + taskId);
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type !== 'progress') return;
+
+    const step = msg.step;
+    const pct = Math.round(msg.progress * 100);
+    document.getElementById('progress-bar').style.width = pct + '%';
+    document.getElementById('progress-pct').textContent = pct + '%';
+    document.getElementById('progress-message').textContent = msg.message;
+
+    const stepEl = document.querySelector(`.step-item[data-step="${step}"]`);
+    if (stepEl) {
+      const icon = stepEl.querySelector('.step-icon');
+      const label = stepEl.querySelector('.step-label');
+      if (msg.status === 'running') {
+        icon.textContent = '◉';
+        icon.className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-purple-900 text-purple-300 text-xs animate-pulse-dot';
+        label.className = 'step-label text-purple-300';
+      } else if (msg.status === 'completed') {
+        icon.textContent = '✓';
+        icon.className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-green-900 text-green-300 text-xs';
+        label.className = 'step-label text-green-400';
+      } else if (msg.status === 'failed') {
+        icon.textContent = '✗';
+        icon.className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-red-900 text-red-300 text-xs';
+        label.className = 'step-label text-red-400';
+      }
+    }
+
+    if (msg.status === 'running' && STEP_MAP[step] !== undefined) {
+      Object.entries(STEP_MAP).forEach(([s, idx]) => {
+        if (idx < STEP_MAP[step]) {
+          const el = document.querySelector(`.step-item[data-step="${s}"]`);
+          if (el) {
+            el.querySelector('.step-icon').textContent = '✓';
+            el.querySelector('.step-icon').className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-green-900 text-green-300 text-xs';
+            el.querySelector('.step-label').className = 'step-label text-green-400';
+          }
+        }
+      });
+    }
+
+    if (step === 'done' && msg.status === 'completed') {
+      showResult(msg.data && msg.data.final_video);
+      clearRunning();
+    }
+
+    if (step === 'error') {
+      clearRunning();
+    }
+  };
+
+  ws.onclose = (e) => {
+    ws = null;
+    if (isTaskRunning && e.code !== 1000) {
+      console.warn('WebSocket closed unexpectedly, code:', e.code, 'reason:', e.reason);
+    }
+  };
+  ws.onerror = (e) => {
+    console.error('WebSocket error:', e);
+    if (isTaskRunning) {
+      document.getElementById('progress-message').textContent = '⚠️ 实时连接断开，正在重试...';
+      setTimeout(() => {
+        if (isTaskRunning && !ws) {
+          connectWS(taskId);
+        }
+      }, 3000);
+    }
+  };
+}
+</script>
+
+</body>
+</html>

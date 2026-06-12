@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.working_dir/
+.workbuddy/
+.agnes_config/
+*.mp4
+*.png
+*.jpg
+*.jpeg
+.DS_Store
+*.egg-info/
+dist/
+build/
