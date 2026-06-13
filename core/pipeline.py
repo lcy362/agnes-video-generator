@@ -29,6 +29,7 @@ class VideoPipeline:
         self,
         api_key: str,
         task_id: str,
+        dir_name: str = None,
         chat_model: str = "agnes-2.0-flash",
         image_model: str = "agnes-image-2.1-flash",
         video_model: str = "agnes-video-v2.0",
@@ -37,9 +38,11 @@ class VideoPipeline:
     ):
         self.api_key = api_key
         self.task_id = task_id
-        self.task_manager = TaskManager(task_id)
+        self.dir_name = dir_name or task_id
+        self.task_manager = TaskManager(task_id, dir_name=self.dir_name)
         self.progress_callback = progress_callback
         self.shutdown_event = shutdown_event
+        self._stop_event = asyncio.Event()
 
         self.screenwriter = Screenwriter(api_key=api_key, model=chat_model)
         self.image_generator = ImageGeneratorAgnesAPI(api_key=api_key, model=image_model)
@@ -53,7 +56,13 @@ class VideoPipeline:
             await self.progress_callback(step, status, message, progress, data or {})
 
     def _is_shutdown(self) -> bool:
+        if self._stop_event.is_set():
+            return True
         return self.shutdown_event is not None and self.shutdown_event.is_set()
+
+    def stop(self):
+        """Request this pipeline to stop at the next checkpoint."""
+        self._stop_event.set()
 
     @property
     def state(self) -> TaskState:

@@ -140,6 +140,7 @@ agnes-video-generator/
 | GET | `/api/tasks` | 列出所有任务 |
 | GET | `/api/tasks/{id}` | 查询任务详情 |
 | POST | `/api/tasks/{id}/resume` | 续传中断任务 |
+| POST | `/api/tasks/{id}/stop` | 中断运行中的任务（可续传） |
 | WS | `/ws/{id}` | WebSocket 实时进度 |
 
 ## ⚠️ 使用须知
@@ -164,6 +165,7 @@ agnes-video-generator/
 - `[Startup]` — 启动时重置残留 running 任务
 - `[WS]` — WebSocket 客户端连接/断开
 - `[Resume]` — 续传任务开始，打印各步骤当前状态
+- `[Stop]` — 用户主动中断任务
 - `[Pipeline]` — 每个步骤的执行状态（SKIP 跳过 / RUNNING 执行）
 - `[TaskManager]` — 任务状态加载
 - `[EndFrame]` — 尾帧生成重试信息

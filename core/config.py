@@ -39,7 +39,3 @@ def set_api_key(key: str):
 
 def get_working_dir() -> str:
     return os.path.join(os.getcwd(), ".working_dir")
-
-
-def get_task_dir(task_id: str) -> str:
-    return os.path.join(get_working_dir(), task_id)

@@ -3,16 +3,17 @@ import logging
 import os
 from typing import Optional
 
-from core.config import get_task_dir
+from core.config import get_working_dir
 from models.task import TaskState, StepStatus, SceneTask
 
 logger = logging.getLogger(__name__)
 
 
 class TaskManager:
-    def __init__(self, task_id: str):
+    def __init__(self, task_id: str, dir_name: str = None):
         self.task_id = task_id
-        self.task_dir = get_task_dir(task_id)
+        self.dir_name = dir_name or task_id
+        self.task_dir = os.path.join(get_working_dir(), self.dir_name)
         self._task_file = os.path.join(self.task_dir, "task_state.json")
         self._state: Optional[TaskState] = None
 
@@ -75,7 +76,7 @@ class TaskManager:
         return os.path.exists(self._task_file)
 
     def list_tasks(self) -> list:
-        working_dir = os.path.dirname(self.task_dir)
+        working_dir = get_working_dir()
         if not os.path.exists(working_dir):
             return []
         tasks = []
@@ -87,6 +88,7 @@ class TaskManager:
                         data = json.load(f)
                     tasks.append({
                         "task_id": data.get("task_id", name),
+                        "dir_name": name,
                         "creative_name": data.get("creative_name", ""),
                         "status": data.get("status", "pending"),
                         "chaining_mode": data.get("chaining_mode", "none"),

@@ -154,7 +154,10 @@
   <div id="progress-panel" class="hidden bg-gray-900 rounded-2xl p-6 mt-6 border border-gray-800">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-purple-300">生成进度</h2>
-      <span id="progress-pct" class="text-sm text-gray-400">0%</span>
+      <div class="flex items-center gap-3">
+        <span id="progress-pct" class="text-sm text-gray-400">0%</span>
+        <button id="btn-stop" onclick="stopTask()" class="hidden text-xs px-3 py-1.5 bg-red-700 hover:bg-red-600 text-red-100 rounded-lg transition">中断任务</button>
+      </div>
     </div>
 
     <!-- Progress bar -->
@@ -217,6 +220,7 @@
 <script>
 // ── State ──
 let currentTaskId = null;
+let currentDirName = null;
 let ws = null;
 let isTaskRunning = false;
 let taskListTimer = null;
@@ -274,6 +278,7 @@ function clearRunning() {
   currentTaskId = null;
   document.getElementById('btn-submit').disabled = false;
   document.getElementById('btn-submit').textContent = '开始生成视频';
+  document.getElementById('btn-stop').classList.add('hidden');
 }
 
 async function autoReconnectRunningTask() {
@@ -283,7 +288,8 @@ async function autoReconnectRunningTask() {
     const running = (d.tasks || []).find(t => t.status === 'running');
     if (running) {
       setRunning(running.task_id);
-      showProgress(running.task_id);
+      currentDirName = running.dir_name || running.task_id;
+      showProgress(running.task_id, currentDirName);
       connectWS(running.task_id);
       restoreProgressFromTask(running.task_id);
     }
@@ -294,6 +300,7 @@ async function restoreProgressFromTask(taskId) {
   try {
     const r = await fetch('/api/tasks/' + taskId);
     const state = await r.json();
+    currentDirName = state.dir_name || taskId;
     const stepStatus = {
       'step_image_analysis': 'image_analysis',
       'step_story': 'story',
@@ -443,7 +450,8 @@ async function createTask() {
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || '创建失败');
     setRunning(d.task_id);
-    showProgress(currentTaskId);
+    currentDirName = d.dir_name || d.task_id;
+    showProgress(currentTaskId, currentDirName);
     connectWS(currentTaskId);
     showToast('任务已提交，请观察控制台日志（启动 server.py 的终端）耐心等待', 5000);
   } catch(e) {
@@ -471,15 +479,18 @@ async function loadTaskList() {
       const isRunning = t.status === 'running';
       const btnLabel = isCompleted ? '查看' : (isRunning ? '查看进度' : '续传');
       const btnAction = isCompleted ? `viewTask('${t.task_id}')` : (isRunning ? `viewRunningTask('${t.task_id}')` : `resumeTask('${t.task_id}')`);
+      const stopBtn = isRunning ? `<button onclick="stopTaskById('${t.task_id}')" class="text-xs px-3 py-1.5 bg-red-700 hover:bg-red-600 text-red-100 rounded-lg transition">中断</button>` : '';
       return `<div class="bg-gray-900 rounded-xl p-4 border border-gray-800 flex items-center justify-between">
         <div>
           <p class="text-sm font-medium">${t.creative_name || t.task_id}</p>
           <p class="text-xs text-gray-500 mt-1">${t.task_id} · ${t.chaining_mode || 'none'}${t.scene_count ? ' · ' + t.scene_count + '个场景' : ''}</p>
+          <p class="text-xs text-gray-600 mt-0.5">目录: <span class="font-mono">${t.dir_name || t.task_id}</span></p>
           ${t.idea ? `<p class="text-xs text-gray-600 mt-1 truncate max-w-xs">${t.idea}</p>` : ''}
         </div>
         <div class="flex items-center gap-3">
           <span class="text-xs ${statusColors[t.status] || 'text-gray-400'}">${statusLabels[t.status] || t.status}</span>
           <button onclick="${btnAction}" class="text-xs px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg transition">${btnLabel}</button>
+          ${stopBtn}
         </div>
       </div>`;
     }).join('');
@@ -500,7 +511,12 @@ async function viewTask(taskId) {
 
 async function viewRunningTask(taskId) {
   setRunning(taskId);
-  showProgress(taskId);
+  try {
+    const r = await fetch('/api/tasks/' + taskId);
+    const state = await r.json();
+    currentDirName = state.dir_name || taskId;
+  } catch(e) { currentDirName = taskId; }
+  showProgress(taskId, currentDirName);
   connectWS(taskId);
   restoreProgressFromTask(taskId);
 }
@@ -515,12 +531,45 @@ async function resumeTask(taskId) {
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || '续传失败');
     setRunning(taskId);
-    showProgress(taskId);
+    currentDirName = d.dir_name || taskId;
+    showProgress(taskId, currentDirName);
     connectWS(taskId);
     restoreProgressFromTask(taskId);
     showToast('续传已开始，请观察控制台日志（启动 server.py 的终端）耐心等待', 5000);
   } catch(e) {
     alert('续传失败: ' + e.message);
+  }
+}
+
+// ── Stop Task ──
+async function stopTask() {
+  if (!currentTaskId) return;
+  if (!confirm('确定要中断当前任务吗？中断后可到任务列表续传。')) return;
+  const btn = document.getElementById('btn-stop');
+  btn.disabled = true;
+  btn.textContent = '正在中断...';
+  try {
+    const r = await fetch('/api/tasks/' + currentTaskId + '/stop', { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.detail || '中断失败');
+    showToast('任务已中断，可在任务列表中续传', 4000);
+  } catch(e) {
+    alert('中断失败: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '中断任务';
+  }
+}
+
+async function stopTaskById(taskId) {
+  if (!confirm('确定要中断该任务吗？中断后可续传。')) return;
+  try {
+    const r = await fetch('/api/tasks/' + taskId + '/stop', { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.detail || '中断失败');
+    showToast('任务已中断', 3000);
+    loadTaskList();
+  } catch(e) {
+    alert('中断失败: ' + e.message);
   }
 }
 
@@ -555,6 +604,7 @@ function showTaskDetail(taskId, state) {
     <div class="space-y-2">
       <p class="text-green-400 font-medium">任务已完成</p>
       <p class="text-gray-500">任务ID: ${taskId}</p>
+      <p class="text-gray-500">目录: <code class="text-xs bg-gray-800 px-1 py-0.5 rounded font-mono">${state.dir_name || taskId}</code></p>
       <p class="text-gray-500">创意: ${(state.idea || '').substring(0, 100)}</p>
       <p class="text-gray-500">场景数: ${state.scene_count || 0}</p>
       <p class="text-gray-500">串联模式: ${state.chaining_mode || 'none'}</p>
@@ -578,12 +628,14 @@ function getStepLabel(step) {
 }
 
 // ── Progress ──
-function showProgress(taskId) {
+function showProgress(taskId, dirName) {
   document.getElementById('progress-panel').classList.remove('hidden');
   document.getElementById('result-area').classList.add('hidden');
+  document.getElementById('btn-stop').classList.remove('hidden');
   document.getElementById('progress-bar').style.width = '0%';
   document.getElementById('progress-pct').textContent = '0%';
-  document.getElementById('progress-message').innerHTML = '<span class="text-yellow-400">提示：请观察控制台日志（启动 server.py 的终端），耐心等待生成完成。关键操作均有日志输出，便于排查问题。</span><br><span class="text-gray-500">任务: ' + taskId + '</span>';
+  const dirInfo = dirName ? '<br><span class="text-gray-600 text-xs">目录: <span class="font-mono">' + dirName + '</span></span>' : '';
+  document.getElementById('progress-message').innerHTML = '<span class="text-yellow-400">提示：请观察控制台日志（启动 server.py 的终端），耐心等待生成完成。关键操作均有日志输出，便于排查问题。</span><br><span class="text-gray-500">任务: ' + taskId + '</span>' + dirInfo;
   document.getElementById('steps-container').innerHTML = ALL_STEPS.map(step => `
     <div class="step-item flex items-center gap-3 text-sm" data-step="${step}">
       <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>

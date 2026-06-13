@@ -5,14 +5,15 @@ import os
 import signal
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Dict
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
-from core.config import get_api_key, set_api_key, get_working_dir, get_task_dir
-from core.pipeline import VideoPipeline
+from core.config import get_api_key, set_api_key, get_working_dir
+from core.pipeline import VideoPipeline, PipelineShutdown
 from core.task_manager import TaskManager
 from models.task import TaskState, CreateTaskRequest, StepStatus
 
@@ -26,6 +27,15 @@ logging.getLogger("websockets").setLevel(logging.WARNING)
 active_connections: Dict[str, WebSocket] = {}
 active_pipelines: Dict[str, VideoPipeline] = {}
 shutdown_event = asyncio.Event()
+
+
+def _find_dir_name(task_id: str) -> str:
+    """Find the directory name for a task_id. Falls back to task_id for legacy tasks."""
+    tm = TaskManager("_")
+    for t in tm.list_tasks():
+        if t["task_id"] == task_id:
+            return t.get("dir_name", task_id)
+    return task_id
 
 
 @asynccontextmanager
@@ -126,7 +136,7 @@ async def list_tasks():
     tm = TaskManager("_")
     tasks = tm.list_tasks()
     for t in tasks:
-        task_tm = TaskManager(t["task_id"])
+        task_tm = TaskManager(t["task_id"], dir_name=t.get("dir_name"))
         state = task_tm.load()
         if state:
             t["final_video_file"] = state.final_video_file
@@ -137,16 +147,20 @@ async def list_tasks():
 
 @app.get("/api/tasks/{task_id}")
 async def get_task(task_id: str):
-    tm = TaskManager(task_id)
+    dir_name = _find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
     state = tm.load()
     if not state:
         raise HTTPException(status_code=404, detail="Task not found")
-    return state.model_dump()
+    data = state.model_dump()
+    data["dir_name"] = dir_name
+    return data
 
 
 @app.get("/api/video/{task_id}")
 async def serve_video(task_id: str):
-    task_dir = get_task_dir(task_id)
+    dir_name = _find_dir_name(task_id)
+    task_dir = os.path.join(get_working_dir(), dir_name)
     video_path = os.path.join(task_dir, "final_video.mp4")
     if not os.path.exists(video_path):
         raise HTTPException(status_code=404, detail="Video not found")
@@ -160,9 +174,15 @@ async def resume_task(task_id: str):
         raise HTTPException(status_code=400, detail="请先配置 API Key")
 
     if task_id in active_pipelines:
-        raise HTTPException(status_code=400, detail="Task is already running")
+        existing = active_pipelines[task_id]
+        if existing._stop_event.is_set():
+            logger.info(f"[Resume] Replacing stopped pipeline for task {task_id}")
+            del active_pipelines[task_id]
+        else:
+            raise HTTPException(status_code=400, detail="Task is already running")
 
-    tm = TaskManager(task_id)
+    dir_name = _find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
     state = tm.load()
     if not state:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -177,7 +197,7 @@ async def resume_task(task_id: str):
                 f"end_frame_gen={state.step_end_frame_generation}, "
                 f"video_gen={state.step_video_generation}, concat={state.step_concatenation}")
 
-    pipeline = VideoPipeline(api_key=api_key, task_id=task_id, shutdown_event=shutdown_event)
+    pipeline = VideoPipeline(api_key=api_key, task_id=task_id, dir_name=dir_name, shutdown_event=shutdown_event)
     active_pipelines[task_id] = pipeline
 
     if task_id in active_connections:
@@ -201,6 +221,25 @@ async def resume_task(task_id: str):
         pipeline.progress_callback = progress_callback
 
     asyncio.create_task(_run_pipeline(pipeline, state))
+    return {"ok": True, "task_id": task_id, "dir_name": dir_name}
+
+
+@app.post("/api/tasks/{task_id}/stop")
+async def stop_task(task_id: str):
+    if task_id not in active_pipelines:
+        raise HTTPException(status_code=400, detail="Task is not running")
+
+    pipeline = active_pipelines[task_id]
+    pipeline.stop()
+
+    dir_name = _find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    if state and state.status == StepStatus.RUNNING:
+        tm.update_state(status=StepStatus.PENDING)
+        logger.info(f"[Stop] Task {task_id} status -> pending")
+
+    logger.info(f"[Stop] Task {task_id} stop requested")
     return {"ok": True, "task_id": task_id}
 
 
@@ -224,6 +263,7 @@ async def create_task(
 
     task_id = uuid.uuid4().hex[:12]
     name = creative_name.strip() if creative_name else f"video_{task_id}"
+    dir_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_id}"
 
     state = TaskState(
         task_id=task_id,
@@ -244,11 +284,11 @@ async def create_task(
             f.write(await reference_image.read())
         state.reference_image = upload_path
 
-    pipeline = VideoPipeline(api_key=api_key, task_id=task_id, shutdown_event=shutdown_event)
+    pipeline = VideoPipeline(api_key=api_key, task_id=task_id, dir_name=dir_name, shutdown_event=shutdown_event)
     active_pipelines[task_id] = pipeline
 
     asyncio.create_task(_run_pipeline(pipeline, state))
-    return {"ok": True, "task_id": task_id}
+    return {"ok": True, "task_id": task_id, "dir_name": dir_name}
 
 
 async def _run_pipeline(pipeline: VideoPipeline, state: TaskState):
@@ -256,6 +296,8 @@ async def _run_pipeline(pipeline: VideoPipeline, state: TaskState):
         logger.info(f"[Pipeline] Starting run for task {pipeline.task_id}")
         await pipeline.run(state)
         logger.info(f"[Pipeline] Completed run for task {pipeline.task_id}")
+    except PipelineShutdown:
+        logger.info(f"[Pipeline] Task {pipeline.task_id} stopped by user")
     except Exception as e:
         logger.error(f"[Pipeline] Task {pipeline.task_id} failed: {e}", exc_info=True)
     finally:

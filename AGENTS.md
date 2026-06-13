@@ -56,6 +56,7 @@ agnes-video-generator/
 | `[Startup]` | 服务启动 | 重置残留 running 任务 |
 | `[WS]` | WebSocket | 客户端连接/断开 |
 | `[Resume]` | 续传任务 | 各步骤当前状态 |
+| `[Stop]` | 用户中断 | 任务中断请求 |
 | `[Pipeline]` | 流水线步骤 | SKIP / RUNNING / Completed / Shutdown |
 | `[TaskManager]` | 任务管理 | 任务加载 |
 | `[EndFrame]` | 尾帧生成 | 重试信息 |
