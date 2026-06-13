@@ -116,7 +116,7 @@ class VideoGeneratorAgnesAPI:
                     f"{BASE_URL}/images/generations",
                     headers=self.headers,
                     json=payload,
-                    timeout=120,
+                    timeout=(30, 120),
                 )
                 if resp.status_code == 429:
                     delay = 30 * (attempt + 1)
@@ -202,7 +202,7 @@ class VideoGeneratorAgnesAPI:
                     f"{BASE_URL}/videos",
                     headers=self.headers,
                     json=payload,
-                    timeout=120,
+                    timeout=(30, 120),
                 )
 
                 if resp.status_code == 200:

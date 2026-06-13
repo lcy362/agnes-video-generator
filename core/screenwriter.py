@@ -35,7 +35,7 @@ class Screenwriter:
                 "temperature": 0.7,
                 "max_tokens": 4096,
             },
-            timeout=None,
+            timeout=120,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -85,7 +85,7 @@ class Screenwriter:
                 "temperature": 0.7,
                 "max_tokens": 4096,
             },
-            timeout=None,
+            timeout=300,
         )
         resp.raise_for_status()
         data = resp.json()
