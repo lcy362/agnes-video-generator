@@ -1,6 +1,6 @@
-# 🎬 Agnes Video Generator — AI 视频生成工具
+# 🎬 Agnes Video Generator — ✨ 完全免费的 AI 视频生成工具
 
-> 基于 Agnes AI 的一键式 AI 视频生成器。输入文字创意，自动生成多场景 AI 视频。支持 text-to-video、image-to-video、keyframes 视频生成。
+> 🆓 完全免费的 AI 视频生成工具。基于 Agnes AI 免费模型，输入文字创意，自动生成多场景 AI 视频。支持 text-to-video、image-to-video、keyframes 视频生成。
 
 本项目基于 [ViMax](https://github.com/HKUDS/ViMax) 和 [vimax-agnes](https://github.com/easyeye163/vimax-agnes) 改造而来，将命令行 AI 视频生成工具升级为带 Web UI 的一站式视频生成器。
 
@@ -119,7 +119,7 @@ agnes-video-generator/
 |---|---|---|
 | 后端 | Python FastAPI | 异步 + WebSocket |
 | 前端 | HTML/CSS/JS + Tailwind CSS CDN | 零构建步骤 |
-| AI 模型 | Agnes AI API | agnes-2.0-flash / agnes-image-2.1-flash / agnes-video-v2.0 |
+| AI 模型 | Agnes AI API | agnes-2.0-flash / agnes-image-2.1-flash / agnes-video-v2.0（全部免费）|
 | 视频拼接 | moviepy | 与原项目一致 |
 
 ## 🎬 三种 AI 视频串联模式
@@ -205,6 +205,8 @@ agnes-video-generator/
 - [vimax-agnes](https://github.com/easyeye163/vimax-agnes) — 基于 ViMax 的 Agnes AI 适配实现
 
 感谢原作者的杰出工作！
+
+同时，特别感谢 [Agnes AI](https://platform.agnes-ai.com) 提供免费、高质量的 AI 模型 API（文本生成、图片生成、视频生成），让这个项目得以零成本运行。
 
 ## 反馈与贡献
 

@@ -1,6 +1,6 @@
-# 🎬 Agnes Video Generator — AI Video Generation Tool
+# 🎬 Agnes Video Generator — ✨ Completely Free AI Video Generation Tool
 
-> A one-click AI video generator powered by Agnes AI. Turn text ideas into multi-scene AI videos automatically. Supports text-to-video, image-to-video, and keyframes video generation.
+> 🆓 A completely free AI video generator powered by Agnes AI. Turn text ideas into multi-scene AI videos automatically. Supports text-to-video, image-to-video, and keyframes video generation.
 
 Built upon [ViMax](https://github.com/HKUDS/ViMax) and [vimax-agnes](https://github.com/easyeye163/vimax-agnes), this project upgrades the command-line AI video generation tool into an all-in-one video generator with a Web UI.
 
@@ -119,7 +119,7 @@ agnes-video-generator/
 |-------|--------|-------|
 | Backend | Python FastAPI | Async + WebSocket |
 | Frontend | HTML/CSS/JS + Tailwind CSS CDN | Zero build steps |
-| AI Models | Agnes AI API | agnes-2.0-flash / agnes-image-2.1-flash / agnes-video-v2.0 |
+| AI Models | Agnes AI API | agnes-2.0-flash / agnes-image-2.1-flash / agnes-video-v2.0 (all free) |
 | Video Concatenation | moviepy | Same as upstream project |
 
 ## 🎬 Three AI Video Chaining Modes
@@ -203,6 +203,8 @@ This project is built upon the following open-source projects:
 - [vimax-agnes](https://github.com/easyeye163/vimax-agnes) — Agnes AI adaptation based on ViMax
 
 Huge thanks to the original authors!
+
+Special thanks to [Agnes AI](https://platform.agnes-ai.com) for providing free, high-quality AI model APIs (text, image, video generation) — this project is able to run at zero cost thanks to their generosity.
 
 ## Feedback & Contributing
 
