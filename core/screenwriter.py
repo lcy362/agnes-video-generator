@@ -7,6 +7,8 @@ import time as _time
 import requests
 from typing import List
 
+from core.api.agnes_chat import AgnesChatAPI
+
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://apihub.agnes-ai.com/v1"
@@ -16,80 +18,24 @@ class Screenwriter:
     def __init__(self, api_key: str, model: str = "agnes-2.0-flash"):
         self.api_key = api_key
         self.model = model
+        self.chat_api = AgnesChatAPI(api_key=api_key, model=model)
+        # 保持旧 headers 供直接引用（兼容）
         self.headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
 
     def _chat(self, system_prompt: str, user_prompt: str) -> str:
-        logger.info(f"[Screenwriter] Calling chat API ({self.model}), prompt length: {len(user_prompt)} chars...")
-        resp = requests.post(
-            f"{BASE_URL}/chat/completions",
-            headers=self.headers,
-            json={
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "temperature": 0.7,
-                "max_tokens": 4096,
-            },
-            timeout=120,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
+        return self.chat_api.chat(system_prompt, user_prompt)
 
     def _chat_json(self, system_prompt: str, user_prompt: str) -> dict:
-        content = self._chat(system_prompt, user_prompt)
-        content = content.strip()
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1]
-            if content.endswith("```"):
-                content = content[:-3]
-        return json.loads(content)
+        return self.chat_api.chat_json(system_prompt, user_prompt)
 
     def _image_to_b64_uri(self, path: str) -> str:
-        with open(path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode("utf-8")
-        mime = mimetypes.guess_type(path)[0] or "image/png"
-        return f"data:{mime};base64,{b64}"
+        return self.chat_api._image_to_b64_uri(path)
 
     def _chat_multimodal(self, system_prompt: str, text_prompt: str, image_paths: List[str]) -> str:
-        messages = [{"role": "system", "content": system_prompt}]
-
-        user_content = [{"type": "text", "text": text_prompt}]
-        for img_path in image_paths:
-            if img_path.startswith(("http://", "https://")):
-                user_content.append({
-                    "type": "image_url",
-                    "image_url": {"url": img_path},
-                })
-            elif os.path.exists(img_path):
-                b64_uri = self._image_to_b64_uri(img_path)
-                user_content.append({
-                    "type": "image_url",
-                    "image_url": {"url": b64_uri},
-                })
-        messages.append({"role": "user", "content": user_content})
-
-        logger.info(f"[Screenwriter] Calling multimodal chat API ({self.model}), "
-                     f"{len(image_paths)} image(s), prompt: {len(text_prompt)} chars...")
-        resp = requests.post(
-            f"{BASE_URL}/chat/completions",
-            headers=self.headers,
-            json={
-                "model": self.model,
-                "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 4096,
-            },
-            timeout=300,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
+        return self.chat_api.chat_multimodal(system_prompt, text_prompt, image_paths)
 
     def describe_images(self, image_paths: List[str], cache_dir: str = "") -> str:
         if not image_paths:
@@ -425,3 +371,51 @@ Rules:
         shots = result.get("shots", [])
         logger.info(f"[Screenwriter] Designed {len(shots)} shots")
         return shots
+
+    def generate_scene_prompt_for_paragraph(self, text: str, style: str = "") -> str:
+        """为稿件段落生成英文视频场景 prompt（类型 3 专用）。
+
+        基于段落语义生成适合 AI 视频生成的英文视觉描述，
+        原文将直接作为旁白文本 + 字幕内容（D2 决策）。
+
+        Args:
+            text: 中文段落文本
+            style: 风格描述（可选）
+
+        Returns:
+            英文视频 prompt 字符串
+        """
+        system_prompt = """\
+You are a professional video director and visual prompt engineer. Given a \
+paragraph of Chinese text that will be narrated as voiceover, generate a \
+detailed ENGLISH visual description for AI video generation.
+
+Rules:
+- Write a detailed VISUAL DESCRIPTION in ENGLISH, 80-150 words.
+- Focus on: environment, lighting, colors, camera movement, atmosphere, mood.
+- Include cinematic details: lens type, depth of field, color grading, \
+weather, time of day.
+- Do NOT include any text overlays, titles, or subtitles in the description.
+- Do NOT describe the narration itself — describe what the VIEWER SEES.
+- The visual should complement and enhance the meaning of the text.
+- Describe MOTION and ACTION, not a static image.
+
+Output ONLY the visual prompt text, no JSON, no explanation.
+"""
+        style_block = f"\n<style>{style}</style>\n" if style else ""
+        user_prompt = f"""\
+<paragraph>
+{text}
+</paragraph>
+{style_block}
+Generate a detailed English visual prompt for this paragraph.
+"""
+        logger.info(f"[Screenwriter] Generating scene prompt for paragraph ({len(text)} chars)...")
+        prompt = self._chat(system_prompt, user_prompt).strip()
+        if prompt.startswith("```"):
+            prompt = prompt.split("\n", 1)[1]
+            if prompt.endswith("```"):
+                prompt = prompt[:-3]
+            prompt = prompt.strip()
+        logger.info(f"[Screenwriter] Scene prompt: {prompt[:100]}...")
+        return prompt
