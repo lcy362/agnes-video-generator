@@ -247,27 +247,141 @@ def auto_check(task_dir):
 
 ## 六、执行流程
 
-当用户说 **"执行大版本回归"** 时，主理人按以下步骤操作：
+当用户说 **"执行大版本回归"** 时，主理人执行以下操作：
+
+### 6.1 准备阶段
 
 ```
 1. git status 确认工作区干净，记录当前 commit hash
-2. bash start.sh & 启动服务（等待 8 秒 health check）
-3. 逐任务类型执行：
-   a. 简单视频: S1 → S2 → S3（通过 API 提交，等待完成，自动验证）
-   b. 创意视频: C1 → C2 → C3 → C4
-   c. 稿件视频: M1 → M2 → M3
-4. 每个任务完成后立即执行自动验证（F1-F3, F7, R1-R10, E1-E9）
-5. 收集所有验证结果，填充报告模板
-6. 输出完整报告，标注 ⚠️ 手动验证项，说明用户需如何验证
-7. 清理测试数据（保留自动化验证产物供用户排查）
+2. 确认 test_ref.png 和 test_end.png 存在（回归素材）
+3. bash start.sh & 启动服务（等待 8 秒 health check）
+4. 确保 .working_dir/ 中无残留的半成品任务干扰测试
+```
+
+### 6.2 并发执行（所有场景同时运行）
+
+使用 `scripts/regression_runner.py` 自动完成创建→轮询→验证→记录全流程。
+
+#### 并行度控制
+
+基于 Agnes API 调用量分析，采用**加权信号量**控制并发：
+
+| 场景类型 | 单场景权重 | 说明（每分钟 Agnes API 调用估算） |
+|---------|-----------|----------------------------------|
+| 简单 (S1-S3) | 1 | 1 次 submit + 轮询 ~4 次/分钟 |
+| 创意 (C1-C4) | 3-4 | Chat + N×Image + N×Video + 轮询 |
+| 稿件 (M1-M3) | 4-5 | 段落×Chat + 段落×Image + 轮询 |
+
+- **总权重上限 = 10**（Agnes API 上限 20 次/分钟，留 50% 余量）
+- 例：可同时运行 2 个创意(权重 8) + 2 个简单(权重 2)
+- 例：或 1 个稿件(权重 5) + 1 个创意(权重 4) + 1 个简单(权重 1)
+
+#### 执行命令
+
+```bash
+# 从头执行（默认：不自动启动服务）
+python scripts/regression_runner.py
+
+# 自动启动服务
+python scripts/regression_runner.py --auto-start
+
+# 断点续传（跳过报告中已完成的场景）
+python scripts/regression_runner.py --resume --auto-start
+
+# 快速验证：不运行新任务，只验证已有产物
+python scripts/regression_runner.py --quick
+```
+
+#### 每场景执行逻辑
+
+```
+对每个 pending 场景（并发执行）：
+
+  步骤 A — 加权信号量 acquire(weight)
+    等待直到当前总权重 + 场景权重 ≤ 10
+
+  步骤 B — 创建任务
+    通过 HTTP POST 提交场景参数，记录 task_id 和 dir_name
+
+  步骤 C — 异步轮询
+    每 20 秒 GET /api/tasks/{task_id} 检查 status
+    超时限制：简单 30min / 创意 120min / 稿件 60min
+
+  步骤 D — 产物验证
+    调用 validate_task() 检查 F1-F7, R1-R10
+    记录每项检查结果到 report
+
+  步骤 E — 释放信号量
+    release(weight)，让下一排队场景开始
+
+  步骤 F — 报告更新
+    将结果写入 docs/regression_report.json（增量写入）
+```
+
+### 6.3 报告与续传
+
+#### 增量报告
+
+测试过程中，`docs/regression_report.json` 在每个场景完成后即时更新。报告结构：
+
+```json
+{
+  "version": "2.0",
+  "git_commit": "abc1234 ...",
+  "scenarios": {
+    "S1": {
+      "status": "completed",
+      "result": {
+        "task_id": "...",
+        "dir_name": "...",
+        "duration_s": 123,
+        "checks": {
+          "F1_final_video_exists": true,
+          "F2_duration": 5.2,
+          "F4_has_audio_stream": false
+        }
+      },
+      "errors": []
+    }
+  },
+  "endpoints": {
+    "E1": { "status": "passed", "detail": "200" }
+  },
+  "summary": {
+    "total": 10, "completed": 3, "failed": 0, "running": 1
+  }
+}
+```
+
+#### 断点续传
+
+```bash
+# 中断后恢复：跳过已完成的场景，继续未完成的
+python scripts/regression_runner.py --resume
+
+# 恢复逻辑：
+#   - status=completed/skipped → 跳过，不重复执行
+#   - status=failed/pending    → 重新提交并运行
+#   - status=running           → 视为 pending（服务器已重启，旧任务失效）
+```
+
+### 6.4 验证阶段
+
+所有场景执行完毕后，脚本自动执行端点验证：
+
+```
+1. 运行 E1-E9 服务端点验证（并发执行 9 项检查）
+2. 汇总所有场景的自动验证结果
+3. 输出汇总日志（控制台）
+4. 报告写入 docs/regression_report.json
 ```
 
 ### 注意事项
 
-- 每个场景需**独立创建**新任务，确保不受前序任务状态影响
-- 创意视频生成耗时长（3-5 场景 × 5-10 分钟/场景），需要等待
-- 自动验证失败 → 立即输出错误信息 → 继续下一场景（不阻塞全流程）
-- 手动验证项在报告中汇总，不中断自动执行
+- **手动验证项**（音频正确性 F4、字幕可见性 F5、字幕文本匹配 F6）不自动检查，需用户按报告中的文件路径逐个播放确认
+- **断点续传不替换已完成的场景检查**——如果某个已完成场景的产物被误删，使用 `--quick` 模式重新验证
+- **Agnes API 调用上限**由加权信号量确保，但若服务器自身的重试逻辑产生额外调用，实际调用数可能略高于估算值
+- 自动验证失败不阻塞其他场景（每个场景独立报告）
 
 ---
 
@@ -291,53 +405,54 @@ def auto_check(task_dir):
 
 ---
 
-## 八、附录：验证脚本示例
+## 八、附录：回归测试脚本
 
-以下脚本供主理人在回归测试时调用：
+回归测试自动化脚本位于 `scripts/regression_runner.py`，包含：
 
-```python
-# auto_validate.py — 主理人执行自动验证
-import json, os
-from moviepy import VideoFileClip, AudioFileClip
+- **并发执行器**：asyncio 驱动，所有场景并发运行
+- **加权信号量**：基于 Agnes API 调用量的并行度控制
+- **增量报告器**：JSON 报告每场景完成后即时更新
+- **产物验证器**：验证 F1-F7、R1-R10 全部检查项
+- **端点验证器**：E1-E9 服务端点并发验证
+- **断点续传**：自动检测已有报告，跳过已完成场景
 
-def validate_task(task_dir: str) -> dict:
-    results = {}
+### 依赖
 
-    # F1: 最终视频
-    video = os.path.join(task_dir, "final_video.mp4")
-    results["F1_exists"] = os.path.exists(video)
-    results["F1_nonempty"] = os.path.getsize(video) > 0 if results["F1_exists"] else False
+脚本依赖项目已有的 `requests` 库，无需额外安装。视频元数据验证（F2/F3/F7）需要 `moviepy`，如不可用则自动跳过。
 
-    if results["F1_exists"]:
-        clip = VideoFileClip(video)
-        results["F2_duration"] = round(clip.duration, 2)
-        results["F3_width"] = clip.w
-        results["F3_height"] = clip.h
-        results["F7_duration_ok"] = clip.duration > 0
-        # F4: 检查音频流
-        results["F4_has_audio"] = clip.audio is not None
-        clip.close()
+### 并行度计算公式
 
-    # R1: task_state.json
-    ts = os.path.join(task_dir, "task_state.json")
-    if os.path.exists(ts):
-        with open(ts) as f:
-            data = json.load(f)
-        results["R1_valid"] = True
-        results["R2_task_type"] = data.get("task_type")
-        # 收集所有 step 状态
-        results["R3_steps"] = {k: v for k, v in data.items() if k.startswith("step_")}
-        results["R4_final_path"] = os.path.exists(data.get("final_video_file", ""))
-    else:
-        results["R1_valid"] = False
-
-    # R5: task.json
-    tj = os.path.join(task_dir, "task.json")
-    results["R5_task_json"] = os.path.exists(tj)
-
-    # R6: curl.sh
-    cs = os.path.join(task_dir, "curl.sh")
-    results["R6_curl_sh"] = os.path.exists(cs)
-
-    return results
 ```
+AGNES_RATE_LIMIT = 20  (次/分钟，平台限制)
+MAX_WEIGHT = AGNES_RATE_LIMIT / 2 = 10  (留 50% 余量)
+
+并发场景一例:
+  2 × Creative (权重 4+3=7) + 3 × Simple (权重 3) = 10 ✅
+  1 × Manuscript (权重 5) + 1 × Creative (权重 4) + 1 × Simple (1) = 10 ✅
+```
+
+---
+
+## 九、回归测试执行记录
+
+每次执行回归测试后，JSON 报告自动保存到 `docs/regression_report.json`。主理人应执行以下命令生成人类可读报告：
+
+```bash
+# 查看 JSON 报告
+cat docs/regression_report.json
+
+# 筛选失败项
+python -c "
+import json
+r = json.load(open('docs/regression_report.json'))
+for sid, sc in r['scenarios'].items():
+    if sc['status'] != 'completed':
+        print(f'{sid}: {sc[\"status\"]} - {sc.get(\"errors\", [])}')
+"
+```
+
+### 执行记录
+
+| 日期 | 版本 | 自动验证 | 手动验证 | 遗留问题 | 报告文件 |
+|------|------|---------|---------|---------|---------|
+| <!-- 在此追加 --> | | | | | |
