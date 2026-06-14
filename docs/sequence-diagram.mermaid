@@ -1,0 +1,145 @@
+sequenceDiagram
+    %% ── 类型 1: 简单视频生成 ──
+    actor User as 👤 User
+    participant FE as 🌐 Browser (Tab 1)
+    participant Server as ⚡ FastAPI Server
+    participant SP as SimpleVideoPipeline
+    participant API as AgnesVideoAPI
+    participant Agnes as Agnes Video API
+
+    rect rgb(40, 50, 80)
+        Note over User,Agnes: 类型 1: 简单视频生成 (Simple Video)
+
+        User->>FE: 输入 prompt + 选择模式 + 参数
+        FE->>Server: POST /api/tasks/simple<br/>{prompt, mode, duration, seed...}
+
+        Server->>SP: new SimpleVideoPipeline(api_key, task_id, dir_name)
+        Server->>SP: asyncio.create_task(pipeline.run(state))
+
+        SP->>SP: 创建 task_state.json (status=running)
+        SP->>FE: WS progress: init
+
+        alt mode = t2v (文生视频)
+            SP->>API: submit_video(prompt, refs=[])
+        else mode = i2v/ti2vid (图生视频)
+            SP->>API: submit_video(prompt, refs=[ref_image])
+        else mode = keyframes (关键帧)
+            SP->>API: submit_video(prompt, refs=[first_frame, end_frame])
+        end
+
+        API->>Agnes: POST /v1/videos (mode=t2v/ti2vid/keyframes)
+        Agnes-->>API: {video_id: "xxx"}
+        API-->>SP: video_id
+
+        SP->>SP: 保存 task.json (video_id)
+
+        loop 轮询 (每15s)
+            SP->>API: wait_for_video(video_id)
+            API->>Agnes: GET /agnesapi?video_id=xxx
+            Agnes-->>API: {status: "processing", progress: 45%}
+            SP->>FE: WS progress: video_gen (running, 45%)
+        end
+
+        Agnes-->>API: {status: "completed", video_url: "..."}
+        API-->>SP: VideoOutput(url)
+        SP->>SP: 下载视频 → final_video.mp4
+        SP->>SP: 更新 task_state.json (status=completed)
+        SP->>FE: WS progress: done (completed, 100%)
+        FE->>User: 显示视频预览 + 下载按钮
+    end
+
+    ---
+
+    %% ── 类型 2: 创意长视频生成 ──
+    rect rgb(60, 40, 80)
+        Note over User,Agnes: 类型 2: 创意长视频生成 (Creative Video, 增强)
+
+        User->>FE: 输入创意描述 + 配置音频
+        FE->>Server: POST /api/tasks/creative<br/>{idea, style, audio_config...}
+
+        Server->>SP: new CreativeVideoPipeline(...)
+        Server->>SP: asyncio.create_task(pipeline.run(state))
+
+        SP->>SP: Step 0: 图片分析 (如有参考图)
+        SP->>SP: Step 1: 故事生成 (Screenwriter.develop_story)
+        SP->>SP: Step 2: 角色参考图 (Screenwriter → AgnesImageAPI)
+        SP->>SP: Step 3: 脚本编写 (Screenwriter.write_script + narration)
+        SP->>SP: Step 3.5: 尾帧提示词 (keyframes 模式)
+        SP->>SP: Step 3.6: 预生成尾帧 (AgnesImageAPI)
+        SP->>SP: Step 4: 视频生成 (AgnesVideoAPI × N scenes)
+
+        Note over SP: === 新增：音频字幕步骤 ===
+        SP->>SP: Step 5: 音频+字幕合成
+
+        loop 每个场景 scene_i
+            SP->>TTSEngine: EdgeTTSEngine.generate(narration_text[i])
+            TTSEngine-->>SP: (audio_path, sub_maker with cues)
+
+            SP->>SubtitleGen: SubtitleGenerator.cues_to_srt(cues)
+            SubtitleGen-->>SP: subtitle.srt
+
+            SP->>SubtitleGen: overlay_subtitles_to_video(video_path, srt, style)
+            SubtitleGen-->>SP: scene_i_with_subtitle.mp4
+
+            SP->>Concatenator: 合成 scene_i 的音频+视频
+            Concatenator-->>SP: scene_i_final.mp4
+        end
+
+        SP->>SP: Step 6: 视频拼接
+        SP->>Concatenator: concat_with_audio(scene_files)
+        Concatenator-->>SP: final_video.mp4
+
+        SP->>FE: WS progress: done
+        FE->>User: 显示视频预览
+    end
+
+    ---
+
+    %% ── 类型 3: 稿件长视频生成 ──
+    rect rgb(40, 70, 70)
+        Note over User,Agnes: 类型 3: 稿件长视频生成 (Manuscript Video)
+
+        User->>FE: 输入长文本 + 配置音频
+        FE->>Server: POST /api/tasks/manuscript<br/>{manuscript_text, audio_config...}
+
+        Server->>MP: new ManuscriptVideoPipeline(...)
+        Server->>MP: asyncio.create_task(pipeline.run(state))
+
+        MP->>MP: Step 1: 文本预处理
+        Note over MP: 按换行符拆分为 N 个段落
+
+        loop 每个段落 para_i
+            MP->>Screenwriter: generate_scene_prompt(para_i.text)
+            Screenwriter-->>MP: scene_prompt_i
+            MP->>MP: 存储 scene_prompt 到 state
+        end
+
+        MP->>MP: Step 2: 场景聚类判断
+        Note over MP: 相邻段落 scene_prompt 语义相似 → 同场景
+
+        loop 每个段落/场景组
+            alt 同场景连续段落
+                MP->>API: submit_video(keyframes, [first, end])
+            else 独立场景
+                MP->>API: submit_video(t2v, prompt)
+            end
+            API-->>MP: video_id
+            MP->>API: wait_for_video(video_id)
+            API-->>MP: video_file
+        end
+
+        Note over MP: Step 3: 音频+字幕合成
+        loop 每个段落 para_i
+            MP->>TTSEngine: EdgeTTSEngine.generate(para_i.text)
+            TTSEngine-->>MP: (audio_path, sub_maker)
+            MP->>SubtitleGen: cues_to_srt → overlay
+            SubtitleGen-->>MP: para_i_final.mp4
+        end
+
+        MP->>MP: Step 4: 拼接
+        MP->>Concatenator: concat_with_audio(all_paras)
+        Concatenator-->>MP: final_video.mp4
+
+        MP->>FE: WS progress: done
+        FE->>User: 显示视频预览
+    end
