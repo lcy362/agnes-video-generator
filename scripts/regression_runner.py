@@ -46,6 +46,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORKING_DIR = os.path.join(PROJECT_ROOT, ".working_dir")
 UPLOAD_DIR = os.path.join(WORKING_DIR, "uploads")
 REPORT_PATH = os.path.join(PROJECT_ROOT, "docs", "regression_report.json")
+REPORT_MD_PATH = os.path.join(PROJECT_ROOT, "docs", "regression_report.md")
 SERVER_URL = "http://localhost:8765"
 SERVER_LOG = os.path.join(PROJECT_ROOT, ".regression_server.log")
 TEST_REF_IMAGE = os.path.join(PROJECT_ROOT, "test_ref.png")
@@ -300,7 +301,7 @@ class ReportManager:
         s["failed"] = sum(1 for x in sv if x["status"] == "failed")
         s["skipped"] = sum(1 for x in sv if x["status"] == "skipped")
         s["running"] = sum(1 for x in sv if x["status"] == "running")
-        s["pending"] = sum(1 for x in sv if x["status"] == "pending")
+        s["pending"] = sum(1 for x in sv if x["status"] in ("pending", "submitted"))
 
         tc = pc = 0
         for x in sv:
@@ -322,7 +323,8 @@ class ReportManager:
             json.dump(self.data, f, ensure_ascii=False, indent=2)
 
     def should_run(self, id_: str) -> bool:
-        return self.data["scenarios"][id_]["status"] not in ("completed", "skipped", "running")
+        st = self.data["scenarios"][id_]["status"]
+        return st not in ("completed", "skipped")
 
     def print_summary(self):
         s = self.data["summary"]
@@ -332,6 +334,166 @@ class ReportManager:
                      f"运行中: {s['running']}")
         logger.info(f"  检查项: {s['passed_checks']}/{s['total_checks']} 通过")
         logger.info("=" * 56)
+
+    def generate_md_report(self, report_md_path: str):
+        d = self.data
+        s = d["summary"]
+        sc = d["scenarios"]
+        ep = d["endpoints"]
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+        icon = lambda st: {"completed": "✅", "failed": "❌", "skipped": "⏭️",
+                           "running": "🔄", "pending": "⏳", "submitted": "⏳"}.get(st, "❓")
+
+        lines = []
+        lines.append(f"# Agnes Video Generator v2.0 — 大版本回归测试报告")
+        lines.append(f"")
+        lines.append(f"| 元数据 | 值 |")
+        lines.append(f"|--------|-----|")
+        lines.append(f"| 日期 | {now} |")
+        lines.append(f"| 版本 | {d.get('git_commit', 'unknown')} |")
+        lines.append(f"| 报告版本 | {d.get('version', '?')} |")
+        lines.append(f"| 自动验证 | {s['passed_checks']}/{s['total_checks']} 通过 |")
+        lines.append(f"")
+        ep_pass = sum(1 for e in ep.values() if e["status"] == "passed")
+        ep_all = len(ep)
+        lines.append(f"## 概览")
+        lines.append(f"")
+        lines.append(f"| 状态 | 数量 |")
+        lines.append(f"|------|------|")
+        lines.append(f"| 总计 | {s['total']} |")
+        lines.append(f"| ✅ 完成 | {s['completed']} |")
+        lines.append(f"| ❌ 失败 | {s['failed']} |")
+        lines.append(f"| ⏭️ 跳过 | {s['skipped']} |")
+        lines.append(f"| 🔄 运行中 | {s['running']} |")
+        lines.append(f"| ⏳ 待处理 | {s['pending']} |")
+        lines.append(f"")
+        lines.append(f"端点验证: {ep_pass}/{ep_all} ✅")
+        lines.append(f"")
+
+        for type_label, type_key, type_ids in [
+            ("简单视频 (Simple)", "simple", ["S1", "S2", "S3"]),
+            ("创意视频 (Creative)", "creative", ["C1", "C2", "C3", "C4"]),
+            ("稿件视频 (Manuscript)", "manuscript", ["M1", "M2"]),
+        ]:
+            lines.append(f"---")
+            lines.append(f"")
+            lines.append(f"## {type_label}")
+            lines.append(f"")
+            for sid in type_ids:
+                sdata = sc.get(sid)
+                if not sdata:
+                    continue
+                st = sdata["status"]
+                chk = (sdata.get("result") or {}).get("checks") or {}
+                errs = sdata.get("errors") or []
+                duration = (sdata.get("result") or {}).get("duration_s", "?")
+                tag = icon(st)
+                label = sdata.get("label", sid)
+                if st == "completed":
+                    fail_checks = [k for k, v in chk.items()
+                                   if v is False and not any(k.endswith(x) for x in
+                                      ("_width", "_height", "_duration", "_count", "_entries", "F2_duration"))]
+                    if not fail_checks:
+                        lines.append(f"### {sid} {label} — {tag} 通过 ({duration}s)")
+                    else:
+                        lines.append(f"### {sid} {label} — ⚠️ 通过但有失败检查 ({duration}s)")
+                else:
+                    lines.append(f"### {sid} {label} — {tag} {st}")
+
+            # Table
+            lines.append(f"")
+            lines.append(f"| 检查项 | " + " | ".join(type_ids) + " |")
+            lines.append(f"|" + "|".join(["---" for _ in range(len(type_ids) + 1)]) + "|")
+
+            all_check_names = set()
+            for sid in type_ids:
+                sdata = sc.get(sid)
+                chk = (sdata.get("result") or {}).get("checks") or {} if sdata else {}
+                all_check_names.update(chk.keys())
+
+            sort_key = lambda n: (0 if n.startswith("F") else 1 if n.startswith("R") else 2, n)
+            for cname in sorted(all_check_names, key=sort_key):
+                if cname.endswith(("_width", "_height", "_duration", "_count", "_entries", "F2_duration")):
+                    continue
+                row = [cname]
+                for sid in type_ids:
+                    sdata = sc.get(sid)
+                    chk = (sdata.get("result") or {}).get("checks") or {} if sdata else {}
+                    val = chk.get(cname, "—")
+                    if val is True:
+                        row.append("✅")
+                    elif val is False:
+                        row.append("❌")
+                    elif val == "N/A":
+                        row.append("N/A")
+                    elif val == "skip":
+                        row.append("⏭️")
+                    elif val and cname.startswith("F2_duration"):
+                        row.append(f"{val}s")
+                    else:
+                        row.append(str(val) if val else "—")
+                lines.append("| " + " | ".join(row) + " |")
+            lines.append(f"")
+
+        # Endpoint results
+        lines.append(f"---")
+        lines.append(f"")
+        lines.append(f"## 端点验证 (E1-E9)")
+        lines.append(f"")
+        lines.append(f"| 端点 | 状态 | 详情 |")
+        lines.append(f"|------|------|------|")
+        for eid in sorted(ep.keys()):
+            e = ep[eid]
+            tag = "✅" if e["status"] == "passed" else "❌"
+            lines.append(f"| {eid} | {tag} | {e.get('detail', '')} |")
+        lines.append(f"")
+
+        # Manual verification section
+        lines.append(f"---")
+        lines.append(f"")
+        lines.append(f"## 需手动验证")
+        lines.append(f"")
+        manual_tasks = []
+        for sid, sdata in sc.items():
+            if sdata["status"] != "completed":
+                continue
+            chk = (sdata.get("result") or {}).get("checks") or {}
+            if "F4_has_audio_stream" in chk:
+                chk_val = chk["F4_has_audio_stream"]
+            else:
+                chk_val = "N/A"
+            dir_name = (sdata.get("result") or {}).get("dir_name", "?")
+            if chk_val is True or chk_val == "N/A":
+                continue
+            manual_tasks.append((sid, sdata.get("label", ""), dir_name))
+        if manual_tasks:
+            lines.append(f"以下场景需要播放视频确认音频/字幕正确性：")
+            lines.append(f"")
+            for sid, label, dname in manual_tasks:
+                lines.append(f"- **{sid}** {label}: `.working_dir/{dname}/final_video.mp4`")
+        else:
+            lines.append(f"无待手动验证项（所有音频检查已通过或标记为 N/A）。")
+
+        # Error summary
+        lines.append(f"")
+        lines.append(f"## 错误汇总")
+        lines.append(f"")
+        has_errors = False
+        for sid, sdata in sorted(sc.items()):
+            errs = sdata.get("errors") or []
+            if errs:
+                has_errors = True
+                lines.append(f"- **{sid}** ({sdata.get('label', '')}): {errs[0]}")
+        if not has_errors:
+            lines.append(f"无错误。")
+        lines.append(f"")
+
+        content = "\n".join(lines)
+        os.makedirs(os.path.dirname(report_md_path), exist_ok=True)
+        with open(report_md_path, "w") as f:
+            f.write(content)
+        logger.info(f"MD 报告: {report_md_path}")
 
 
 # ═══════════════════════════════════════════════════
@@ -586,10 +748,21 @@ async def run_scenario(scenario: ScenarioConfig,
         return
 
     try:
-        submit_result = await submit_task(scenario)
-        task_id = submit_result["task_id"]
-        dir_name = submit_result.get("dir_name", task_id)
-        logger.info(f"[{scenario.id}] 提交 → {task_id[:12]}")
+        # Check if this scenario was already submitted (resume from crash)
+        existing = report.data["scenarios"].get(scenario.id, {}).get("result")
+        task_id = None
+        dir_name = None
+        if existing and existing.get("task_id"):
+            task_id = existing["task_id"]
+            dir_name = existing.get("dir_name", task_id)
+            logger.info(f"[{scenario.id}] 续传已有任务 {task_id[:12]}")
+        else:
+            submit_result = await submit_task(scenario)
+            task_id = submit_result["task_id"]
+            dir_name = submit_result.get("dir_name", task_id)
+            report.update_scenario(scenario.id, "submitted",
+                                   result={"task_id": task_id, "dir_name": dir_name})
+            logger.info(f"[{scenario.id}] 提交 → {task_id[:12]}")
 
         final_status = None
         deadline = time.monotonic() + scenario.timeout
@@ -697,7 +870,7 @@ async def verify_endpoints(report: ReportManager):
 
     await asyncio.gather(
         check("E1", "GET / → 200 + index.html",
-              lambda: _200("/", "simple-video")),
+              lambda: _200("/", "Agnes Video Generator")),
         check("E2", "GET /api/config → 200",
               lambda: _200("/api/config")),
         check("E3", "POST /api/tasks/simple → ok",
@@ -803,8 +976,9 @@ async def main(resume: bool = False, auto_start: bool = False, quick: bool = Fal
             except Exception as e:
                 report.update_scenario(sc.id, "failed", errors=[str(e)])
         await verify_endpoints(report)
-        report.print_summary()
         report._save()
+        report.generate_md_report(REPORT_MD_PATH)
+        report.print_summary()
         return 0
 
     pending = [sc for sc in SCENARIO_DEFS if report.should_run(sc.id)]
@@ -823,10 +997,12 @@ async def main(resume: bool = False, auto_start: bool = False, quick: bool = Fal
 
     await verify_endpoints(report)
     report._save()
+    report.generate_md_report(REPORT_MD_PATH)
 
     passed = report.data["summary"]["failed"] == 0
     report.print_summary()
-    logger.info(f"报告: {REPORT_PATH}")
+    logger.info(f"JSON 报告: {REPORT_PATH}")
+    logger.info(f"MD  报告: {REPORT_MD_PATH}")
     return 0 if passed else 1
 
 

@@ -12,7 +12,9 @@ Steps:
 import asyncio
 import json
 import logging
+import math
 import os
+import re
 import subprocess
 from typing import Callable, List, Optional
 
@@ -24,6 +26,20 @@ from core.compositor.concatenator import VideoConcatenator
 from core.pipelines import BasePipeline, PipelineShutdown
 from core.screenwriter import Screenwriter
 from models.task import CreativeVideoTask, SceneTask, StepStatus
+
+_CHARS_PER_SEC = 4.0
+_SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[。！？.!?])")
+
+
+def _trim_to_sentence(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    candidate = text[:max_chars]
+    # find the last sentence boundary within the valid prefix
+    matches = list(_SENTENCE_BOUNDARY_RE.finditer(candidate))
+    if matches and matches[-1].end() > max_chars * 0.4:
+        return text[: matches[-1].end()]
+    return candidate[:max_chars]
 
 logger = logging.getLogger(__name__)
 
@@ -1042,6 +1058,11 @@ class CreativeVideoPipeline(BasePipeline):
             count = base + (1 if i < rem else 0)
             narrations.append("\n".join(paragraphs[idx : idx + count]))
             idx += count
+
+        # Trim each narration to fit within video_duration * 4 chars/sec speaking rate
+        max_chars = max(int(self._state.video_duration * _CHARS_PER_SEC), 20)
+        narrations = [_trim_to_sentence(n, max_chars) for n in narrations]
+
         self._state.narrations = narrations
         self.task_manager.update_state(narrations=narrations)
 

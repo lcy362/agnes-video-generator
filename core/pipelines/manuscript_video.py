@@ -6,6 +6,7 @@
 import asyncio
 import json
 import logging
+import math
 import os
 import re
 from typing import Callable, List, Optional, Tuple
@@ -480,9 +481,14 @@ class ManuscriptVideoPipeline(BasePipeline):
                     0.15 + 0.45 * (i / max(total, 1)),
                 )
 
+                para_duration = max(int(math.ceil(len(para.text) / _CHARS_PER_SEC)), 3)
+                logger.info(
+                    "[Manuscript] video: paragraph %d estimated duration %.1fs (chars=%d)",
+                    para.index, para_duration, len(para.text),
+                )
                 video_id = await self.video_api.submit_video(
                     prompt=para.scene_prompt,
-                    duration=self._state.video_duration,
+                    duration=para_duration,
                     width=self._state.video_width,
                     height=self._state.video_height,
                 )

@@ -375,7 +375,8 @@ python scripts/regression_runner.py --resume
 1. 运行 E1-E9 服务端点验证（并发执行 9 项检查）
 2. 汇总所有场景的自动验证结果
 3. 输出汇总日志（控制台）
-4. 报告写入 docs/regression_report.json
+4. JSON 原始记录写入 docs/regression_report.json
+5. MD 可读报告写入 docs/regression_report.md
 ```
 
 ### 注意事项
@@ -437,11 +438,21 @@ MAX_WEIGHT = AGNES_RATE_LIMIT / 2 = 10  (留 50% 余量)
 
 ## 九、回归测试执行记录
 
-每次执行回归测试后，JSON 报告自动保存到 `docs/regression_report.json`。主理人应执行以下命令生成人类可读报告：
+每次执行回归测试后，输出两个报告文件：
+
+| 文件 | 说明 |
+|------|------|
+| `docs/regression_report.json` | JSON 原始数据（机器可读，用于断点续传和 CI） |
+| `docs/regression_report.md` | Markdown 可读报告（人类可读，可直接用于 PR/评审） |
+
+常用命令：
 
 ```bash
-# 查看 JSON 报告
+# 查看 JSON 原始记录
 cat docs/regression_report.json
+
+# 查看 MD 可读报告
+cat docs/regression_report.md
 
 # 筛选失败项
 python -c "
