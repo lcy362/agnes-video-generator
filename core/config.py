@@ -5,9 +5,12 @@ core/config.py — Agnes Video Generator v2.0 配置模块
 """
 
 import json
+import logging
 import os
 
 from models.task import AudioConfig, SubtitleStyle
+
+logger = logging.getLogger(__name__)
 
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".agnes_config")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
@@ -24,13 +27,25 @@ def font_dir() -> str:
 # 默认中文字体文件名（需位于 resource/fonts/ 下）
 DEFAULT_CHINESE_FONT = "STHeitiMedium.ttc"
 
+# 不支持 CJK 字符的常见字体名（用于向后兼容旧任务）
+# 这些字体在 moviepy/pillow TextClip 中无法正确渲染中文，
+# 检测到后自动回退到 DEFAULT_CHINESE_FONT。
+_NON_CJK_FONTS = frozenset({
+    "arial", "arial bold", "arial italic", "arial black",
+    "helvetica", "times", "times new roman", "courier",
+    "courier new", "verdana", "tahoma", "georgia", "trebuchet ms",
+    "impact", "comic sans ms", "lucida console",
+})
+
 
 def resolve_font_path(font: str) -> str:
     """将字体名称解析为 moviepy TextClip 可用的路径。
 
-    如果 font 是绝对路径或系统字体名称（不含 . 且不包含路径分隔符），直接返回。
-    如果 font 是一个文件名（含扩展名），则在项目 resource/fonts/ 目录下查找。
-    找不到时回退到系统字体名称。
+    优先级：
+    1. 绝对路径且文件存在 → 直接返回
+    2. 文件名（含扩展名）→ 在 resource/fonts/ 目录下查找
+    3. 已知的非 CJK 字体名 → 回退到 DEFAULT_CHINESE_FONT（兼容旧任务）
+    4. 其他系统字体名 → 直接返回
     """
     # 已经是绝对路径，直接返回
     if os.path.isabs(font) and os.path.exists(font):
@@ -41,6 +56,16 @@ def resolve_font_path(font: str) -> str:
         candidate = os.path.join(font_dir(), font)
         if os.path.exists(candidate):
             return candidate
+
+    # 检查是否为已知的非 CJK 字体（向后兼容：旧任务的 font 可能仍为 "Arial"）
+    if font.strip().lower() in _NON_CJK_FONTS:
+        fallback = os.path.join(font_dir(), DEFAULT_CHINESE_FONT)
+        if os.path.exists(fallback):
+            logger.warning(
+                f"Font '{font}' does not support CJK characters, "
+                f"falling back to {DEFAULT_CHINESE_FONT}"
+            )
+            return fallback
 
     # 当作系统字体名称返回
     return font
