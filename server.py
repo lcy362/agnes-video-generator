@@ -26,7 +26,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, F
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
-from core.config import get_api_key, set_api_key, get_working_dir, AVAILABLE_VOICES, DURATION_FRAME_MAP
+from core.config import get_api_key, set_api_key, delete_api_key, get_api_key_source, get_working_dir, AVAILABLE_VOICES, DURATION_FRAME_MAP
 from core.pipelines import (
     BasePipeline,
     PipelineShutdown,
@@ -199,13 +199,31 @@ async def root():
 @app.get("/api/config")
 async def get_config():
     key = get_api_key()
-    data = {"api_key": key[:8] + "..." if key else ""}
+    source = get_api_key_source()
+    data = {
+        "api_key": key[:8] + "..." if key else "",
+        "source": source,
+        "can_clear": source == "config",
+    }
     return data
 
 
 @app.post("/api/config")
 async def save_config(api_key: str = Form(...)):
     set_api_key(api_key)
+    return {"ok": True}
+
+
+@app.delete("/api/config")
+async def clear_config():
+    """Delete the API key from the config file."""
+    source = get_api_key_source()
+    if source == "env":
+        raise HTTPException(
+            status_code=400,
+            detail="API Key 来自环境变量，无法从界面清除",
+        )
+    delete_api_key()
     return {"ok": True}
 
 
