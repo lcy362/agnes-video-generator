@@ -1,0 +1,361 @@
+classDiagram
+    %% ═══════════════════════════════════════════
+    %% 枚举
+    %% ═══════════════════════════════════════════
+    class TaskType {
+        <<enumeration>>
+        SIMPLE
+        CREATIVE
+        MANUSCRIPT
+    }
+    class StepStatus {
+        <<enumeration>>
+        PENDING
+        RUNNING
+        COMPLETED
+        FAILED
+    }
+    class VideoMode {
+        <<enumeration>>
+        t2v
+        i2v
+        ti2vid
+        keyframes
+    }
+
+    %% ═══════════════════════════════════════════
+    %% 配置类
+    %% ═══════════════════════════════════════════
+    class SubtitleStyle {
+        +font: str = "Arial"
+        +color: str = "white"
+        +position: tuple = (center, bottom-80)
+        +fontsize: int = 48
+        +stroke_color: str = "black"
+        +stroke_width: int = 2
+        +bg_color: Optional[str] = "black@0.5"
+    }
+    class AudioConfig {
+        +enabled: bool = True
+        +voice: str = "zh-CN-XiaoxiaoNeural"
+        +rate: str = "+0%"
+        +subtitle_style: SubtitleStyle
+    }
+
+    %% ═══════════════════════════════════════════
+    %% 数据模型 — 任务
+    %% ═══════════════════════════════════════════
+    class BaseTaskState {
+        <<abstract>>
+        +task_id: str
+        +creative_name: str
+        +task_type: TaskType
+        +status: StepStatus
+        +video_width: int
+        +video_height: int
+        +final_video_file: str
+    }
+
+    class SimpleVideoTask {
+        +task_type: TaskType = SIMPLE
+        +prompt: str
+        +mode: VideoMode
+        +reference_image: str
+        +end_frame_image: str
+        +duration: int
+        +seed: Optional[int]
+        +negative_prompt: Optional[str]
+        +video_id: str
+        +status: StepStatus
+    }
+
+    class CreativeVideoTask {
+        +task_type: TaskType = CREATIVE
+        +idea: str
+        +user_requirement: str
+        +style: str
+        +chaining_mode: str
+        +video_duration: int
+        +reference_image: str
+        +end_frame_images: List[str]
+        +use_custom_end_frames: bool
+        +generate_end_frames_from_ref: bool
+        +step_story: StepStatus
+        +story_file: str
+        +step_character_ref: StepStatus
+        +character_ref_prompt: str
+        +character_ref_file: str
+        +step_script: StepStatus
+        +script_file: str
+        +scene_count: int
+        +scenes: List~SceneTask~
+        +step_end_frame_prompts: StepStatus
+        +end_frame_prompts_file: str
+        +step_image_analysis: StepStatus
+        +image_analysis_file: str
+        +step_end_frame_generation: StepStatus
+        +pregenerated_end_frames: dict
+        +step_video_generation: StepStatus
+        +step_audio_subtitle: StepStatus
+        +step_concatenation: StepStatus
+        +audio_config: AudioConfig
+        +narrations: List[str]
+        +all_scenes_completed(): bool
+        +all_videos_completed(): bool
+        +get_pending_scenes(): List~SceneTask~
+        +get_pending_videos(): List~SceneTask~
+    }
+
+    class ManuscriptVideoTask {
+        +task_type: TaskType = MANUSCRIPT
+        +manuscript_text: str
+        +paragraphs: List~ManuscriptParagraph~
+        +audio_config: AudioConfig
+        +video_duration: int
+        +step_split: StepStatus
+        +step_scene_prompts: StepStatus
+        +step_video_generation: StepStatus
+        +step_audio_subtitle: StepStatus
+        +step_concatenation: StepStatus
+    }
+
+    class ManuscriptParagraph {
+        +index: int
+        +text: str
+        +scene_prompt: str
+        +same_scene_as_prev: bool
+        +video_file: str
+        +narration_audio: str
+        +subtitle_srt: str
+        +final_clip: str
+    }
+
+    class SceneTask {
+        +index: int
+        +status: StepStatus
+        +end_frame_prompt: str
+        +end_frame_file: str
+        +video_id: str
+        +video_status: StepStatus
+        +video_file: str
+        +narration_text: str
+        +narration_audio: str
+        +subtitle_srt: str
+        +final_clip: str
+    }
+
+    BaseTaskState <|-- SimpleVideoTask
+    BaseTaskState <|-- CreativeVideoTask
+    BaseTaskState <|-- ManuscriptVideoTask
+    CreativeVideoTask *-- SceneTask : scenes[]
+    ManuscriptVideoTask *-- ManuscriptParagraph : paragraphs[]
+    CreativeVideoTask *-- AudioConfig : audio_config
+    ManuscriptVideoTask *-- AudioConfig : audio_config
+    AudioConfig *-- SubtitleStyle : subtitle_style
+
+    %% ═══════════════════════════════════════════
+    %% API 层
+    %% ═══════════════════════════════════════════
+    class AgnesImageAPI {
+        -api_key: str
+        -model: str
+        -headers: dict
+        +generate_single_image(prompt, reference_image_paths, size) ImageOutput
+        -_path_to_b64(path) str
+        -_resolve_image_ref(ref) str
+    }
+    class ImageOutput {
+        +fmt: str
+        +ext: str
+        +data: str
+        +save(path) None
+    }
+
+    class AgnesVideoAPI {
+        -api_key: str
+        -model: str
+        -headers: dict
+        -shutdown_event: Event
+        +generate_single_video(prompt, refs, duration, width, height, seed, neg_prompt) VideoOutput
+        +submit_video(prompt, refs, duration, width, height, seed, neg_prompt) str
+        +wait_for_video(video_id, progress_callback) VideoOutput
+        -_poll_task(video_id) dict
+        -_submit_with_retry(payload, mode_desc) str
+        -_get_frame_config(duration) tuple
+        -_resolve_image_ref(ref) str
+        -_upload_image_to_url(path) str
+    }
+    class VideoOutput {
+        +fmt: str
+        +ext: str
+        +data: str
+        +save(path) None
+    }
+
+    class AgnesChatAPI {
+        -api_key: str
+        -model: str
+        -headers: dict
+        +chat(system_prompt, user_prompt) str
+        +chat_json(system_prompt, user_prompt) dict
+        +chat_multimodal(system_prompt, text_prompt, image_paths) str
+        -_image_to_b64_uri(path) str
+    }
+
+    %% ═══════════════════════════════════════════
+    %% 音频层
+    %% ═══════════════════════════════════════════
+    class TTSEngine {
+        <<abstract>>
+        +generate(text, voice, rate)* (audio_path, sub_maker)
+    }
+    class EdgeTTSEngine {
+        +generate(text, voice, rate) (audio_path, sub_maker)
+        -_text_to_speech(text, voice, rate) sub_maker
+    }
+    class SilentTTSEngine {
+        +generate(duration_sec) (audio_path, empty_cues)
+    }
+
+    class SubtitleGenerator {
+        +cue_to_srt_time(seconds) str
+        +cues_to_srt(cues, output_path) str
+        +overlay_subtitles_to_video(video_path, srt_path, style, output_path) str
+        +generate_styled_subtitles(text, duration, style) CompositeVideoClip
+    }
+
+    TTSEngine <|-- EdgeTTSEngine
+    TTSEngine <|-- SilentTTSEngine
+
+    %% ═══════════════════════════════════════════
+    %% 拼接层
+    %% ═══════════════════════════════════════════
+    class VideoConcatenator {
+        +concat_videos(video_paths, output_path) str
+        +concat_with_audio(clip_tuples, output_path) str
+        -_synthesize_single(video, audio, srt) str
+    }
+    class VideoProcessor {
+        +resize_video(input_path, width, height, output_path) str
+        +extract_last_frame(video_path, output_path) str
+        +generate_silent_audio(duration_sec, output_path) str
+        +freeze_last_frame(video_path, freeze_duration, output_path) str
+    }
+
+    %% ═══════════════════════════════════════════
+    %% 业务层
+    %% ═══════════════════════════════════════════
+    class BasePipeline {
+        <<abstract>>
+        +api_key: str
+        +task_id: str
+        +dir_name: str
+        +task_manager: TaskManager
+        +progress_callback: Callable
+        +shutdown_event: Event
+        -_stop_event: Event
+        +stop() None
+        +_emit(step, status, message, progress, data) None
+        +_is_shutdown() bool
+        +run(state)* str
+    }
+
+    class SimpleVideoPipeline {
+        +run(state: SimpleVideoTask) str
+        -_submit_and_wait() str
+    }
+
+    class CreativeVideoPipeline {
+        +screenwriter: Screenwriter
+        +image_generator: AgnesImageAPI
+        +video_generator: AgnesVideoAPI
+        +run(state: CreativeVideoTask) str
+        -_step_image_analysis() str
+        -_step_story() str
+        -_step_character_reference() str
+        -_step_script() list
+        -_step_end_frame_prompts() list
+        -_step_pregenerate_end_frames() dict
+        -_step_generate_videos() list
+        -_step_audio_subtitle() None
+        -_step_concatenate() str
+        -_generate_keyframe_scenes() list
+        -_generate_chained_scenes() list
+        -_generate_independent_scenes() list
+    }
+
+    class ManuscriptVideoPipeline {
+        +screenwriter: Screenwriter
+        +video_generator: AgnesVideoAPI
+        +tts_engine: EdgeTTSEngine
+        +subtitle_gen: SubtitleGenerator
+        +concatenator: VideoConcatenator
+        +run(state: ManuscriptVideoTask) str
+        -_step_split_text() list
+        -_step_generate_scene_prompts() None
+        -_step_cluster_scenes() None
+        -_step_generate_videos() None
+        -_step_audio_subtitle() None
+        -_step_concatenate() str
+    }
+
+    class Screenwriter {
+        +chat_api: AgnesChatAPI
+        +develop_story(idea, requirement, style, image_context) str
+        +write_script(story, requirement, style) List[str]
+        +extract_character_description(story, style) str
+        +get_character_appearance(story) str
+        +generate_end_frame_prompts(scenes, style, appearance) List[str]
+        +generate_scene_prompt_for_paragraph(text, style) str
+        +describe_images(paths, cache_dir) str
+        +design_shots_for_scene(scene_text, style, max_shots) list
+        -_describe_with_retry(prompt, img_path, label) str
+    }
+
+    class TaskManager {
+        +task_id: str
+        +dir_name: str
+        +task_dir: str
+        +create(state) TaskState
+        +load() Optional~BaseTaskState~
+        +update_step(name, status) None
+        +update_scene(scene) None
+        +update_state(**kwargs) None
+        +get_state() Optional~BaseTaskState~
+        +exists() bool
+        +list_tasks() list
+        -_save() None
+        -_ensure_dir() None
+    }
+
+    BasePipeline <|-- SimpleVideoPipeline
+    BasePipeline <|-- CreativeVideoPipeline
+    BasePipeline <|-- ManuscriptVideoPipeline
+
+    CreativeVideoPipeline --> AgnesImageAPI : uses
+    CreativeVideoPipeline --> AgnesVideoAPI : uses
+    CreativeVideoPipeline --> Screenwriter : uses
+    CreativeVideoPipeline --> TTSEngine : uses
+    CreativeVideoPipeline --> SubtitleGenerator : uses
+    CreativeVideoPipeline --> VideoConcatenator : uses
+    CreativeVideoPipeline --> TaskManager : uses
+
+    SimpleVideoPipeline --> AgnesVideoAPI : uses
+    SimpleVideoPipeline --> TaskManager : uses
+
+    ManuscriptVideoPipeline --> AgnesVideoAPI : uses
+    ManuscriptVideoPipeline --> Screenwriter : uses
+    ManuscriptVideoPipeline --> EdgeTTSEngine : uses
+    ManuscriptVideoPipeline --> SubtitleGenerator : uses
+    ManuscriptVideoPipeline --> VideoConcatenator : uses
+    ManuscriptVideoPipeline --> TaskManager : uses
+
+    Screenwriter --> AgnesChatAPI : uses
+    AgnesVideoAPI --> VideoOutput : creates
+    AgnesImageAPI --> ImageOutput : creates
+
+    %% 关系标注
+    note for CreativeVideoTask "保持现有字段完全不变<br/>新增: audio_config, narrations,<br/>step_audio_subtitle"
+    note for SceneTask "新增: narration_text,<br/>narration_audio, subtitle_srt,<br/>final_clip"
+    note for ManuscriptVideoTask "全新类型：稿件长视频"
+    note for SimpleVideoTask "全新类型：简单视频"

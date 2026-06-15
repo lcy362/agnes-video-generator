@@ -12,6 +12,11 @@
   .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
   .step-line { transition: all 0.5s ease; }
   pre { white-space: pre-wrap; word-break: break-all; }
+  .tab-active { background: linear-gradient(135deg, #7c3aed, #db2777); color: white; }
+  .tab-inactive { background: #1f2937; color: #d1d5db; }
+  .tab-inactive:hover { background: #374151; }
+  .collapse-header { cursor: pointer; user-select: none; }
+  .collapse-body { overflow: hidden; transition: max-height 0.3s ease; }
 </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen font-sans">
@@ -34,7 +39,7 @@
     <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
       Agnes Video Generator
     </h1>
-    <p class="text-gray-400 mt-2" data-i18n="subtitle">创意 → 视频，一键生成</p>
+    <p class="text-gray-400 mt-2" data-i18n="subtitle">AI 视频，一键生成</p>
   </div>
 
   <!-- API Key -->
@@ -49,119 +54,405 @@
     </div>
   </div>
 
-  <!-- Main Tabs -->
+  <!-- Main Tabs: 新建任务 / 任务列表 -->
   <div class="flex gap-2 mb-6">
-    <button onclick="switchTab('create')" id="tab-create" class="tab-btn px-5 py-2.5 rounded-lg text-sm font-medium bg-purple-600 text-white transition" data-i18n="tabCreate">新建任务</button>
-    <button onclick="switchTab('list')" id="tab-list" class="tab-btn px-5 py-2.5 rounded-lg text-sm font-medium bg-gray-800 text-gray-300 hover:bg-gray-700 transition" data-i18n="tabList">任务列表</button>
+    <button onclick="switchMainTab('create')" id="mtab-create" class="mtab-btn px-5 py-2.5 rounded-lg text-sm font-medium tab-active transition" data-i18n="tabCreate">新建任务</button>
+    <button onclick="switchMainTab('list')" id="mtab-list" class="mtab-btn px-5 py-2.5 rounded-lg text-sm font-medium tab-inactive transition" data-i18n="tabList">任务列表</button>
   </div>
 
-  <!-- Create Tab -->
+  <!-- ═══════════ Create Panel ═══════════ -->
   <div id="panel-create">
 
-    <!-- Basic Config -->
-    <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
-      <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="creativeSettings">创意设置</h2>
-
-      <div class="mb-4">
-        <label class="block text-sm text-gray-400 mb-1.5" data-i18n="taskName">任务名称</label>
-        <input id="creative_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
-      </div>
-
-      <div class="mb-4">
-        <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="ideaLabel">创意描述</span> (idea) <span class="text-red-400">*</span></label>
-        <textarea id="idea" rows="4" data-i18n-placeholder="ideaPlaceholder" placeholder="描述你心中的故事、场景和角色..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div>
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="userRequirement">用户要求</label>
-          <input id="user_requirement" value="3个场景，每个场景5秒，电影质感" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
-        </div>
-        <div>
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="visualStyle">视觉风格</label>
-          <input id="style" value="电影质感写实风格" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
-        </div>
-      </div>
+    <!-- Task Type Tabs -->
+    <div class="flex gap-2 mb-4">
+      <button onclick="switchTaskType('simple')" id="ttype-simple" class="ttype-btn flex-1 px-4 py-3 rounded-xl text-sm font-medium tab-inactive transition text-center">
+        <span class="text-lg">🎬</span><br><span data-i18n="ttSimple">简单视频</span>
+      </button>
+      <button onclick="switchTaskType('creative')" id="ttype-creative" class="ttype-btn flex-1 px-4 py-3 rounded-xl text-sm font-medium tab-active transition text-center">
+        <span class="text-lg">🎥</span><br><span data-i18n="ttCreative">创意长视频</span>
+      </button>
+      <button onclick="switchTaskType('manuscript')" id="ttype-manuscript" class="ttype-btn flex-1 px-4 py-3 rounded-xl text-sm font-medium tab-inactive transition text-center">
+        <span class="text-lg">📝</span><br><span data-i18n="ttManuscript">稿件长视频</span>
+      </button>
     </div>
 
-    <!-- Advanced Config -->
-    <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
-      <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="advancedSettings">高级设置</h2>
+    <!-- ═══════ Tab 1: Simple Video ═══════ -->
+    <div id="form-simple" class="hidden">
+      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+        <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="simpleSettings">简单视频设置</h2>
 
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-        <div>
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="chainingMode">串联模式</label>
-          <select id="chaining_mode" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
-            <option value="keyframes" data-i18n="modeKeyframes">keyframes (推荐)</option>
-            <option value="ti2vid" data-i18n="modeTi2vid">ti2vid (过渡帧)</option>
-            <option value="none" data-i18n="modeNone">none (独立场景)</option>
-          </select>
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="promptLabel">视频描述</span> (prompt) <span class="text-red-400">*</span></label>
+          <textarea id="s_prompt" rows="3" data-i18n-placeholder="promptPlaceholder" placeholder="描述你想要的视频画面..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
         </div>
-        <div>
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="videoWidth">视频宽度</label>
-          <input id="video_width" type="number" value="768" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
-        </div>
-        <div>
-          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="videoHeight">视频高度</label>
-          <input id="video_height" type="number" value="1152" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
-        </div>
-      </div>
-    </div>
 
-    <!-- Reference Image -->
-    <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
-      <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="referenceImage">参考图 (可选)</h2>
-      <div class="flex items-center gap-4">
-        <label class="cursor-pointer px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm transition inline-block">
-          <span id="ref-label" data-i18n="chooseImage">选择参考图</span>
-          <input id="reference_image" type="file" accept="image/*" class="hidden" onchange="updateRefLabel()">
-        </label>
-        <span id="ref-name" class="text-sm text-gray-500" data-i18n="notSelected">未选择</span>
-      </div>
-      <p class="text-xs text-gray-500 mt-2" data-i18n="refDescription">可选。提供后所有场景将以该图为视觉锚点；不提供则自动从故事中生成角色参考图</p>
-    </div>
-
-    <!-- End Frames -->
-    <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold text-purple-300" data-i18n="customEndFrames">自定义尾帧 (可选)</h2>
-        <div class="flex gap-3">
-          <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-            <input type="checkbox" id="use_custom_end_frames" onchange="toggleEndFrames()" class="rounded bg-gray-800 border-gray-600">
-            <span data-i18n="enableCustomEndFrames">启用自定义尾帧</span>
-          </label>
-          <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-            <input type="checkbox" id="generate_end_frames_from_ref" onchange="toggleEndFrameMode()" class="rounded bg-gray-800 border-gray-600">
-            <span data-i18n="genEndFramesFromRef">基于参考图生成尾帧 (i2i)</span>
-          </label>
-        </div>
-      </div>
-      <div id="end-frames-container" class="hidden space-y-2">
-        <p class="text-xs text-gray-500 mb-2" data-i18n="endFrameDesc">每个场景一张尾帧图，按顺序对应。多余场景自动生成尾帧。</p>
-        <div id="end-frame-inputs">
-          <div class="flex items-center gap-3 mb-2">
-            <span class="text-xs text-gray-500 w-16" data-i18n-prefix="scene_" data-i18n-arg="1">场景 1</span>
-            <input type="file" accept="image/*" class="end-frame-file flex-1 text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-gray-700 file:text-gray-200 hover:file:bg-gray-600">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="genMode">生成模式</label>
+            <select id="s_mode" onchange="onSimpleModeChange()" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+              <option value="t2v" data-i18n="modeT2v">文生视频</option>
+              <option value="i2v" data-i18n="modeI2v">图生视频</option>
+              <option value="keyframes" data-i18n="modeKeyframesSimple">关键帧</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="duration">时长</label>
+            <select id="s_duration" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+              <option value="5">5s</option>
+              <option value="10">10s</option>
+              <option value="15">15s</option>
+              <option value="18">18s</option>
+              <option value="20">20s</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
+            <select id="s_resolution" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+              <option value="768x1152" data-i18n="resPortrait">竖屏 9:16</option>
+              <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
+              <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
+            </select>
           </div>
         </div>
-        <button onclick="addEndFrameInput()" class="text-xs text-purple-400 hover:text-purple-300 mt-2" data-i18n="addEndFrame">+ 添加尾帧</button>
+
+        <!-- Reference Image (i2v / keyframes) -->
+        <div id="s_ref_section" class="hidden mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="refImageSimple">参考图</label>
+          <div class="flex items-center gap-4">
+            <label class="cursor-pointer px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm transition inline-block">
+              <span data-i18n="chooseImage">选择参考图</span>
+              <input id="s_ref_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('s_ref_image','s_ref_name')">
+            </label>
+            <span id="s_ref_name" class="text-sm text-gray-500" data-i18n="notSelected">未选择</span>
+          </div>
+        </div>
+
+        <!-- End Frame Image (keyframes only) -->
+        <div id="s_end_section" class="hidden mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="endFrameImage">尾帧图</label>
+          <div class="flex items-center gap-4">
+            <label class="cursor-pointer px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm transition inline-block">
+              <span data-i18n="chooseImage">选择参考图</span>
+              <input id="s_end_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('s_end_image','s_end_name')">
+            </label>
+            <span id="s_end_name" class="text-sm text-gray-500" data-i18n="notSelected">未选择</span>
+          </div>
+        </div>
+
+        <!-- Advanced (collapsible) -->
+        <div class="border-t border-gray-800 pt-4 mt-4">
+          <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('s_advanced')">
+            <span class="text-sm text-gray-400" data-i18n="advancedSettings">高级设置</span>
+            <span id="s_advanced-arrow" class="text-gray-500 text-xs">▶</span>
+          </div>
+          <div id="s_advanced" class="collapse-body hidden mt-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1.5">Seed (<span data-i18n="optional">可选</span>)</label>
+                <input id="s_seed" type="number" placeholder="留空随机" data-i18n-placeholder="seedPlaceholder" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+              </div>
+              <div>
+                <label class="block text-sm text-gray-400 mb-1.5">Negative Prompt (<span data-i18n="optional">可选</span>)</label>
+                <input id="s_negative" data-i18n-placeholder="negativePlaceholder" placeholder="排除不希望出现的元素" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <button id="btn-simple" onclick="submitSimple()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="startGenerate">
+        开始生成视频
+      </button>
     </div>
 
-    <!-- Submit -->
-    <button id="btn-submit" onclick="createTask()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="startGenerate">
-      开始生成视频
-    </button>
+    <!-- ═══════ Tab 2: Creative Video ═══════ -->
+    <div id="form-creative">
+      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+        <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="creativeSettings">创意设置</h2>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="taskName">任务名称</label>
+          <input id="c_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="ideaLabel">创意描述</span> (idea) <span class="text-red-400">*</span></label>
+          <textarea id="c_idea" rows="4" data-i18n-placeholder="ideaPlaceholder" placeholder="描述你心中的故事、场景和角色..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="userRequirement">用户要求</label>
+            <input id="c_requirement" value="3个场景，每个场景5秒，电影质感" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="visualStyle">视觉风格</label>
+            <input id="c_style" value="电影质感写实风格" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+          </div>
+        </div>
+      </div>
+
+      <!-- Advanced Config -->
+      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+        <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="advancedSettings">高级设置</h2>
+
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="chainingMode">串联模式</label>
+            <select id="c_chaining" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+              <option value="keyframes" data-i18n="modeKeyframes">keyframes (推荐)</option>
+              <option value="ti2vid" data-i18n="modeTi2vid">ti2vid (过渡帧)</option>
+              <option value="none" data-i18n="modeNone">none (独立场景)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
+            <select id="c_resolution" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+              <option value="768x1152" data-i18n="resPortrait">竖屏 9:16</option>
+              <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
+              <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Reference Image -->
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="referenceImage">参考图 (可选)</label>
+          <div class="flex items-center gap-4">
+            <label class="cursor-pointer px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm transition inline-block">
+              <span data-i18n="chooseImage">选择参考图</span>
+              <input id="c_ref_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('c_ref_image','c_ref_name')">
+            </label>
+            <span id="c_ref_name" class="text-sm text-gray-500" data-i18n="notSelected">未选择</span>
+          </div>
+          <p class="text-xs text-gray-500 mt-2" data-i18n="refDescription">可选。提供后所有场景将以该图为视觉锚点；不提供则自动从故事中生成角色参考图</p>
+        </div>
+
+        <!-- End Frames -->
+        <div class="mb-4">
+          <div class="flex items-center justify-between mb-3">
+            <label class="text-sm text-gray-400" data-i18n="customEndFrames">自定义尾帧 (可选)</label>
+            <div class="flex gap-3">
+              <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                <input type="checkbox" id="c_use_end_frames" onchange="toggleCEndFrames()" class="rounded bg-gray-800 border-gray-600">
+                <span data-i18n="enableCustomEndFrames">启用自定义尾帧</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                <input type="checkbox" id="c_gen_end_from_ref" onchange="toggleCEndFrameMode()" class="rounded bg-gray-800 border-gray-600">
+                <span data-i18n="genEndFramesFromRef">基于参考图生成尾帧 (i2i)</span>
+              </label>
+            </div>
+          </div>
+          <div id="c-end-frames-container" class="hidden space-y-2">
+            <p class="text-xs text-gray-500 mb-2" data-i18n="endFrameDesc">每个场景一张尾帧图，按顺序对应。多余场景自动生成尾帧。</p>
+            <div id="c-end-frame-inputs">
+              <div class="flex items-center gap-3 mb-2">
+                <span class="text-xs text-gray-500 w-16" data-i18n="scene_">场景</span>
+                <input type="file" accept="image/*" class="end-frame-file flex-1 text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-gray-700 file:text-gray-200 hover:file:bg-gray-600">
+              </div>
+            </div>
+            <button onclick="addCEndFrameInput()" class="text-xs text-purple-400 hover:text-purple-300 mt-2" data-i18n="addEndFrame">+ 添加尾帧</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audio Config (Creative) -->
+      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+        <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('c_audio_body')">
+          <h2 class="text-lg font-semibold text-purple-300" data-i18n="audioConfig">音频与字幕配置</h2>
+          <span id="c_audio_body-arrow" class="text-gray-500 text-xs">▶</span>
+        </div>
+        <div id="c_audio_body" class="collapse-body hidden mt-4">
+          <div class="flex items-center gap-3 mb-4">
+            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <input type="checkbox" id="c_audio_enabled" checked class="rounded bg-gray-800 border-gray-600">
+              <span data-i18n="enableNarration">启用旁白配音</span>
+            </label>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
+              <select id="c_voice" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+                <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (温柔女声)</option>
+                <option value="zh-CN-YunyangNeural">Yunyang (沉稳男声)</option>
+                <option value="zh-CN-XiaoyiNeural">Xiaoyi (活泼女声)</option>
+                <option value="zh-CN-YunxiNeural">Yunxi (年轻男声)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
+              <select id="c_rate" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+                <option value="-30%">-30% (慢)</option>
+                <option value="-15%">-15%</option>
+                <option value="+0%" selected data-i18n="rateNormal">正常</option>
+                <option value="+15%">+15%</option>
+                <option value="+30%">+30% (快)</option>
+              </select>
+            </div>
+          </div>
+          <!-- Subtitle Style -->
+          <div class="border-t border-gray-800 pt-4">
+            <p class="text-sm text-gray-400 mb-3" data-i18n="subtitleStyle">字幕样式</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subFont">字体</label>
+                <input id="c_sub_font" value="STHeitiMedium.ttc" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subColor">颜色</label>
+                <input id="c_sub_color" value="white" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subSize">字号</label>
+                <input id="c_sub_fontsize" type="number" value="48" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subPosition">位置</label>
+                <select id="c_sub_position" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <option value="bottom" data-i18n="posBottom">底部</option>
+                  <option value="top" data-i18n="posTop">顶部</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeColor">描边色</label>
+                <input id="c_sub_stroke_color" value="black" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeWidth">描边宽</label>
+                <input id="c_sub_stroke_width" type="number" value="2" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subBgColor">背景色</label>
+                <input id="c_sub_bg_color" value="black@0.5" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-creative" onclick="submitCreative()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="startGenerate">
+        开始生成视频
+      </button>
+    </div>
+
+    <!-- ═══════ Tab 3: Manuscript Video ═══════ -->
+    <div id="form-manuscript" class="hidden">
+      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+        <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="manuscriptSettings">稿件设置</h2>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="taskName">任务名称</label>
+          <input id="m_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="manuscriptText">稿件正文</span> <span class="text-red-400">*</span></label>
+          <textarea id="m_text" rows="10" data-i18n-placeholder="manuscriptPlaceholder" placeholder="粘贴你的文章、新闻稿、公众号文章等..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y font-mono"></textarea>
+          <p class="text-xs text-gray-500 mt-1"><span data-i18n="charCount">字数</span>: <span id="m_char_count">0</span></p>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
+          <select id="m_resolution" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+            <option value="768x1152" data-i18n="resPortrait">竖屏 9:16</option>
+            <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
+            <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Audio Config (Manuscript) -->
+      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+        <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('m_audio_body')">
+          <h2 class="text-lg font-semibold text-purple-300" data-i18n="audioConfig">音频与字幕配置</h2>
+          <span id="m_audio_body-arrow" class="text-gray-500 text-xs">▶</span>
+        </div>
+        <div id="m_audio_body" class="collapse-body hidden mt-4">
+          <div class="flex items-center gap-3 mb-4">
+            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <input type="checkbox" id="m_audio_enabled" checked class="rounded bg-gray-800 border-gray-600">
+              <span data-i18n="enableNarration">启用旁白配音</span>
+            </label>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
+              <select id="m_voice" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+                <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (温柔女声)</option>
+                <option value="zh-CN-YunyangNeural">Yunyang (沉稳男声)</option>
+                <option value="zh-CN-XiaoyiNeural">Xiaoyi (活泼女声)</option>
+                <option value="zh-CN-YunxiNeural">Yunxi (年轻男声)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
+              <select id="m_rate" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+                <option value="-30%">-30% (慢)</option>
+                <option value="-15%">-15%</option>
+                <option value="+0%" selected data-i18n="rateNormal">正常</option>
+                <option value="+15%">+15%</option>
+                <option value="+30%">+30% (快)</option>
+              </select>
+            </div>
+          </div>
+          <div class="border-t border-gray-800 pt-4">
+            <p class="text-sm text-gray-400 mb-3" data-i18n="subtitleStyle">字幕样式</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subFont">字体</label>
+                <input id="m_sub_font" value="STHeitiMedium.ttc" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subColor">颜色</label>
+                <input id="m_sub_color" value="white" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subSize">字号</label>
+                <input id="m_sub_fontsize" type="number" value="48" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subPosition">位置</label>
+                <select id="m_sub_position" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <option value="bottom" data-i18n="posBottom">底部</option>
+                  <option value="top" data-i18n="posTop">顶部</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeColor">描边色</label>
+                <input id="m_sub_stroke_color" value="black" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeWidth">描边宽</label>
+                <input id="m_sub_stroke_width" type="number" value="2" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1" data-i18n="subBgColor">背景色</label>
+                <input id="m_sub_bg_color" value="black@0.5" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-manuscript" onclick="submitManuscript()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="startGenerate">
+        开始生成视频
+      </button>
+    </div>
+
   </div>
 
-  <!-- List Tab -->
+  <!-- ═══════════ List Panel ═══════════ -->
   <div id="panel-list" class="hidden">
     <div id="task-list-container" class="space-y-3">
       <p class="text-gray-500 text-sm" data-i18n="loading">加载中...</p>
     </div>
   </div>
 
-  <!-- Progress Panel -->
+  <!-- ═══════════ Progress Panel ═══════════ -->
   <div id="progress-panel" class="hidden bg-gray-900 rounded-2xl p-6 mt-6 border border-gray-800">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-purple-300" data-i18n="progress">生成进度</h2>
@@ -171,55 +462,14 @@
       </div>
     </div>
 
-    <!-- Progress bar -->
     <div class="w-full bg-gray-800 rounded-full h-2.5 mb-6">
       <div id="progress-bar" class="bg-gradient-to-r from-purple-500 to-pink-500 h-2.5 rounded-full transition-all duration-500" style="width:0%"></div>
     </div>
 
-    <!-- Steps -->
-    <div class="space-y-2" id="steps-container">
-      <div class="step-item flex items-center gap-3 text-sm" data-step="init">
-        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
-        <span class="step-label text-gray-500" data-i18n="stepInit">初始化</span>
-      </div>
-      <div class="step-item flex items-center gap-3 text-sm" data-step="image_analysis">
-        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
-        <span class="step-label text-gray-500" data-i18n="stepImageAnalysis">图片分析</span>
-      </div>
-      <div class="step-item flex items-center gap-3 text-sm" data-step="story">
-        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
-        <span class="step-label text-gray-500" data-i18n="stepStory">故事生成</span>
-      </div>
-      <div class="step-item flex items-center gap-3 text-sm" data-step="character_ref">
-        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
-        <span class="step-label text-gray-500" data-i18n="stepCharacterRef">角色参考图</span>
-      </div>
-      <div class="step-item flex items-center gap-3 text-sm" data-step="script">
-        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
-        <span class="step-label text-gray-500" data-i18n="stepScript">脚本编写</span>
-      </div>
-      <div class="step-item flex items-center gap-3 text-sm" data-step="end_frame_prompts">
-        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
-        <span class="step-label text-gray-500" data-i18n="stepEndFramePrompts">尾帧提示词</span>
-      </div>
-      <div class="step-item flex items-center gap-3 text-sm" data-step="end_frame_gen">
-        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
-        <span class="step-label text-gray-500" data-i18n="stepEndFrameGen">尾帧生成</span>
-      </div>
-      <div class="step-item flex items-center gap-3 text-sm" data-step="video_gen">
-        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
-        <span class="step-label text-gray-500" data-i18n="stepVideoGen">视频生成</span>
-      </div>
-      <div class="step-item flex items-center gap-3 text-sm" data-step="concatenate">
-        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
-        <span class="step-label text-gray-500" data-i18n="stepConcatenate">视频拼接</span>
-      </div>
-    </div>
+    <div class="space-y-2" id="steps-container"></div>
 
-    <!-- Message -->
     <div id="progress-message" class="mt-4 text-sm text-gray-400"></div>
 
-    <!-- Result -->
     <div id="result-area" class="hidden mt-4 p-4 bg-gray-800 rounded-lg">
       <p class="text-green-400 text-sm font-medium mb-2" data-i18n="videoComplete">视频生成完成!</p>
       <video id="result-video" controls class="w-full rounded-lg max-h-96"></video>
@@ -229,732 +479,471 @@
 </div>
 
 <script>
-// ── i18n ──
-const LANGUAGES = {
-  zh: { name: '中文', flag: '🇨🇳' },
-  en: { name: 'English', flag: '🇺🇸' },
-  ru: { name: 'Русский', flag: '🇷🇺' },
-  ja: { name: '日本語', flag: '🇯🇵' },
-  ko: { name: '한국어', flag: '🇰🇷' },
-  ms: { name: 'Bahasa Melayu', flag: '🇲🇾' },
-  id: { name: 'Bahasa Indonesia', flag: '🇮🇩' },
-};
+// ═══════════════════════════════════════════════════
+// i18n
+// ═══════════════════════════════════════════════════
 
 const T = {
   zh: {
-    subtitle: '创意 → 视频，一键生成',
-    apiKeyTitle: 'API Key 配置',
-    apiKeyNotConfigured: '未配置',
-    apiKeyConfigured: '已配置',
-    apiKeyPlaceholder: '输入 Agnes API Key',
-    apiKeyMasked: '已配置 (●●●)',
-    save: '保存',
-    tabCreate: '新建任务',
-    tabList: '任务列表',
-    creativeSettings: '创意设置',
-    taskName: '任务名称',
-    taskNamePlaceholder: '可选，留空自动生成',
-    ideaLabel: '创意描述',
-    ideaPlaceholder: '描述你心中的故事、场景和角色...',
-    userRequirement: '用户要求',
-    visualStyle: '视觉风格',
-    advancedSettings: '高级设置',
-    chainingMode: '串联模式',
-    modeKeyframes: 'keyframes (推荐)',
-    modeTi2vid: 'ti2vid (过渡帧)',
-    modeNone: 'none (独立场景)',
-    videoWidth: '视频宽度',
-    videoHeight: '视频高度',
-    referenceImage: '参考图 (可选)',
-    chooseImage: '选择参考图',
-    notSelected: '未选择',
-    refDescription: '可选。提供后所有场景将以该图为视觉锚点；不提供则自动从故事中生成角色参考图',
-    customEndFrames: '自定义尾帧 (可选)',
-    enableCustomEndFrames: '启用自定义尾帧',
-    genEndFramesFromRef: '基于参考图生成尾帧 (i2i)',
-    endFrameDesc: '每个场景一张尾帧图，按顺序对应。多余场景自动生成尾帧。',
-    scene_: '场景',
-    addEndFrame: '+ 添加尾帧',
-    startGenerate: '开始生成视频',
-    submitting: '提交中...',
-    taskRunning: '任务进行中...',
-    loading: '加载中...',
-    noTasks: '暂无任务',
-    loadFailed: '加载失败',
-    progress: '生成进度',
-    stopTask: '中断任务',
-    stepInit: '初始化',
-    stepImageAnalysis: '图片分析',
-    stepStory: '故事生成',
-    stepCharacterRef: '角色参考图',
-    stepScript: '脚本编写',
-    stepEndFramePrompts: '尾帧提示词',
-    stepEndFrameGen: '尾帧生成',
-    stepVideoGen: '视频生成',
-    stepConcatenate: '视频拼接',
-    videoComplete: '视频生成完成!',
-    taskComplete: '任务已完成',
-    taskId: '任务ID',
-    dir: '目录',
-    idea_: '创意',
-    sceneCount: '场景数',
-    chainingMode_: '串联模式',
-    artifact: '产物',
-    statusCompleted: '已完成',
-    statusRunning: '进行中',
-    statusFailed: '失败',
-    statusPending: '待处理',
-    btnView: '查看',
-    btnViewProgress: '查看进度',
-    btnResume: '续传',
-    btnStop: '中断',
-    sceneUnit: '个场景',
+    subtitle: 'AI 视频，一键生成',
+    apiKeyTitle: 'API Key 配置', apiKeyNotConfigured: '未配置', apiKeyConfigured: '已配置',
+    apiKeyPlaceholder: '输入 Agnes API Key', apiKeyMasked: '已配置 (●●●)', save: '保存',
+    tabCreate: '新建任务', tabList: '任务列表',
+    ttSimple: '简单视频', ttCreative: '创意长视频', ttManuscript: '稿件长视频',
+    simpleSettings: '简单视频设置', creativeSettings: '创意设置', manuscriptSettings: '稿件设置',
+    promptLabel: '视频描述', promptPlaceholder: '描述你想要的视频画面...',
+    genMode: '生成模式', modeT2v: '文生视频', modeI2v: '图生视频', modeKeyframesSimple: '关键帧',
+    duration: '时长', resolution: '分辨率',
+    resPortrait: '竖屏 9:16', resLandscape: '横屏 16:9', resSquare: '方形 1:1',
+    refImageSimple: '参考图', endFrameImage: '尾帧图',
+    chooseImage: '选择参考图', notSelected: '未选择',
+    advancedSettings: '高级设置', optional: '可选', seedPlaceholder: '留空随机', negativePlaceholder: '排除不希望出现的元素',
+    taskName: '任务名称', taskNamePlaceholder: '可选，留空自动生成',
+    ideaLabel: '创意描述', ideaPlaceholder: '描述你心中的故事、场景和角色...',
+    userRequirement: '用户要求', visualStyle: '视觉风格',
+    chainingMode: '串联模式', modeKeyframes: 'keyframes (推荐)', modeTi2vid: 'ti2vid (过渡帧)', modeNone: 'none (独立场景)',
+    referenceImage: '参考图 (可选)', refDescription: '可选。提供后所有场景将以该图为视觉锚点；不提供则自动从故事中生成角色参考图',
+    customEndFrames: '自定义尾帧 (可选)', enableCustomEndFrames: '启用自定义尾帧',
+    genEndFramesFromRef: '基于参考图生成尾帧 (i2i)', endFrameDesc: '每个场景一张尾帧图，按顺序对应。',
+    scene_: '场景', addEndFrame: '+ 添加尾帧',
+    audioConfig: '音频与字幕配置', enableNarration: '启用旁白配音', voiceRole: '语音角色', speechRate: '语速', rateNormal: '正常',
+    subtitleStyle: '字幕样式', subFont: '字体', subColor: '颜色', subSize: '字号', subPosition: '位置', posBottom: '底部', posTop: '顶部',
+    subStrokeColor: '描边色', subStrokeWidth: '描边宽', subBgColor: '背景色',
+    manuscriptText: '稿件正文', manuscriptPlaceholder: '粘贴你的文章、新闻稿、公众号文章等...',
+    charCount: '字数',
+    startGenerate: '开始生成视频', submitting: '提交中...', taskRunning: '任务进行中...',
+    loading: '加载中...', noTasks: '暂无任务', loadFailed: '加载失败',
+    progress: '生成进度', stopTask: '中断任务',
+    // Progress steps — simple
+    sStepSubmit: '提交任务', sStepVideoGen: '视频生成',
+    // Progress steps — creative
+    cStepInit: '初始化', cStepImageAnalysis: '图片分析', cStepStory: '故事生成',
+    cStepCharacterRef: '角色参考图', cStepScript: '脚本编写', cStepEndFramePrompts: '尾帧提示词',
+    cStepEndFrameGen: '尾帧生成', cStepVideoGen: '视频生成', cStepAudioSub: '音频字幕', cStepConcat: '视频拼接',
+    // Progress steps — manuscript
+    mStepSplit: '文本拆分', mStepScenePrompts: '场景Prompt', mStepVideoGen: '视频生成', mStepAudioSub: '音频字幕', mStepConcat: '视频拼接',
+    videoComplete: '视频生成完成!', taskComplete: '任务已完成',
+    taskId: '任务ID', dir: '目录', idea_: '创意', sceneCount: '场景数', chainingMode_: '串联模式',
+    artifact: '产物', paragraphCount: '段落数',
+    statusCompleted: '已完成', statusRunning: '进行中', statusFailed: '失败', statusPending: '待处理',
+    btnView: '查看', btnViewProgress: '查看进度', btnResume: '续传', btnStop: '中断',
+    sceneUnit: '个场景', paraUnit: '段',
+    typeSimple: '简单', typeCreative: '创意', typeManuscript: '稿件',
     stopConfirm: '确定要中断当前任务吗？中断后可到任务列表续传。',
     stopConfirmById: '确定要中断该任务吗？中断后可续传。',
-    stopped: '任务已中断，可在任务列表中续传',
-    stoppedById: '任务已中断',
-    enterApiKey: '请输入 API Key',
-    enterIdea: '请输入创意描述',
+    stopped: '任务已中断，可在任务列表中续传', stoppedById: '任务已中断',
+    enterApiKey: '请输入 API Key', enterPrompt: '请输入视频描述', enterIdea: '请输入创意描述', enterText: '请输入稿件内容',
     taskRunningWarn: '已有任务正在运行中，请等待完成',
-    taskRunningSwitch: '任务正在运行中，可在下方进度面板查看实时状态',
-    failCreate: '创建失败',
-    failResume: '续传失败',
-    failLoad: '加载任务详情失败',
-    failStop: '中断失败',
-    stopping: '正在中断...',
-    submitted: '任务已提交，请观察控制台日志（启动 server.py 的终端）耐心等待',
-    resumed: '续传已开始，请观察控制台日志（启动 server.py 的终端）耐心等待',
-    watchLog: '提示：请观察控制台日志（启动 server.py 的终端），耐心等待生成完成。关键操作均有日志输出，便于排查问题。',
-    task_: '任务',
-    genFailed: '任务生成失败',
-    genFailedMsg: '请查看控制台日志排查问题，然后到任务列表点击"续传"恢复。',
-    gotoResume: '前往任务列表续传',
-    connLost: '连接中断',
-    connLostMsg: '与服务端的实时连接已断开。请检查控制台日志，服务可能仍在后台运行。可到任务列表查看状态并续传。',
-    gotoList: '前往任务列表',
-    reconnecting: '⚠️ 实时连接断开，正在重试...',
+    failCreate: '创建失败', failResume: '续传失败', failLoad: '加载任务详情失败', failStop: '中断失败',
+    stopping: '正在中断...', submitted: '任务已提交，请耐心等待',
+    resumed: '续传已开始，请耐心等待', watchLog: '提示：请观察控制台日志，耐心等待生成完成。',
+    task_: '任务', genFailed: '任务生成失败', genFailedMsg: '请查看控制台日志排查问题，然后到任务列表续传。',
+    gotoResume: '前往任务列表续传', connLost: '连接中断',
+    connLostMsg: '与服务端的实时连接已断开。服务可能仍在后台运行。可到任务列表查看状态并续传。',
+    gotoList: '前往任务列表', reconnecting: '实时连接断开，正在重试...',
   },
   en: {
-    subtitle: 'Idea → Video, One Click',
-    apiKeyTitle: 'API Key Configuration',
-    apiKeyNotConfigured: 'Not configured',
-    apiKeyConfigured: 'Configured',
-    apiKeyPlaceholder: 'Enter Agnes API Key',
-    apiKeyMasked: 'Configured (●●●)',
-    save: 'Save',
-    tabCreate: 'New Task',
-    tabList: 'Task List',
-    creativeSettings: 'Creative Settings',
-    taskName: 'Task Name',
-    taskNamePlaceholder: 'Optional, leave blank for auto-generation',
-    ideaLabel: 'Idea Description',
-    ideaPlaceholder: 'Describe your story, scenes, and characters...',
-    userRequirement: 'Requirements',
-    visualStyle: 'Visual Style',
-    advancedSettings: 'Advanced Settings',
-    chainingMode: 'Chaining Mode',
-    modeKeyframes: 'keyframes (recommended)',
-    modeTi2vid: 'ti2vid (transition frames)',
-    modeNone: 'none (independent scenes)',
-    videoWidth: 'Video Width',
-    videoHeight: 'Video Height',
-    referenceImage: 'Reference Image (Optional)',
-    chooseImage: 'Choose Image',
-    notSelected: 'Not selected',
-    refDescription: 'Optional. All scenes will use this image as a visual anchor. If not provided, a character reference will be auto-generated from the story.',
-    customEndFrames: 'Custom End Frames (Optional)',
-    enableCustomEndFrames: 'Enable custom end frames',
-    genEndFramesFromRef: 'Generate end frames from reference (i2i)',
-    endFrameDesc: 'One end frame per scene, in order. Extra scenes will auto-generate end frames.',
-    scene_: 'Scene',
-    addEndFrame: '+ Add end frame',
-    startGenerate: 'Start Generating Video',
-    submitting: 'Submitting...',
-    taskRunning: 'Task in progress...',
-    loading: 'Loading...',
-    noTasks: 'No tasks',
-    loadFailed: 'Load failed',
-    progress: 'Progress',
-    stopTask: 'Stop Task',
-    stepInit: 'Initialization',
-    stepImageAnalysis: 'Image Analysis',
-    stepStory: 'Story Generation',
-    stepCharacterRef: 'Character Reference',
-    stepScript: 'Script Writing',
-    stepEndFramePrompts: 'End Frame Prompts',
-    stepEndFrameGen: 'End Frame Generation',
-    stepVideoGen: 'Video Generation',
-    stepConcatenate: 'Video Concatenation',
-    videoComplete: 'Video generation complete!',
-    taskComplete: 'Task completed',
-    taskId: 'Task ID',
-    dir: 'Directory',
-    idea_: 'Idea',
-    sceneCount: 'Scenes',
-    chainingMode_: 'Chaining Mode',
-    artifact: 'Output',
-    statusCompleted: 'Completed',
-    statusRunning: 'Running',
-    statusFailed: 'Failed',
-    statusPending: 'Pending',
-    btnView: 'View',
-    btnViewProgress: 'View Progress',
-    btnResume: 'Resume',
-    btnStop: 'Stop',
-    sceneUnit: ' scenes',
-    stopConfirm: 'Are you sure you want to stop the current task? It can be resumed from the task list.',
-    stopConfirmById: 'Are you sure you want to stop this task? It can be resumed later.',
-    stopped: 'Task stopped, can be resumed from the task list',
-    stoppedById: 'Task stopped',
-    enterApiKey: 'Please enter your API Key',
-    enterIdea: 'Please describe your idea',
-    taskRunningWarn: 'A task is already running, please wait for it to complete',
-    taskRunningSwitch: 'A task is running, check the progress panel below for real-time status',
-    failCreate: 'Failed to create task',
-    failResume: 'Failed to resume task',
-    failLoad: 'Failed to load task details',
-    failStop: 'Failed to stop task',
-    stopping: 'Stopping...',
-    submitted: 'Task submitted. Please check the console logs (terminal running server.py) and be patient.',
-    resumed: 'Task resumed. Please check the console logs (terminal running server.py) and be patient.',
-    watchLog: 'Please observe the console logs (terminal running server.py) and wait patiently. All key operations are logged for debugging.',
-    task_: 'Task',
-    genFailed: 'Task failed',
-    genFailedMsg: 'Check the console logs for details, then click "Resume" in the task list to retry.',
-    gotoResume: 'Go to task list to resume',
-    connLost: 'Connection Lost',
-    connLostMsg: 'Real-time connection to the server was lost. The server may still be running in the background. Check the task list for status.',
-    gotoList: 'Go to task list',
-    reconnecting: '⚠️ Connection lost, retrying...',
+    subtitle: 'AI Video, One Click',
+    apiKeyTitle: 'API Key Configuration', apiKeyNotConfigured: 'Not configured', apiKeyConfigured: 'Configured',
+    apiKeyPlaceholder: 'Enter Agnes API Key', apiKeyMasked: 'Configured (●●●)', save: 'Save',
+    tabCreate: 'New Task', tabList: 'Task List',
+    ttSimple: 'Simple Video', ttCreative: 'Creative Video', ttManuscript: 'Article Video',
+    simpleSettings: 'Simple Video Settings', creativeSettings: 'Creative Settings', manuscriptSettings: 'Article Settings',
+    promptLabel: 'Video Description', promptPlaceholder: 'Describe the video you want...',
+    genMode: 'Generation Mode', modeT2v: 'Text to Video', modeI2v: 'Image to Video', modeKeyframesSimple: 'Keyframes',
+    duration: 'Duration', resolution: 'Resolution',
+    resPortrait: 'Portrait 9:16', resLandscape: 'Landscape 16:9', resSquare: 'Square 1:1',
+    refImageSimple: 'Reference Image', endFrameImage: 'End Frame Image',
+    chooseImage: 'Choose Image', notSelected: 'Not selected',
+    advancedSettings: 'Advanced Settings', optional: 'Optional', seedPlaceholder: 'Leave blank for random', negativePlaceholder: 'Elements to exclude',
+    taskName: 'Task Name', taskNamePlaceholder: 'Optional, auto-generated if blank',
+    ideaLabel: 'Idea Description', ideaPlaceholder: 'Describe your story, scenes, and characters...',
+    userRequirement: 'Requirements', visualStyle: 'Visual Style',
+    chainingMode: 'Chaining Mode', modeKeyframes: 'keyframes (recommended)', modeTi2vid: 'ti2vid (transition)', modeNone: 'none (independent)',
+    referenceImage: 'Reference Image (Optional)', refDescription: 'Optional. All scenes use this as visual anchor. Auto-generated if not provided.',
+    customEndFrames: 'Custom End Frames (Optional)', enableCustomEndFrames: 'Enable custom end frames',
+    genEndFramesFromRef: 'Generate end frames from ref (i2i)', endFrameDesc: 'One end frame per scene, in order.',
+    scene_: 'Scene', addEndFrame: '+ Add end frame',
+    audioConfig: 'Audio & Subtitle Config', enableNarration: 'Enable narration', voiceRole: 'Voice Role', speechRate: 'Speech Rate', rateNormal: 'Normal',
+    subtitleStyle: 'Subtitle Style', subFont: 'Font', subColor: 'Color', subSize: 'Size', subPosition: 'Position', posBottom: 'Bottom', posTop: 'Top',
+    subStrokeColor: 'Stroke Color', subStrokeWidth: 'Stroke Width', subBgColor: 'BG Color',
+    manuscriptText: 'Article Text', manuscriptPlaceholder: 'Paste your article, news, blog post...',
+    charCount: 'Characters',
+    startGenerate: 'Start Generating', submitting: 'Submitting...', taskRunning: 'Task in progress...',
+    loading: 'Loading...', noTasks: 'No tasks', loadFailed: 'Load failed',
+    progress: 'Progress', stopTask: 'Stop Task',
+    sStepSubmit: 'Submit', sStepVideoGen: 'Video Generation',
+    cStepInit: 'Init', cStepImageAnalysis: 'Image Analysis', cStepStory: 'Story',
+    cStepCharacterRef: 'Character Ref', cStepScript: 'Script', cStepEndFramePrompts: 'End Frame Prompts',
+    cStepEndFrameGen: 'End Frame Gen', cStepVideoGen: 'Video Gen', cStepAudioSub: 'Audio & Sub', cStepConcat: 'Concatenate',
+    mStepSplit: 'Text Split', mStepScenePrompts: 'Scene Prompts', mStepVideoGen: 'Video Gen', mStepAudioSub: 'Audio & Sub', mStepConcat: 'Concatenate',
+    videoComplete: 'Video generation complete!', taskComplete: 'Task completed',
+    taskId: 'Task ID', dir: 'Directory', idea_: 'Idea', sceneCount: 'Scenes', chainingMode_: 'Chaining',
+    artifact: 'Output', paragraphCount: 'Paragraphs',
+    statusCompleted: 'Completed', statusRunning: 'Running', statusFailed: 'Failed', statusPending: 'Pending',
+    btnView: 'View', btnViewProgress: 'Progress', btnResume: 'Resume', btnStop: 'Stop',
+    sceneUnit: ' scenes', paraUnit: ' paragraphs',
+    typeSimple: 'Simple', typeCreative: 'Creative', typeManuscript: 'Article',
+    stopConfirm: 'Stop the current task? It can be resumed from the task list.',
+    stopConfirmById: 'Stop this task? It can be resumed later.',
+    stopped: 'Task stopped, resumable from task list', stoppedById: 'Task stopped',
+    enterApiKey: 'Please enter your API Key', enterPrompt: 'Please describe the video', enterIdea: 'Please describe your idea', enterText: 'Please enter article text',
+    taskRunningWarn: 'A task is already running',
+    failCreate: 'Failed to create', failResume: 'Failed to resume', failLoad: 'Failed to load', failStop: 'Failed to stop',
+    stopping: 'Stopping...', submitted: 'Task submitted, please wait',
+    resumed: 'Task resumed, please wait', watchLog: 'Please check console logs and wait patiently.',
+    task_: 'Task', genFailed: 'Task failed', genFailedMsg: 'Check console logs, then resume from task list.',
+    gotoResume: 'Go to task list', connLost: 'Connection Lost',
+    connLostMsg: 'Connection lost. Server may still be running. Check task list for status.',
+    gotoList: 'Go to task list', reconnecting: 'Connection lost, retrying...',
   },
   ru: {
-    subtitle: 'Идея → Видео, Один клик',
-    apiKeyTitle: 'Настройка API Key',
-    apiKeyNotConfigured: 'Не настроен',
-    apiKeyConfigured: 'Настроен',
-    apiKeyPlaceholder: 'Введите Agnes API Key',
-    apiKeyMasked: 'Настроен (●●●)',
-    save: 'Сохранить',
-    tabCreate: 'Новая задача',
-    tabList: 'Список задач',
-    creativeSettings: 'Настройки сценария',
-    taskName: 'Название задачи',
-    taskNamePlaceholder: 'Необязательно, оставьте пустым для автогенерации',
-    ideaLabel: 'Описание идеи',
-    ideaPlaceholder: 'Опишите вашу историю, сцены и персонажей...',
-    userRequirement: 'Требования',
-    visualStyle: 'Визуальный стиль',
-    advancedSettings: 'Расширенные настройки',
-    chainingMode: 'Режим связывания',
-    modeKeyframes: 'keyframes (рекомендуется)',
-    modeTi2vid: 'ti2vid (переходные кадры)',
-    modeNone: 'none (независимые сцены)',
-    videoWidth: 'Ширина видео',
-    videoHeight: 'Высота видео',
-    referenceImage: 'Референс (необязательно)',
-    chooseImage: 'Выбрать изображение',
-    notSelected: 'Не выбрано',
-    refDescription: 'Необязательно. Все сцены будут использовать это изображение как визуальный якорь. Если не указано, референс будет создан автоматически.',
-    customEndFrames: 'Финальные кадры (необязательно)',
-    enableCustomEndFrames: 'Включить финальные кадры',
-    genEndFramesFromRef: 'Создать финальные кадры из референса (i2i)',
-    endFrameDesc: 'Один финальный кадр на сцену, по порядку. Лишние сцены создадут кадры автоматически.',
-    scene_: 'Сцена',
-    addEndFrame: '+ Добавить кадр',
-    startGenerate: 'Начать генерацию видео',
-    submitting: 'Отправка...',
-    taskRunning: 'Задача выполняется...',
-    loading: 'Загрузка...',
-    noTasks: 'Нет задач',
-    loadFailed: 'Ошибка загрузки',
-    progress: 'Прогресс',
-    stopTask: 'Остановить',
-    stepInit: 'Инициализация',
-    stepImageAnalysis: 'Анализ изображения',
-    stepStory: 'Генерация сюжета',
-    stepCharacterRef: 'Референс персонажа',
-    stepScript: 'Написание сценария',
-    stepEndFramePrompts: 'Промпты финальных кадров',
-    stepEndFrameGen: 'Генерация финальных кадров',
-    stepVideoGen: 'Генерация видео',
-    stepConcatenate: 'Сборка видео',
-    videoComplete: 'Видео готово!',
-    taskComplete: 'Задача выполнена',
-    taskId: 'ID задачи',
-    dir: 'Папка',
-    idea_: 'Идея',
-    sceneCount: 'Сцены',
-    chainingMode_: 'Режим связывания',
-    artifact: 'Результат',
-    statusCompleted: 'Завершено',
-    statusRunning: 'Выполняется',
-    statusFailed: 'Ошибка',
-    statusPending: 'Ожидание',
-    btnView: 'Просмотр',
-    btnViewProgress: 'Прогресс',
-    btnResume: 'Продолжить',
-    btnStop: 'Остановить',
-    sceneUnit: ' сцен',
-    stopConfirm: 'Остановить текущую задачу? Её можно будет продолжить из списка задач.',
-    stopConfirmById: 'Остановить эту задачу? Её можно будет продолжить позже.',
-    stopped: 'Задача остановлена, можно продолжить из списка задач',
-    stoppedById: 'Задача остановлена',
-    enterApiKey: 'Пожалуйста, введите API Key',
-    enterIdea: 'Пожалуйста, опишите идею',
-    taskRunningWarn: 'Задача уже выполняется, дождитесь завершения',
-    taskRunningSwitch: 'Задача выполняется, проверьте прогресс на панели ниже',
-    failCreate: 'Ошибка создания задачи',
-    failResume: 'Ошибка возобновления задачи',
-    failLoad: 'Ошибка загрузки деталей задачи',
-    failStop: 'Ошибка остановки задачи',
-    stopping: 'Остановка...',
-    submitted: 'Задача отправлена. Следите за логами в консоли (терминал с server.py).',
-    resumed: 'Задача возобновлена. Следите за логами в консоли (терминал с server.py).',
-    watchLog: 'Следите за логами в консоли (терминал с server.py). Все ключевые операции логируются.',
-    task_: 'Задача',
-    genFailed: 'Ошибка генерации',
-    genFailedMsg: 'Проверьте логи консоли, затем нажмите "Продолжить" в списке задач.',
-    gotoResume: 'Перейти к списку задач',
-    connLost: 'Соединение потеряно',
-    connLostMsg: 'Соединение с сервером потеряно. Сервер может всё ещё работать. Проверьте список задач.',
-    gotoList: 'Перейти к списку задач',
-    reconnecting: '⚠️ Соединение потеряно, повторная попытка...',
+    subtitle: 'AI Видео, Один клик',
+    apiKeyTitle: 'API Key', apiKeyNotConfigured: 'Не настроен', apiKeyConfigured: 'Настроен',
+    apiKeyPlaceholder: 'Введите Agnes API Key', apiKeyMasked: 'Настроен (●●●)', save: 'Сохранить',
+    tabCreate: 'Новая задача', tabList: 'Список задач',
+    ttSimple: 'Простое видео', ttCreative: 'Креативное видео', ttManuscript: 'Видео из статьи',
+    simpleSettings: 'Настройки простого видео', creativeSettings: 'Настройки сценария', manuscriptSettings: 'Настройки статьи',
+    promptLabel: 'Описание видео', promptPlaceholder: 'Опишите желаемое видео...',
+    genMode: 'Режим', modeT2v: 'Текст в видео', modeI2v: 'Изображение в видео', modeKeyframesSimple: 'Ключевые кадры',
+    duration: 'Длительность', resolution: 'Разрешение',
+    resPortrait: 'Вертикальное 9:16', resLandscape: 'Горизонтальное 16:9', resSquare: 'Квадрат 1:1',
+    refImageSimple: 'Референс', endFrameImage: 'Финальный кадр',
+    chooseImage: 'Выбрать', notSelected: 'Не выбрано',
+    advancedSettings: 'Расширенные', optional: 'Опционально', seedPlaceholder: 'Пусто = случайно', negativePlaceholder: 'Исключить элементы',
+    taskName: 'Название', taskNamePlaceholder: 'Необязательно',
+    ideaLabel: 'Идея', ideaPlaceholder: 'Опишите историю, сцены, персонажей...',
+    userRequirement: 'Требования', visualStyle: 'Стиль',
+    chainingMode: 'Связывание', modeKeyframes: 'keyframes', modeTi2vid: 'ti2vid', modeNone: 'none',
+    referenceImage: 'Референс', refDescription: 'Все сцены используют это изображение.',
+    customEndFrames: 'Финальные кадры', enableCustomEndFrames: 'Включить',
+    genEndFramesFromRef: 'Создать из референса (i2i)', endFrameDesc: 'Один кадр на сцену.',
+    scene_: 'Сцена', addEndFrame: '+ Кадр',
+    audioConfig: 'Аудио и субтитры', enableNarration: 'Озвучка', voiceRole: 'Голос', speechRate: 'Скорость', rateNormal: 'Нормальная',
+    subtitleStyle: 'Субтитры', subFont: 'Шрифт', subColor: 'Цвет', subSize: 'Размер', subPosition: 'Позиция', posBottom: 'Низ', posTop: 'Верх',
+    subStrokeColor: 'Цвет обводки', subStrokeWidth: 'Ширина обводки', subBgColor: 'Цвет фона',
+    manuscriptText: 'Текст статьи', manuscriptPlaceholder: 'Вставьте статью...',
+    charCount: 'Символов',
+    startGenerate: 'Начать генерацию', submitting: 'Отправка...', taskRunning: 'Выполняется...',
+    loading: 'Загрузка...', noTasks: 'Нет задач', loadFailed: 'Ошибка загрузки',
+    progress: 'Прогресс', stopTask: 'Остановить',
+    sStepSubmit: 'Отправка', sStepVideoGen: 'Генерация видео',
+    cStepInit: 'Инициализация', cStepImageAnalysis: 'Анализ', cStepStory: 'Сюжет',
+    cStepCharacterRef: 'Персонаж', cStepScript: 'Сценарий', cStepEndFramePrompts: 'Промпты кадров',
+    cStepEndFrameGen: 'Генерация кадров', cStepVideoGen: 'Генерация видео', cStepAudioSub: 'Аудио', cStepConcat: 'Сборка',
+    mStepSplit: 'Разбиение', mStepScenePrompts: 'Промпты', mStepVideoGen: 'Генерация видео', mStepAudioSub: 'Аудио', mStepConcat: 'Сборка',
+    videoComplete: 'Видео готово!', taskComplete: 'Задача выполнена',
+    taskId: 'ID', dir: 'Папка', idea_: 'Идея', sceneCount: 'Сцены', chainingMode_: 'Режим',
+    artifact: 'Результат', paragraphCount: 'Параграфов',
+    statusCompleted: 'Готово', statusRunning: 'Работает', statusFailed: 'Ошибка', statusPending: 'Ожидание',
+    btnView: 'Просмотр', btnViewProgress: 'Прогресс', btnResume: 'Продолжить', btnStop: 'Стоп',
+    sceneUnit: ' сцен', paraUnit: ' параграфов',
+    typeSimple: 'Простое', typeCreative: 'Креатив', typeManuscript: 'Статья',
+    stopConfirm: 'Остановить задачу?', stopConfirmById: 'Остановить?',
+    stopped: 'Остановлена', stoppedById: 'Остановлена',
+    enterApiKey: 'Введите API Key', enterPrompt: 'Опишите видео', enterIdea: 'Опишите идею', enterText: 'Введите текст',
+    taskRunningWarn: 'Задача уже выполняется',
+    failCreate: 'Ошибка создания', failResume: 'Ошибка возобновления', failLoad: 'Ошибка загрузки', failStop: 'Ошибка остановки',
+    stopping: 'Остановка...', submitted: 'Задача отправлена',
+    resumed: 'Задача возобновлена', watchLog: 'Следите за логами.',
+    task_: 'Задача', genFailed: 'Ошибка', genFailedMsg: 'Проверьте логи.',
+    gotoResume: 'К списку задач', connLost: 'Соединение потеряно',
+    connLostMsg: 'Соединение потеряно.', gotoList: 'К списку', reconnecting: 'Переподключение...',
   },
   ja: {
-    subtitle: 'アイデア → 動画、ワンクリック',
-    apiKeyTitle: 'API Key 設定',
-    apiKeyNotConfigured: '未設定',
-    apiKeyConfigured: '設定済み',
-    apiKeyPlaceholder: 'Agnes API Key を入力',
-    apiKeyMasked: '設定済み (●●●)',
-    save: '保存',
-    tabCreate: '新規タスク',
-    tabList: 'タスク一覧',
-    creativeSettings: 'クリエイティブ設定',
-    taskName: 'タスク名',
-    taskNamePlaceholder: '任意、空欄で自動生成',
-    ideaLabel: 'アイデア説明',
-    ideaPlaceholder: 'ストーリー、シーン、キャラクターを記述してください...',
-    userRequirement: '要件',
-    visualStyle: 'ビジュアルスタイル',
-    advancedSettings: '詳細設定',
-    chainingMode: '連鎖モード',
-    modeKeyframes: 'keyframes (推奨)',
-    modeTi2vid: 'ti2vid (遷移フレーム)',
-    modeNone: 'none (独立シーン)',
-    videoWidth: '動画幅',
-    videoHeight: '動画高さ',
-    referenceImage: '参照画像 (任意)',
-    chooseImage: '画像を選択',
-    notSelected: '未選択',
-    refDescription: '任意。全シーンでこの画像を視覚的なアンカーとして使用します。指定しない場合はストーリーから自動生成されます。',
-    customEndFrames: 'カスタム最終フレーム (任意)',
-    enableCustomEndFrames: '最終フレームを有効化',
-    genEndFramesFromRef: '参照画像から最終フレームを生成 (i2i)',
-    endFrameDesc: 'シーンごとに1枚の最終フレーム画像を順番に指定。余剰シーンは自動生成されます。',
-    scene_: 'シーン',
-    addEndFrame: '+ フレーム追加',
-    startGenerate: '動画生成を開始',
-    submitting: '送信中...',
-    taskRunning: 'タスク実行中...',
-    loading: '読み込み中...',
-    noTasks: 'タスクがありません',
-    loadFailed: '読み込み失敗',
-    progress: '進捗',
-    stopTask: '中断',
-    stepInit: '初期化',
-    stepImageAnalysis: '画像分析',
-    stepStory: 'ストーリー生成',
-    stepCharacterRef: 'キャラクター参照',
-    stepScript: '脚本作成',
-    stepEndFramePrompts: '最終フレームプロンプト',
-    stepEndFrameGen: '最終フレーム生成',
-    stepVideoGen: '動画生成',
-    stepConcatenate: '動画結合',
-    videoComplete: '動画生成完了!',
-    taskComplete: 'タスク完了',
-    taskId: 'タスクID',
-    dir: 'ディレクトリ',
-    idea_: 'アイデア',
-    sceneCount: 'シーン数',
-    chainingMode_: '連鎖モード',
-    artifact: '出力',
-    statusCompleted: '完了',
-    statusRunning: '実行中',
-    statusFailed: '失敗',
-    statusPending: '保留中',
-    btnView: '表示',
-    btnViewProgress: '進捗表示',
-    btnResume: '再開',
-    btnStop: '停止',
-    sceneUnit: ' シーン',
-    stopConfirm: '現在のタスクを中断しますか？タスク一覧から再開できます。',
-    stopConfirmById: 'このタスクを中断しますか？後で再開できます。',
-    stopped: 'タスクを中断しました。タスク一覧から再開できます。',
-    stoppedById: 'タスクを中断しました',
-    enterApiKey: 'API Key を入力してください',
-    enterIdea: 'アイデアを記述してください',
-    taskRunningWarn: 'タスクが実行中です。完了をお待ちください',
-    taskRunningSwitch: 'タスクが実行中です。下の進捗パネルで確認できます',
-    failCreate: 'タスク作成に失敗しました',
-    failResume: 'タスク再開に失敗しました',
-    failLoad: 'タスク詳細の読み込みに失敗しました',
-    failStop: 'タスク停止に失敗しました',
-    stopping: '停止中...',
-    submitted: 'タスクを送信しました。コンソールログ（server.py のターミナル）をご確認ください。',
-    resumed: 'タスクを再開しました。コンソールログ（server.py のターミナル）をご確認ください。',
-    watchLog: 'コンソールログ（server.py のターミナル）をご確認の上、しばらくお待ちください。',
-    task_: 'タスク',
-    genFailed: '生成に失敗しました',
-    genFailedMsg: 'コンソールログを確認し、タスク一覧から「再開」をクリックしてください。',
-    gotoResume: 'タスク一覧へ',
-    connLost: '接続が切れました',
-    connLostMsg: 'サーバーとの接続が切れました。サーバーはバックグラウンドで動作中の場合があります。タスク一覧で状態を確認してください。',
-    gotoList: 'タスク一覧へ',
-    reconnecting: '⚠️ 接続が切れました、再接続中...',
+    subtitle: 'AI動画、ワンクリック',
+    apiKeyTitle: 'API Key 設定', apiKeyNotConfigured: '未設定', apiKeyConfigured: '設定済み',
+    apiKeyPlaceholder: 'Agnes API Key を入力', apiKeyMasked: '設定済み (●●●)', save: '保存',
+    tabCreate: '新規タスク', tabList: 'タスク一覧',
+    ttSimple: 'シンプル動画', ttCreative: 'クリエイティブ動画', ttManuscript: '記事動画',
+    simpleSettings: 'シンプル設定', creativeSettings: 'クリエイティブ設定', manuscriptSettings: '記事設定',
+    promptLabel: '動画説明', promptPlaceholder: '希望する動画を記述...',
+    genMode: 'モード', modeT2v: 'テキスト→動画', modeI2v: '画像→動画', modeKeyframesSimple: 'キーフレーム',
+    duration: '長さ', resolution: '解像度',
+    resPortrait: '縦型 9:16', resLandscape: '横型 16:9', resSquare: '正方形 1:1',
+    refImageSimple: '参照画像', endFrameImage: '最終フレーム',
+    chooseImage: '画像を選択', notSelected: '未選択',
+    advancedSettings: '詳細設定', optional: '任意', seedPlaceholder: '空欄=ランダム', negativePlaceholder: '除外要素',
+    taskName: 'タスク名', taskNamePlaceholder: '任意',
+    ideaLabel: 'アイデア', ideaPlaceholder: 'ストーリーを記述...',
+    userRequirement: '要件', visualStyle: 'スタイル',
+    chainingMode: '連鎖', modeKeyframes: 'keyframes', modeTi2vid: 'ti2vid', modeNone: 'none',
+    referenceImage: '参照画像', refDescription: '全シーンの視覚アンカー。',
+    customEndFrames: '最終フレーム', enableCustomEndFrames: '有効化',
+    genEndFramesFromRef: '参照から生成 (i2i)', endFrameDesc: 'シーンごとに1枚。',
+    scene_: 'シーン', addEndFrame: '+ 追加',
+    audioConfig: '音声・字幕', enableNarration: 'ナレーション', voiceRole: '音声', speechRate: '速度', rateNormal: '標準',
+    subtitleStyle: '字幕', subFont: 'フォント', subColor: '色', subSize: 'サイズ', subPosition: '位置', posBottom: '下', posTop: '上',
+    subStrokeColor: '縁取り色', subStrokeWidth: '縁取り幅', subBgColor: '背景色',
+    manuscriptText: '記事テキスト', manuscriptPlaceholder: '記事を貼り付け...',
+    charCount: '文字数',
+    startGenerate: '生成開始', submitting: '送信中...', taskRunning: '実行中...',
+    loading: '読込中...', noTasks: 'タスクなし', loadFailed: '読込失敗',
+    progress: '進捗', stopTask: '中断',
+    sStepSubmit: '送信', sStepVideoGen: '動画生成',
+    cStepInit: '初期化', cStepImageAnalysis: '画像分析', cStepStory: 'ストーリー',
+    cStepCharacterRef: 'キャラ参照', cStepScript: '脚本', cStepEndFramePrompts: '最終フレームP',
+    cStepEndFrameGen: '最終フレーム生成', cStepVideoGen: '動画生成', cStepAudioSub: '音声字幕', cStepConcat: '結合',
+    mStepSplit: 'テキスト分割', mStepScenePrompts: 'シーンP', mStepVideoGen: '動画生成', mStepAudioSub: '音声字幕', mStepConcat: '結合',
+    videoComplete: '動画完了!', taskComplete: 'タスク完了',
+    taskId: 'ID', dir: 'ディレクトリ', idea_: 'アイデア', sceneCount: 'シーン', chainingMode_: '連鎖',
+    artifact: '出力', paragraphCount: '段落数',
+    statusCompleted: '完了', statusRunning: '実行中', statusFailed: '失敗', statusPending: '保留',
+    btnView: '表示', btnViewProgress: '進捗', btnResume: '再開', btnStop: '停止',
+    sceneUnit: ' シーン', paraUnit: ' 段落',
+    typeSimple: 'シンプル', typeCreative: 'クリエイティブ', typeManuscript: '記事',
+    stopConfirm: '中断しますか？', stopConfirmById: '中断しますか？',
+    stopped: '中断しました', stoppedById: '中断しました',
+    enterApiKey: 'API Keyを入力', enterPrompt: '動画を記述', enterIdea: 'アイデアを記述', enterText: 'テキストを入力',
+    taskRunningWarn: 'タスク実行中', failCreate: '作成失敗', failResume: '再開失敗', failLoad: '読込失敗', failStop: '停止失敗',
+    stopping: '停止中...', submitted: 'タスク送信済み', resumed: '再開済み', watchLog: 'コンソールログを確認。',
+    task_: 'タスク', genFailed: '生成失敗', genFailedMsg: 'ログを確認。',
+    gotoResume: 'タスク一覧へ', connLost: '接続切断', connLostMsg: '接続が切れました。', gotoList: '一覧へ', reconnecting: '再接続中...',
   },
   ko: {
-    subtitle: '아이디어 → 영상, 원클릭',
-    apiKeyTitle: 'API Key 설정',
-    apiKeyNotConfigured: '미설정',
-    apiKeyConfigured: '설정됨',
-    apiKeyPlaceholder: 'Agnes API Key 입력',
-    apiKeyMasked: '설정됨 (●●●)',
-    save: '저장',
-    tabCreate: '새 작업',
-    tabList: '작업 목록',
-    creativeSettings: '크리에이티브 설정',
-    taskName: '작업 이름',
-    taskNamePlaceholder: '선택사항, 비워두면 자동 생성',
-    ideaLabel: '아이디어 설명',
-    ideaPlaceholder: '스토리, 장면, 캐릭터를 설명하세요...',
-    userRequirement: '요구사항',
-    visualStyle: '비주얼 스타일',
-    advancedSettings: '고급 설정',
-    chainingMode: '체인 모드',
-    modeKeyframes: 'keyframes (권장)',
-    modeTi2vid: 'ti2vid (전환 프레임)',
-    modeNone: 'none (독립 장면)',
-    videoWidth: '비디오 너비',
-    videoHeight: '비디오 높이',
-    referenceImage: '참조 이미지 (선택사항)',
-    chooseImage: '이미지 선택',
-    notSelected: '선택 안 됨',
-    refDescription: '선택사항. 모든 장면이 이 이미지를 시각적 기준으로 사용합니다. 제공하지 않으면 스토리에서 자동 생성됩니다.',
-    customEndFrames: '커스텀 엔드 프레임 (선택사항)',
-    enableCustomEndFrames: '엔드 프레임 활성화',
-    genEndFramesFromRef: '참조 이미지로 엔드 프레임 생성 (i2i)',
-    endFrameDesc: '장면별로 하나의 엔드 프레임 이미지를 순서대로 지정합니다. 추가 장면은 자동 생성됩니다.',
-    scene_: '장면',
-    addEndFrame: '+ 프레임 추가',
-    startGenerate: '영상 생성 시작',
-    submitting: '제출 중...',
-    taskRunning: '작업 실행 중...',
-    loading: '로딩 중...',
-    noTasks: '작업 없음',
-    loadFailed: '로딩 실패',
-    progress: '진행 상황',
-    stopTask: '중단',
-    stepInit: '초기화',
-    stepImageAnalysis: '이미지 분석',
-    stepStory: '스토리 생성',
-    stepCharacterRef: '캐릭터 참조',
-    stepScript: '대본 작성',
-    stepEndFramePrompts: '엔드 프레임 프롬프트',
-    stepEndFrameGen: '엔드 프레임 생성',
-    stepVideoGen: '영상 생성',
-    stepConcatenate: '영상 편집',
-    videoComplete: '영상 생성 완료!',
-    taskComplete: '작업 완료',
-    taskId: '작업 ID',
-    dir: '디렉토리',
-    idea_: '아이디어',
-    sceneCount: '장면 수',
-    chainingMode_: '체인 모드',
-    artifact: '출력물',
-    statusCompleted: '완료',
-    statusRunning: '실행 중',
-    statusFailed: '실패',
-    statusPending: '대기 중',
-    btnView: '보기',
-    btnViewProgress: '진행 보기',
-    btnResume: '재개',
-    btnStop: '중지',
-    sceneUnit: '개 장면',
-    stopConfirm: '현재 작업을 중단하시겠습니까? 작업 목록에서 재개할 수 있습니다.',
-    stopConfirmById: '이 작업을 중단하시겠습니까? 나중에 재개할 수 있습니다.',
-    stopped: '작업이 중단되었습니다. 작업 목록에서 재개할 수 있습니다.',
-    stoppedById: '작업이 중단되었습니다',
-    enterApiKey: 'API Key를 입력하세요',
-    enterIdea: '아이디어를 입력하세요',
-    taskRunningWarn: '이미 실행 중인 작업이 있습니다. 완료될 때까지 기다려주세요.',
-    taskRunningSwitch: '작업이 실행 중입니다. 아래 진행 패널에서 상태를 확인하세요.',
-    failCreate: '작업 생성 실패',
-    failResume: '작업 재개 실패',
-    failLoad: '작업 상세 로딩 실패',
-    failStop: '작업 중단 실패',
-    stopping: '중단 중...',
-    submitted: '작업이 제출되었습니다. 콘솔 로그(server.py 터미널)를 확인하고 기다려주세요.',
-    resumed: '작업이 재개되었습니다. 콘솔 로그(server.py 터미널)를 확인하고 기다려주세요.',
-    watchLog: '콘솔 로그(server.py 터미널)를 확인하고 기다려주세요. 모든 주요 작업이 로그에 기록됩니다.',
-    task_: '작업',
-    genFailed: '생성 실패',
-    genFailedMsg: '콘솔 로그를 확인한 후 작업 목록에서 "재개"를 클릭하세요.',
-    gotoResume: '작업 목록으로 이동',
-    connLost: '연결 끊김',
-    connLostMsg: '서버와의 연결이 끊어졌습니다. 서버는 백그라운드에서 계속 실행 중일 수 있습니다. 작업 목록에서 상태를 확인하세요.',
-    gotoList: '작업 목록으로 이동',
-    reconnecting: '⚠️ 연결 끊김, 재시도 중...',
+    subtitle: 'AI 영상, 원클릭',
+    apiKeyTitle: 'API Key 설정', apiKeyNotConfigured: '미설정', apiKeyConfigured: '설정됨',
+    apiKeyPlaceholder: 'Agnes API Key 입력', apiKeyMasked: '설정됨 (●●●)', save: '저장',
+    tabCreate: '새 작업', tabList: '작업 목록',
+    ttSimple: '간단 영상', ttCreative: '크리에이티브 영상', ttManuscript: '기사 영상',
+    simpleSettings: '간단 설정', creativeSettings: '크리에이티브 설정', manuscriptSettings: '기사 설정',
+    promptLabel: '영상 설명', promptPlaceholder: '원하는 영상을 설명하세요...',
+    genMode: '모드', modeT2v: '텍스트→영상', modeI2v: '이미지→영상', modeKeyframesSimple: '키프레임',
+    duration: '길이', resolution: '해상도',
+    resPortrait: '세로 9:16', resLandscape: '가로 16:9', resSquare: '정사각 1:1',
+    refImageSimple: '참조 이미지', endFrameImage: '엔드 프레임',
+    chooseImage: '이미지 선택', notSelected: '미선택',
+    advancedSettings: '고급 설정', optional: '선택', seedPlaceholder: '비우기=랜덤', negativePlaceholder: '제외 요소',
+    taskName: '작업 이름', taskNamePlaceholder: '선택사항',
+    ideaLabel: '아이디어', ideaPlaceholder: '스토리를 설명하세요...',
+    userRequirement: '요구사항', visualStyle: '스타일',
+    chainingMode: '체인', modeKeyframes: 'keyframes', modeTi2vid: 'ti2vid', modeNone: 'none',
+    referenceImage: '참조 이미지', refDescription: '모든 장면의 시각 기준.',
+    customEndFrames: '엔드 프레임', enableCustomEndFrames: '활성화',
+    genEndFramesFromRef: '참조로 생성 (i2i)', endFrameDesc: '장면당 한 장.',
+    scene_: '장면', addEndFrame: '+ 추가',
+    audioConfig: '음성/자막', enableNarration: '내레이션', voiceRole: '음성', speechRate: '속도', rateNormal: '보통',
+    subtitleStyle: '자막', subFont: '폰트', subColor: '색상', subSize: '크기', subPosition: '위치', posBottom: '하단', posTop: '상단',
+    subStrokeColor: '테두리 색', subStrokeWidth: '테두리 두께', subBgColor: '배경 색',
+    manuscriptText: '기사 텍스트', manuscriptPlaceholder: '기사를 붙여넣기...',
+    charCount: '글자 수',
+    startGenerate: '생성 시작', submitting: '제출 중...', taskRunning: '실행 중...',
+    loading: '로딩...', noTasks: '작업 없음', loadFailed: '로딩 실패',
+    progress: '진행', stopTask: '중단',
+    sStepSubmit: '제출', sStepVideoGen: '영상 생성',
+    cStepInit: '초기화', cStepImageAnalysis: '이미지 분석', cStepStory: '스토리',
+    cStepCharacterRef: '캐릭터', cStepScript: '대본', cStepEndFramePrompts: '엔드 프레임 P',
+    cStepEndFrameGen: '엔드 프레임 생성', cStepVideoGen: '영상 생성', cStepAudioSub: '음성/자막', cStepConcat: '결합',
+    mStepSplit: '텍스트 분할', mStepScenePrompts: '씬 프롬프트', mStepVideoGen: '영상 생성', mStepAudioSub: '음성/자막', mStepConcat: '결합',
+    videoComplete: '영상 완료!', taskComplete: '작업 완료',
+    taskId: 'ID', dir: '디렉토리', idea_: '아이디어', sceneCount: '장면', chainingMode_: '체인',
+    artifact: '출력', paragraphCount: '문단 수',
+    statusCompleted: '완료', statusRunning: '실행 중', statusFailed: '실패', statusPending: '대기',
+    btnView: '보기', btnViewProgress: '진행', btnResume: '재개', btnStop: '중지',
+    sceneUnit: '개 장면', paraUnit: '개 문단',
+    typeSimple: '간단', typeCreative: '크리에이티브', typeManuscript: '기사',
+    stopConfirm: '중단하시겠습니까?', stopConfirmById: '중단하시겠습니까?',
+    stopped: '중단됨', stoppedById: '중단됨',
+    enterApiKey: 'API Key 입력', enterPrompt: '영상 설명', enterIdea: '아이디어 입력', enterText: '텍스트 입력',
+    taskRunningWarn: '작업 실행 중', failCreate: '생성 실패', failResume: '재개 실패', failLoad: '로딩 실패', failStop: '중지 실패',
+    stopping: '중지 중...', submitted: '작업 제출됨', resumed: '재개됨', watchLog: '콘솔 로그를 확인하세요.',
+    task_: '작업', genFailed: '생성 실패', genFailedMsg: '로그를 확인하세요.',
+    gotoResume: '작업 목록으로', connLost: '연결 끊김', connLostMsg: '연결이 끊어졌습니다.', gotoList: '목록으로', reconnecting: '재연결 중...',
   },
   ms: {
-    subtitle: 'Idea → Video, Satu Klik',
-    apiKeyTitle: 'Konfigurasi API Key',
-    apiKeyNotConfigured: 'Belum dikonfigurasi',
-    apiKeyConfigured: 'Sudah dikonfigurasi',
-    apiKeyPlaceholder: 'Masukkan Agnes API Key',
-    apiKeyMasked: 'Sudah dikonfigurasi (●●●)',
-    save: 'Simpan',
-    tabCreate: 'Tugas Baru',
-    tabList: 'Senarai Tugas',
-    creativeSettings: 'Tetapan Kreatif',
-    taskName: 'Nama Tugas',
-    taskNamePlaceholder: 'Pilihan, biarkan kosong untuk auto-generasi',
-    ideaLabel: 'Penerangan Idea',
-    ideaPlaceholder: 'Terangkan cerita, babak, dan watak anda...',
-    userRequirement: 'Keperluan',
-    visualStyle: 'Gaya Visual',
-    advancedSettings: 'Tetapan Lanjutan',
-    chainingMode: 'Mod Rantai',
-    modeKeyframes: 'keyframes (disyorkan)',
-    modeTi2vid: 'ti2vid (bingkai peralihan)',
-    modeNone: 'none (babak bebas)',
-    videoWidth: 'Lebar Video',
-    videoHeight: 'Tinggi Video',
-    referenceImage: 'Imej Rujukan (Pilihan)',
-    chooseImage: 'Pilih Imej',
-    notSelected: 'Tidak dipilih',
-    refDescription: 'Pilihan. Semua babak akan menggunakan imej ini sebagai sauh visual. Jika tidak disediakan, rujukan akan dijana secara automatik daripada cerita.',
-    customEndFrames: 'Bingkai Akhir Tersuai (Pilihan)',
-    enableCustomEndFrames: 'Aktifkan bingkai akhir tersuai',
-    genEndFramesFromRef: 'Hasilkan bingkai akhir daripada rujukan (i2i)',
-    endFrameDesc: 'Satu bingkai akhir setiap babak, mengikut tertib. Babak lebihan akan menjana bingkai akhir secara automatik.',
-    scene_: 'Babak',
-    addEndFrame: '+ Tambah bingkai',
-    startGenerate: 'Mula Hasilkan Video',
-    submitting: 'Menghantar...',
-    taskRunning: 'Tugas sedang berjalan...',
-    loading: 'Memuatkan...',
-    noTasks: 'Tiada tugas',
-    loadFailed: 'Gagal memuatkan',
-    progress: 'Kemajuan',
-    stopTask: 'Henti',
-    stepInit: 'Permulaan',
-    stepImageAnalysis: 'Analisis Imej',
-    stepStory: 'Penjanaan Cerita',
-    stepCharacterRef: 'Rujukan Watak',
-    stepScript: 'Penulisan Skrip',
-    stepEndFramePrompts: 'Prompt Bingkai Akhir',
-    stepEndFrameGen: 'Penjanaan Bingkai Akhir',
-    stepVideoGen: 'Penjanaan Video',
-    stepConcatenate: 'Gabungan Video',
-    videoComplete: 'Penjanaan video selesai!',
-    taskComplete: 'Tugas selesai',
-    taskId: 'ID Tugas',
-    dir: 'Direktori',
-    idea_: 'Idea',
-    sceneCount: 'Bilangan Babak',
-    chainingMode_: 'Mod Rantai',
-    artifact: 'Hasil',
-    statusCompleted: 'Selesai',
-    statusRunning: 'Berjalan',
-    statusFailed: 'Gagal',
-    statusPending: 'Menunggu',
-    btnView: 'Lihat',
-    btnViewProgress: 'Lihat Kemajuan',
-    btnResume: 'Sambung Semula',
-    btnStop: 'Henti',
-    sceneUnit: ' babak',
-    stopConfirm: 'Pasti ingin menghentikan tugas semasa? Ia boleh disambung semula dari senarai tugas.',
-    stopConfirmById: 'Pasti ingin menghentikan tugas ini? Ia boleh disambung semula kemudian.',
-    stopped: 'Tugas dihentikan, boleh disambung semula dari senarai tugas',
-    stoppedById: 'Tugas dihentikan',
-    enterApiKey: 'Sila masukkan API Key',
-    enterIdea: 'Sila terangkan idea anda',
-    taskRunningWarn: 'Tugas sedang berjalan, sila tunggu sehingga selesai',
-    taskRunningSwitch: 'Tugas sedang berjalan, lihat panel kemajuan di bawah untuk status masa nyata',
-    failCreate: 'Gagal mencipta tugas',
-    failResume: 'Gagal menyambung semula tugas',
-    failLoad: 'Gagal memuatkan butiran tugas',
-    failStop: 'Gagal menghentikan tugas',
-    stopping: 'Memberhentikan...',
-    submitted: 'Tugas telah dihantar. Sila perhatikan log konsol (terminal yang menjalankan server.py) dan bersabar.',
-    resumed: 'Tugas disambung semula. Sila perhatikan log konsol (terminal yang menjalankan server.py) dan bersabar.',
-    watchLog: 'Sila perhatikan log konsol (terminal yang menjalankan server.py) dan tunggu dengan sabar. Semua operasi utama dicatat untuk debugging.',
-    task_: 'Tugas',
-    genFailed: 'Penjanaan gagal',
-    genFailedMsg: 'Periksa log konsol untuk butiran, kemudian klik "Sambung Semula" dalam senarai tugas.',
-    gotoResume: 'Pergi ke senarai tugas',
-    connLost: 'Sambungan Terputus',
-    connLostMsg: 'Sambungan masa nyata ke pelayan terputus. Pelayan mungkin masih berjalan di latar belakang. Periksa senarai tugas untuk status.',
-    gotoList: 'Pergi ke senarai tugas',
-    reconnecting: '⚠️ Sambungan terputus, mencuba semula...',
+    subtitle: 'Video AI, Satu Klik',
+    apiKeyTitle: 'API Key', apiKeyNotConfigured: 'Belum', apiKeyConfigured: 'Sudah',
+    apiKeyPlaceholder: 'Masukkan Agnes API Key', apiKeyMasked: 'Sudah (●●●)', save: 'Simpan',
+    tabCreate: 'Tugas Baru', tabList: 'Senarai Tugas',
+    ttSimple: 'Video Ringkas', ttCreative: 'Video Kreatif', ttManuscript: 'Video Artikel',
+    simpleSettings: 'Tetapan Ringkas', creativeSettings: 'Tetapan Kreatif', manuscriptSettings: 'Tetapan Artikel',
+    promptLabel: 'Penerangan Video', promptPlaceholder: 'Terangkan video yang diingini...',
+    genMode: 'Mod', modeT2v: 'Teks ke Video', modeI2v: 'Imej ke Video', modeKeyframesSimple: 'Bingkai Kunci',
+    duration: 'Tempoh', resolution: 'Resolusi',
+    resPortrait: 'Potret 9:16', resLandscape: 'Landskap 16:9', resSquare: 'Segi Empat 1:1',
+    refImageSimple: 'Imej Rujukan', endFrameImage: 'Bingkai Akhir',
+    chooseImage: 'Pilih Imej', notSelected: 'Tidak dipilih',
+    advancedSettings: 'Tetapan Lanjutan', optional: 'Pilihan', seedPlaceholder: 'Kosong=rawak', negativePlaceholder: 'Kecualikan elemen',
+    taskName: 'Nama Tugas', taskNamePlaceholder: 'Pilihan',
+    ideaLabel: 'Idea', ideaPlaceholder: 'Terangkan cerita anda...',
+    userRequirement: 'Keperluan', visualStyle: 'Gaya',
+    chainingMode: 'Rantai', modeKeyframes: 'keyframes', modeTi2vid: 'ti2vid', modeNone: 'none',
+    referenceImage: 'Imej Rujukan', refDescription: 'Semua babak guna imej ini.',
+    customEndFrames: 'Bingkai Akhir', enableCustomEndFrames: 'Aktifkan',
+    genEndFramesFromRef: 'Hasilkan dari rujukan (i2i)', endFrameDesc: 'Satu bingkai per babak.',
+    scene_: 'Babak', addEndFrame: '+ Tambah',
+    audioConfig: 'Audio & Sarikata', enableNarration: 'Narasi', voiceRole: 'Suara', speechRate: 'Kelajuan', rateNormal: 'Biasa',
+    subtitleStyle: 'Sarikata', subFont: 'Fon', subColor: 'Warna', subSize: 'Saiz', subPosition: 'Kedudukan', posBottom: 'Bawah', posTop: 'Atas',
+    subStrokeColor: 'Warna Garis', subStrokeWidth: 'Lebar Garis', subBgColor: 'Warna Latar',
+    manuscriptText: 'Teks Artikel', manuscriptPlaceholder: 'Tampal artikel anda...',
+    charCount: 'Aksara',
+    startGenerate: 'Mula Hasilkan', submitting: 'Menghantar...', taskRunning: 'Berjalan...',
+    loading: 'Memuat...', noTasks: 'Tiada tugas', loadFailed: 'Gagal memuat',
+    progress: 'Kemajuan', stopTask: 'Henti',
+    sStepSubmit: 'Hantar', sStepVideoGen: 'Hasilkan Video',
+    cStepInit: 'Permulaan', cStepImageAnalysis: 'Analisis', cStepStory: 'Cerita',
+    cStepCharacterRef: 'Watak', cStepScript: 'Skrip', cStepEndFramePrompts: 'Bingkai Akhir P',
+    cStepEndFrameGen: 'Bingkai Akhir', cStepVideoGen: 'Video', cStepAudioSub: 'Audio', cStepConcat: 'Gabung',
+    mStepSplit: 'Pecah Teks', mStepScenePrompts: 'Prompt', mStepVideoGen: 'Video', mStepAudioSub: 'Audio', mStepConcat: 'Gabung',
+    videoComplete: 'Video selesai!', taskComplete: 'Tugas selesai',
+    taskId: 'ID', dir: 'Direktori', idea_: 'Idea', sceneCount: 'Babak', chainingMode_: 'Rantai',
+    artifact: 'Hasil', paragraphCount: 'Perenggan',
+    statusCompleted: 'Selesai', statusRunning: 'Berjalan', statusFailed: 'Gagal', statusPending: 'Menunggu',
+    btnView: 'Lihat', btnViewProgress: 'Kemajuan', btnResume: 'Sambung', btnStop: 'Henti',
+    sceneUnit: ' babak', paraUnit: ' perenggan',
+    typeSimple: 'Ringkas', typeCreative: 'Kreatif', typeManuscript: 'Artikel',
+    stopConfirm: 'Hentikan tugas?', stopConfirmById: 'Hentikan?',
+    stopped: 'Dihentikan', stoppedById: 'Dihentikan',
+    enterApiKey: 'Masukkan API Key', enterPrompt: 'Terangkan video', enterIdea: 'Terangkan idea', enterText: 'Masukkan teks',
+    taskRunningWarn: 'Tugas sedang berjalan', failCreate: 'Gagal mencipta', failResume: 'Gagal sambung', failLoad: 'Gagal memuat', failStop: 'Gagal henti',
+    stopping: 'Menghentikan...', submitted: 'Tugas dihantar', resumed: 'Tugas disambung', watchLog: 'Periksa log konsol.',
+    task_: 'Tugas', genFailed: 'Gagal', genFailedMsg: 'Periksa log.',
+    gotoResume: 'Ke senarai', connLost: 'Sambungan terputus', connLostMsg: 'Sambungan terputus.', gotoList: 'Ke senarai', reconnecting: 'Menyambung semula...',
   },
   id: {
-    subtitle: 'Ide → Video, Satu Klik',
-    apiKeyTitle: 'Konfigurasi API Key',
-    apiKeyNotConfigured: 'Belum dikonfigurasi',
-    apiKeyConfigured: 'Terkonfigurasi',
-    apiKeyPlaceholder: 'Masukkan Agnes API Key',
-    apiKeyMasked: 'Terkonfigurasi (●●●)',
-    save: 'Simpan',
-    tabCreate: 'Tugas Baru',
-    tabList: 'Daftar Tugas',
-    creativeSettings: 'Pengaturan Kreatif',
-    taskName: 'Nama Tugas',
-    taskNamePlaceholder: 'Opsional, kosongkan untuk auto-generasi',
-    ideaLabel: 'Deskripsi Ide',
-    ideaPlaceholder: 'Jelaskan cerita, adegan, dan karakter Anda...',
-    userRequirement: 'Persyaratan',
-    visualStyle: 'Gaya Visual',
-    advancedSettings: 'Pengaturan Lanjutan',
-    chainingMode: 'Mode Rantai',
-    modeKeyframes: 'keyframes (direkomendasikan)',
-    modeTi2vid: 'ti2vid (bingkai transisi)',
-    modeNone: 'none (adegan independen)',
-    videoWidth: 'Lebar Video',
-    videoHeight: 'Tinggi Video',
-    referenceImage: 'Gambar Referensi (Opsional)',
-    chooseImage: 'Pilih Gambar',
-    notSelected: 'Belum dipilih',
-    refDescription: 'Opsional. Semua adegan akan menggunakan gambar ini sebagai jangkar visual. Jika tidak disediakan, referensi akan dihasilkan secara otomatis dari cerita.',
-    customEndFrames: 'Bingkai Akhir Kustom (Opsional)',
-    enableCustomEndFrames: 'Aktifkan bingkai akhir kustom',
-    genEndFramesFromRef: 'Hasilkan bingkai akhir dari referensi (i2i)',
-    endFrameDesc: 'Satu bingkai akhir per adegan, sesuai urutan. Adegan berlebih akan menghasilkan bingkai akhir otomatis.',
-    scene_: 'Adegan',
-    addEndFrame: '+ Tambah bingkai',
-    startGenerate: 'Mulai Hasilkan Video',
-    submitting: 'Mengirim...',
-    taskRunning: 'Tugas berjalan...',
-    loading: 'Memuat...',
-    noTasks: 'Tidak ada tugas',
-    loadFailed: 'Gagal memuat',
-    progress: 'Kemajuan',
-    stopTask: 'Hentikan',
-    stepInit: 'Inisialisasi',
-    stepImageAnalysis: 'Analisis Gambar',
-    stepStory: 'Pembuatan Cerita',
-    stepCharacterRef: 'Referensi Karakter',
-    stepScript: 'Penulisan Skenario',
-    stepEndFramePrompts: 'Prompt Bingkai Akhir',
-    stepEndFrameGen: 'Pembuatan Bingkai Akhir',
-    stepVideoGen: 'Pembuatan Video',
-    stepConcatenate: 'Penggabungan Video',
-    videoComplete: 'Pembuatan video selesai!',
-    taskComplete: 'Tugas selesai',
-    taskId: 'ID Tugas',
-    dir: 'Direktori',
-    idea_: 'Ide',
-    sceneCount: 'Jumlah Adegan',
-    chainingMode_: 'Mode Rantai',
-    artifact: 'Hasil',
-    statusCompleted: 'Selesai',
-    statusRunning: 'Berjalan',
-    statusFailed: 'Gagal',
-    statusPending: 'Menunggu',
-    btnView: 'Lihat',
-    btnViewProgress: 'Lihat Kemajuan',
-    btnResume: 'Lanjutkan',
-    btnStop: 'Henti',
-    sceneUnit: ' adegan',
-    stopConfirm: 'Yakin ingin menghentikan tugas saat ini? Dapat dilanjutkan dari daftar tugas.',
-    stopConfirmById: 'Yakin ingin menghentikan tugas ini? Dapat dilanjutkan nanti.',
-    stopped: 'Tugas dihentikan, dapat dilanjutkan dari daftar tugas',
-    stoppedById: 'Tugas dihentikan',
-    enterApiKey: 'Silakan masukkan API Key',
-    enterIdea: 'Silakan jelaskan ide Anda',
-    taskRunningWarn: 'Tugas sedang berjalan, harap tunggu hingga selesai',
-    taskRunningSwitch: 'Tugas sedang berjalan, lihat panel kemajuan di bawah untuk status real-time',
-    failCreate: 'Gagal membuat tugas',
-    failResume: 'Gagal melanjutkan tugas',
-    failLoad: 'Gagal memuat detail tugas',
-    failStop: 'Gagal menghentikan tugas',
-    stopping: 'Menghentikan...',
-    submitted: 'Tugas telah dikirim. Silakan amati log konsol (terminal yang menjalankan server.py) dan bersabar.',
-    resumed: 'Tugas dilanjutkan. Silakan amati log konsol (terminal yang menjalankan server.py) dan bersabar.',
-    watchLog: 'Silakan amati log konsol (terminal yang menjalankan server.py) dan tunggu dengan sabar. Semua operasi kunci dicatat untuk debugging.',
-    task_: 'Tugas',
-    genFailed: 'Pembuatan gagal',
-    genFailedMsg: 'Periksa log konsol untuk detail, lalu klik "Lanjutkan" di daftar tugas.',
-    gotoResume: 'Pergi ke daftar tugas',
-    connLost: 'Koneksi Terputus',
-    connLostMsg: 'Koneksi real-time ke server terputus. Server mungkin masih berjalan di latar belakang. Periksa daftar tugas untuk status.',
-    gotoList: 'Pergi ke daftar tugas',
-    reconnecting: '⚠️ Koneksi terputus, mencoba ulang...',
+    subtitle: 'Video AI, Satu Klik',
+    apiKeyTitle: 'API Key', apiKeyNotConfigured: 'Belum', apiKeyConfigured: 'Sudah',
+    apiKeyPlaceholder: 'Masukkan Agnes API Key', apiKeyMasked: 'Sudah (●●●)', save: 'Simpan',
+    tabCreate: 'Tugas Baru', tabList: 'Daftar Tugas',
+    ttSimple: 'Video Simpel', ttCreative: 'Video Kreatif', ttManuscript: 'Video Artikel',
+    simpleSettings: 'Pengaturan Simpel', creativeSettings: 'Pengaturan Kreatif', manuscriptSettings: 'Pengaturan Artikel',
+    promptLabel: 'Deskripsi Video', promptPlaceholder: 'Jelaskan video yang diinginkan...',
+    genMode: 'Mode', modeT2v: 'Teks ke Video', modeI2v: 'Gambar ke Video', modeKeyframesSimple: 'Keyframe',
+    duration: 'Durasi', resolution: 'Resolusi',
+    resPortrait: 'Potret 9:16', resLandscape: 'Lanskap 16:9', resSquare: 'Persegi 1:1',
+    refImageSimple: 'Gambar Referensi', endFrameImage: 'Bingkai Akhir',
+    chooseImage: 'Pilih Gambar', notSelected: 'Belum dipilih',
+    advancedSettings: 'Pengaturan Lanjutan', optional: 'Opsional', seedPlaceholder: 'Kosong=acak', negativePlaceholder: 'Kecualikan elemen',
+    taskName: 'Nama Tugas', taskNamePlaceholder: 'Opsional',
+    ideaLabel: 'Ide', ideaPlaceholder: 'Jelaskan cerita Anda...',
+    userRequirement: 'Persyaratan', visualStyle: 'Gaya',
+    chainingMode: 'Rantai', modeKeyframes: 'keyframes', modeTi2vid: 'ti2vid', modeNone: 'none',
+    referenceImage: 'Gambar Referensi', refDescription: 'Semua adegan pakai gambar ini.',
+    customEndFrames: 'Bingkai Akhir', enableCustomEndFrames: 'Aktifkan',
+    genEndFramesFromRef: 'Hasilkan dari referensi (i2i)', endFrameDesc: 'Satu bingkai per adegan.',
+    scene_: 'Adegan', addEndFrame: '+ Tambah',
+    audioConfig: 'Audio & Subtitle', enableNarration: 'Narasi', voiceRole: 'Suara', speechRate: 'Kecepatan', rateNormal: 'Normal',
+    subtitleStyle: 'Subtitle', subFont: 'Font', subColor: 'Warna', subSize: 'Ukuran', subPosition: 'Posisi', posBottom: 'Bawah', posTop: 'Atas',
+    subStrokeColor: 'Warna Garis', subStrokeWidth: 'Lebar Garis', subBgColor: 'Warna Latar',
+    manuscriptText: 'Teks Artikel', manuscriptPlaceholder: 'Tempel artikel Anda...',
+    charCount: 'Karakter',
+    startGenerate: 'Mulai Hasilkan', submitting: 'Mengirim...', taskRunning: 'Berjalan...',
+    loading: 'Memuat...', noTasks: 'Tidak ada tugas', loadFailed: 'Gagal memuat',
+    progress: 'Kemajuan', stopTask: 'Hentikan',
+    sStepSubmit: 'Kirim', sStepVideoGen: 'Hasilkan Video',
+    cStepInit: 'Inisialisasi', cStepImageAnalysis: 'Analisis', cStepStory: 'Cerita',
+    cStepCharacterRef: 'Karakter', cStepScript: 'Skenario', cStepEndFramePrompts: 'Bingkai Akhir P',
+    cStepEndFrameGen: 'Bingkai Akhir', cStepVideoGen: 'Video', cStepAudioSub: 'Audio', cStepConcat: 'Gabung',
+    mStepSplit: 'Pecah Teks', mStepScenePrompts: 'Prompt', mStepVideoGen: 'Video', mStepAudioSub: 'Audio', mStepConcat: 'Gabung',
+    videoComplete: 'Video selesai!', taskComplete: 'Tugas selesai',
+    taskId: 'ID', dir: 'Direktori', idea_: 'Ide', sceneCount: 'Adegan', chainingMode_: 'Rantai',
+    artifact: 'Hasil', paragraphCount: 'Paragraf',
+    statusCompleted: 'Selesai', statusRunning: 'Berjalan', statusFailed: 'Gagal', statusPending: 'Menunggu',
+    btnView: 'Lihat', btnViewProgress: 'Kemajuan', btnResume: 'Lanjutkan', btnStop: 'Henti',
+    sceneUnit: ' adegan', paraUnit: ' paragraf',
+    typeSimple: 'Simpel', typeCreative: 'Kreatif', typeManuscript: 'Artikel',
+    stopConfirm: 'Hentikan tugas?', stopConfirmById: 'Hentikan?',
+    stopped: 'Dihentikan', stoppedById: 'Dihentikan',
+    enterApiKey: 'Masukkan API Key', enterPrompt: 'Jelaskan video', enterIdea: 'Jelaskan ide', enterText: 'Masukkan teks',
+    taskRunningWarn: 'Tugas sedang berjalan', failCreate: 'Gagal membuat', failResume: 'Gagal lanjut', failLoad: 'Gagal memuat', failStop: 'Gagal henti',
+    stopping: 'Menghentikan...', submitted: 'Tugas dikirim', resumed: 'Tugas dilanjutkan', watchLog: 'Periksa log konsol.',
+    task_: 'Tugas', genFailed: 'Gagal', genFailedMsg: 'Periksa log.',
+    gotoResume: 'Ke daftar', connLost: 'Koneksi terputus', connLostMsg: 'Koneksi terputus.', gotoList: 'Ke daftar', reconnecting: 'Menyambung ulang...',
   },
 };
 
-let currentLang = localStorage.getItem('lang') || 'zh';
+let currentLang = 'zh';
 
-function t(key, arg) {
+function t(key) {
   let val = (T[currentLang] && T[currentLang][key]);
   if (val === undefined) val = (T['zh'] && T['zh'][key]) || key;
-  if (arg !== undefined) val = val + ' ' + arg;
   return val;
 }
 
 function applyLanguage(lang) {
-  currentLang = lang || localStorage.getItem('lang') || 'zh';
-  localStorage.setItem('lang', currentLang);
+  currentLang = lang || 'zh';
+  try { localStorage.setItem('lang', currentLang); } catch(e) {}
   document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : currentLang;
   document.getElementById('lang-selector').value = currentLang;
-
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.dataset.i18n;
-    const arg = el.dataset.i18nArg;
-    el.textContent = t(key, arg);
+    el.textContent = t(key);
   });
-
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
 }
 
-function switchLang(lang) {
-  applyLanguage(lang);
-}
+function switchLang(lang) { applyLanguage(lang); }
 
-// ── State ──
+// ═══════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════
+
 let currentTaskId = null;
 let currentDirName = null;
 let ws = null;
 let isTaskRunning = false;
 let taskListTimer = null;
-const STEP_MAP = {
-  init: 0, image_analysis: 1, story: 2, character_ref: 3,
-  script: 4, end_frame_prompts: 5, end_frame_gen: 6, video_gen: 7, concatenate: 8
-};
-const ALL_STEPS = ['init', 'image_analysis', 'story', 'character_ref', 'script', 'end_frame_prompts', 'end_frame_gen', 'video_gen', 'concatenate'];
+let currentTaskType = 'creative'; // active task type tab
 
-// ── Init ──
+// Step definitions per task type
+const STEPS = {
+  simple: [
+    { key: 'submit', labelKey: 'sStepSubmit' },
+    { key: 'video_gen', labelKey: 'sStepVideoGen' },
+  ],
+  creative: [
+    { key: 'init', labelKey: 'cStepInit' },
+    { key: 'image_analysis', labelKey: 'cStepImageAnalysis' },
+    { key: 'story', labelKey: 'cStepStory' },
+    { key: 'character_ref', labelKey: 'cStepCharacterRef' },
+    { key: 'script', labelKey: 'cStepScript' },
+    { key: 'end_frame_prompts', labelKey: 'cStepEndFramePrompts' },
+    { key: 'end_frame_gen', labelKey: 'cStepEndFrameGen' },
+    { key: 'video_gen', labelKey: 'cStepVideoGen' },
+    { key: 'audio_subtitle', labelKey: 'cStepAudioSub' },
+    { key: 'concatenate', labelKey: 'cStepConcat' },
+  ],
+  manuscript: [
+    { key: 'split', labelKey: 'mStepSplit' },
+    { key: 'scene_prompts', labelKey: 'mStepScenePrompts' },
+    { key: 'video_gen', labelKey: 'mStepVideoGen' },
+    { key: 'audio_subtitle', labelKey: 'mStepAudioSub' },
+    { key: 'concatenate', labelKey: 'mStepConcat' },
+  ],
+};
+
+// ═══════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════
+
 (async function init() {
-  applyLanguage(localStorage.getItem('lang') || 'zh');
+  try { currentLang = localStorage.getItem('lang') || 'zh'; } catch(e) { currentLang = 'zh'; }
+  applyLanguage(currentLang);
 
   try {
     const r = await fetch('/api/config');
     const d = await r.json();
     if (d.api_key) {
-      document.getElementById('apikey-input').value = '';
       document.getElementById('apikey-input').placeholder = t('apiKeyMasked');
       document.getElementById('apikey-status').textContent = t('apiKeyConfigured');
       document.getElementById('apikey-status').className = 'text-xs px-2 py-1 rounded-full bg-green-900 text-green-300';
     }
   } catch(e) {}
 
+  // Character count for manuscript
+  document.getElementById('m_text').addEventListener('input', function() {
+    document.getElementById('m_char_count').textContent = this.value.length;
+  });
+
   autoReconnectRunningTask();
 })();
 
-// ── Toast ──
+// ═══════════════════════════════════════════════════
+// Toast
+// ═══════════════════════════════════════════════════
+
 function showToast(msg, duration = 2500) {
   let el = document.getElementById('toast');
   if (!el) {
@@ -973,146 +962,90 @@ function showToast(msg, duration = 2500) {
   }, duration);
 }
 
-// ── Task lifecycle ──
-function setRunning(taskId) {
-  isTaskRunning = true;
-  currentTaskId = taskId;
-  document.getElementById('btn-submit').disabled = true;
-  document.getElementById('btn-submit').textContent = t('taskRunning');
-}
+// ═══════════════════════════════════════════════════
+// Main Tabs (Create / List)
+// ═══════════════════════════════════════════════════
 
-function clearRunning() {
-  isTaskRunning = false;
-  currentTaskId = null;
-  document.getElementById('btn-submit').disabled = false;
-  document.getElementById('btn-submit').textContent = t('startGenerate');
-  document.getElementById('btn-stop').classList.add('hidden');
-}
-
-async function autoReconnectRunningTask() {
-  try {
-    const r = await fetch('/api/tasks');
-    const d = await r.json();
-    const running = (d.tasks || []).find(t => t.status === 'running');
-    if (running) {
-      setRunning(running.task_id);
-      currentDirName = running.dir_name || running.task_id;
-      showProgress(running.task_id, currentDirName);
-      connectWS(running.task_id);
-      restoreProgressFromTask(running.task_id);
-    }
-  } catch(e) {}
-}
-
-async function restoreProgressFromTask(taskId) {
-  try {
-    const r = await fetch('/api/tasks/' + taskId);
-    const state = await r.json();
-    currentDirName = state.dir_name || taskId;
-    const stepStatus = {
-      'step_image_analysis': 'image_analysis',
-      'step_story': 'story',
-      'step_character_ref': 'character_ref',
-      'step_script': 'script',
-      'step_end_frame_prompts': 'end_frame_prompts',
-      'step_end_frame_generation': 'end_frame_gen',
-      'step_video_generation': 'video_gen',
-      'step_concatenation': 'concatenate',
-    };
-    let maxCompletedIdx = 0;
-    for (const [key, stepName] of Object.entries(stepStatus)) {
-      if (state[key] === 'completed') {
-        markStepCompleted(stepName);
-        const idx = STEP_MAP[stepName];
-        if (idx !== undefined && idx > maxCompletedIdx) maxCompletedIdx = idx;
-      }
-    }
-    if (state.status === 'completed') {
-      document.getElementById('progress-bar').style.width = '100%';
-      document.getElementById('progress-pct').textContent = '100%';
-      ALL_STEPS.forEach(s => markStepCompleted(s));
-      showResult(state.final_video_file);
-    } else if (maxCompletedIdx > 0) {
-      const pct = Math.round((maxCompletedIdx / ALL_STEPS.length) * 100);
-      document.getElementById('progress-bar').style.width = pct + '%';
-      document.getElementById('progress-pct').textContent = pct + '%';
-    }
-  } catch(e) {}
-}
-
-function markStepCompleted(stepName) {
-  const el = document.querySelector(`.step-item[data-step="${stepName}"]`);
-  if (el) {
-    el.querySelector('.step-icon').textContent = '✓';
-    el.querySelector('.step-icon').className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-green-900 text-green-300 text-xs';
-    el.querySelector('.step-label').className = 'step-label text-green-400';
-  }
-}
-
-function showResult(videoPath) {
-  document.getElementById('result-area').classList.remove('hidden');
-  const video = document.getElementById('result-video');
-  if (videoPath) {
-    video.src = '/api/video/' + currentTaskId;
-  }
-}
-
-// ── API Key ──
-document.getElementById('apikey-save').onclick = async () => {
-  const key = document.getElementById('apikey-input').value.trim();
-  if (!key) return alert(t('enterApiKey'));
-  const form = new FormData();
-  form.append('api_key', key);
-  await fetch('/api/config', { method: 'POST', body: form });
-  document.getElementById('apikey-input').value = '';
-  document.getElementById('apikey-input').placeholder = t('apiKeyMasked');
-  document.getElementById('apikey-status').textContent = t('apiKeyConfigured');
-  document.getElementById('apikey-status').className = 'text-xs px-2 py-1 rounded-full bg-green-900 text-green-300';
-};
-
-// ── Tabs ──
-function switchTab(tab) {
-  if (tab === 'create' && isTaskRunning) {
-    showToast(t('taskRunningWarn'));
-    return;
-  }
-  if (tab === 'list' && isTaskRunning) {
-    showToast(t('taskRunningSwitch'));
-  }
-  document.querySelectorAll('.tab-btn').forEach(b => b.className = b.className.replace(/bg-purple-600 text-white/, 'bg-gray-800 text-gray-300 hover:bg-gray-700'));
-  document.getElementById('tab-' + tab).className = 'tab-btn px-5 py-2.5 rounded-lg text-sm font-medium bg-purple-600 text-white transition';
+function switchMainTab(tab) {
+  document.querySelectorAll('.mtab-btn').forEach(b => {
+    b.className = b.className.replace(/tab-active/, 'tab-inactive');
+  });
+  document.getElementById('mtab-' + tab).className = document.getElementById('mtab-' + tab).className.replace(/tab-inactive/, 'tab-active');
   document.getElementById('panel-create').classList.toggle('hidden', tab !== 'create');
   document.getElementById('panel-list').classList.toggle('hidden', tab !== 'list');
   if (tab === 'list') {
     loadTaskList();
-    if (!taskListTimer) {
-      taskListTimer = setInterval(loadTaskList, 5000);
-    }
+    if (!taskListTimer) taskListTimer = setInterval(loadTaskList, 5000);
   } else {
-    if (taskListTimer) {
-      clearInterval(taskListTimer);
-      taskListTimer = null;
-    }
+    if (taskListTimer) { clearInterval(taskListTimer); taskListTimer = null; }
   }
 }
 
-// ── End Frames ──
-function toggleEndFrames() {
-  const on = document.getElementById('use_custom_end_frames').checked;
-  document.getElementById('end-frames-container').classList.toggle('hidden', !on);
-  if (!on) document.getElementById('generate_end_frames_from_ref').checked = false;
+// ═══════════════════════════════════════════════════
+// Task Type Tabs
+// ═══════════════════════════════════════════════════
+
+function switchTaskType(type) {
+  currentTaskType = type;
+  document.querySelectorAll('.ttype-btn').forEach(b => {
+    b.className = b.className.replace(/tab-active/, 'tab-inactive');
+  });
+  document.getElementById('ttype-' + type).className = document.getElementById('ttype-' + type).className.replace(/tab-inactive/, 'tab-active');
+
+  ['simple', 'creative', 'manuscript'].forEach(t => {
+    document.getElementById('form-' + t).classList.toggle('hidden', t !== type);
+  });
 }
 
-function toggleEndFrameMode() {
-  const on = document.getElementById('generate_end_frames_from_ref').checked;
+// ═══════════════════════════════════════════════════
+// UI Helpers
+// ═══════════════════════════════════════════════════
+
+function toggleCollapse(id) {
+  const el = document.getElementById(id);
+  const arrow = document.getElementById(id + '-arrow');
+  if (el.classList.contains('hidden')) {
+    el.classList.remove('hidden');
+    if (arrow) arrow.textContent = '▼';
+  } else {
+    el.classList.add('hidden');
+    if (arrow) arrow.textContent = '▶';
+  }
+}
+
+function onSimpleModeChange() {
+  const mode = document.getElementById('s_mode').value;
+  document.getElementById('s_ref_section').classList.toggle('hidden', mode === 't2v');
+  document.getElementById('s_end_section').classList.toggle('hidden', mode !== 'keyframes');
+}
+
+function updateLabel(inputId, labelId) {
+  const f = document.getElementById(inputId).files[0];
+  document.getElementById(labelId).textContent = f ? f.name : t('notSelected');
+}
+
+function parseResolution(val) {
+  const [w, h] = val.split('x').map(Number);
+  return { width: w, height: h };
+}
+
+// Creative end frames
+function toggleCEndFrames() {
+  const on = document.getElementById('c_use_end_frames').checked;
+  document.getElementById('c-end-frames-container').classList.toggle('hidden', !on);
+  if (!on) document.getElementById('c_gen_end_from_ref').checked = false;
+}
+
+function toggleCEndFrameMode() {
+  const on = document.getElementById('c_gen_end_from_ref').checked;
   if (on) {
-    document.getElementById('use_custom_end_frames').checked = false;
-    document.getElementById('end-frames-container').classList.add('hidden');
+    document.getElementById('c_use_end_frames').checked = false;
+    document.getElementById('c-end-frames-container').classList.add('hidden');
   }
 }
 
-function addEndFrameInput() {
-  const container = document.getElementById('end-frame-inputs');
+function addCEndFrameInput() {
+  const container = document.getElementById('c-end-frame-inputs');
   const idx = container.children.length + 1;
   const div = document.createElement('div');
   div.className = 'flex items-center gap-3 mb-2';
@@ -1120,236 +1053,190 @@ function addEndFrameInput() {
   container.appendChild(div);
 }
 
-function updateRefLabel() {
-  const f = document.getElementById('reference_image').files[0];
-  document.getElementById('ref-name').textContent = f ? f.name : t('notSelected');
+// ═══════════════════════════════════════════════════
+// Submit Functions
+// ═══════════════════════════════════════════════════
+
+function setRunning(taskId) {
+  isTaskRunning = true;
+  currentTaskId = taskId;
+  ['btn-simple', 'btn-creative', 'btn-manuscript'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) { btn.disabled = true; btn.textContent = t('taskRunning'); }
+  });
 }
 
-// ── Create Task ──
-async function createTask() {
-  const idea = document.getElementById('idea').value.trim();
-  if (!idea) return alert(t('enterIdea'));
+function clearRunning() {
+  isTaskRunning = false;
+  currentTaskId = null;
+  ['btn-simple', 'btn-creative', 'btn-manuscript'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) { btn.disabled = false; btn.textContent = t('startGenerate'); }
+  });
+  document.getElementById('btn-stop').classList.add('hidden');
+}
 
-  if (isTaskRunning) {
-    showToast(t('taskRunningWarn'));
-    return;
-  }
+async function submitSimple() {
+  const prompt = document.getElementById('s_prompt').value.trim();
+  if (!prompt) return alert(t('enterPrompt'));
+  if (isTaskRunning) return showToast(t('taskRunningWarn'));
 
-  const btn = document.getElementById('btn-submit');
-  btn.disabled = true;
-  btn.textContent = t('submitting');
+  const btn = document.getElementById('btn-simple');
+  btn.disabled = true; btn.textContent = t('submitting');
 
   const form = new FormData();
-  form.append('idea', idea);
-  form.append('creative_name', document.getElementById('creative_name').value.trim());
-  form.append('user_requirement', document.getElementById('user_requirement').value);
-  form.append('style', document.getElementById('style').value);
-  form.append('chaining_mode', document.getElementById('chaining_mode').value);
-  form.append('video_width', document.getElementById('video_width').value);
-  form.append('video_height', document.getElementById('video_height').value);
-  form.append('use_custom_end_frames', document.getElementById('use_custom_end_frames').checked);
-  form.append('generate_end_frames_from_ref', document.getElementById('generate_end_frames_from_ref').checked);
+  form.append('prompt', prompt);
+  form.append('mode', document.getElementById('s_mode').value);
+  form.append('duration', document.getElementById('s_duration').value);
+  const res = parseResolution(document.getElementById('s_resolution').value);
+  form.append('video_width', res.width);
+  form.append('video_height', res.height);
+  const seed = document.getElementById('s_seed').value;
+  if (seed) form.append('seed', seed);
+  const neg = document.getElementById('s_negative').value;
+  if (neg) form.append('negative_prompt', neg);
 
-  const refFile = document.getElementById('reference_image').files[0];
+  const refFile = document.getElementById('s_ref_image').files[0];
   if (refFile) form.append('reference_image', refFile);
+  const endFile = document.getElementById('s_end_image').files[0];
+  if (endFile) form.append('end_frame_image', endFile);
 
   try {
-    const r = await fetch('/api/tasks', { method: 'POST', body: form });
+    const r = await fetch('/api/tasks/simple', { method: 'POST', body: form });
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || t('failCreate'));
+    currentTaskType = 'simple';
     setRunning(d.task_id);
-    currentDirName = d.dir_name || d.task_id;
-    showProgress(currentTaskId, currentDirName);
-    connectWS(currentTaskId);
+    currentDirName = d.dir_name;
+    showProgress(d.task_id, d.dir_name);
+    connectWS(d.task_id);
     showToast(t('submitted'), 5000);
   } catch(e) {
     alert(t('failCreate') + ': ' + e.message);
-    btn.disabled = false;
-    btn.textContent = t('startGenerate');
+    btn.disabled = false; btn.textContent = t('startGenerate');
   }
 }
 
-// ── Task List ──
-async function loadTaskList() {
-  const container = document.getElementById('task-list-container');
+async function submitCreative() {
+  const idea = document.getElementById('c_idea').value.trim();
+  if (!idea) return alert(t('enterIdea'));
+  if (isTaskRunning) return showToast(t('taskRunningWarn'));
+
+  const btn = document.getElementById('btn-creative');
+  btn.disabled = true; btn.textContent = t('submitting');
+
+  const form = new FormData();
+  form.append('idea', idea);
+  form.append('creative_name', document.getElementById('c_name').value.trim());
+  form.append('user_requirement', document.getElementById('c_requirement').value);
+  form.append('style', document.getElementById('c_style').value);
+  form.append('chaining_mode', document.getElementById('c_chaining').value);
+  const res = parseResolution(document.getElementById('c_resolution').value);
+  form.append('video_width', res.width);
+  form.append('video_height', res.height);
+  form.append('use_custom_end_frames', document.getElementById('c_use_end_frames').checked);
+  form.append('generate_end_frames_from_ref', document.getElementById('c_gen_end_from_ref').checked);
+
+  const refFile = document.getElementById('c_ref_image').files[0];
+  if (refFile) form.append('reference_image', refFile);
+
+  // Audio config
+  form.append('audio_enabled', document.getElementById('c_audio_enabled').checked);
+  form.append('audio_voice', document.getElementById('c_voice').value);
+  form.append('audio_rate', document.getElementById('c_rate').value);
+  form.append('subtitle_font', document.getElementById('c_sub_font').value);
+  form.append('subtitle_color', document.getElementById('c_sub_color').value);
+  form.append('subtitle_fontsize', document.getElementById('c_sub_fontsize').value);
+  form.append('subtitle_position', document.getElementById('c_sub_position').value);
+  form.append('subtitle_stroke_color', document.getElementById('c_sub_stroke_color').value);
+  form.append('subtitle_stroke_width', document.getElementById('c_sub_stroke_width').value);
+  form.append('subtitle_bg_color', document.getElementById('c_sub_bg_color').value);
+
   try {
-    const r = await fetch('/api/tasks');
+    const r = await fetch('/api/tasks/creative', { method: 'POST', body: form });
     const d = await r.json();
-    const tasks = d.tasks || [];
-    if (!tasks.length) {
-      container.innerHTML = '<p class="text-gray-500 text-sm">' + t('noTasks') + '</p>';
-      return;
-    }
-    container.innerHTML = tasks.map(task => {
-      const statusColors = { completed: 'text-green-400', running: 'text-yellow-400', failed: 'text-red-400', pending: 'text-gray-400' };
-      const statusLabels = { completed: t('statusCompleted'), running: t('statusRunning'), failed: t('statusFailed'), pending: t('statusPending') };
-      const isCompleted = task.status === 'completed';
-      const isRunning = task.status === 'running';
-      const btnLabel = isCompleted ? t('btnView') : (isRunning ? t('btnViewProgress') : t('btnResume'));
-      const btnAction = isCompleted ? `viewTask('${task.task_id}')` : (isRunning ? `viewRunningTask('${task.task_id}')` : `resumeTask('${task.task_id}')`);
-      const stopBtn = isRunning ? `<button onclick="stopTaskById('${task.task_id}')" class="text-xs px-3 py-1.5 bg-red-700 hover:bg-red-600 text-red-100 rounded-lg transition">${t('btnStop')}</button>` : '';
-      return `<div class="bg-gray-900 rounded-xl p-4 border border-gray-800 flex items-center justify-between">
-        <div>
-          <p class="text-sm font-medium">${task.creative_name || task.task_id}</p>
-          <p class="text-xs text-gray-500 mt-1">${task.task_id} · ${task.chaining_mode || 'none'}${task.scene_count ? ' · ' + task.scene_count + t('sceneUnit') : ''}</p>
-          <p class="text-xs text-gray-600 mt-0.5">${t('dir')}: <span class="font-mono">${task.dir_name || task.task_id}</span></p>
-          ${task.idea ? `<p class="text-xs text-gray-600 mt-1 truncate max-w-xs">${task.idea}</p>` : ''}
-        </div>
-        <div class="flex items-center gap-3">
-          <span class="text-xs ${statusColors[task.status] || 'text-gray-400'}">${statusLabels[task.status] || task.status}</span>
-          <button onclick="${btnAction}" class="text-xs px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg transition">${btnLabel}</button>
-          ${stopBtn}
-        </div>
-      </div>`;
-    }).join('');
+    if (!d.ok) throw new Error(d.detail || t('failCreate'));
+    currentTaskType = 'creative';
+    setRunning(d.task_id);
+    currentDirName = d.dir_name;
+    showProgress(d.task_id, d.dir_name);
+    connectWS(d.task_id);
+    showToast(t('submitted'), 5000);
   } catch(e) {
-    container.innerHTML = '<p class="text-red-400 text-sm">' + t('loadFailed') + '</p>';
+    alert(t('failCreate') + ': ' + e.message);
+    btn.disabled = false; btn.textContent = t('startGenerate');
   }
 }
 
-async function viewTask(taskId) {
-  try {
-    const r = await fetch('/api/tasks/' + taskId);
-    const state = await r.json();
-    showTaskDetail(taskId, state);
-  } catch(e) {
-    alert(t('failLoad') + ': ' + e.message);
-  }
-}
+async function submitManuscript() {
+  const text = document.getElementById('m_text').value.trim();
+  if (!text) return alert(t('enterText'));
+  if (isTaskRunning) return showToast(t('taskRunningWarn'));
 
-async function viewRunningTask(taskId) {
-  setRunning(taskId);
-  try {
-    const r = await fetch('/api/tasks/' + taskId);
-    const state = await r.json();
-    currentDirName = state.dir_name || taskId;
-  } catch(e) { currentDirName = taskId; }
-  showProgress(taskId, currentDirName);
-  connectWS(taskId);
-  restoreProgressFromTask(taskId);
-}
+  const btn = document.getElementById('btn-manuscript');
+  btn.disabled = true; btn.textContent = t('submitting');
 
-async function resumeTask(taskId) {
-  if (isTaskRunning) {
-    showToast(t('taskRunningWarn'));
-    return;
-  }
+  const form = new FormData();
+  form.append('manuscript_text', text);
+  form.append('creative_name', document.getElementById('m_name').value.trim());
+  const res = parseResolution(document.getElementById('m_resolution').value);
+  form.append('video_width', res.width);
+  form.append('video_height', res.height);
+
+  // Audio config
+  form.append('audio_enabled', document.getElementById('m_audio_enabled').checked);
+  form.append('audio_voice', document.getElementById('m_voice').value);
+  form.append('audio_rate', document.getElementById('m_rate').value);
+  form.append('subtitle_font', document.getElementById('m_sub_font').value);
+  form.append('subtitle_color', document.getElementById('m_sub_color').value);
+  form.append('subtitle_fontsize', document.getElementById('m_sub_fontsize').value);
+  form.append('subtitle_position', document.getElementById('m_sub_position').value);
+  form.append('subtitle_stroke_color', document.getElementById('m_sub_stroke_color').value);
+  form.append('subtitle_stroke_width', document.getElementById('m_sub_stroke_width').value);
+  form.append('subtitle_bg_color', document.getElementById('m_sub_bg_color').value);
+
   try {
-    const r = await fetch('/api/tasks/' + taskId + '/resume', { method: 'POST' });
+    const r = await fetch('/api/tasks/manuscript', { method: 'POST', body: form });
     const d = await r.json();
-    if (!d.ok) throw new Error(d.detail || t('failResume'));
-    setRunning(taskId);
-    currentDirName = d.dir_name || taskId;
-    showProgress(taskId, currentDirName);
-    connectWS(taskId);
-    restoreProgressFromTask(taskId);
-    showToast(t('resumed'), 5000);
+    if (!d.ok) throw new Error(d.detail || t('failCreate'));
+    currentTaskType = 'manuscript';
+    setRunning(d.task_id);
+    currentDirName = d.dir_name;
+    showProgress(d.task_id, d.dir_name);
+    connectWS(d.task_id);
+    showToast(t('submitted'), 5000);
   } catch(e) {
-    alert(t('failResume') + ': ' + e.message);
+    alert(t('failCreate') + ': ' + e.message);
+    btn.disabled = false; btn.textContent = t('startGenerate');
   }
 }
 
-// ── Stop Task ──
-async function stopTask() {
-  if (!currentTaskId) return;
-  if (!confirm(t('stopConfirm'))) return;
-  const btn = document.getElementById('btn-stop');
-  btn.disabled = true;
-  btn.textContent = t('stopping');
-  try {
-    const r = await fetch('/api/tasks/' + currentTaskId + '/stop', { method: 'POST' });
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.detail || t('failStop'));
-    showToast(t('stopped'), 4000);
-  } catch(e) {
-    alert(t('failStop') + ': ' + e.message);
-    btn.disabled = false;
-    btn.textContent = t('stopTask');
-  }
+// ═══════════════════════════════════════════════════
+// Progress
+// ═══════════════════════════════════════════════════
+
+function getStepsForType(taskType) {
+  return STEPS[taskType] || STEPS.creative;
 }
 
-async function stopTaskById(taskId) {
-  if (!confirm(t('stopConfirmById'))) return;
-  try {
-    const r = await fetch('/api/tasks/' + taskId + '/stop', { method: 'POST' });
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.detail || t('failStop'));
-    showToast(t('stoppedById'), 3000);
-    loadTaskList();
-  } catch(e) {
-    alert(t('failStop') + ': ' + e.message);
-  }
-}
-
-// ── Task Detail ──
-function showTaskDetail(taskId, state) {
+function showProgress(taskId, dirName) {
   const panel = document.getElementById('progress-panel');
   panel.classList.remove('hidden');
-  document.getElementById('result-area').classList.add('hidden');
-
-  const stepsHtml = ALL_STEPS.map(step => {
-    const stepKey = {
-      'image_analysis': 'step_image_analysis', 'story': 'step_story',
-      'character_ref': 'step_character_ref', 'script': 'step_script',
-      'end_frame_prompts': 'step_end_frame_prompts', 'end_frame_gen': 'step_end_frame_generation',
-      'video_gen': 'step_video_generation', 'concatenate': 'step_concatenation',
-    };
-    const key = stepKey[step];
-    const isDone = key ? state[key] === 'completed' : (step === 'init');
-    const icon = isDone ? '✓' : '○';
-    const iconClass = isDone ? 'bg-green-900 text-green-300' : 'bg-gray-800 text-xs';
-    const labelClass = isDone ? 'text-green-400' : 'text-gray-500';
-    return `<div class="step-item flex items-center gap-3 text-sm" data-step="${step}">
-      <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full ${iconClass} text-xs">${icon}</span>
-      <span class="step-label ${labelClass}">${getStepLabel(step)}</span>
-    </div>`;
-  }).join('');
-
-  document.getElementById('steps-container').innerHTML = stepsHtml;
-  document.getElementById('progress-bar').style.width = '100%';
-  document.getElementById('progress-pct').textContent = '100%';
-  document.getElementById('progress-message').innerHTML = `
-    <div class="space-y-2">
-      <p class="text-green-400 font-medium">${t('taskComplete')}</p>
-      <p class="text-gray-500">${t('taskId')}: ${taskId}</p>
-      <p class="text-gray-500">${t('dir')}: <code class="text-xs bg-gray-800 px-1 py-0.5 rounded font-mono">${state.dir_name || taskId}</code></p>
-      <p class="text-gray-500">${t('idea_')}: ${(state.idea || '').substring(0, 100)}</p>
-      <p class="text-gray-500">${t('sceneCount')}: ${state.scene_count || 0}</p>
-      <p class="text-gray-500">${t('chainingMode_')}: ${state.chaining_mode || 'none'}</p>
-      ${state.final_video_file ? `<p class="text-gray-500">${t('artifact')}: <code class="text-xs bg-gray-800 px-1 py-0.5 rounded">${state.final_video_file}</code></p>` : ''}
-    </div>`;
-
-  if (state.final_video_file) {
-    document.getElementById('result-area').classList.remove('hidden');
-    document.getElementById('result-video').src = '/api/video/' + taskId;
-  }
-}
-
-function getStepLabel(step) {
-  const labels = {
-    init: t('stepInit'), image_analysis: t('stepImageAnalysis'), story: t('stepStory'),
-    character_ref: t('stepCharacterRef'), script: t('stepScript'),
-    end_frame_prompts: t('stepEndFramePrompts'), end_frame_gen: t('stepEndFrameGen'),
-    video_gen: t('stepVideoGen'), concatenate: t('stepConcatenate'),
-  };
-  return labels[step] || step;
-}
-
-// ── Progress ──
-function showProgress(taskId, dirName) {
-  document.getElementById('progress-panel').classList.remove('hidden');
   document.getElementById('result-area').classList.add('hidden');
   document.getElementById('btn-stop').classList.remove('hidden');
   document.getElementById('progress-bar').style.width = '0%';
   document.getElementById('progress-pct').textContent = '0%';
-  const dirInfo = dirName ? '<br><span class="text-gray-600 text-xs">' + t('dir') + ': <span class="font-mono">' + dirName + '</span></span>' : '';
-  document.getElementById('progress-message').innerHTML = '<span class="text-yellow-400">' + t('watchLog') + '</span><br><span class="text-gray-500">' + t('task_') + ': ' + taskId + '</span>' + dirInfo;
-  document.getElementById('steps-container').innerHTML = ALL_STEPS.map(step => `
-    <div class="step-item flex items-center gap-3 text-sm" data-step="${step}">
+
+  const steps = getStepsForType(currentTaskType);
+  document.getElementById('steps-container').innerHTML = steps.map(s => `
+    <div class="step-item flex items-center gap-3 text-sm" data-step="${s.key}">
       <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
-      <span class="step-label text-gray-500">${getStepLabel(step)}</span>
+      <span class="step-label text-gray-500">${t(s.labelKey)}</span>
     </div>
   `).join('');
+
+  const dirInfo = dirName ? `<br><span class="text-gray-600 text-xs">${t('dir')}: <span class="font-mono">${dirName}</span></span>` : '';
+  document.getElementById('progress-message').innerHTML = `<span class="text-yellow-400">${t('watchLog')}</span><br><span class="text-gray-500">${t('task_')}: ${taskId}</span>${dirInfo}`;
 }
 
 function connectWS(taskId) {
@@ -1386,17 +1273,20 @@ function connectWS(taskId) {
       }
     }
 
-    if (msg.status === 'running' && STEP_MAP[step] !== undefined) {
-      Object.entries(STEP_MAP).forEach(([s, idx]) => {
-        if (idx < STEP_MAP[step]) {
-          const el = document.querySelector(`.step-item[data-step="${s}"]`);
+    // Mark all prior steps as completed when a step is running
+    if (msg.status === 'running') {
+      const steps = getStepsForType(currentTaskType);
+      const idx = steps.findIndex(s => s.key === step);
+      if (idx > 0) {
+        for (let i = 0; i < idx; i++) {
+          const el = document.querySelector(`.step-item[data-step="${steps[i].key}"]`);
           if (el) {
             el.querySelector('.step-icon').textContent = '✓';
             el.querySelector('.step-icon').className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-green-900 text-green-300 text-xs';
             el.querySelector('.step-label').className = 'step-label text-green-400';
           }
         }
-      });
+      }
     }
 
     if (step === 'done' && msg.status === 'completed') {
@@ -1410,7 +1300,7 @@ function connectWS(taskId) {
         <div class="p-4 bg-red-950 border border-red-800 rounded-lg space-y-2">
           <p class="text-red-400 font-medium">${t('genFailed')}</p>
           <p class="text-gray-400 text-xs">${msg.message || t('genFailedMsg')}</p>
-          <button onclick="switchTab('list')" class="mt-1 text-xs px-3 py-1.5 bg-red-800 hover:bg-red-700 text-red-100 rounded-lg transition">${t('gotoResume')}</button>
+          <button onclick="switchMainTab('list')" class="mt-1 text-xs px-3 py-1.5 bg-red-800 hover:bg-red-700 text-red-100 rounded-lg transition">${t('gotoResume')}</button>
         </div>`;
     }
   };
@@ -1418,28 +1308,287 @@ function connectWS(taskId) {
   ws.onclose = (e) => {
     ws = null;
     if (isTaskRunning && e.code !== 1000) {
-      console.warn('WebSocket closed unexpectedly, code:', e.code, 'reason:', e.reason);
       clearRunning();
       document.getElementById('progress-message').innerHTML = `
         <div class="p-4 bg-yellow-950 border border-yellow-800 rounded-lg space-y-2">
           <p class="text-yellow-400 font-medium">${t('connLost')}</p>
           <p class="text-gray-400 text-xs">${t('connLostMsg')}</p>
-          <button onclick="switchTab('list')" class="mt-1 text-xs px-3 py-1.5 bg-yellow-800 hover:bg-yellow-700 text-yellow-100 rounded-lg transition">${t('gotoList')}</button>
+          <button onclick="switchMainTab('list')" class="mt-1 text-xs px-3 py-1.5 bg-yellow-800 hover:bg-yellow-700 text-yellow-100 rounded-lg transition">${t('gotoList')}</button>
         </div>`;
     }
   };
+
   ws.onerror = (e) => {
-    console.error('WebSocket error:', e);
     if (isTaskRunning) {
       document.getElementById('progress-message').textContent = t('reconnecting');
-      setTimeout(() => {
-        if (isTaskRunning && !ws) {
-          connectWS(taskId);
-        }
-      }, 3000);
+      setTimeout(() => { if (isTaskRunning && !ws) connectWS(taskId); }, 3000);
     }
   };
 }
+
+function showResult(videoPath) {
+  document.getElementById('result-area').classList.remove('hidden');
+  if (videoPath && currentTaskId) {
+    document.getElementById('result-video').src = '/api/video/' + currentTaskId;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Auto-reconnect
+// ═══════════════════════════════════════════════════
+
+async function autoReconnectRunningTask() {
+  try {
+    const r = await fetch('/api/tasks');
+    const d = await r.json();
+    const running = (d.tasks || []).find(t => t.status === 'running');
+    if (running) {
+      currentTaskType = running.task_type || 'creative';
+      setRunning(running.task_id);
+      currentDirName = running.dir_name || running.task_id;
+      showProgress(running.task_id, currentDirName);
+      connectWS(running.task_id);
+      restoreProgressFromTask(running.task_id);
+    }
+  } catch(e) {}
+}
+
+async function restoreProgressFromTask(taskId) {
+  try {
+    const r = await fetch('/api/tasks/' + taskId);
+    const state = await r.json();
+    currentDirName = state.dir_name || taskId;
+    currentTaskType = state.task_type || 'creative';
+
+    const steps = getStepsForType(currentTaskType);
+    document.getElementById('steps-container').innerHTML = steps.map(s => `
+      <div class="step-item flex items-center gap-3 text-sm" data-step="${s.key}">
+        <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full bg-gray-800 text-xs">○</span>
+        <span class="step-label text-gray-500">${t(s.labelKey)}</span>
+      </div>
+    `).join('');
+
+    if (state.status === 'completed') {
+      document.getElementById('progress-bar').style.width = '100%';
+      document.getElementById('progress-pct').textContent = '100%';
+      steps.forEach(s => markStepCompleted(s.key));
+      showResult(state.final_video_file);
+    }
+  } catch(e) {}
+}
+
+function markStepCompleted(stepKey) {
+  const el = document.querySelector(`.step-item[data-step="${stepKey}"]`);
+  if (el) {
+    el.querySelector('.step-icon').textContent = '✓';
+    el.querySelector('.step-icon').className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-green-900 text-green-300 text-xs';
+    el.querySelector('.step-label').className = 'step-label text-green-400';
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Task List
+// ═══════════════════════════════════════════════════
+
+async function loadTaskList() {
+  const container = document.getElementById('task-list-container');
+  try {
+    const r = await fetch('/api/tasks');
+    const d = await r.json();
+    const tasks = d.tasks || [];
+    if (!tasks.length) {
+      container.innerHTML = '<p class="text-gray-500 text-sm">' + t('noTasks') + '</p>';
+      return;
+    }
+    container.innerHTML = tasks.map(task => {
+      const statusColors = { completed: 'text-green-400', running: 'text-yellow-400', failed: 'text-red-400', pending: 'text-gray-400' };
+      const statusLabels = { completed: t('statusCompleted'), running: t('statusRunning'), failed: t('statusFailed'), pending: t('statusPending') };
+      const typeLabels = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript') };
+      const typeColors = { simple: 'bg-blue-900 text-blue-300', creative: 'bg-purple-900 text-purple-300', manuscript: 'bg-orange-900 text-orange-300' };
+      const isCompleted = task.status === 'completed';
+      const isRunning = task.status === 'running';
+      const btnLabel = isCompleted ? t('btnView') : (isRunning ? t('btnViewProgress') : t('btnResume'));
+      const btnAction = isCompleted ? `viewTask('${task.task_id}')` : (isRunning ? `viewRunningTask('${task.task_id}')` : `resumeTask('${task.task_id}')`);
+      const stopBtn = isRunning ? `<button onclick="stopTaskById('${task.task_id}')" class="text-xs px-3 py-1.5 bg-red-700 hover:bg-red-600 text-red-100 rounded-lg transition">${t('btnStop')}</button>` : '';
+      const typeBadge = `<span class="text-xs px-2 py-0.5 rounded-full ${typeColors[task.task_type] || 'bg-gray-800 text-gray-400'}">${typeLabels[task.task_type] || task.task_type}</span>`;
+      const desc = task.idea || task.prompt || (task.manuscript_text || '').substring(0, 80);
+      const extra = task.scene_count ? ` · ${task.scene_count}${t('sceneUnit')}` : (task.paragraph_count ? ` · ${task.paragraph_count}${t('paraUnit')}` : '');
+      return `<div class="bg-gray-900 rounded-xl p-4 border border-gray-800 flex items-center justify-between">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">${typeBadge}<p class="text-sm font-medium truncate">${task.creative_name || task.task_id}</p></div>
+          <p class="text-xs text-gray-500 mt-0.5">${task.task_id}${extra}</p>
+          ${desc ? `<p class="text-xs text-gray-600 mt-1 truncate max-w-xs">${desc}</p>` : ''}
+        </div>
+        <div class="flex items-center gap-3 ml-3">
+          <span class="text-xs ${statusColors[task.status] || 'text-gray-400'}">${statusLabels[task.status] || task.status}</span>
+          <button onclick="${btnAction}" class="text-xs px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg transition">${btnLabel}</button>
+          ${stopBtn}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = '<p class="text-red-400 text-sm">' + t('loadFailed') + '</p>';
+  }
+}
+
+async function viewTask(taskId) {
+  try {
+    const r = await fetch('/api/tasks/' + taskId);
+    const state = await r.json();
+    currentTaskType = state.task_type || 'creative';
+    showTaskDetail(taskId, state);
+  } catch(e) { alert(t('failLoad') + ': ' + e.message); }
+}
+
+async function viewRunningTask(taskId) {
+  try {
+    const r = await fetch('/api/tasks/' + taskId);
+    const state = await r.json();
+    currentTaskType = state.task_type || 'creative';
+  } catch(e) { currentTaskType = 'creative'; }
+  setRunning(taskId);
+  showProgress(taskId, null);
+  connectWS(taskId);
+  restoreProgressFromTask(taskId);
+}
+
+async function resumeTask(taskId) {
+  if (isTaskRunning) return showToast(t('taskRunningWarn'));
+  try {
+    const r = await fetch('/api/tasks/' + taskId + '/resume', { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.detail || t('failResume'));
+    // Determine task type from detail
+    try {
+      const sr = await fetch('/api/tasks/' + taskId);
+      const st = await sr.json();
+      currentTaskType = st.task_type || 'creative';
+    } catch(e) { currentTaskType = 'creative'; }
+    setRunning(taskId);
+    currentDirName = d.dir_name;
+    showProgress(taskId, d.dir_name);
+    connectWS(taskId);
+    restoreProgressFromTask(taskId);
+    showToast(t('resumed'), 5000);
+  } catch(e) { alert(t('failResume') + ': ' + e.message); }
+}
+
+// ═══════════════════════════════════════════════════
+// Stop
+// ═══════════════════════════════════════════════════
+
+async function stopTask() {
+  if (!currentTaskId) return;
+  if (!confirm(t('stopConfirm'))) return;
+  const btn = document.getElementById('btn-stop');
+  btn.disabled = true; btn.textContent = t('stopping');
+  try {
+    const r = await fetch('/api/tasks/' + currentTaskId + '/stop', { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.detail || t('failStop'));
+    showToast(t('stopped'), 4000);
+  } catch(e) {
+    alert(t('failStop') + ': ' + e.message);
+    btn.disabled = false; btn.textContent = t('stopTask');
+  }
+}
+
+async function stopTaskById(taskId) {
+  if (!confirm(t('stopConfirmById'))) return;
+  try {
+    const r = await fetch('/api/tasks/' + taskId + '/stop', { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.detail || t('failStop'));
+    showToast(t('stoppedById'), 3000);
+    loadTaskList();
+  } catch(e) { alert(t('failStop') + ': ' + e.message); }
+}
+
+// ═══════════════════════════════════════════════════
+// Task Detail
+// ═══════════════════════════════════════════════════
+
+function showTaskDetail(taskId, state) {
+  const panel = document.getElementById('progress-panel');
+  panel.classList.remove('hidden');
+  document.getElementById('result-area').classList.add('hidden');
+
+  const taskType = state.task_type || 'creative';
+  const steps = getStepsForType(taskType);
+
+  // Map step keys to state fields for creative
+  const creativeStepMap = {
+    image_analysis: 'step_image_analysis', story: 'step_story',
+    character_ref: 'step_character_ref', script: 'step_script',
+    end_frame_prompts: 'step_end_frame_prompts', end_frame_gen: 'step_end_frame_generation',
+    video_gen: 'step_video_generation', audio_subtitle: 'step_audio_subtitle',
+    concatenate: 'step_concatenation',
+  };
+  const manuscriptStepMap = {
+    split: 'step_split', scene_prompts: 'step_scene_prompts',
+    video_gen: 'step_video_generation', audio_subtitle: 'step_audio_subtitle',
+    concatenate: 'step_concatenation',
+  };
+
+  const stepsHtml = steps.map(s => {
+    let stateField = null;
+    if (taskType === 'creative') stateField = creativeStepMap[s.key];
+    else if (taskType === 'manuscript') stateField = manuscriptStepMap[s.key];
+    const isDone = stateField ? state[stateField] === 'completed' : (s.key === 'init' || s.key === 'submit');
+    const icon = isDone ? '✓' : '○';
+    const iconClass = isDone ? 'bg-green-900 text-green-300' : 'bg-gray-800 text-xs';
+    const labelClass = isDone ? 'text-green-400' : 'text-gray-500';
+    return `<div class="step-item flex items-center gap-3 text-sm" data-step="${s.key}">
+      <span class="step-icon w-5 h-5 flex items-center justify-center rounded-full ${iconClass} text-xs">${icon}</span>
+      <span class="step-label ${labelClass}">${t(s.labelKey)}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('steps-container').innerHTML = stepsHtml;
+  document.getElementById('progress-bar').style.width = '100%';
+  document.getElementById('progress-pct').textContent = '100%';
+
+  const typeLabel = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript') };
+  let extraInfo = '';
+  if (taskType === 'creative') {
+    extraInfo = `<p class="text-gray-500">${t('idea_')}: ${(state.idea || '').substring(0, 100)}</p>
+      <p class="text-gray-500">${t('sceneCount')}: ${state.scene_count || 0}</p>`;
+  } else if (taskType === 'manuscript') {
+    extraInfo = `<p class="text-gray-500">${t('paragraphCount')}: ${(state.paragraphs || []).length}</p>`;
+  } else {
+    extraInfo = `<p class="text-gray-500">Prompt: ${(state.prompt || '').substring(0, 100)}</p>`;
+  }
+
+  document.getElementById('progress-message').innerHTML = `
+    <div class="space-y-2">
+      <p class="text-green-400 font-medium">${t('taskComplete')}</p>
+      <p class="text-gray-500">${t('taskId')}: ${taskId} · ${typeLabel[taskType] || taskType}</p>
+      <p class="text-gray-500">${t('dir')}: <code class="text-xs bg-gray-800 px-1 py-0.5 rounded font-mono">${state.dir_name || taskId}</code></p>
+      ${extraInfo}
+      ${state.final_video_file ? `<p class="text-gray-500">${t('artifact')}: <code class="text-xs bg-gray-800 px-1 py-0.5 rounded">${state.final_video_file}</code></p>` : ''}
+    </div>`;
+
+  if (state.final_video_file) {
+    document.getElementById('result-area').classList.remove('hidden');
+    document.getElementById('result-video').src = '/api/video/' + taskId;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// API Key
+// ═══════════════════════════════════════════════════
+
+document.getElementById('apikey-save').onclick = async () => {
+  const key = document.getElementById('apikey-input').value.trim();
+  if (!key) return alert(t('enterApiKey'));
+  const form = new FormData();
+  form.append('api_key', key);
+  await fetch('/api/config', { method: 'POST', body: form });
+  document.getElementById('apikey-input').value = '';
+  document.getElementById('apikey-input').placeholder = t('apiKeyMasked');
+  document.getElementById('apikey-status').textContent = t('apiKeyConfigured');
+  document.getElementById('apikey-status').className = 'text-xs px-2 py-1 rounded-full bg-green-900 text-green-300';
+};
 </script>
 
 </body>

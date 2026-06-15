@@ -1,7 +1,25 @@
-from enum import Enum
-from typing import List, Optional
-from pydantic import BaseModel, Field
+"""
+Agnes Video Generator v2.0 — 数据模型层
+
+定义所有任务类型的数据结构：
+- TaskType 枚举、VideoMode 枚举
+- SubtitleStyle、AudioConfig 配置类
+- BaseTaskState（共享字段）+ 三种任务子类
+- 请求/响应模型
+"""
+
+from __future__ import annotations
+
 import uuid
+from enum import Enum
+from typing import List, Literal, Optional, Tuple, Union
+
+from pydantic import BaseModel, Field, field_validator
+
+
+# ═══════════════════════════════════════════════════
+# 枚举
+# ═══════════════════════════════════════════════════
 
 
 class StepStatus(str, Enum):
@@ -11,7 +29,83 @@ class StepStatus(str, Enum):
     FAILED = "failed"
 
 
+class TaskType(str, Enum):
+    SIMPLE = "simple"
+    CREATIVE = "creative"
+    MANUSCRIPT = "manuscript"
+
+
+class VideoMode(str, Enum):
+    T2V = "t2v"
+    I2V = "i2v"
+    TI2VID = "ti2vid"
+    KEYFRAMES = "keyframes"
+
+
+# ═══════════════════════════════════════════════════
+# 配置类
+# ═══════════════════════════════════════════════════
+
+
+class SubtitleStyle(BaseModel):
+    """字幕样式配置（D4：P1 范围）"""
+
+    font: str = "STHeitiMedium.ttc"
+    color: str = "white"
+    position: tuple = ("center", "bottom-80")
+    fontsize: int = 48
+    stroke_color: str = "black"
+    stroke_width: int = 2
+    bg_color: tuple = (0, 0, 0, 128)
+
+    @field_validator("bg_color", mode="before")
+    @classmethod
+    def _coerce_bg_color(cls, v):
+        if isinstance(v, tuple):
+            return v
+        if isinstance(v, str):
+            if "@" in v:
+                parts = v.split("@", 1)
+                rgb = {"black": (0, 0, 0), "white": (255, 255, 255),
+                       "red": (255, 0, 0), "blue": (0, 0, 255),
+                       "yellow": (255, 255, 0)}.get(parts[0].strip().lower(), (0, 0, 0))
+                return (*rgb, int(float(parts[1]) * 255))
+            if v.lower() in ("none", "transparent", ""):
+                return None
+        return (0, 0, 0, 128)
+
+
+class AudioConfig(BaseModel):
+    """音频配置（TTS 语音 + 字幕样式）"""
+
+    enabled: bool = True
+    voice: str = "zh-CN-XiaoxiaoNeural"
+    rate: str = "+0%"
+    subtitle_style: SubtitleStyle = Field(default_factory=SubtitleStyle)
+
+
+# ═══════════════════════════════════════════════════
+# 子结构模型
+# ═══════════════════════════════════════════════════
+
+
+class ManuscriptParagraph(BaseModel):
+    """稿件段落（类型 3 专用）"""
+
+    index: int
+    text: str
+    scene_prompt: str = ""
+    same_scene_as_prev: bool = False
+    video_id: str = ""
+    video_file: str = ""
+    narration_audio: str = ""
+    subtitle_srt: str = ""
+    final_clip: str = ""
+
+
 class SceneTask(BaseModel):
+    """场景任务（类型 2 专用，v2.0 新增旁白/音频/字幕字段）"""
+
     index: int
     status: StepStatus = StepStatus.PENDING
     end_frame_prompt: str = ""
@@ -19,19 +113,61 @@ class SceneTask(BaseModel):
     video_id: str = ""
     video_status: StepStatus = StepStatus.PENDING
     video_file: str = ""
+    # v2.0 新增
+    narration_text: str = ""
+    narration_audio: str = ""
+    subtitle_srt: str = ""
+    final_clip: str = ""
 
 
-class TaskState(BaseModel):
+# ═══════════════════════════════════════════════════
+# 任务状态模型
+# ═══════════════════════════════════════════════════
+
+
+class BaseTaskState(BaseModel):
+    """所有任务共享的基础字段（抽象父类）"""
+
     task_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     creative_name: str = ""
+    task_type: TaskType
     status: StepStatus = StepStatus.PENDING
+    video_width: int = 1152
+    video_height: int = 768
+    final_video_file: str = ""
 
+
+class SimpleVideoTask(BaseTaskState):
+    """简单视频任务（类型 1）
+
+    用户直接输入 prompt，选择模式/时长/分辨率，调用 Agnes Video API 生成单个视频。
+    """
+
+    task_type: Literal[TaskType.SIMPLE] = TaskType.SIMPLE
+
+    prompt: str = ""
+    mode: VideoMode = VideoMode.T2V
+    reference_image: str = ""
+    end_frame_image: str = ""
+    duration: int = 5
+    seed: Optional[int] = None
+    negative_prompt: Optional[str] = None
+    video_id: str = ""
+
+
+class CreativeVideoTask(BaseTaskState):
+    """创意长视频任务（类型 2）
+
+    保持现有 TaskState 全部字段向后兼容，v2.0 新增音频/字幕配置和旁白列表。
+    """
+
+    task_type: Literal[TaskType.CREATIVE] = TaskType.CREATIVE
+
+    # ── 现有字段（保持兼容）──
     idea: str = ""
     user_requirement: str = ""
     style: str = ""
     chaining_mode: str = "none"
-    video_width: int = 1152
-    video_height: int = 768
     video_duration: int = 5
 
     reference_image: str = ""
@@ -63,8 +199,14 @@ class TaskState(BaseModel):
 
     step_video_generation: StepStatus = StepStatus.PENDING
 
+    # ── v2.0 新增：音频 + 字幕 ──
+    step_audio_subtitle: StepStatus = StepStatus.PENDING
+    audio_config: AudioConfig = Field(default_factory=AudioConfig)
+    narrations: List[str] = Field(default_factory=list)
+
     step_concatenation: StepStatus = StepStatus.PENDING
-    final_video_file: str = ""
+
+    # ── 辅助方法（保持向后兼容）──
 
     def all_scenes_completed(self) -> bool:
         return all(s.status == StepStatus.COMPLETED for s in self.scenes)
@@ -79,7 +221,73 @@ class TaskState(BaseModel):
         return [s for s in self.scenes if s.video_status != StepStatus.COMPLETED]
 
 
-class CreateTaskRequest(BaseModel):
+class ManuscriptVideoTask(BaseTaskState):
+    """稿件长视频任务（类型 3）
+
+    用户粘贴长文本 → 按朗读时间拆段 → 每段生成视频 prompt → 视频生成 → TTS+字幕 → 拼接。
+    """
+
+    task_type: Literal[TaskType.MANUSCRIPT] = TaskType.MANUSCRIPT
+
+    manuscript_text: str = ""
+    paragraphs: List[ManuscriptParagraph] = Field(default_factory=list)
+    audio_config: AudioConfig = Field(default_factory=AudioConfig)
+    video_duration: int = 10
+
+    combined_audio: str = ""
+    combined_subtitle: str = ""
+
+    step_split: StepStatus = StepStatus.PENDING
+    step_scene_prompts: StepStatus = StepStatus.PENDING
+    step_video_generation: StepStatus = StepStatus.PENDING
+    step_audio_subtitle: StepStatus = StepStatus.PENDING
+    step_concatenation: StepStatus = StepStatus.PENDING
+
+
+# ═══════════════════════════════════════════════════
+# 联合类型 + 反序列化工厂
+# ═══════════════════════════════════════════════════
+
+AnyTaskState = Union[SimpleVideoTask, CreativeVideoTask, ManuscriptVideoTask]
+
+# 用于 TaskManager.load()：根据 task_type 字段选择正确的模型类
+_TASK_TYPE_MAP: dict[str, type[BaseTaskState]] = {
+    TaskType.SIMPLE: SimpleVideoTask,
+    TaskType.CREATIVE: CreativeVideoTask,
+    TaskType.MANUSCRIPT: ManuscriptVideoTask,
+}
+
+
+def parse_task_state(data: dict) -> BaseTaskState:
+    """根据 task_type 字段反序列化为正确的任务子类。
+
+    向后兼容：如果 data 中没有 task_type 字段，默认视为 CREATIVE 类型（D6 决策）。
+    """
+    task_type_str = data.get("task_type", TaskType.CREATIVE)
+    model_cls = _TASK_TYPE_MAP.get(task_type_str, CreativeVideoTask)
+    return model_cls(**data)
+
+
+# ═══════════════════════════════════════════════════
+# 请求模型
+# ═══════════════════════════════════════════════════
+
+
+class CreateSimpleTaskRequest(BaseModel):
+    """创建简单视频任务的请求体"""
+
+    prompt: str
+    mode: str = "t2v"
+    duration: int = 5
+    video_width: int = 768
+    video_height: int = 1152
+    seed: Optional[int] = None
+    negative_prompt: Optional[str] = None
+
+
+class CreateCreativeTaskRequest(BaseModel):
+    """创建创意长视频任务的请求体"""
+
     idea: str
     user_requirement: str = "3个场景，每个场景10秒，电影质感"
     style: str = "电影质感写实风格"
@@ -87,6 +295,22 @@ class CreateTaskRequest(BaseModel):
     video_width: int = 768
     video_height: int = 1152
     video_duration: int = 5
+    audio_config: Optional[AudioConfig] = None
+
+
+class CreateManuscriptTaskRequest(BaseModel):
+    """创建稿件长视频任务的请求体"""
+
+    manuscript_text: str
+    video_width: int = 768
+    video_height: int = 1152
+    video_duration: int = 10
+    audio_config: Optional[AudioConfig] = None
+
+
+# ═══════════════════════════════════════════════════
+# 响应模型
+# ═══════════════════════════════════════════════════
 
 
 class TaskResponse(BaseModel):
@@ -105,3 +329,14 @@ class WSMessage(BaseModel):
     message: str = ""
     progress: float = 0.0
     data: dict = Field(default_factory=dict)
+
+
+# ═══════════════════════════════════════════════════
+# 向后兼容别名（Batch B/C 迁移完成后移除）
+# ═══════════════════════════════════════════════════
+
+# 旧代码中 TaskState 等同于 CreativeVideoTask（D6）
+TaskState = CreativeVideoTask
+
+# 旧请求模型映射到新的创意视频请求
+CreateTaskRequest = CreateCreativeTaskRequest
