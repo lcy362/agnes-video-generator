@@ -32,6 +32,43 @@ class SubtitleGenerator:
     """字幕生成器：cues → SRT + moviepy 叠加。"""
 
     @staticmethod
+    def _split_long_text(txt: str, max_chars_per_line: int = 14) -> str:
+        """将过长的字幕文本拆分为多行，避免单行溢出屏幕。
+
+        对 CJK 文本按字符数拆分，对非 CJK 文本按单词边界拆分。
+        最多拆为 2 行，尽量等长分配。
+
+        Args:
+            txt: 原始字幕文本
+            max_chars_per_line: 每行最大字符数（CJK）或单词数（非 CJK）
+
+        Returns:
+            可能含 \\n 的文本
+        """
+        if not txt or "\n" in txt:
+            return txt
+
+        has_cjk = any('\u4e00' <= ch <= '\u9fff' or '\u3400' <= ch <= '\u4dbf' for ch in txt)
+
+        if has_cjk:
+            if len(txt) <= max_chars_per_line:
+                return txt
+            # 拆为 2 行，尽量等长
+            mid = len(txt) // 2
+            # 在中间附近找标点或自然断点
+            for offset in range(min(4, mid)):
+                for candidate in (mid + offset, mid - offset):
+                    if 0 < candidate < len(txt) and txt[candidate - 1] in '，。、；！？,. ;!?':
+                        return txt[:candidate] + "\n" + txt[candidate:]
+            return txt[:mid] + "\n" + txt[mid:]
+        else:
+            words = txt.split()
+            if len(words) <= max_chars_per_line:
+                return txt
+            mid = len(words) // 2
+            return " ".join(words[:mid]) + "\n" + " ".join(words[mid:])
+
+    @staticmethod
     def cue_to_srt_time(seconds: float) -> str:
         """将秒数转换为 SRT 时间格式 HH:MM:SS,mmm。"""
         h = int(seconds // 3600)
@@ -349,19 +386,26 @@ class SubtitleGenerator:
                 else:
                     bg = (0, 0, 0, 128)
 
+            # 根据视频宽度动态计算每行最大字符数
+            available_w = video_clip.w - 40
+            # 粗略估算：CJK 字符宽 ≈ fontsize，latin 字符宽 ≈ fontsize * 0.5
+            cjk_max_chars = max(8, available_w // style.fontsize)
+
             # moviepy 的 SubtitlesClip 读取 SRT 文件
             def make_text_clip(txt):
                 from moviepy import TextClip
+                # 长文本自动拆为多行
+                wrapped = SubtitleGenerator._split_long_text(txt, cjk_max_chars)
                 return TextClip(
-                    text=txt,
+                    text=wrapped,
                     font=font_path,
                     font_size=style.fontsize,
                     color=style.color,
                     stroke_color=style.stroke_color,
                     stroke_width=style.stroke_width,
                     bg_color=bg,
-                    method="label",
-                    size=(video_clip.w - 40, None),
+                    method="caption",
+                    size=(available_w, None),
                     text_align="center",
                 )
 
