@@ -420,58 +420,68 @@ Generate a detailed English visual prompt for this paragraph.
         logger.info(f"[Screenwriter] Scene prompt: {prompt[:100]}...")
         return prompt
 
-    def generate_narration_for_scene(
-        self, scene_prompt: str, story_context: str, video_duration: float, style: str = ""
+    def generate_narration_for_video(
+        self, story: str, scenes: List[str], total_duration: float, style: str = ""
     ) -> str:
-        """为单个场景生成旁白文案（类型 2 专用）。
+        """为整个视频一次性生成旁白文案。
 
-        基于场景的视觉 prompt 和故事上下文，生成适合视频时长的中文旁白文本。
-        旁白用于 TTS 朗读和字幕显示。
+        基于故事全文和所有场景描述，生成一段完整的中文旁白文本，
+        时长匹配视频总时长（num_scenes * video_duration）。
 
         Args:
-            scene_prompt: 场景的英文视觉描述（来自 write_script）
-            story_context: 完整故事文本（提供上下文）
-            video_duration: 视频时长（秒），用于控制旁白长度
+            story: 完整故事文本
+            scenes: 所有场景的英文视觉描述列表
+            total_duration: 视频总时长（秒）
             style: 风格描述（可选）
 
         Returns:
-            中文旁白文本字符串
+            完整的中文旁白文本字符串
         """
-        max_chars = max(int(video_duration * 4.0), 20)
+        max_chars = max(int(total_duration * 4.0), 40)
+        scene_count = len(scenes)
+
+        scene_summary = "\n".join(
+            f"Scene {i+1}: {s[:300]}" for i, s in enumerate(scenes)
+        )
 
         system_prompt = f"""\
-You are a professional video narrator and scriptwriter. Given a scene's visual \
-description and the full story context, write a Chinese narration voiceover \
-for this specific scene.
+You are a professional video narrator and scriptwriter. Given the full story \
+and all scene visual descriptions, write a SINGLE CONTINUOUS Chinese narration \
+voiceover that covers the ENTIRE video from beginning to end.
 
 Rules:
 - Write in CHINESE (中文), natural and suitable for voiceover narration.
 - The narration should be {max_chars} characters or fewer to fit a \
-{video_duration:.0f}-second video clip (Chinese speech rate ~4 chars/sec).
-- Focus on what is happening in the scene — describe actions, emotions, \
-and atmosphere that complement the visuals.
+{total_duration:.0f}-second video ({scene_count} scenes × {total_duration/scene_count:.0f}s each, \
+Chinese speech rate ~4 chars/sec).
+- Tell the complete story as a cohesive voiceover — do NOT treat each \
+scene as a separate narration. This is ONE continuous narration for the \
+whole video.
+- Match the narration pacing to the visual flow: introduce the scene \
+context as the scene appears, describe actions/emotions/atmosphere.
 - Use vivid, cinematic language suitable for short video narration.
-- Do NOT repeat the visual description verbatim — narrate the STORY, \
-not the camera directions.
-- End with a natural sentence boundary (。！？) — do NOT truncate mid-sentence.
+- Do NOT repeat the visual descriptions verbatim — narrate the STORY.
+- End with a natural sentence boundary (。！？).
 - Output ONLY the narration text, no quotes, no explanation.
 
-The target length is approximately {max_chars} Chinese characters.
+The target length is approximately {max_chars} Chinese characters total.
 """
+        style_block = f"\n<style>{style}</style>\n" if style else ""
         user_prompt = f"""\
-<story_context>
-{story_context}
-</story_context>
+<story>
+{story}
+</story>
 
-<scene_visual>
-{scene_prompt}
-</scene_visual>
-
-Write a Chinese narration voiceover for this scene, approximately {max_chars} characters.
+<scenes>
+{scene_summary}
+</scenes>
+{style_block}
+Write ONE continuous Chinese narration voiceover for the entire video, \
+approximately {max_chars} characters total.
 """
         logger.info(
-            f"[Screenwriter] Generating narration for scene "
-            f"(max {max_chars} chars, {video_duration:.0f}s video)..."
+            f"[Screenwriter] Generating narration for video "
+            f"(max {max_chars} chars, {total_duration:.0f}s total, {scene_count} scenes)..."
         )
         narration = self._chat(system_prompt, user_prompt).strip()
         if narration.startswith("```"):
