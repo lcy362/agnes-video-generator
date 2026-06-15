@@ -51,6 +51,7 @@
     <div class="flex gap-3">
       <input id="apikey-input" type="password" data-i18n-placeholder="apiKeyPlaceholder" placeholder="输入 Agnes API Key" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
       <button id="apikey-save" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm font-medium transition" data-i18n="save">保存</button>
+      <button id="apikey-clear" class="px-5 py-2.5 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-medium transition hidden" data-i18n="clear">清除</button>
     </div>
   </div>
 
@@ -488,6 +489,8 @@ const T = {
     subtitle: 'AI 视频，一键生成',
     apiKeyTitle: 'API Key 配置', apiKeyNotConfigured: '未配置', apiKeyConfigured: '已配置',
     apiKeyPlaceholder: '输入 Agnes API Key', apiKeyMasked: '已配置 (●●●)', save: '保存',
+    clear: '清除', clearConfirm: '确定要清除已配置的 API Key 吗？', apiKeyFromEnv: '已配置 (环境变量)',
+    clearEnvHint: '当前 API Key 来自环境变量 AGNES_API_KEY，无法从界面清除。请取消环境变量后重试。',
     tabCreate: '新建任务', tabList: '任务列表',
     ttSimple: '简单视频', ttCreative: '创意长视频', ttManuscript: '稿件长视频',
     simpleSettings: '简单视频设置', creativeSettings: '创意设置', manuscriptSettings: '稿件设置',
@@ -546,6 +549,8 @@ const T = {
     subtitle: 'AI Video, One Click',
     apiKeyTitle: 'API Key Configuration', apiKeyNotConfigured: 'Not configured', apiKeyConfigured: 'Configured',
     apiKeyPlaceholder: 'Enter Agnes API Key', apiKeyMasked: 'Configured (●●●)', save: 'Save',
+    clear: 'Clear', clearConfirm: 'Are you sure you want to clear the configured API Key?', apiKeyFromEnv: 'Configured (env)',
+    clearEnvHint: 'The API Key is set via environment variable AGNES_API_KEY and cannot be cleared from the UI.',
     tabCreate: 'New Task', tabList: 'Task List',
     ttSimple: 'Simple Video', ttCreative: 'Creative Video', ttManuscript: 'Article Video',
     simpleSettings: 'Simple Video Settings', creativeSettings: 'Creative Settings', manuscriptSettings: 'Article Settings',
@@ -601,6 +606,8 @@ const T = {
     subtitle: 'AI Видео, Один клик',
     apiKeyTitle: 'API Key', apiKeyNotConfigured: 'Не настроен', apiKeyConfigured: 'Настроен',
     apiKeyPlaceholder: 'Введите Agnes API Key', apiKeyMasked: 'Настроен (●●●)', save: 'Сохранить',
+    clear: 'Очистить', clearConfirm: 'Вы уверены, что хотите удалить API Key?', apiKeyFromEnv: 'Настроен (env)',
+    clearEnvHint: 'API Key задан через переменную AGNES_API_KEY и не может быть удалён из интерфейса.',
     tabCreate: 'Новая задача', tabList: 'Список задач',
     ttSimple: 'Простое видео', ttCreative: 'Креативное видео', ttManuscript: 'Видео из статьи',
     simpleSettings: 'Настройки простого видео', creativeSettings: 'Настройки сценария', manuscriptSettings: 'Настройки статьи',
@@ -654,6 +661,8 @@ const T = {
     subtitle: 'AI動画、ワンクリック',
     apiKeyTitle: 'API Key 設定', apiKeyNotConfigured: '未設定', apiKeyConfigured: '設定済み',
     apiKeyPlaceholder: 'Agnes API Key を入力', apiKeyMasked: '設定済み (●●●)', save: '保存',
+    clear: 'クリア', clearConfirm: '設定済みのAPI Keyを削除しますか？', apiKeyFromEnv: '設定済み (環境変数)',
+    clearEnvHint: 'API Keyは環境変数 AGNES_API_KEY で設定されているため、画面から削除できません。',
     tabCreate: '新規タスク', tabList: 'タスク一覧',
     ttSimple: 'シンプル動画', ttCreative: 'クリエイティブ動画', ttManuscript: '記事動画',
     simpleSettings: 'シンプル設定', creativeSettings: 'クリエイティブ設定', manuscriptSettings: '記事設定',
@@ -704,6 +713,8 @@ const T = {
     subtitle: 'AI 영상, 원클릭',
     apiKeyTitle: 'API Key 설정', apiKeyNotConfigured: '미설정', apiKeyConfigured: '설정됨',
     apiKeyPlaceholder: 'Agnes API Key 입력', apiKeyMasked: '설정됨 (●●●)', save: '저장',
+    clear: '초기화', clearConfirm: '설정된 API Key를 삭제하시겠습니까?', apiKeyFromEnv: '설정됨 (환경변수)',
+    clearEnvHint: 'API Key가 환경변수 AGNES_API_KEY로 설정되어 있어 화면에서 삭제할 수 없습니다.',
     tabCreate: '새 작업', tabList: '작업 목록',
     ttSimple: '간단 영상', ttCreative: '크리에이티브 영상', ttManuscript: '기사 영상',
     simpleSettings: '간단 설정', creativeSettings: '크리에이티브 설정', manuscriptSettings: '기사 설정',
@@ -754,6 +765,8 @@ const T = {
     subtitle: 'Video AI, Satu Klik',
     apiKeyTitle: 'API Key', apiKeyNotConfigured: 'Belum', apiKeyConfigured: 'Sudah',
     apiKeyPlaceholder: 'Masukkan Agnes API Key', apiKeyMasked: 'Sudah (●●●)', save: 'Simpan',
+    clear: 'Padam', clearConfirm: 'Pasti mahu padam API Key?', apiKeyFromEnv: 'Sudah (env)',
+    clearEnvHint: 'API Key ditetapkan melalui pembolehubah AGNES_API_KEY dan tidak boleh dipadam dari UI.',
     tabCreate: 'Tugas Baru', tabList: 'Senarai Tugas',
     ttSimple: 'Video Ringkas', ttCreative: 'Video Kreatif', ttManuscript: 'Video Artikel',
     simpleSettings: 'Tetapan Ringkas', creativeSettings: 'Tetapan Kreatif', manuscriptSettings: 'Tetapan Artikel',
@@ -804,6 +817,8 @@ const T = {
     subtitle: 'Video AI, Satu Klik',
     apiKeyTitle: 'API Key', apiKeyNotConfigured: 'Belum', apiKeyConfigured: 'Sudah',
     apiKeyPlaceholder: 'Masukkan Agnes API Key', apiKeyMasked: 'Sudah (●●●)', save: 'Simpan',
+    clear: 'Hapus', clearConfirm: 'Yakin ingin menghapus API Key?', apiKeyFromEnv: 'Sudah (env)',
+    clearEnvHint: 'API Key diatur melalui variabel AGNES_API_KEY dan tidak dapat dihapus dari UI.',
     tabCreate: 'Tugas Baru', tabList: 'Daftar Tugas',
     ttSimple: 'Video Simpel', ttCreative: 'Video Kreatif', ttManuscript: 'Video Artikel',
     simpleSettings: 'Pengaturan Simpel', creativeSettings: 'Pengaturan Kreatif', manuscriptSettings: 'Pengaturan Artikel',
@@ -926,9 +941,7 @@ const STEPS = {
     const r = await fetch('/api/config');
     const d = await r.json();
     if (d.api_key) {
-      document.getElementById('apikey-input').placeholder = t('apiKeyMasked');
-      document.getElementById('apikey-status').textContent = t('apiKeyConfigured');
-      document.getElementById('apikey-status').className = 'text-xs px-2 py-1 rounded-full bg-green-900 text-green-300';
+      setApiKeyConfiguredUI(d.source, d.can_clear);
     }
   } catch(e) {}
 
@@ -1578,16 +1591,75 @@ function showTaskDetail(taskId, state) {
 // API Key
 // ═══════════════════════════════════════════════════
 
+function setApiKeyConfiguredUI(source, canClear) {
+  const input = document.getElementById('apikey-input');
+  const saveBtn = document.getElementById('apikey-save');
+  const clearBtn = document.getElementById('apikey-clear');
+  const statusEl = document.getElementById('apikey-status');
+
+  input.placeholder = t('apiKeyMasked');
+  input.value = '';
+  input.disabled = true;
+  input.classList.add('opacity-50', 'cursor-not-allowed');
+
+  saveBtn.disabled = true;
+  saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+  statusEl.textContent = source === 'env' ? t('apiKeyFromEnv') : t('apiKeyConfigured');
+  statusEl.className = 'text-xs px-2 py-1 rounded-full bg-green-900 text-green-300';
+
+  clearBtn.classList.remove('hidden');
+  clearBtn.dataset.source = source;
+}
+
+function resetApiKeyUI() {
+  const input = document.getElementById('apikey-input');
+  const saveBtn = document.getElementById('apikey-save');
+  const clearBtn = document.getElementById('apikey-clear');
+  const statusEl = document.getElementById('apikey-status');
+
+  input.placeholder = t('apiKeyPlaceholder');
+  input.value = '';
+  input.disabled = false;
+  input.classList.remove('opacity-50', 'cursor-not-allowed');
+
+  saveBtn.disabled = false;
+  saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+  statusEl.textContent = t('apiKeyNotConfigured');
+  statusEl.className = 'text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400';
+
+  clearBtn.classList.add('hidden');
+}
+
 document.getElementById('apikey-save').onclick = async () => {
   const key = document.getElementById('apikey-input').value.trim();
   if (!key) return alert(t('enterApiKey'));
   const form = new FormData();
   form.append('api_key', key);
-  await fetch('/api/config', { method: 'POST', body: form });
-  document.getElementById('apikey-input').value = '';
-  document.getElementById('apikey-input').placeholder = t('apiKeyMasked');
-  document.getElementById('apikey-status').textContent = t('apiKeyConfigured');
-  document.getElementById('apikey-status').className = 'text-xs px-2 py-1 rounded-full bg-green-900 text-green-300';
+  const r = await fetch('/api/config', { method: 'POST', body: form });
+  if (r.ok) {
+    setApiKeyConfiguredUI('config', true);
+  }
+};
+
+document.getElementById('apikey-clear').onclick = async () => {
+  if (document.getElementById('apikey-clear').dataset.source === 'env') {
+    alert(t('clearEnvHint'));
+    return;
+  }
+  if (!confirm(t('clearConfirm'))) return;
+  try {
+    const r = await fetch('/api/config', { method: 'DELETE' });
+    if (r.ok) {
+      resetApiKeyUI();
+    } else {
+      const d = await r.json();
+      alert(d.detail || 'Failed to clear');
+    }
+  } catch(e) {
+    alert('Network error');
+  }
 };
 </script>
 

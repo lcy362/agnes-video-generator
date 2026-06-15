@@ -108,6 +108,40 @@ def set_api_key(key: str):
     save_config(config)
 
 
+def delete_api_key() -> bool:
+    """Remove the API key from the config file.
+
+    Returns:
+        True if a key was removed, False if no key existed.
+
+    Note:
+        This does NOT affect the AGNES_API_KEY environment variable.
+        If the env var is set, get_api_key() will still return it.
+    """
+    config = load_config()
+    if "api_key" in config:
+        del config["api_key"]
+        save_config(config)
+        return True
+    return False
+
+
+def get_api_key_source() -> str:
+    """Return the source of the current API key.
+
+    Returns:
+        'env' if from AGNES_API_KEY environment variable,
+        'config' if from the config file,
+        'none' if no key is configured.
+    """
+    if os.environ.get("AGNES_API_KEY", ""):
+        return "env"
+    config = load_config()
+    if config.get("api_key"):
+        return "config"
+    return "none"
+
+
 def get_working_dir() -> str:
     return os.path.join(os.getcwd(), ".working_dir")
 
