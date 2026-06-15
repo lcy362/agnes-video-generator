@@ -237,7 +237,7 @@ class AgnesVideoAPI:
                     f"{BASE_URL}/videos",
                     headers=self.headers,
                     json=payload,
-                    timeout=(30, 120),
+                    timeout=(30, 180),
                 )
 
                 if resp.status_code == 200:
