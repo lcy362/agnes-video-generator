@@ -10,9 +10,9 @@
 | 任务类型 | 测试场景数 | 涉及核心模块 |
 |----------|-----------|-------------|
 | 简单视频 (Type 1) | 3 | `simple_video.py`, `agnes_video.py`, `task_manager.py` |
-| 创意视频 (Type 2) | 4 | `creative_video.py`, `agnes_image.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `concatenator.py` |
+| 创意视频 (Type 2) | 5 | `creative_video.py`, `agnes_image.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `concatenator.py` |
 | 稿件视频 (Type 3) | 2 | `manuscript_video.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `concatenator.py` |
-| **总计** | **9** | |
+| **总计** | **10** | |
 
 ---
 
@@ -30,21 +30,35 @@
 
 测试重点：**无配音场景为主**，配音字幕有一个场景验证可用即可。
 
+> **`chaining_mode` 取值说明**（对应 `creative_video.py:617-632` 的三路分发）：
+> - `none`（脚本默认值，等价于历史上的 `independent`）→ 各场景独立提交，参考图为 `character_ref_path`
+> - `keyframes` → 首尾帧成对提交，并预生成尾帧
+> - `ti2vid` → 链式续传：上一段尾帧经 ffmpeg 抽帧 + transition 帧生成，作为下一段参考图
+
 | ID | 场景 | chaining_mode | 参考图 | 配音 | 覆盖要点 |
 |----|------|--------------|--------|------|---------|
-| C1 | 纯文字+独立+无配音 | independent | 无 | 关闭 | 纯文字输入、story→script→video→SilentTTS→concat 链路 |
+| C1 | 纯文字+独立+无配音 | none | 无 | 关闭 | 纯文字输入、story→script→video→SilentTTS→concat 链路 |
 | C2 | 带参考图+关键帧+无配音 | keyframes | 上传参考图 | 关闭 | 参考图上传、端帧生成、keyframes 提交 |
 | C3 | 参考图生成尾帧+关键帧+无配音 | keyframes | 上传参考图 | 关闭 | `generate_end_frames_from_ref`、i2i 端帧生成、keyframes |
-| C4 | 独立场景+配音字幕验证 | independent | 无 | 开启 | TTS+字幕全链路验证（一个场景覆盖即可） |
+| C4 | 独立场景+配音字幕验证 | none | 无 | 开启 | TTS+字幕全链路验证（一个场景覆盖即可） |
+| C5 | 链式续传 ti2vid + 无配音 | ti2vid | 无 | 关闭 | `_generate_chained_scenes`：ffmpeg 抽尾帧 → transition 生成 → 下一段参考图链式传递（最易坏的 creative 分支，权重 4） |
 
 ### 2.3 稿件视频 (ManuscriptVideoPipeline)
 
-仅回归短文本场景，无需长文本。
+回归稿件**多段拆分**场景，确保 `split_manuscript` 的贪心合并算法、多段批量提交与多段拼接路径被真正触发。
+
+> **文本长度说明**：M1/M2 稿件统一加长到 ~130 字 / 6 句号，按 4 字/秒估算 ≈ 32s，经 `_step_split_text` 贪心合并（上限 12s/段、下限 5s/段）预期拆成 **3-4 段**。过短的稿件（如旧版 56 字）只会产生 1 段，使拆段算法与多段拼接路径完全无法被覆盖（见 `fix_plan_v2.md` B1.2）。
 
 | ID | 场景 | 稿件长度 | 配音 | 覆盖要点 |
 |----|------|---------|------|---------|
-| M1 | 短稿件+配音 | ~100 字 | 开启 | split→prompt→video→TTS→SRT→concat overlay |
-| M2 | 短稿件+自定义字幕 | ~100 字 | 开启 | 自定义 stroke/position/bg 字幕样式 |
+| M1 | 多段稿件+配音 | ~130 字 / 6 句 | 开启 | split 多段合并 → 多段 prompt → 多段 video 批量 → 合并 TTS+SRT → concat overlay |
+| M2 | 多段稿件+自定义字幕 | ~130 字 / 6 句 | 开启 | 自定义 stroke/position/bg 字幕样式 + 多段拆分路径 |
+
+**统一稿件文本（M1/M2 共用）**：
+
+```
+春天的花园里，一只小猫正在追逐蝴蝶。阳光明媚，花朵盛开，空气中弥漫着花香。小猫跳来跳去，非常开心，尾巴翘得高高的。蝴蝶停在一朵花上，小猫悄悄靠近，屏住呼吸。突然蝴蝶飞走了，小猫扑了个空，翻了个跟头。它并不气馁，爬起来继续追逐，在花丛中穿梭。最后小猫累了，趴在树荫下休息，看着蝴蝶越飞越远。
+```
 
 ---
 
@@ -58,11 +72,11 @@
 |---|------|---------|---------|---------|---------|
 | F1 | 最终视频 | `{working_dir}/{task_dir}/final_video.mp4` | 文件存在、非空 | 自动 | `os.path.exists` 且 `os.path.getsize > 0` |
 | F2 | 视频时长 | — | 时长合理（> 0） | 自动 | `ffprobe` 或 `moviepy` 读取 duration |
-| F3 | 视频分辨率 | — | 匹配请求参数 | 自动 | `ffprobe` 读取宽高比 |
+| F3 | 视频分辨率 | — | 匹配请求参数 | 自动 | `moviepy` 读取宽高，**断言 `clip.w == 请求 video_width 且 clip.h == 请求 video_height`**（当前实现仅记录数值不校验，见 `fix_plan_v2.md` B4.1） |
 | F4 | 音频轨道 + 语音内容 | — | 视频包含音频轨道 + 语音内容匹配预期 | 自动 | `moviepy` 检测 audio stream + `whisper` ASR 转录文本并与原文模糊匹配 |
 | F5 | 字幕可见性 | — | 视频画面中字幕正确显示 | 手动 | 播放查看字幕出现时机、内容、样式是否正确 |
 | F6 | 字幕文本匹配 | — | 字幕文本与原文一致 | 自动 | `whisper` 提取音频中的语音文本，与输入原文做模糊匹配（字符重叠率 > 30%） |
-| F7 | 视频总时长合理 | — | 总时长 ≈ max(各段视频和, 总音频时长+1s) | 自动 | 用 `ffprobe` 获取 duration，脚本校验 |
+| F7 | 视频总时长合理 | — | 总时长 ≈ max(Σ各段视频时长, 合并音频时长 + 1s)，容差 ±15% | 自动 | 从 `task_state.json` 读取各段时长（`paragraphs[*]` / `scenes[*]`）与 `combined_audio` 时长，与 `clip.duration` 做区间校验：`abs(actual - expected) / expected ≤ 0.15`（当前实现仅判 `duration > 0`，与 F2 重复，见 `fix_plan_v2.md` B2.1） |
 
 ### 3.2 断点续传产物 (Resume Checkpoints)
 
@@ -70,10 +84,10 @@
 |---|------|---------|---------|---------|---------|
 | R1 | task_state.json | `{task_dir}/task_state.json` | 文件有效 JSON、包含所有必要字段 | 自动 | `json.load` 成功，字段完整 |
 | R2 | task_type 字段 | task_state.json | 值正确（simple/creative/manuscript） | 自动 | 与创建时一致 |
-| R3 | 各 step 状态 | task_state.json | 已完成步骤为 `completed` | 自动 | step_xxx 字段值 |
+| R3 | 各 step 状态 | task_state.json | 已完成步骤为 `completed` | 自动 | creative/manuscript：`step_*` 字段全部为 `completed`（非 keyframes 模式自动跳过 `step_end_frame_*`）；**simple 无 `step_*` 字段，改校验顶层 `status == completed`**（当前实现未区分，见 `fix_plan_v2.md` B4.2） |
 | R4 | final_video_file | task_state.json | 路径有效 | 自动 | `os.path.exists(路径)` |
 | R5 | task.json (video_id) | `{task_dir}/task.json` (简易) 或 `{scene_dir}/task.json` (创意/稿件) | 文件存在、包含 video_id | 自动 | `json.load` 含 `video_id` 键 |
-| R6 | curl.sh | `{task_dir}/curl.sh` 或 `{scene/para_dir}/curl.sh` | 文件存在、包含有效 curl 命令 | 自动 | 文件存在，内容含 `agnesapi?video_id=` |
+| R6 | curl.sh | `{task_dir}/curl.sh` 或 `{scene/para_dir}/curl.sh` | 文件存在、包含有效 curl 命令 | 自动 | 文件存在，内容含完整查询模式 `agnesapi?...video_id=` 或 `mode=...&video_id=...`（**禁止裸 `video_id=` 子串匹配**；当前实现过宽，见 `fix_plan_v2.md` B4.3） |
 | R7 | 段落/场景级音频 | `para_{n}/narration.mp3` 等 | 音频文件存在（稿件/创意） | 自动 | `os.path.exists` |
 | R8 | 段落/场景级字幕 | `{para_dir}/narration.srt` 或 `{scene_dir}/subtitle.srt` | 字幕文件存在 | 自动 | `os.path.exists` |
 | R9 | 合稿音频 (稿件) | `{task_dir}/full_narration.mp3` | 文件存在、非空 | 自动 | 同 F1 |
@@ -182,20 +196,22 @@ def auto_check(task_dir):
   C2 [带参考图+关键帧+无配音]       — ✅ 最终产物全部通过
   C3 [参考图生成尾帧+关键帧+无配音] — ✅ 最终产物全部通过
   C4 [独立场景+配音字幕验证]         — ✅ 最终产物全部通过
+  C5 [链式续传 ti2vid+无配音]       — ✅ 最终产物全部通过
 
-  │ 检查项               │ C1      │ C2      │ C3      │ C4      │
-  │──────────────────────│────────│────────│────────│────────│
-  │ F1 最终视频存在       │ ✅      │ ✅      │ ✅      │ ✅      │
-  │ F2 视频时长 > 0      │ {n}s    │ {n}s    │ {n}s    │ {n}s    │
-   │ F4 音频轨道+语音内容  │ N/A¹    │ N/A¹    │ N/A¹    │ ✅      │
-   │ F6 字幕文本匹配       │ N/A¹    │ N/A¹    │ N/A¹    │ ✅      │
-   │ F7 总时长合理         │ ✅      │ ✅      │ ✅      │ ✅      │
-   │ R3 step_* 状态       │ ✅      │ ✅      │ ✅      │ ✅      │
-   │ R5 scene_N/task.json │ ✅      │ ✅      │ ✅      │ ✅      │
-   │ R7 scene_N/narration │ N/A¹    │ N/A¹    │ N/A¹    │ ✅      │
-   │ R8 scene_N/subtitle  │ N/A¹    │ N/A¹    │ N/A¹    │ ✅      │
+  │ 检查项               │ C1      │ C2      │ C3      │ C4      │ C5      │
+  │──────────────────────│────────│────────│────────│────────│────────│
+  │ F1 最终视频存在       │ ✅      │ ✅      │ ✅      │ ✅      │ ✅      │
+  │ F2 视频时长 > 0      │ {n}s    │ {n}s    │ {n}s    │ {n}s    │ {n}s    │
+   │ F4 音频轨道+语音内容  │ N/A¹    │ N/A¹    │ N/A¹    │ ✅      │ N/A¹    │
+   │ F6 字幕文本匹配       │ N/A¹    │ N/A¹    │ N/A¹    │ ✅      │ N/A¹    │
+   │ F7 总时长合理         │ ✅      │ ✅      │ ✅      │ ✅      │ ✅      │
+   │ R3 step_* 状态       │ ✅      │ ✅      │ ✅      │ ✅      │ ✅      │
+   │ R5 scene_N/task.json │ ✅      │ ✅      │ ✅      │ ✅      │ ✅      │
+   │ R7 scene_N/narration │ N/A¹    │ N/A¹    │ N/A¹    │ ✅      │ N/A¹    │
+   │ R8 scene_N/subtitle  │ N/A¹    │ N/A¹    │ N/A¹    │ ✅      │ N/A¹    │
 
-   ¹ C1-C3 无配音，音频/字幕相关检查标记为 N/A。F5 字幕可见性仍为手动验证项。
+   ¹ C1-C3/C5 无配音，音频/字幕相关检查标记为 N/A。F5 字幕可见性仍为手动验证项。
+   ² C5 额外手动观察：各 scene_N 目录应含 transition 帧/中间产物（链式续传的证据）。
 
 ────────────────────────────────────────────────
 三、稿件视频 (Manuscript)
@@ -268,12 +284,12 @@ def auto_check(task_dir):
 | 场景类型 | 单场景权重 | 说明（每分钟 Agnes API 调用估算） |
 |---------|-----------|----------------------------------|
 | 简单 (S1-S3) | 1 | 1 次 submit + 轮询 ~4 次/分钟 |
-| 创意 (C1-C4) | 3-4 | Chat + N×Image + N×Video + 轮询 |
+| 创意 (C1-C5) | 3-4 | Chat + N×Image + N×Video + 轮询；C5 链式额外含 transition 帧生成，权重 4 |
 | 稿件 (M1-M2) | 4 | 段落×Chat + 段落×Image + 轮询 |
 
 - **总权重上限 = 10**（Agnes API 上限 20 次/分钟，留 50% 余量）
-- 例：可同时运行 2 个创意(权重 7) + 3 个简单(权重 3) = 10 ✅
-- 例：或 1 个稿件(权重 4) + 1 个创意(权重 4) + 2 个简单(权重 2) = 10 ✅
+- 例：可同时运行 1 个稿件(权重 4) + 1 个创意(权重 4) + 2 个简单(权重 2) = 10 ✅
+- 例：或 2 个创意(权重 7-8) + 2-3 个简单(权重 2-3) = 10 ✅
 
 #### 执行命令
 
@@ -305,6 +321,9 @@ python scripts/regression_runner.py --quick
   步骤 C — 异步轮询
     每 20 秒 GET /api/tasks/{task_id} 检查 status
     超时限制：简单 30min / 创意 120min / 稿件 60min
+
+    注：此处的 20s 是"任务状态轮询间隔"（脚本查 /api/tasks/{id}），
+    与 AGENTS.md 8.2 节中 pipeline 内部的 15s（Agnes Video API 轮询）语境不同，不冲突。
 
   步骤 D — 产物验证
     调用 validate_task() 检查 F1-F7, R1-R10
@@ -589,10 +608,15 @@ done
 AGNES_RATE_LIMIT = 20  (次/分钟，平台限制)
 MAX_WEIGHT = AGNES_RATE_LIMIT / 2 = 10  (留 50% 余量)
 
-并发场景一例:
+10 场景总权重 = 3×1 (S) + 4+4+3+3+4 (C) + 4+4 (M) = 29
+=> 不可能全并发，由加权信号量调度，峰值并发 ≈ 2-3 个场景
+
+并发组合示例 (总和 = 10):
   1 × Creative (w=4) + 1 × Manuscript (w=4) + 2 × Simple (w=2) = 10 ✅
-  2 × Creative (w=7) + 3 × Simple (w=3) = 10 ✅
+  2 × Creative (w=7-8) + 2-3 × Simple (w=2-3) = 10 ✅
 ```
+
+> ⚠️ **信号量语义注记**：当前实现中信号量在"整个场景执行期间"持有（含提交、轮询、验证），而非仅在"API 调用窗口"持有，因此实际并发度会低于上述组合的理论值。详见 `fix_plan_v2.md` B3.2。
 
 ---
 
