@@ -34,10 +34,26 @@ class ImageOutput:
 class AgnesImageAPI:
     """Agnes Image 生成 API 封装（t2i / i2i）。"""
 
-    def __init__(self, api_key: str, model: str = "agnes-image-2.1-flash"):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "agnes-image-2.1-flash",
+        i2i_model: Optional[str] = None,
+    ):
+        """初始化图片 API。
+
+        Args:
+            api_key: Agnes API Key。
+            model: t2i 默认模型。
+            i2i_model: i2i 默认模型。默认与 ``model`` 相同（官方 agnes-image-2.1-flash
+                同时支持 t2i 与 i2i）。如需回退到 2.0，可通过环境变量
+                ``AGNES_IMAGE_I2I_MODEL`` 或显式传参覆盖。
+        """
         self.api_key = api_key
         self.model = model
-        self.i2i_model = "agnes-image-2.0-flash"
+        # i2i 默认与 t2i 同模型（官方 2.1 同时支持 t2i/i2i）；环境变量可回退到 2.0。
+        env_i2i = os.environ.get("AGNES_IMAGE_I2I_MODEL")
+        self.i2i_model = i2i_model or env_i2i or model
         self.headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -77,12 +93,12 @@ class AgnesImageAPI:
 
         if reference_image_paths:
             resolved = [await self._resolve_image_ref(p) for p in reference_image_paths]
-            extra_body: dict = {"response_format": "url"}
-            if len(resolved) == 1:
-                extra_body["image"] = resolved[0]
-            else:
-                extra_body["image"] = resolved
-            payload["extra_body"] = extra_body
+            # 官方文档所有 i2i 示例均用 image 数组形式（extra_body.image=[url]），
+            # 单图也统一传数组，保持与官方协议一致。
+            payload["extra_body"] = {
+                "response_format": "url",
+                "image": resolved,
+            }
 
         logger.info(f"[AgnesImage] Generating ({'i2i' if use_i2i else 't2i'}): {prompt[:80]}...")
 

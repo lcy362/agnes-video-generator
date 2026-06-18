@@ -377,6 +377,77 @@ class CreativeVideoPipeline(BasePipeline):
         return end_frame_prompts
 
     # ==================================================================
+    # Helpers: image normalization
+    # ==================================================================
+
+    @staticmethod
+    def _normalize_image_to_size(src: str, vw: int, vh: int, dst: str) -> str:
+        """Normalize an image to exactly ``vw x vh`` using ffmpeg scale+pad.
+
+        Keeps the original aspect ratio (no stretching) and pads with black
+        bars. This avoids feeding i2i a composition that the model would
+        otherwise stretch/letterbox unpredictably — the i2i model then only
+        needs to preserve identity, not reshape the layout.
+
+        Args:
+            src: Source image path.
+            vw: Target width.
+            vh: Target height.
+            dst: Destination path. If it already exists it is reused (cache).
+
+        Returns:
+            Path to the normalized image (``dst``).
+        """
+        if os.path.exists(dst):
+            logger.debug(f"[Pipeline] normalize cache hit: {dst}")
+            return dst
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", src,
+                "-vf",
+                f"scale={vw}:{vh}:force_original_aspect_ratio=decrease,"
+                f"pad={vw}:{vh}:(ow-iw)/2:(oh-ih)/2",
+                dst,
+            ],
+            capture_output=True,
+            check=True,
+            timeout=30,
+        )
+        return dst
+
+    def _get_normalized_character_ref(self, character_ref_path: str) -> str:
+        """Return a character-reference image normalized to the video size.
+
+        Caches the result under ``working_dir/character_ref_normalized.png``
+        so it is generated at most once per task. Returns the original path
+        unchanged if normalization is not possible (e.g. path is a URL).
+
+        Args:
+            character_ref_path: Original character reference path or URL.
+
+        Returns:
+            Path to the normalized image, or the original path on failure.
+        """
+        vw = self._state.video_width
+        vh = self._state.video_height
+        if not character_ref_path:
+            return character_ref_path
+        # Only normalize local files; URLs/data: are passed through as-is.
+        if character_ref_path.startswith(("http://", "https://", "data:")):
+            return character_ref_path
+        if not os.path.exists(character_ref_path):
+            return character_ref_path
+        dst = os.path.join(self.working_dir, "character_ref_normalized.png")
+        try:
+            return self._normalize_image_to_size(character_ref_path, vw, vh, dst)
+        except Exception as e:
+            logger.warning(
+                f"[Pipeline] normalize character ref failed ({e}), using original"
+            )
+            return character_ref_path
+
+    # ==================================================================
     # Step 3.6: Pre-generate End Frames (keyframes mode)
     # ==================================================================
 
@@ -464,13 +535,15 @@ class CreativeVideoPipeline(BasePipeline):
                     if scene_idx < len(end_frame_prompts)
                     else "cinematic end frame"
                 )
+                # 规范化角色参考图到目标尺寸，避免 i2i 拉伸/构图错位
+                normalized_ref = self._get_normalized_character_ref(character_ref_path)
                 for attempt in range(3):
                     if self._is_shutdown():
                         raise PipelineShutdown(f"interrupted during end frame gen scene {scene_idx}")
                     try:
                         img_output = await self.image_generator.generate_single_image(
                             prompt=end_frame_prompt,
-                            reference_image_paths=[character_ref_path],
+                            reference_image_paths=[normalized_ref],
                             size=f"{vw}x{vh}",
                         )
                         img_output.save(end_frame_path)
