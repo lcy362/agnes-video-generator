@@ -6,6 +6,8 @@
 
 本项目基于 [ViMax](https://github.com/HKUDS/ViMax) 和 [vimax-agnes](https://github.com/easyeye163/vimax-agnes) 改造而来，将命令行 AI 视频生成工具升级为带 Web UI 的一站式免费视频创作平台。
 
+**[🌐 在线体验](https://video.lichuanyang.top)** | **[📝 博客文章（中文）](https://lichuanyang.top/posts/22470/)** | **[📝 Blog (English)](https://lichuanyang.top/en/posts/22470/)**
+
 ## 🎥 Demo
 
 ### 1. 创意视频 — 无配音

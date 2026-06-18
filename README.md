@@ -6,6 +6,8 @@
 
 Built upon [ViMax](https://github.com/HKUDS/ViMax) and [vimax-agnes](https://github.com/easyeye163/vimax-agnes), this project transforms command-line AI video generation into an all-in-one free video creation platform with a modern Web UI.
 
+**[🌐 Live Demo](https://video.lichuanyang.top)** | **[📝 Blog (中文)](https://lichuanyang.top/posts/22470/)** | **[📝 Blog (English)](https://lichuanyang.top/en/posts/22470/)**
+
 ## 🎥 Demo
 
 ### 1. Creative Video — No Narration
