@@ -483,6 +483,8 @@ class CreativeVideoPipeline(BasePipeline):
 
         pregenerated: dict = {}
         cached = self._state.pregenerated_end_frames or {}
+        # 批次5：维护上一场景尾帧路径，用于多图 i2i 场景间视觉链
+        prev_end_frame: Optional[str] = None
 
         for scene_idx in range(len(scenes)):
             if self._is_shutdown():
@@ -493,6 +495,7 @@ class CreativeVideoPipeline(BasePipeline):
 
             if str(scene_idx) in cached and os.path.exists(end_frame_path):
                 pregenerated[scene_idx] = end_frame_path
+                prev_end_frame = end_frame_path  # 维护视觉链
                 continue
 
             user_ef = (
@@ -520,11 +523,13 @@ class CreativeVideoPipeline(BasePipeline):
                     end_frame_path = dest
                 pregenerated[scene_idx] = end_frame_path
                 cached[str(scene_idx)] = end_frame_path
+                prev_end_frame = end_frame_path  # 维护视觉链
                 continue
 
             if os.path.exists(end_frame_path):
                 pregenerated[scene_idx] = end_frame_path
                 cached[str(scene_idx)] = end_frame_path
+                prev_end_frame = end_frame_path  # 维护视觉链
                 continue
 
             if self._state.generate_end_frames_from_ref and character_ref_path:
@@ -549,13 +554,21 @@ class CreativeVideoPipeline(BasePipeline):
                     )
                 # 规范化角色参考图到目标尺寸，避免 i2i 拉伸/构图错位
                 normalized_ref = self._get_normalized_character_ref(character_ref_path)
+                # 批次5：多图 i2i 引导 —— 角色图锁身份 + 上一场景尾帧锁环境/风格延续
+                ref_images = [normalized_ref]
+                if prev_end_frame and os.path.exists(prev_end_frame):
+                    ref_images.append(prev_end_frame)
+                    logger.info(
+                        f"[EndFrame] Scene {scene_idx}: multi-ref i2i "
+                        f"(character + prev scene {scene_idx-1} end frame)"
+                    )
                 for attempt in range(3):
                     if self._is_shutdown():
                         raise PipelineShutdown(f"interrupted during end frame gen scene {scene_idx}")
                     try:
                         img_output = await self.image_generator.generate_single_image(
                             prompt=end_frame_prompt,
-                            reference_image_paths=[normalized_ref],
+                            reference_image_paths=ref_images,
                             size=f"{vw}x{vh}",
                         )
                         img_output.save(end_frame_path)
@@ -591,6 +604,9 @@ class CreativeVideoPipeline(BasePipeline):
                 img_output.save(end_frame_path)
                 pregenerated[scene_idx] = end_frame_path
                 cached[str(scene_idx)] = end_frame_path
+
+            # 维护视觉链：所有路径（i2i/t2i）生成完毕后更新 prev_end_frame
+            prev_end_frame = end_frame_path
 
             if scene_idx < len(scenes) - 1:
                 await asyncio.sleep(2)
