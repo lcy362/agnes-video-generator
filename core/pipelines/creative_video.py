@@ -1041,15 +1041,41 @@ class CreativeVideoPipeline(BasePipeline):
                         )
                         end_frame_path = dest
                     else:
+                        # 批次6：兖底尾帧生成与 Step 3.6 一致策略（i2i + 规范化角色图 + 拼合 prompt）
                         end_frame_prompt = (
                             end_frame_prompts[scene_idx]
                             if scene_idx < len(end_frame_prompts)
                             else "cinematic end frame"
                         )
-                        img_output = await self.image_generator.generate_single_image(
-                            prompt=end_frame_prompt,
-                            size=f"{vw}x{vh}",
+                        use_i2i = (
+                            self._state.generate_end_frames_from_ref
+                            and reference_image
                         )
+                        if use_i2i:
+                            # 程序化拼入 [PRESERVE] 角色外观硬约束
+                            if self._state.character_appearance:
+                                end_frame_prompt = (
+                                    "[PRESERVE — keep exactly]\n"
+                                    f"{self._state.character_appearance}\n"
+                                    "Keep the same person, same face, same clothing. "
+                                    "Do NOT alter identity.\n\n"
+                                    "[CHANGE — end frame of this scene]\n"
+                                    f"{end_frame_prompt}"
+                                )
+                            normalized_ref = self._get_normalized_character_ref(reference_image)
+                            logger.info(
+                                f"[Keyframes] Scene {scene_idx} fallback: i2i with normalized ref"
+                            )
+                            img_output = await self.image_generator.generate_single_image(
+                                prompt=end_frame_prompt,
+                                reference_image_paths=[normalized_ref],
+                                size=f"{vw}x{vh}",
+                            )
+                        else:
+                            img_output = await self.image_generator.generate_single_image(
+                                prompt=end_frame_prompt,
+                                size=f"{vw}x{vh}",
+                            )
                         img_output.save(end_frame_path)
 
             first_frame_url = await self.video_generator._resolve_image_ref(current_first_frame)
