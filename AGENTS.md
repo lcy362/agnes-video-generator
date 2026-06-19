@@ -2,7 +2,7 @@
 
 > **面向对象**：SoftwareCompany 团队（产品经理 / 架构师 / 工程师 / QA 工程师）及 AI Agent
 > **当前阶段**：🟢 **开发完成（v2.0） — 维护模式**
-> **配套文档**：`docs/system_design.md`（架构）、`docs/regression_test_plan.md`（大版本回归）
+> **配套文档**：`docs/regression_test_plan.md`（大版本回归）、`docs/plans-v1.0/system_design.md`（v1.0 原始设计）
 
 ---
 
@@ -296,13 +296,14 @@ agnes-video-generator/
 │   └── regression_runner.py          # 10 场景大版本回归测试脚本
 │
 └── docs/
-    ├── system_design.md              # 系统架构设计
     ├── regression_test_plan.md       # 大版本回归测试计划
-    ├── code_review_report.md         # 代码审查报告（v2.0）
-    ├── development_plan.md           # 开发计划
-    ├── fix_plan.md                   # 修复计划
-    ├── class-diagram.mermaid         # 类图
-    └── sequence-diagram.mermaid      # 时序图
+    ├── plans-v1.0/                   # v1.0 计划文档
+    │   ├── development_plan.md       # 开发计划
+    │   ├── system_design.md          # v1.0 原始系统架构设计
+    │   ├── class-diagram.mermaid     # 类图
+    │   └── sequence-diagram.mermaid  # 时序图
+    ├── plans-v2.0/                   # v2.0 计划 & 审查文档（含 code review、bug fix、i2i 优化）
+    └── plans-v3.0/                   # v3.0 计划文档
 ```
 
 ---
@@ -400,7 +401,7 @@ python scripts/regression_runner.py --quick
 ### 7.2 架构师（高见远）
 
 **输入**：PRD 文档
-**产出**：`docs/system_design.md` 增量更新
+**产出**：`docs/plans-v1.0/system_design.md` 增量更新（或新版本架构文档）
 
 ---
 

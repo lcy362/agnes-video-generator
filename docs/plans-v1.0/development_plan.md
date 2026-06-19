@@ -63,7 +63,7 @@ Batch A (T01)  →  QA验证A  →  ✅用户确认  →  Batch B (T02+T03)
 > 以下是 Agnes Video Generator v2.0 **第 X 批（Batch X）** 实现任务。
 >
 > 请先阅读以下文件了解完整上下文：
-> - `docs/development_plan.md` — 开发计划总览（重点看当前批次的任务清单）
+> - `docs/plans-v1.0/development_plan.md` — 开发计划总览（重点看当前批次的任务清单）
 > - `docs/system_design.md` — 架构设计（重点看当前批次相关章节）
 > - `AGENTS.md` — 代码规范、日志前缀、共享知识
 >

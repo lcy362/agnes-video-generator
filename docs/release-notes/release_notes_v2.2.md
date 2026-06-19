@@ -59,7 +59,7 @@ Six-batch feature implementation for visual consistency across scenes:
 
 ## Documentation
 
-- `docs/bug_fix_plan.md` — comprehensive bug fix plan (added)
+- `docs/plans-v2.0/bug_fix_plan.md` — comprehensive bug fix plan (added)
 - `docs/regression_test_plan.md` — updated scenarios and flow rules
 - `AGENTS.md` — synced rate limiter architecture, runner resume strategy
 - `docs/release-notes/` — v2.0 and v2.1 release notes (added)
@@ -88,7 +88,7 @@ Six-batch feature implementation for visual consistency across scenes:
 | `server.py` | Rate limiter integration + endpoint fixes |
 | `static/index.html` | i18n duration parse + style defaults |
 | `scripts/regression_runner.py` | Resume + quick-verify enhancements |
-| `docs/bug_fix_plan.md` | New — bug fix tracking |
+| `docs/plans-v2.0/bug_fix_plan.md` | New — bug fix tracking |
 
 ---
 

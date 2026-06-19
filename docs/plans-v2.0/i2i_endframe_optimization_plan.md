@@ -312,7 +312,7 @@ curl -X POST http://localhost:8765/api/tasks/creative \
 | `core/pipelines/creative_video.py` | 修改（改动 2/4/5/6） |
 | `core/screenwriter.py` | 修改（改动 3） |
 | `models/task.py` | 修改（改动 4，新增字段） |
-| `docs/i2i_endframe_optimization_plan.md` | 新增（本文档） |
+| `docs/plans-v2.0/i2i_endframe_optimization_plan.md` | 新增（本文档） |
 
 ---
 

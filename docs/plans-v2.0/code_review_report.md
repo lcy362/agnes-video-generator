@@ -189,7 +189,7 @@
 
 ### L6. AGENTS.md 文档与代码多处不符
 - **文件**：`AGENTS.md:238-297, 349-357, 608`
-- **根因**：目录树遗漏 `core/pipeline.py`、`core/image_generator.py`、`core/video_generator.py`、`docs/development_plan.md`、`docs/fix_plan.md`；场景权重表与代码 `SCENARIO_WEIGHTS` 不一致；D5 称"8 个参数"，实际 simple 端点 9 个。
+- **根因**：目录树遗漏 `core/pipeline.py`、`core/image_generator.py`、`core/video_generator.py`、`docs/plans-v1.0/development_plan.md`、`docs/plans-v2.0/fix_plan.md`；场景权重表与代码 `SCENARIO_WEIGHTS` 不一致；D5 称"8 个参数"，实际 simple 端点 9 个。
 - **修复方案**：对齐目录树、权重表、参数计数。
 - **批次**：阶段 3
 

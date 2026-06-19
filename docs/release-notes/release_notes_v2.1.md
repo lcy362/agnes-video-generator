@@ -10,7 +10,7 @@ v2.1 focuses on code quality and engineering robustness. All 24 issues from the 
 
 ## Code Review Fixes
 
-Based on `docs/code_review_report.md`, all 24 issues resolved:
+Based on `docs/plans-v2.0/code_review_report.md`, all 24 issues resolved:
 
 ### High Severity (H1-H6)
 - **H1** — API Key hardcoded in `agnes_chat.py` → unified read from `config.py`
@@ -78,7 +78,7 @@ All 9 endpoints auto-verified: homepage, config, three task creation endpoints, 
 ### New / Deleted Files
 | File | Action | Description |
 |------|--------|-------------|
-| `docs/code_review_report.md` | +added | 24 code review issues documented |
+| `docs/plans-v2.0/code_review_report.md` | +added | 24 code review issues documented |
 | `docs/release-notes/release_notes_v2.0.md` | +added | v2.0 release notes |
 | `docs/release-notes/release_notes_v2.1.md` | +added | v2.1 release notes |
 | `tests/test_core.py` | +added | 428-line automated unit test suite |

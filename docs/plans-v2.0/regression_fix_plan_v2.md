@@ -3,7 +3,7 @@
 > **状态**：🎉 全部完成（12/12）
 > **创建日期**：2026-06-17
 > **最近更新**：2026-06-17 — 全部 12 项完成
-> **关联**：`docs/regression_test_plan.md`（目标规范）、`docs/code_review_report.md`（v1 审查）、`docs/fix_plan.md`（v1 修复）
+> **关联**：`docs/regression_test_plan.md`（目标规范）、`docs/plans-v2.0/code_review_report.md`（v1 审查）、`docs/plans-v2.0/fix_plan.md`（v1 修复）
 > **范围**：仅 `scripts/regression_runner.py` 的场景定义与验证逻辑修复，不动 `server.py` / `core/` / `models/`
 
 ---
