@@ -3,10 +3,12 @@
 将 edge_tts SubMaker cues 转换为 SRT 格式，并通过 moviepy SubtitlesClip 叠加到视频。
 
 v2.1: 支持细粒度字幕分割，避免 5 秒视频只有 1 条字幕的问题。
+v3.0: 支持任意位置（四角/百分比/坐标）、逐场景精拆分、突出字幕时⻓加成。
 """
 
 import datetime
 import logging
+import math
 import os
 from typing import List, Optional, Tuple
 
@@ -20,13 +22,17 @@ from models.task import SubtitleStyle
 logger = logging.getLogger(__name__)
 
 # ── 细粒度字幕分割参数 ──
-# 每条字幕最大持续时长（秒）
-_MAX_SUB_DURATION = 2.5
-# 每条字幕最大字符数（中文场景）
-_MAX_SUB_CHARS = 18
+# 每条字幕最大持续时长（秒）— v3.0 降至 1.8 以支持更细拆分
+_MAX_SUB_DURATION = 1.8
+# 每条字幕最大字符数（中文场景）— v3.0 降至 14 以支持更细拆分
+_MAX_SUB_CHARS = 14
 # 最少字数字幕阈值：如果词级 cues 太少（如只有 3 个 cues for 14s），
 # 说明 edge_tts 本身提供的粒度已足够，不需要额外细化（避免空洞字幕）
 _MIN_WORD_CUES_FOR_FINE = 6
+# 突出字幕时长倍率
+_PROMINENT_DURATION_MULTIPLIER = 1.4
+# 突出检测：文本长度 ≤ 此值时视为"短句突出"
+_PROMINENT_MAX_CHARS = 12
 
 
 class SubtitleGenerator:
@@ -185,6 +191,18 @@ class SubtitleGenerator:
             else:
                 break
 
+        # ── 应用突出时长加成 ──
+        if groups:
+            for gi, (s_s, e_s, txt) in enumerate(groups):
+                multiplier = SubtitleGenerator._detect_prominence(txt)
+                if multiplier > 1.0:
+                    new_dur = (e_s - s_s) * multiplier
+                    e_s = s_s + new_dur
+                    # 不超过下一个字幕的 start
+                    if gi + 1 < len(groups):
+                        e_s = min(e_s, groups[gi + 1][0] - 0.05)
+                    groups[gi] = (s_s, e_s, txt)
+
         # 生成 SRT
         entries = []
         for idx, (s_s, e_s, txt) in enumerate(groups, 1):
@@ -200,6 +218,142 @@ class SubtitleGenerator:
             start_time = SubtitleGenerator.cue_to_srt_time(s_s)
             end_time = SubtitleGenerator.cue_to_srt_time(e_s)
             entries.append(f"{idx}\n{start_time} --> {end_time}\n{txt}\n")
+
+        return "\n".join(entries)
+
+    @staticmethod
+    def _detect_prominence(text: str) -> float:
+        """检测字幕文本是否"突出"，返回时长倍率（≥1.0）。
+
+        突出规则：
+          - 短句（≤ _PROMINENT_MAX_CHARS 字）且以！？?! 结尾 → 1.5x
+          - 短句（≤ _PROMINENT_MAX_CHARS 字）→ 1.3x
+          - 包含"注意、重要、关键、突然、竟然、原来"等关键词 → 1.3x
+          - 其他 → 1.0x（正常）
+        """
+        t = text.strip()
+        if not t:
+            return 1.0
+        low = t.lower()
+        key_words = {"注意", "重要", "关键", "突然", "竟然", "原来",
+                     "attention", "important", "suddenly", "finally", "warning"}
+        if len(t) <= _PROMINENT_MAX_CHARS:
+            if t[-1] in "！？!?":
+                return 1.5
+            return 1.3
+        if any(kw in low for kw in key_words):
+            return 1.3
+        return 1.0
+
+    @staticmethod
+    def _generate_scene_aware_srt(
+        scene_texts: List[str],
+        scene_durations: List[float],
+        word_cues: object = None,
+        max_chars_per_group: int = _MAX_SUB_CHARS,
+        scene_start_times: Optional[List[float]] = None,
+    ) -> str:
+        """为每个场景/段落生成细粒度 SRT，支持场景内再拆分为子段。
+
+        策略（无需 TTS cues 也能工作）：
+          1. 每个场景的文本按句子（。！？.!?）拆分为候选句
+          2. 在场景时长内均匀分布各句
+          3. 检测突出文本并赋予更长显示时间
+          4. 合并为全量 SRT（偏移到场景在时间轴上的位置）
+
+        Args:
+            scene_texts: 每个场景的旁白文本列表。
+            scene_durations: 每个场景的时长（秒）。
+            word_cues: 可选 TTS SubMaker cues，如有则从中推导精确时间。
+            max_chars_per_group: 每组最大字符数。
+            scene_start_times: 每个场景在时间轴上的起始时间（秒）。
+                若未提供则按 scene_durations 累积计算。
+
+        Returns:
+            SRT 格式字符串。
+        """
+        if not scene_texts or not scene_durations:
+            return ""
+
+        if scene_start_times is None:
+            scene_start_times = []
+            acc = 0.0
+            for d in scene_durations:
+                scene_start_times.append(acc)
+                acc += d
+
+        entries = []
+        global_idx = 1
+
+        for si, text in enumerate(scene_texts):
+            if not text.strip():
+                continue
+            scene_dur = scene_durations[si]
+            scene_start = scene_start_times[si]
+            scene_end = scene_start + scene_dur
+
+            # 按句子拆分
+            sentences = [s.strip() for s in _re.split(r'(?<=[。！？.!?])', text) if s.strip()]
+            if not sentences:
+                sentences = [text.strip()]
+            if not sentences:
+                continue
+
+            # 进一步将长句拆为子段（按逗号/分号）
+            all_segments = []
+            for sent in sentences:
+                if len(sent) > max_chars_per_group:
+                    sub_parts = _re.split(r'(?<=[，、；,;])', sent)
+                    temp = ""
+                    for part in sub_parts:
+                        if not part.strip():
+                            continue
+                        if not temp or len(temp) + len(part) <= max_chars_per_group:
+                            temp += part
+                        else:
+                            if temp.strip():
+                                all_segments.append(temp.strip())
+                            temp = part
+                    if temp.strip():
+                        all_segments.append(temp.strip())
+                else:
+                    all_segments.append(sent.strip())
+
+            if not all_segments:
+                continue
+
+            # 在场景时长内均匀分配各子段
+            seg_count = len(all_segments)
+            # 保留 10% padding 让最后一段有呼吸感
+            usable_dur = scene_dur * 0.9
+            base_dur = usable_dur / seg_count
+
+            current_time = scene_start
+            for idx, seg in enumerate(all_segments):
+                # 基础时长
+                seg_dur = base_dur
+
+                # 突出检测 → 时长加成（从前一段或 padding 中借时）
+                mult = SubtitleGenerator._detect_prominence(seg)
+                if mult > 1.0 and idx > 0:
+                    # 从前一段匀 20% 时长给本段
+                    borrowed = seg_dur * 0.2
+                    seg_dur += borrowed
+                    # 修正前一段结束时间（在 entries 中已修正则为之后生效）
+                elif mult > 1.0:
+                    seg_dur *= mult
+
+                seg_start = current_time
+                seg_end = min(seg_start + seg_dur, scene_end - 0.05)
+
+                if seg_end <= seg_start:
+                    seg_end = seg_start + 0.3  # 最低 0.3s
+
+                start_srt = SubtitleGenerator.cue_to_srt_time(seg_start)
+                end_srt = SubtitleGenerator.cue_to_srt_time(seg_end)
+                entries.append(f"{global_idx}\n{start_srt} --> {end_srt}\n{seg}\n")
+                global_idx += 1
+                current_time = seg_end + 0.05  # 50ms 间隔
 
         return "\n".join(entries)
 
@@ -412,6 +566,92 @@ class SubtitleGenerator:
         return datetime.timedelta(seconds=total_seconds)
 
     @staticmethod
+    def resolve_position(
+        pos,
+        video_width: int,
+        video_height: int,
+    ) -> tuple:
+        """将各种格式的字幕位置解析为 moviepy (h, v) 坐标。
+
+        支持格式：
+          - 标准: ("center", "bottom"), ("left", "top"), ("right", "center")
+          - 偏移: ("center", "bottom-80"), ("left+20", "top+10"), ("right-30", "bottom-50")
+          - 百分比: ("50%", "30%") — 表示水平 50%, 垂直 30%
+          - 像素坐标: ("center", 200) — 垂直 200px
+          - 四角: "top-left", "top-right", "bottom-left", "bottom-right"
+          - 纯字符串: "center", "top", "bottom", "top-left" 等
+        """
+        default = ("center", "bottom")
+
+        # ── 字符串格式（如 "top-left", "center"）──
+        if isinstance(pos, str):
+            p = pos.strip().lower()
+            corner_map = {
+                "top-left": ("left", "top"), "top-right": ("right", "top"),
+                "bottom-left": ("left", "bottom"), "bottom-right": ("right", "bottom"),
+                "center": ("center", "center"), "middle": ("center", "center"),
+                "top": ("center", "top"), "bottom": ("center", "bottom"),
+                "left": ("left", "center"), "right": ("right", "center"),
+            }
+            if p in corner_map:
+                return corner_map[p]
+            # 尝试解析 "bottom-80" 纯字符串
+            m_bot = _re.match(r'^bottom\s*[-–]\s*(\d+)$', p)
+            if m_bot and video_height > 0:
+                offset = int(m_bot.group(1))
+                return ("center", max(video_height - offset, 0))
+            m_top = _re.match(r'^top\s*\+\s*(\d+)$', p)
+            if m_top:
+                offset = int(m_top.group(1))
+                return ("center", offset)
+            return default
+
+        # ── 二元组 ──
+        if not isinstance(pos, (list, tuple)) or len(pos) != 2:
+            return default
+
+        h_raw, v_raw = pos[0], pos[1]
+
+        # 解析水平位置
+        def resolve_h(h_val) -> str:
+            if isinstance(h_val, (int, float)):
+                return h_val
+            hs = str(h_val).strip().lower()
+            if hs.endswith("%"):
+                pct = float(hs.replace("%", ""))
+                return int(video_width * pct / 100)
+            # left+N / right-N
+            m_l = _re.match(r'^left\s*\+\s*(\d+)$', hs)
+            if m_l:
+                return int(m_l.group(1))
+            m_r = _re.match(r'^right\s*[-–]\s*(\d+)$', hs)
+            if m_r:
+                return max(video_width - int(m_r.group(1)), 0)
+            if hs in ("left", "right", "center"):
+                return hs
+            return "center"
+
+        def resolve_v(v_val) -> str:
+            if isinstance(v_val, (int, float)):
+                return v_val
+            vs = str(v_val).strip().lower()
+            if vs.endswith("%"):
+                pct = float(vs.replace("%", ""))
+                return int(video_height * pct / 100)
+            m_bot = _re.match(r'^bottom\s*[-–]\s*(\d+)$', vs)
+            if m_bot and video_height > 0:
+                offset = int(m_bot.group(1))
+                return max(video_height - offset, 0)
+            m_top = _re.match(r'^top\s*\+\s*(\d+)$', vs)
+            if m_top:
+                return int(m_top.group(1))
+            if vs in ("top", "bottom", "center"):
+                return vs
+            return "bottom"
+
+        return (resolve_h(h_raw), resolve_v(v_raw))
+
+    @staticmethod
     def overlay_subtitles_to_video(
         video_path: str,
         srt_path: str,
@@ -475,45 +715,10 @@ class SubtitleGenerator:
 
             subtitles_clip = SubtitlesClip(srt_path, make_textclip=make_text_clip)
 
-            # 根据 position 设置字幕位置（M1: 支持 bottom-N/top+N 偏移）
-            pos = style.position
-            position = ("center", "bottom")
-            if isinstance(pos, (list, tuple)) and len(pos) == 2:
-                h, v = pos[0], pos[1]
-                if isinstance(v, str):
-                    v_lower = v.strip().lower()
-                    m_bottom = _re.match(r'^bottom\s*[-\u2013]\s*(\d+)$', v_lower)
-                    if m_bottom:
-                        offset = int(m_bottom.group(1))
-                        position = (h, max(video_clip.h - offset, 0))
-                    else:
-                        m_top = _re.match(r'^top\s*\+\s*(\d+)$', v_lower)
-                        if m_top:
-                            offset = int(m_top.group(1))
-                            position = (h, offset)
-                        elif "top" in v_lower:
-                            position = (h, "top")
-                        elif "bottom" in v_lower:
-                            position = (h, "bottom")
-                        else:
-                            position = (h, v)
-                else:
-                    position = (h, v)
-            elif isinstance(pos, str):
-                pos_lower = pos.strip().lower()
-                m_bottom = _re.match(r'^bottom\s*[-\u2013]\s*(\d+)$', pos_lower)
-                if m_bottom:
-                    offset = int(m_bottom.group(1))
-                    position = ("center", max(video_clip.h - offset, 0))
-                else:
-                    m_top = _re.match(r'^top\s*\+\s*(\d+)$', pos_lower)
-                    if m_top:
-                        offset = int(m_top.group(1))
-                        position = ("center", offset)
-                    elif "top" in pos_lower:
-                        position = ("center", "top")
-                    elif "bottom" in pos_lower:
-                        position = ("center", "bottom")
+            # 使用新的解析器支持任意位置
+            position = SubtitleGenerator.resolve_position(
+                style.position, video_clip.w, video_clip.h
+            )
 
             final = CompositeVideoClip([video_clip, subtitles_clip.with_position(position)])
             final.write_videofile(

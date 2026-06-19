@@ -96,49 +96,25 @@ class VideoConcatenator:
         return output_path
 
     @staticmethod
-    def _resolve_subtitle_position(pos, default=("center", "bottom"), video_height: int = 0) -> tuple:
+    def _resolve_subtitle_position(
+        pos, default=("center", "bottom"), video_height: int = 0, video_width: int = 1920,
+    ) -> tuple:
         """将字幕位置配置归一化为 (horizontal, vertical) 元组。
 
-        支持 "bottom-N" / "top+N" 格式（N 为像素偏移），
-        返回 moviepy 可用的位置元组。
+        支持格式：
+          - 标准四角: "top-left", "top-right", "bottom-left", "bottom-right"
+          - 偏移: "bottom-80", "top+20", "left+10", "right-30"
+          - 百分比: ("50%", "30%")
+          - 像素坐标: ("center", 200)
+          - 传统: ("center", "bottom"), ("left", "top")
+          - 纯字符串: "center", "top", "bottom", "top-left" 等
+
+        复用 SubtitleGenerator.resolve_position 的核心逻辑。
         """
-        if isinstance(pos, (list, tuple)) and len(pos) == 2:
-            h, v = pos[0], pos[1]
-            if isinstance(v, str):
-                v_lower = v.strip().lower()
-                # 解析 "bottom-N" 格式
-                m_bottom = _re.match(r'^bottom\s*[-–]\s*(\d+)$', v_lower)
-                if m_bottom and video_height > 0:
-                    offset = int(m_bottom.group(1))
-                    return (h, max(video_height - offset, 0))
-                # 解析 "top+N" 格式
-                m_top = _re.match(r'^top\s*\+\s*(\d+)$', v_lower)
-                if m_top:
-                    offset = int(m_top.group(1))
-                    return (h, offset)
-                if "top" in v_lower:
-                    return (h, "top")
-                if "bottom" in v_lower:
-                    return (h, "bottom")
-            return (h, v)
-        if isinstance(pos, str):
-            pos_lower = pos.strip().lower()
-            m_bottom = _re.match(r'^bottom\s*[-–]\s*(\d+)$', pos_lower)
-            if m_bottom and video_height > 0:
-                offset = int(m_bottom.group(1))
-                return ("center", max(video_height - offset, 0))
-            m_top = _re.match(r'^top\s*\+\s*(\d+)$', pos_lower)
-            if m_top:
-                offset = int(m_top.group(1))
-                return ("center", offset)
-            position_map = {
-                "bottom": ("center", "bottom"),
-                "top": ("center", "top"),
-                "center": ("center", "center"),
-                "middle": ("center", "center"),
-            }
-            return position_map.get(pos_lower, default)
-        return default
+        from core.audio.subtitle import SubtitleGenerator
+        return SubtitleGenerator.resolve_position(
+            pos, video_width or 1920, video_height or 1080,
+        )
 
     @staticmethod
     def _parse_srt_to_clips(
@@ -235,7 +211,7 @@ class VideoConcatenator:
                 )
                 clip = clip.with_position(
                     VideoConcatenator._resolve_subtitle_position(
-                        pos, video_height=video_height
+                        pos, video_height=video_height, video_width=video_width,
                     )
                 )
                 subs_clips.append(clip)

@@ -701,15 +701,38 @@ class ManuscriptVideoPipeline(BasePipeline):
 
         await self._emit(
             "subtitle", "running",
-            f"生成整段字幕 ({len(full_text)} 字)...",
+            f"生成整段字幕 ({len(full_text)} 字, {len(paragraphs)} 段)...",
             0.75,
         )
 
-        if subtitle_config.enabled and sub_maker is not None:
+        num_paras = len(paragraphs)
+        if subtitle_config.enabled and num_paras > 1:
+            # ── v3.0: 段落感知字幕生成 ──
+            # 每段的文本 + 每段视频估算时长 → 场景感知细粒度 SRT
+            para_texts = [p.text for p in paragraphs if p.text]
+            para_durations = []
+            for p in paragraphs:
+                if p.text:
+                    dur = max(len(p.text) / _CHARS_PER_SEC, 2.0)
+                else:
+                    dur = 5.0
+                para_durations.append(dur)
+
+            srt_content = SubtitleGenerator._generate_scene_aware_srt(
+                para_texts, para_durations,
+                word_cues=sub_maker if sub_maker is not None else None,
+            )
+            if srt_content.strip():
+                with open(srt_path, "w", encoding="utf-8") as f:
+                    f.write(srt_content)
+                entry_count = srt_content.count("\n\n") + 1 if "\n\n" in srt_content else 0
+                logger.info(f"[Manuscript] Scene-aware SRT generated: {entry_count} entries across {num_paras} paragraphs")
+            else:
+                subtitle_config.enabled = False
+        elif subtitle_config.enabled and sub_maker is not None:
             SubtitleGenerator.cues_to_srt(sub_maker, srt_path)
         elif subtitle_config.enabled:
-            # Estimate duration from text length
-            total_duration = len(full_text) / 4.0
+            total_duration = len(full_text) / _CHARS_PER_SEC
             SubtitleGenerator.text_to_srt(full_text, srt_path, total_duration)
         else:
             with open(srt_path, "w", encoding="utf-8") as f:

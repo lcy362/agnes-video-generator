@@ -72,6 +72,57 @@ def _trim_to_sentence(text: str, max_chars: int) -> str:
         return text[: matches[-1].end()]
     return candidate[:max_chars]
 
+
+def _split_narration_into_scenes(text: str, num_scenes: int) -> list[str]:
+    """将单段旁白文本按场景数均匀切分（基于字符数比例，在句末断开）。
+
+    Args:
+        text: 旁白文本
+        num_scenes: 目标场景数
+
+    Returns:
+        每个场景的旁白文本列表。
+    """
+    if num_scenes <= 1 or not text:
+        return [text] if text else [""]
+    if num_scenes >= len(text):
+        # 极短文本：逐字分配
+        return [text[i:i+1] for i in range(len(text))] + [""] * (num_scenes - len(text))
+
+    # 在句末标点处分段，尽量均匀
+    sentences = [s.strip() for s in _SENTENCE_BOUNDARY_RE.split(text) if s.strip()]
+    if not sentences:
+        sentences = [text]
+
+    total_chars = len(text)
+    target_per_scene = total_chars / num_scenes
+
+    scenes_texts = []
+    current_text = ""
+    current_chars = 0
+
+    for sent in sentences:
+        if current_chars > 0 and (current_chars + len(sent)) / target_per_scene > 1.3:
+            scenes_texts.append(current_text)
+            current_text = sent
+            current_chars = len(sent)
+        else:
+            current_text += sent
+            current_chars += len(sent)
+
+    if current_text:
+        scenes_texts.append(current_text)
+
+    # 补足或合并到目标场景数
+    while len(scenes_texts) < num_scenes:
+        scenes_texts.append("")
+    while len(scenes_texts) > num_scenes:
+        scenes_texts[-2] += scenes_texts[-1]
+        scenes_texts.pop()
+
+    return scenes_texts
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -1445,7 +1496,8 @@ class CreativeVideoPipeline(BasePipeline):
 
         logger.info(
             f"[Pipeline] Step subtitle: RUNNING "
-            f"(enabled={subtitle_enabled}, narration={len(narration_text)} chars)"
+            f"(enabled={subtitle_enabled}, narration={len(narration_text)} chars, "
+            f"scenes={len(self._state.scenes)})"
         )
         await self._emit(
             "subtitle", "running",
@@ -1453,12 +1505,35 @@ class CreativeVideoPipeline(BasePipeline):
             0.86,
         )
 
-        if subtitle_enabled and sub_maker is not None:
+        num_scenes = len(self._state.scenes)
+        if subtitle_enabled and num_scenes > 1:
+            # ── v3.0: 场景感知字幕生成 ──
+            # 将单条旁白按场景数切分，每段视频内再拆为多个子字幕段落
+            scene_texts = self._state.narrations[:]
+            if len(scene_texts) == 1 and num_scenes > 1:
+                # 单条旁白 → 按场景数均匀切分（基于字符数比例）
+                scene_texts = _split_narration_into_scenes(
+                    narration_text, num_scenes,
+                )
+            scene_durations = [float(self._state.video_duration)] * num_scenes
+
+            srt_content = SubtitleGenerator._generate_scene_aware_srt(
+                scene_texts, scene_durations,
+                word_cues=sub_maker if sub_maker is not None else None,
+            )
+            if srt_content.strip():
+                with open(combined_srt, "w", encoding="utf-8") as f:
+                    f.write(srt_content)
+                entry_count = srt_content.count("\n\n") + 1 if "\n\n" in srt_content else 0
+                logger.info(f"[Pipeline] Scene-aware SRT generated: {entry_count} entries across {num_scenes} scenes")
+            else:
+                subtitle_enabled = False
+        elif subtitle_enabled and sub_maker is not None:
             # TTS cues available → fine-grained SRT
             SubtitleGenerator.cues_to_srt(sub_maker, combined_srt)
         elif subtitle_enabled and narration_text:
             # No TTS cues → plain text SRT
-            total_duration = float(self._state.video_duration) * len(self._state.scenes)
+            total_duration = float(self._state.video_duration) * num_scenes
             SubtitleGenerator.text_to_srt(narration_text, combined_srt, total_duration)
         else:
             # Subtitle disabled: write empty SRT
