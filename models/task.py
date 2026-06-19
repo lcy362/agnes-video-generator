@@ -163,6 +163,7 @@ class SimpleVideoTask(BaseTaskState):
     duration: int = 5
     seed: Optional[int] = None
     negative_prompt: Optional[str] = None
+    system_prompt: str = ""
     video_id: str = ""
 
 
@@ -316,6 +317,7 @@ class SimpleImageTask(BaseTaskState):
     prompt: str = ""
     size: str = "1024x1024"
     negative_prompt: str = ""
+    system_prompt: str = ""
 
 
 # ═══════════════════════════════════════════════════
@@ -359,6 +361,7 @@ class CreateSimpleTaskRequest(BaseModel):
     video_height: int = 1152
     seed: Optional[int] = None
     negative_prompt: Optional[str] = None
+    system_prompt: str = ""
 
 
 class CreateCreativeTaskRequest(BaseModel):
@@ -405,6 +408,7 @@ class CreateSimpleImageTaskRequest(BaseModel):
     prompt: str
     size: str = "1024x1024"
     negative_prompt: Optional[str] = None
+    system_prompt: str = ""
 
 
 # ═══════════════════════════════════════════════════

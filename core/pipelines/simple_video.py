@@ -133,8 +133,9 @@ class SimpleVideoPipeline(BasePipeline):
 
         await self._emit("video_gen", "running", f"提交视频任务 (mode={self._state.mode})...", 0.1)
 
+        full_prompt = f"{self._state.system_prompt.strip()}\n\n--- Generate image/video strictly based on the following description ---\n{self._state.prompt}" if self._state.system_prompt.strip() else self._state.prompt
         video_id = await self.video_api.submit_video(
-            prompt=self._state.prompt,
+            prompt=full_prompt,
             reference_image_paths=ref_images,
             duration=self._state.duration,
             width=self._state.video_width,

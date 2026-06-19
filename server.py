@@ -275,6 +275,7 @@ async def generate_image(
     prompt: str = Form(...),
     size: str = Form("1024x1024"),
     negative_prompt: Optional[str] = Form(None),
+    system_prompt: str = Form(""),
     reference_image: UploadFile = File(None),
 ):
     """简单图片生成：创建任务 → 直调 Agnes Image API → 保存到任务目录。"""
@@ -301,6 +302,7 @@ async def generate_image(
         prompt=prompt.strip(),
         size=size,
         negative_prompt=negative_prompt or "",
+        system_prompt=system_prompt,
     )
 
     # 先用 PENDING 创建任务目录和状态文件
@@ -322,8 +324,9 @@ async def generate_image(
         state.status = StepStatus.RUNNING
         tm.update_state(status=StepStatus.RUNNING)
 
+        full_prompt = f"{system_prompt.strip()}\n\n--- Generate image/video strictly based on the following description ---\n{prompt}" if system_prompt.strip() else prompt
         output = await image_api.generate_single_image(
-            prompt=prompt,
+            prompt=full_prompt,
             reference_image_paths=ref_paths,
             size=size,
             negative_prompt=negative_prompt,
@@ -564,6 +567,7 @@ async def create_simple_task(
     video_height: int = Form(1152),
     seed: Optional[int] = Form(None),
     negative_prompt: Optional[str] = Form(None),
+    system_prompt: str = Form(""),
     reference_image: UploadFile = File(None),
     end_frame_image: UploadFile = File(None),
 ):
@@ -607,6 +611,7 @@ async def create_simple_task(
         video_height=video_height,
         seed=seed,
         negative_prompt=negative_prompt,
+        system_prompt=system_prompt,
     )
 
     # 处理参考图上传（L4: 用 UUID 替代客户端文件名，避免路径穿越）

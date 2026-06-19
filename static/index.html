@@ -163,6 +163,10 @@
                 <input id="s_negative" data-i18n-placeholder="negativePlaceholder" placeholder="排除不希望出现的元素" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
               </div>
             </div>
+            <div class="mt-4">
+              <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="systemPrompt">系统提示词</span> (<span data-i18n="optional">可选</span>)</label>
+              <textarea id="s_system" rows="2" data-i18n-placeholder="systemPromptPlaceholder" placeholder="给模型的额外提示指令（如风格、质量要求），不影响生成内容的主体描述" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
+            </div>
           </div>
         </div>
       </div>
@@ -721,6 +725,10 @@
               <label class="block text-sm text-gray-400 mb-1.5">Negative Prompt (<span data-i18n="optional">可选</span>)</label>
               <input id="i_negative" data-i18n-placeholder="negativePlaceholder" placeholder="排除不希望出现的元素" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
             </div>
+            <div class="mt-4">
+              <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="systemPrompt">系统提示词</span> (<span data-i18n="optional">可选</span>)</label>
+              <textarea id="i_system" rows="2" data-i18n-placeholder="systemPromptPlaceholder" placeholder="给模型的额外提示指令（如风格、质量要求），不影响生成内容的主体描述" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
+            </div>
           </div>
         </div>
       </div>
@@ -860,6 +868,8 @@ const T = {
     aStepAudio: '音频生成',
     aStepSubtitle: '字幕生成',
     aStepComposite: '视频合成',
+    systemPrompt: '系统提示词',
+    systemPromptPlaceholder: '给模型的额外提示指令（如风格、质量要求），不影响生成内容的主体描述',
   },
   en: {
     subtitle: 'AI Video, One Click',
@@ -942,6 +952,8 @@ const T = {
     aStepAudio: 'Audio Gen',
     aStepSubtitle: 'Subtitle Gen',
     aStepComposite: 'Composite',
+    systemPrompt: 'System Prompt',
+    systemPromptPlaceholder: 'Extra instructions for the model (e.g. style, quality), does not affect the subject description',
   },
   ru: {
     subtitle: 'AI Видео, Один клик',
@@ -1022,6 +1034,8 @@ const T = {
     aStepAudio: 'Аудио',
     aStepSubtitle: 'Субтитры',
     aStepComposite: 'Сборка',
+    systemPrompt: 'Системный промпт',
+    systemPromptPlaceholder: 'Дополнительные инструкции для модели (стиль, качество), не влияют на основной контент',
   },
   ja: {
     subtitle: 'AI動画、ワンクリック',
@@ -1099,6 +1113,8 @@ const T = {
     aStepAudio: '音声生成',
     aStepSubtitle: '字幕生成',
     aStepComposite: '合成',
+    systemPrompt: 'システムプロンプト',
+    systemPromptPlaceholder: 'モデルへの追加指示（スタイル、品質など）。生成内容の主体には影響しません',
   },
   ko: {
     subtitle: 'AI 영상, 원클릭',
@@ -1176,6 +1192,8 @@ const T = {
     aStepAudio: '오디오 생성',
     aStepSubtitle: '자막 생성',
     aStepComposite: '합성',
+    systemPrompt: '시스템 프롬프트',
+    systemPromptPlaceholder: '모델에 대한 추가 지침(스타일, 품질 등). 생성 내용의 주제에는 영향을 미치지 않습니다',
   },
   ms: {
     subtitle: 'Video AI, Satu Klik',
@@ -1253,6 +1271,8 @@ const T = {
     aStepAudio: 'Generasi Audio',
     aStepSubtitle: 'Generasi Sarikata',
     aStepComposite: 'Komposit',
+    systemPrompt: 'Arahan Sistem',
+    systemPromptPlaceholder: 'Arahan tambahan untuk model (cth. gaya, kualiti). Tidak menjejaskan penerangan kandungan utama',
   },
   id: {
     subtitle: 'Video AI, Satu Klik',
@@ -1329,6 +1349,8 @@ const T = {
     aStepAudio: 'Hasilkan Audio',
     aStepSubtitle: 'Hasilkan Subtitle',
     aStepComposite: 'Gabung',
+    systemPrompt: 'Prompt Sistem',
+    systemPromptPlaceholder: 'Instruksi tambahan untuk model (mis. gaya, kualitas). Tidak mempengaruhi subjek deskripsi konten',
   },
 };
 
@@ -1621,6 +1643,8 @@ async function submitSimple() {
   if (seed) form.append('seed', seed);
   const neg = document.getElementById('s_negative').value;
   if (neg) form.append('negative_prompt', neg);
+  const sp = document.getElementById('s_system').value.trim();
+  if (sp) form.append('system_prompt', sp);
 
   const refFile = document.getElementById('s_ref_image').files[0];
   if (refFile) form.append('reference_image', refFile);
@@ -1823,6 +1847,8 @@ async function submitImage() {
   form.append('size', document.getElementById('i_size').value);
   const neg = document.getElementById('i_negative').value;
   if (neg) form.append('negative_prompt', neg);
+  const sp = document.getElementById('i_system').value.trim();
+  if (sp) form.append('system_prompt', sp);
   const refFile = document.getElementById('i_ref_image').files[0];
   if (refFile) form.append('reference_image', refFile);
 
