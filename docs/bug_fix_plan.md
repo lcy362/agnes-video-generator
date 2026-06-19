@@ -14,7 +14,7 @@
 | **批次 1** | 事件循环阻塞与并发安全 | P1, P2 | `core/pipelines/*`, `server.py` | ✅ 完成 |
 | **批次 2** | 用户功能失效修复 | P3, P4 | `server.py`, `static/index.html` | ✅ 完成 |
 | **批次 3** | LLM 调用健壮性 | P5, P11, P8 | `core/api/agnes_chat.py`, `core/screenwriter.py` | ✅ 完成 |
-| **批次 4** | 视频合成与音频健壮性 | P6, P9, P10, P12 | `core/compositor/`, `core/audio/`, `core/api/agnes_video.py` | ⬜ 待开始 |
+| **批次 4** | 视频合成与音频健壮性 | P6, P9, P10, P12 | `core/compositor/`, `core/audio/`, `core/api/agnes_video.py` | ✅ 完成 |
 | **批次 5** | 参数校验与持久化原子性 | P7, P13, H5 | `server.py`, `core/task_manager.py`, `models/task.py` | ⬜ 待开始 |
 | **批次 6** | 代码质量与体验优化 | 重复代码/魔数/排序/下载限制/前端 UX | 多处 | ⬜ 待开始 |
 
@@ -33,10 +33,10 @@
 | P5 | 🔴 高 | chat_json 无降级 | 3 | ✅ |
 | P11 | 🟡 中 | LLM 调用无重试 | 3 | ✅ |
 | P8 | 🟡 中 | prompt 注入风险 | 3 | ✅ |
-| P6 | 🔴 高 | concat_videos 资源泄漏 | 4 | ⬜ |
-| P9 | 🟡 中 | SilentTTS 不查 ffmpeg 返回码 | 4 | ⬜ |
-| P10 | 🟡 中 | 字幕叠加静默降级 | 4 | ⬜ |
-| P12 | 🟡 中 | .url 缓存不过期 | 4 | ⬜ |
+| P6 | 🔴 高 | concat_videos 资源泄漏 | 4 | ✅ |
+| P9 | 🟡 中 | SilentTTS 不查 ffmpeg 返回码 | 4 | ✅ |
+| P10 | 🟡 中 | 字幕叠加静默降级 | 4 | ✅ |
+| P12 | 🟡 中 | .url 缓存不过期 | 4 | ✅ |
 | P7 | 🟡 中 | 参数零校验 | 5 | ⬜ |
 | P13 | 🟡 中 | TaskManager 临时文件名固定 | 5 | ⬜ |
 | H5 | 🟡 中 | lifespan 非原子写 | 5 | ⬜ |

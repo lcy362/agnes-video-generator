@@ -2,9 +2,11 @@
 
 import asyncio
 import base64
+import json
 import logging
 import mimetypes
 import os
+import time
 from typing import List, Optional
 
 import requests
@@ -74,21 +76,37 @@ class AgnesVideoAPI:
             return ref
         if os.path.exists(ref):
             url_file = ref + ".url"
+            # P12: 缓存过期检查（预签名 URL 有效期有限，超过 1 小时则重新上传）
+            _URL_CACHE_MAX_AGE = 3600  # 1 小时
             if os.path.exists(url_file):
                 try:
                     with open(url_file, "r") as f:
-                        cached_url = f.read().strip()
-                    if cached_url:
-                        logger.info(f"[AgnesVideo] Using cached hosted URL: {cached_url[:80]}...")
+                        cache_data = json.loads(f.read())
+                    cached_url = cache_data.get("url", "")
+                    cached_ts = cache_data.get("ts", 0)
+                    age = time.time() - cached_ts
+                    if cached_url and age < _URL_CACHE_MAX_AGE:
+                        logger.info(
+                            f"[AgnesVideo] Using cached hosted URL (age={age:.0f}s): "
+                            f"{cached_url[:80]}..."
+                        )
                         return cached_url
-                except Exception as e:
+                    if cached_url:
+                        logger.info(
+                            f"[AgnesVideo] Cached URL expired (age={age:.0f}s), re-uploading"
+                        )
+                except (json.JSONDecodeError, OSError) as e:
                     logger.debug(f"[AgnesVideo] Failed to read cached URL: {e}")
-            url = await self._upload_image_to_url(ref)
+                # 兼容旧格式纯文本缓存文件
+                except Exception as e:
+                    logger.debug(f"[AgnesVideo] Failed to read legacy URL cache: {e}")
+            url = await self._upload_image_to_host(ref)
             if url:
                 try:
+                    cache_data = {"url": url, "ts": time.time()}
                     tmp_file = url_file + ".tmp"
                     with open(tmp_file, "w") as f:
-                        f.write(url)
+                        json.dump(cache_data, f)
                         f.flush()
                         os.fsync(f.fileno())
                     os.replace(tmp_file, url_file)

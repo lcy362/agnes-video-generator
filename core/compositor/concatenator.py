@@ -58,6 +58,7 @@ class VideoConcatenator:
                 resized_clips.append(c.resized((target_w, target_h)))
             else:
                 resized_clips.append(c)
+        final = None
         try:
             final = concatenate_videoclips(resized_clips, method="compose")
             final.write_videofile(
@@ -70,8 +71,23 @@ class VideoConcatenator:
                 logger="bar",
             )
         finally:
+            # P6: 关闭所有资源（clips + resized_clips + final）
+            for c in clips:
+                try:
+                    c.close()
+                except Exception:
+                    pass
             for c in resized_clips:
-                c.close()
+                if c not in clips:  # 避免重复 close
+                    try:
+                        c.close()
+                    except Exception:
+                        pass
+            if final is not None:
+                try:
+                    final.close()
+                except Exception:
+                    pass
 
         logger.info(f"[Compositor] Concatenation complete: {output_path}")
         return output_path

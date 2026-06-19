@@ -470,7 +470,6 @@ class SubtitleGenerator:
             return output_path
 
         except Exception as e:
-            logger.error(f"[Subtitle] Overlay failed: {e}, falling back to copy")
-            import shutil
-            shutil.copy2(video_path, output_path)
-            return output_path
+            # P10: 不再静默降级复制原视频，向上抛异常让调用方决定
+            logger.error(f"[Subtitle] Overlay failed: {e}")
+            raise

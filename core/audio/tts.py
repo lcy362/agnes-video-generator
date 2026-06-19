@@ -131,9 +131,16 @@ class SilentTTSEngine(TTSEngine):
             "-q:a", "4",
             output_path,
             stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
         )
-        await proc.wait()
+        _, stderr = await proc.communicate()
+
+        # P9: 检查 ffmpeg 返回码，失败时抛出异常而非静默返回
+        if proc.returncode != 0:
+            err_msg = stderr.decode(errors="replace")[:500] if stderr else ""
+            raise RuntimeError(
+                f"[TTS] ffmpeg silent generation failed (code {proc.returncode}): {err_msg}"
+            )
 
         # 返回空 cues
         return output_path, {}
