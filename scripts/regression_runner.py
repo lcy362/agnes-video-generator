@@ -127,19 +127,19 @@ SCENARIO_DEFS = [
     # ── 简单视频 ──
     ScenarioConfig("S1", "纯文本 t2v", "simple",
         "/api/tasks/simple",
-        {"prompt": "一只猫在花园里追逐蝴蝶，慢动作，柔和的阳光透过树叶",
+        {"prompt": "春天花园里花朵盛开，阳光柔和",
          "mode": "t2v", "duration": 5},
         TIMEOUT_SIMPLE, SCENARIO_WEIGHTS["S1"]),
 
     ScenarioConfig("S2", "图生视频 ti2vid", "simple",
         "/api/tasks/simple",
-        {"prompt": "一只猫在花园里追逐蝴蝶，慢动作，柔和的阳光透过树叶",
+        {"prompt": "春天花园里花朵盛开，阳光柔和",
          "mode": "ti2vid", "duration": 5},
         TIMEOUT_SIMPLE, SCENARIO_WEIGHTS["S2"], requires_ref_image=True),
 
     ScenarioConfig("S3", "关键帧 keyframes", "simple",
         "/api/tasks/simple",
-        {"prompt": "一只猫在花园里追逐蝴蝶，慢动作，柔和的阳光透过树叶",
+        {"prompt": "春天花园里花朵盛开，阳光柔和",
          "mode": "keyframes", "duration": 5},
         TIMEOUT_SIMPLE, SCENARIO_WEIGHTS["S3"],
         requires_ref_image=True, requires_end_image=True),
@@ -147,27 +147,27 @@ SCENARIO_DEFS = [
     # ── 创意视频（主测无配音，三种场景模式 + 一个配音验证）──
     ScenarioConfig("C1", "纯文字+独立+无配音", "creative",
         "/api/tasks/creative",
-        {"idea": "一只猫在花园里探索的冒险故事",
-         "user_requirement": "3个场景，每个场景5秒，动画风格",
-         "style": "动画风格", "chaining_mode": "none",
+        {"idea": "清晨小镇溪边的宁静风景",
+         "user_requirement": "3个场景，每个场景5秒，写实风格",
+         "style": "写实风格", "chaining_mode": "none",
          "video_duration": 5,
          "audio_enabled": False},
         TIMEOUT_CREATIVE, SCENARIO_WEIGHTS["C1"]),
 
     ScenarioConfig("C2", "带参考图+关键帧+无配音", "creative",
         "/api/tasks/creative",
-        {"idea": "一只猫在花园里探索的冒险故事",
-         "user_requirement": "3个场景，每个场景5秒，动画风格",
-         "style": "动画风格", "chaining_mode": "keyframes",
+        {"idea": "清晨小镇溪边的宁静风景",
+         "user_requirement": "3个场景，每个场景5秒，写实风格",
+         "style": "写实风格", "chaining_mode": "keyframes",
          "video_duration": 5,
          "audio_enabled": False},
         TIMEOUT_CREATIVE, SCENARIO_WEIGHTS["C2"], requires_ref_image=True),
 
     ScenarioConfig("C3", "参考图生成尾帧+关键帧+无配音", "creative",
         "/api/tasks/creative",
-        {"idea": "一只猫在花园里探索的冒险故事",
-         "user_requirement": "3个场景，每个场景5秒，动画风格",
-         "style": "动画风格", "chaining_mode": "keyframes",
+        {"idea": "清晨小镇溪边的宁静风景",
+         "user_requirement": "3个场景，每个场景5秒，写实风格",
+         "style": "写实风格", "chaining_mode": "keyframes",
          "video_duration": 5,
          "audio_enabled": False,
          "use_custom_end_frames": True,
@@ -176,40 +176,46 @@ SCENARIO_DEFS = [
 
     ScenarioConfig("C4", "独立场景+配音字幕验证", "creative",
         "/api/tasks/creative",
-        {"idea": "一只猫在花园里探索的冒险故事",
-         "user_requirement": "3个场景，每个场景5秒，动画风格",
-         "style": "动画风格", "chaining_mode": "none",
+        {"idea": "清晨小镇溪边的宁静风景",
+         "user_requirement": "3个场景，每个场景5秒，写实风格",
+         "style": "写实风格", "chaining_mode": "none",
          "video_duration": 5,
          "audio_enabled": True, "audio_voice": "zh-CN-XiaoxiaoNeural"},
         TIMEOUT_CREATIVE, SCENARIO_WEIGHTS["C4"]),
 
     ScenarioConfig("C5", "链式续传 ti2vid + 无配音", "creative",
         "/api/tasks/creative",
-        {"idea": "一只猫在花园里探索的冒险故事",
-         "user_requirement": "3个场景，每个场景5秒，动画风格",
-         "style": "动画风格", "chaining_mode": "ti2vid",
+        {"idea": "清晨小镇溪边的宁静风景",
+         "user_requirement": "3个场景，每个场景5秒，写实风格",
+         "style": "写实风格", "chaining_mode": "ti2vid",
          "video_duration": 5, "audio_enabled": False},
         TIMEOUT_CREATIVE, SCENARIO_WEIGHTS["C5"]),
 
     # ── 稿件视频（短文本，激活拆段算法）──
     ScenarioConfig("M1", "短稿件+配音", "manuscript",
         "/api/tasks/manuscript",
-        {"manuscript_text": "春天的花园里，一只小猫正在追逐蝴蝶。阳光明媚，"
-         "花朵盛开，空气中弥漫着花香。小猫跳来跳去，非常开心，尾巴翘得高高的。"
-         "蝴蝶停在一朵花上，小猫悄悄靠近，屏住呼吸。突然蝴蝶飞走了，小猫扑了"
-         "个空，翻了个跟头。它并不气馁，爬起来继续追逐，在花丛中穿梭。最后小猫"
-         "累了，趴在树荫下休息，看着蝴蝶越飞越远。",
+        {"manuscript_text": "清晨的小镇，一条小溪静静流过石桥。"
+         "溪水清澈见底，映着蓝天白云的倒影。"
+         "岸边的柳树轻轻摇摆，叶子随风飘动。"
+         "阳光洒在水面上，泛起点点金光。"
+         "微风吹过，带来泥土和青草的气息。"
+         "远处的屋顶上升起缕缕炊烟，宁静而安详。"
+         "春天来了，古镇的景色越发迷人。"
+         "桃花开满了枝头，柳树抽出嫩绿的新芽。",
          "video_duration": 5, "audio_enabled": True,
          "audio_voice": "zh-CN-XiaoxiaoNeural"},
         TIMEOUT_MANUSCRIPT, SCENARIO_WEIGHTS["M1"]),
 
     ScenarioConfig("M2", "短稿件+自定义字幕", "manuscript",
         "/api/tasks/manuscript",
-        {"manuscript_text": "春天的花园里，一只小猫正在追逐蝴蝶。阳光明媚，"
-         "花朵盛开，空气中弥漫着花香。小猫跳来跳去，非常开心，尾巴翘得高高的。"
-         "蝴蝶停在一朵花上，小猫悄悄靠近，屏住呼吸。突然蝴蝶飞走了，小猫扑了"
-         "个空，翻了个跟头。它并不气馁，爬起来继续追逐，在花丛中穿梭。最后小猫"
-         "累了，趴在树荫下休息，看着蝴蝶越飞越远。",
+        {"manuscript_text": "清晨的小镇，一条小溪静静流过石桥。"
+         "溪水清澈见底，映着蓝天白云的倒影。"
+         "岸边的柳树轻轻摇摆，叶子随风飘动。"
+         "阳光洒在水面上，泛起点点金光。"
+         "微风吹过，带来泥土和青草的气息。"
+         "远处的屋顶上升起缕缕炊烟，宁静而安详。"
+         "春天来了，古镇的景色越发迷人。"
+         "桃花开满了枝头，柳树抽出嫩绿的新芽。",
          "video_duration": 5, "audio_enabled": True,
          "audio_voice": "zh-CN-XiaoxiaoNeural",
          "subtitle_font": "SimHei", "subtitle_color": "yellow",

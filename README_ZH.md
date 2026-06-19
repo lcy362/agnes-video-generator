@@ -243,7 +243,7 @@ agnes-video-generator/
 │   ├── image.py                      # 图片下载 / base64 转换
 │   └── video.py                      # 视频下载
 ├── scripts/
-│   └── regression_runner.py          # 9 场景回归测试套件
+│   └── regression_runner.py          # 10 场景回归测试套件
 └── docs/
     ├── system_design.md              # 架构设计文档
     ├── regression_test_plan.md       # 回归测试计划
