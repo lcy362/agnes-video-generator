@@ -142,6 +142,8 @@ class AgnesImageAPI:
                     await asyncio.sleep(delay)
                     continue
 
+                if resp.status_code != 200:
+                    logger.error(f"[AgnesImage] Non-retryable error: HTTP {resp.status_code}, body: {resp.text[:500]}")
                 resp.raise_for_status()
                 break
 
@@ -158,7 +160,9 @@ class AgnesImageAPI:
         else:
             # 重试耗尽
             if resp is not None:
+                logger.error(f"[AgnesImage] max retries exceeded, last response: {resp.status_code} {resp.text[:500]}")
                 resp.raise_for_status()
+            logger.error(f"[AgnesImage] max retries ({max_retries}) exceeded with no response")
             raise RuntimeError(
                 f"[AgnesImage] max retries ({max_retries}) exceeded"
             )

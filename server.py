@@ -334,6 +334,7 @@ async def generate_image(
     except Exception as e:
         state.status = StepStatus.FAILED
         tm.update_state(status=StepStatus.FAILED)
+        logger.error(f"[Image] Task {task_id} failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
     img_filename = "final_image.png"
@@ -343,6 +344,7 @@ async def generate_image(
     except Exception as e:
         state.status = StepStatus.FAILED
         tm.update_state(status=StepStatus.FAILED)
+        logger.error(f"[Image] Task {task_id} save failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"图片保存失败: {e}")
 
     state.status = StepStatus.COMPLETED
