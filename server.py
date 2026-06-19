@@ -45,6 +45,7 @@ from models.task import (
     BaseTaskState,
     CreativeVideoTask,
     ManuscriptVideoTask,
+    SimpleImageTask,
     SimpleVideoTask,
     StepStatus,
     SubtitleConfig,
@@ -265,10 +266,8 @@ async def get_voices():
 
 
 # ═══════════════════════════════════════════════════
-# 简单图片生成（非任务，直调接口返回）
+# 简单图片生成（任务 + working_dir 持久化）
 # ═══════════════════════════════════════════════════
-
-GENERATED_DIR = os.path.join(os.path.dirname(__file__), "static", "generated")
 
 
 @app.post("/api/image/generate")
@@ -278,7 +277,7 @@ async def generate_image(
     negative_prompt: Optional[str] = Form(None),
     reference_image: UploadFile = File(None),
 ):
-    """简单图片生成：直调 Agnes Image API 并返回图片 URL。"""
+    """简单图片生成：创建任务 → 直调 Agnes Image API → 保存到任务目录。"""
     api_key = get_api_key()
     if not api_key:
         raise HTTPException(status_code=400, detail="请先配置 API Key")
@@ -292,7 +291,22 @@ async def generate_image(
     if size not in _VALID_SIZES:
         raise HTTPException(status_code=422, detail=f"size 必须为 {_VALID_SIZES} 之一")
 
-    os.makedirs(GENERATED_DIR, exist_ok=True)
+    task_id = uuid.uuid4().hex[:12]
+    name = f"image_{task_id}"
+    dir_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_id}"
+
+    state = SimpleImageTask(
+        task_id=task_id,
+        creative_name=name,
+        prompt=prompt.strip(),
+        size=size,
+        negative_prompt=negative_prompt or "",
+    )
+
+    # 先用 PENDING 创建任务目录和状态文件
+    tm = TaskManager(task_id, dir_name=dir_name)
+    tm.create(state)
+
     image_api = AgnesImageAPI(api_key=api_key)
 
     ref_paths = []
@@ -305,6 +319,9 @@ async def generate_image(
         ref_paths.append(ref_path)
 
     try:
+        state.status = StepStatus.RUNNING
+        tm.update_state(status=StepStatus.RUNNING)
+
         output = await image_api.generate_single_image(
             prompt=prompt,
             reference_image_paths=ref_paths,
@@ -312,17 +329,38 @@ async def generate_image(
             negative_prompt=negative_prompt,
         )
     except Exception as e:
+        state.status = StepStatus.FAILED
+        tm.update_state(status=StepStatus.FAILED)
         raise HTTPException(status_code=500, detail=str(e))
 
-    img_filename = f"{uuid.uuid4().hex[:12]}.png"
-    img_path = os.path.join(GENERATED_DIR, img_filename)
+    img_filename = "final_image.png"
+    img_path = os.path.join(tm.task_dir, img_filename)
     try:
         output.save(img_path)
     except Exception as e:
+        state.status = StepStatus.FAILED
+        tm.update_state(status=StepStatus.FAILED)
         raise HTTPException(status_code=500, detail=f"图片保存失败: {e}")
 
-    logger.info(f"[Image] Generated: {img_filename}, prompt={prompt[:60]}...")
-    return {"ok": True, "url": f"/static/generated/{img_filename}"}
+    state.status = StepStatus.COMPLETED
+    state.final_video_file = img_path
+    tm.update_state(status=StepStatus.COMPLETED, final_video_file=img_path)
+
+    logger.info(f"[Image] Task {task_id} completed: {img_path}, prompt={prompt[:60]}...")
+    return {"ok": True, "task_id": task_id, "dir_name": dir_name}
+
+
+@app.get("/api/image/{task_id}")
+async def serve_image(task_id: str):
+    """返回已生成的图片文件。"""
+    dir_name = _find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    if not state or not state.final_video_file:
+        raise HTTPException(status_code=404, detail="Image not found")
+    if not os.path.exists(state.final_video_file):
+        raise HTTPException(status_code=404, detail="Image file not found")
+    return FileResponse(state.final_video_file)
 
 
 # ═══════════════════════════════════════════════════
@@ -356,6 +394,10 @@ async def list_tasks():
             elif isinstance(state, SimpleVideoTask):
                 t["prompt"] = state.prompt[:100] if state.prompt else ""
                 t["mode"] = state.mode
+            # 简单图片
+            elif isinstance(state, SimpleImageTask):
+                t["prompt"] = state.prompt[:100] if state.prompt else ""
+                t["size"] = state.size
     return {"tasks": tasks}
 
 

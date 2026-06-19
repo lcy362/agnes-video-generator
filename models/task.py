@@ -34,6 +34,7 @@ class TaskType(str, Enum):
     CREATIVE = "creative"
     MANUSCRIPT = "manuscript"
     ANCHOR = "anchor"
+    IMAGE = "image"
 
 
 class VideoMode(str, Enum):
@@ -303,11 +304,25 @@ class AnchorVideoTask(BaseTaskState):
     final_video_path: str = ""
 
 
+class SimpleImageTask(BaseTaskState):
+    """简单图片任务（类型 5）
+
+    用户输入 prompt 和尺寸，直调 Agnes Image API 生成单张图片，
+    在 working_dir 中建任务并保存结果。
+    """
+
+    task_type: Literal[TaskType.IMAGE] = TaskType.IMAGE
+
+    prompt: str = ""
+    size: str = "1024x1024"
+    negative_prompt: str = ""
+
+
 # ═══════════════════════════════════════════════════
 # 联合类型 + 反序列化工厂
 # ═══════════════════════════════════════════════════
 
-AnyTaskState = Union[SimpleVideoTask, CreativeVideoTask, ManuscriptVideoTask, AnchorVideoTask]
+AnyTaskState = Union[SimpleVideoTask, CreativeVideoTask, ManuscriptVideoTask, AnchorVideoTask, SimpleImageTask]
 
 # 用于 TaskManager.load()：根据 task_type 字段选择正确的模型类
 _TASK_TYPE_MAP: dict[str, type[BaseTaskState]] = {
@@ -315,6 +330,7 @@ _TASK_TYPE_MAP: dict[str, type[BaseTaskState]] = {
     TaskType.CREATIVE: CreativeVideoTask,
     TaskType.MANUSCRIPT: ManuscriptVideoTask,
     TaskType.ANCHOR: AnchorVideoTask,
+    TaskType.IMAGE: SimpleImageTask,
 }
 
 
@@ -381,6 +397,14 @@ class CreateAnchorTaskRequest(BaseModel):
     video_height: int = 1344
     audio_config: Optional[AudioConfig] = None
     subtitle_config: Optional[SubtitleConfig] = None
+
+
+class CreateSimpleImageTaskRequest(BaseModel):
+    """创建简单图片任务的请求体"""
+
+    prompt: str
+    size: str = "1024x1024"
+    negative_prompt: Optional[str] = None
 
 
 # ═══════════════════════════════════════════════════

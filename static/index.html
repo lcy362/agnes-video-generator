@@ -826,7 +826,7 @@ const T = {
     statusCompleted: '已完成', statusRunning: '进行中', statusFailed: '失败', statusPending: '待处理',
     btnView: '查看', btnViewProgress: '查看进度', btnResume: '续传', btnStop: '中断',
     sceneUnit: '个场景', paraUnit: '段',
-    typeSimple: '简单', typeCreative: '创意', typeManuscript: '稿件',
+    typeSimple: '简单', typeCreative: '创意', typeManuscript: '稿件', typeImage: '图片',
     stopConfirm: '确定要中断当前任务吗？中断后可到任务列表续传。',
     stopConfirmById: '确定要中断该任务吗？中断后可续传。',
     stopped: '任务已中断，可在任务列表中续传', stoppedById: '任务已中断',
@@ -908,7 +908,7 @@ const T = {
     statusCompleted: 'Completed', statusRunning: 'Running', statusFailed: 'Failed', statusPending: 'Pending',
     btnView: 'View', btnViewProgress: 'Progress', btnResume: 'Resume', btnStop: 'Stop',
     sceneUnit: ' scenes', paraUnit: ' paragraphs',
-    typeSimple: 'Simple', typeCreative: 'Creative', typeManuscript: 'Article',
+    typeSimple: 'Simple', typeCreative: 'Creative', typeManuscript: 'Article', typeImage: 'Image',
     stopConfirm: 'Stop the current task? It can be resumed from the task list.',
     stopConfirmById: 'Stop this task? It can be resumed later.',
     stopped: 'Task stopped, resumable from task list', stoppedById: 'Task stopped',
@@ -990,7 +990,7 @@ const T = {
     statusCompleted: 'Готово', statusRunning: 'Работает', statusFailed: 'Ошибка', statusPending: 'Ожидание',
     btnView: 'Просмотр', btnViewProgress: 'Прогресс', btnResume: 'Продолжить', btnStop: 'Стоп',
     sceneUnit: ' сцен', paraUnit: ' параграфов',
-    typeSimple: 'Простое', typeCreative: 'Креатив', typeManuscript: 'Статья',
+    typeSimple: 'Простое', typeCreative: 'Креатив', typeManuscript: 'Статья', typeImage: 'Изображение',
     stopConfirm: 'Остановить задачу?', stopConfirmById: 'Остановить?',
     stopped: 'Остановлена', stoppedById: 'Остановлена',
     enterApiKey: 'Введите API Key', enterPrompt: 'Опишите видео', enterIdea: 'Опишите идею', enterText: 'Введите текст',
@@ -1070,7 +1070,7 @@ const T = {
     statusCompleted: '完了', statusRunning: '実行中', statusFailed: '失敗', statusPending: '保留',
     btnView: '表示', btnViewProgress: '進捗', btnResume: '再開', btnStop: '停止',
     sceneUnit: ' シーン', paraUnit: ' 段落',
-    typeSimple: 'シンプル', typeCreative: 'クリエイティブ', typeManuscript: '記事',
+    typeSimple: 'シンプル', typeCreative: 'クリエイティブ', typeManuscript: '記事', typeImage: '画像',
     stopConfirm: '中断しますか？', stopConfirmById: '中断しますか？',
     stopped: '中断しました', stoppedById: '中断しました',
     enterApiKey: 'API Keyを入力', enterPrompt: '動画を記述', enterIdea: 'アイデアを記述', enterText: 'テキストを入力',
@@ -1147,7 +1147,7 @@ const T = {
     statusCompleted: '완료', statusRunning: '실행 중', statusFailed: '실패', statusPending: '대기',
     btnView: '보기', btnViewProgress: '진행', btnResume: '재개', btnStop: '중지',
     sceneUnit: '개 장면', paraUnit: '개 문단',
-    typeSimple: '간단', typeCreative: '크리에이티브', typeManuscript: '기사',
+    typeSimple: '간단', typeCreative: '크리에이티브', typeManuscript: '기사', typeImage: '이미지',
     stopConfirm: '중단하시겠습니까?', stopConfirmById: '중단하시겠습니까?',
     stopped: '중단됨', stoppedById: '중단됨',
     enterApiKey: 'API Key 입력', enterPrompt: '영상 설명', enterIdea: '아이디어 입력', enterText: '텍스트 입력',
@@ -1224,7 +1224,7 @@ const T = {
     statusCompleted: 'Selesai', statusRunning: 'Berjalan', statusFailed: 'Gagal', statusPending: 'Menunggu',
     btnView: 'Lihat', btnViewProgress: 'Kemajuan', btnResume: 'Sambung', btnStop: 'Henti',
     sceneUnit: ' babak', paraUnit: ' perenggan',
-    typeSimple: 'Ringkas', typeCreative: 'Kreatif', typeManuscript: 'Artikel',
+    typeSimple: 'Ringkas', typeCreative: 'Kreatif', typeManuscript: 'Artikel', typeImage: 'Imej',
     stopConfirm: 'Hentikan tugas?', stopConfirmById: 'Hentikan?',
     stopped: 'Dihentikan', stoppedById: 'Dihentikan',
     enterApiKey: 'Masukkan API Key', enterPrompt: 'Terangkan video', enterIdea: 'Terangkan idea', enterText: 'Masukkan teks',
@@ -1300,7 +1300,7 @@ const T = {
     statusCompleted: 'Selesai', statusRunning: 'Berjalan', statusFailed: 'Gagal', statusPending: 'Menunggu',
     btnView: 'Lihat', btnViewProgress: 'Kemajuan', btnResume: 'Lanjutkan', btnStop: 'Henti',
     sceneUnit: ' adegan', paraUnit: ' paragraf',
-    typeSimple: 'Simpel', typeCreative: 'Kreatif', typeManuscript: 'Artikel',
+    typeSimple: 'Simpel', typeCreative: 'Kreatif', typeManuscript: 'Artikel', typeImage: 'Gambar',
     stopConfirm: 'Hentikan tugas?', stopConfirmById: 'Hentikan?',
     stopped: 'Dihentikan', stoppedById: 'Dihentikan',
     enterApiKey: 'Masukkan API Key', enterPrompt: 'Jelaskan video', enterIdea: 'Jelaskan ide', enterText: 'Masukkan teks',
@@ -1831,7 +1831,7 @@ async function submitImage() {
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || t('failCreate'));
 
-    document.getElementById('result-image').src = d.url;
+    document.getElementById('result-image').src = '/api/image/' + d.task_id;
     document.getElementById('image-result').classList.remove('hidden');
     showToast(t('imgComplete'), 5000);
   } catch(e) {
@@ -2048,7 +2048,7 @@ async function loadTaskList() {
     container.innerHTML = tasks.map(task => {
       const statusColors = { completed: 'text-green-400', running: 'text-yellow-400', failed: 'text-red-400', pending: 'text-gray-400' };
       const statusLabels = { completed: t('statusCompleted'), running: t('statusRunning'), failed: t('statusFailed'), pending: t('statusPending') };
-      const typeLabels = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript'), anchor: t('typeAnchor') };
+      const typeLabels = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript'), anchor: t('typeAnchor'), image: t('typeImage') };
       const typeColors = { simple: 'bg-blue-900 text-blue-300', creative: 'bg-purple-900 text-purple-300', manuscript: 'bg-orange-900 text-orange-300', anchor: 'bg-pink-900 text-pink-300' };
       const isCompleted = task.status === 'completed';
       const isRunning = task.status === 'running';
@@ -2199,7 +2199,7 @@ function showTaskDetail(taskId, state) {
   document.getElementById('progress-bar').style.width = '100%';
   document.getElementById('progress-pct').textContent = '100%';
 
-  const typeLabel = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript'), anchor: t('typeAnchor') };
+  const typeLabel = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript'), anchor: t('typeAnchor'), image: t('typeImage') };
   let extraInfo = '';
   if (taskType === 'creative') {
     extraInfo = `<p class="text-gray-500">${t('idea_')}: ${escapeHtml((state.idea || '').substring(0, 100))}</p>

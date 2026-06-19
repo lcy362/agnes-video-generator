@@ -16,16 +16,20 @@ from models.task import (
     ManuscriptParagraph,
     SceneTask,
     # 任务状态模型
+    AnchorVideoTask,
     AnyTaskState,
     BaseTaskState,
     CreativeVideoTask,
     ManuscriptVideoTask,
+    SimpleImageTask,
     SimpleVideoTask,
     # 工厂函数
     parse_task_state,
     # 请求模型
+    CreateAnchorTaskRequest,
     CreateCreativeTaskRequest,
     CreateManuscriptTaskRequest,
+    CreateSimpleImageTaskRequest,
     CreateSimpleTaskRequest,
     # 向后兼容别名（Batch B/C 迁移完成后移除）
     CreateTaskRequest,
@@ -47,16 +51,20 @@ __all__ = [
     "ManuscriptParagraph",
     "SceneTask",
     # 任务模型
+    "AnchorVideoTask",
     "AnyTaskState",
     "BaseTaskState",
     "CreativeVideoTask",
     "ManuscriptVideoTask",
+    "SimpleImageTask",
     "SimpleVideoTask",
     # 工厂
     "parse_task_state",
     # 请求
+    "CreateAnchorTaskRequest",
     "CreateCreativeTaskRequest",
     "CreateManuscriptTaskRequest",
+    "CreateSimpleImageTaskRequest",
     "CreateSimpleTaskRequest",
     # 向后兼容
     "CreateTaskRequest",
