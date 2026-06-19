@@ -75,6 +75,9 @@
       <button onclick="switchTaskType('manuscript')" id="ttype-manuscript" class="ttype-btn flex-1 px-4 py-3 rounded-xl text-sm font-medium tab-inactive transition text-center">
         <span class="text-lg">📝</span><br><span data-i18n="ttManuscript">稿件长视频</span>
       </button>
+      <button onclick="switchTaskType('anchor')" id="ttype-anchor" class="ttype-btn flex-1 px-4 py-3 rounded-xl text-sm font-medium tab-inactive transition text-center">
+        <span class="text-lg">🎙️</span><br><span data-i18n="ttAnchor">数字人口播</span>
+      </button>
     </div>
 
     <!-- ═══════ Tab 1: Simple Video ═══════ -->
@@ -511,6 +514,165 @@
       </button>
     </div>
 
+    <!-- ═══════ Tab 4: Anchor Video ═══════ -->
+    <div id="form-anchor" class="hidden">
+      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+        <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="anchorSettings">数字人设置</h2>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="anchorPrompt">主播形象描述</label>
+          <textarea id="a_prompt" rows="3" data-i18n-placeholder="anchorPromptPlaceholder" placeholder="一位专业的新闻主播，穿着正式西装，坐在现代化的新闻演播室中..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="anchorRefImage">参考图 (可选)</label>
+          <div class="flex items-center gap-4">
+            <label class="cursor-pointer px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm transition inline-block">
+              <span data-i18n="chooseImage">选择参考图</span>
+              <input id="a_ref_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('a_ref_image','a_ref_name')">
+            </label>
+            <span id="a_ref_name" class="text-sm text-gray-500" data-i18n="notSelected">未选择</span>
+          </div>
+          <p class="text-xs text-gray-500 mt-1" data-i18n="anchorRefImageHint">可选。上传后以该图为基底微调主播形象；不上传则纯 AI 生成</p>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="scriptText">口播稿件</span> <span class="text-red-400">*</span></label>
+          <textarea id="a_script" rows="8" data-i18n-placeholder="scriptTextPlaceholder" placeholder="输入主播要朗读的口播稿件..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y font-mono"></textarea>
+          <p class="text-xs text-gray-500 mt-1"><span data-i18n="charCount">字数</span>: <span id="a_char_count">0</span></p>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
+          <select id="a_resolution" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+            <option value="768x1344" data-i18n="resPortraitHD">竖屏 9:16 (HD)</option>
+            <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
+            <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Audio Config (Anchor) -->
+      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+        <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('a_audio_body')">
+          <h2 class="text-lg font-semibold text-purple-300" data-i18n="audioConfig">音频配置</h2>
+          <span id="a_audio_body-arrow" class="text-gray-500 text-xs">▶</span>
+        </div>
+        <div id="a_audio_body" class="collapse-body hidden mt-4">
+          <div class="flex items-center gap-3 mb-4">
+            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <input type="checkbox" id="a_audio_enabled" checked class="rounded bg-gray-800 border-gray-600">
+              <span data-i18n="enableNarration">启用旁白配音</span>
+            </label>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
+              <select id="a_voice" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+                <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (温柔女声)</option>
+                <option value="zh-CN-YunyangNeural">Yunyang (沉稳男声)</option>
+                <option value="zh-CN-XiaoyiNeural">Xiaoyi (活泼女声)</option>
+                <option value="zh-CN-YunxiNeural">Yunxi (年轻男声)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
+              <select id="a_rate" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+                <option value="-30%">-30% (慢)</option>
+                <option value="-15%">-15%</option>
+                <option value="+0%" selected data-i18n="rateNormal">正常</option>
+                <option value="+15%">+15%</option>
+                <option value="+30%">+30% (快)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subtitle Config (Anchor) -->
+      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+        <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('a_subtitle_body')">
+          <h2 class="text-lg font-semibold text-purple-300" data-i18n="subtitleConfig">字幕配置</h2>
+          <span id="a_subtitle_body-arrow" class="text-gray-500 text-xs">▶</span>
+        </div>
+        <div id="a_subtitle_body" class="collapse-body hidden mt-4">
+          <div class="flex items-center gap-3 mb-4">
+            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <input type="checkbox" id="a_subtitle_enabled" checked class="rounded bg-gray-800 border-gray-600">
+              <span data-i18n="enableSubtitle">启用字幕</span>
+            </label>
+          </div>
+          <div class="border-t border-gray-800 pt-4">
+            <div class="mb-4">
+              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleMode">样式模式</label>
+              <select id="a_sub_style_mode" onchange="toggleSubStyleMode('a')" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
+                <option value="fixed" data-i18n="subStyleFixed">固定样式</option>
+                <option value="llm" data-i18n="subStyleLLM">AI 智能样式</option>
+              </select>
+            </div>
+            <div id="a_sub_fixed_controls">
+              <p class="text-sm text-gray-400 mb-3" data-i18n="subtitleStyle">字幕样式</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subFont">字体</label>
+                  <input id="a_sub_font" value="STHeitiMedium.ttc" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subColor">颜色</label>
+                  <input id="a_sub_color" value="white" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subSize">字号</label>
+                  <input id="a_sub_fontsize" type="number" value="42" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subPosition">位置</label>
+                  <select id="a_sub_position" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                    <option value="bottom" data-i18n="posBottom">底部</option>
+                    <option value="top" data-i18n="posTop">顶部</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeColor">描边色</label>
+                  <input id="a_sub_stroke_color" value="black" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeWidth">描边宽</label>
+                  <input id="a_sub_stroke_width" type="number" value="2" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1" data-i18n="subBgColor">背景色</label>
+                  <input id="a_sub_bg_color" value="black@0.5" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                </div>
+              </div>
+            </div>
+            <div id="a_sub_llm_controls" class="hidden">
+              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleHints">样式偏好描述</label>
+              <textarea id="a_sub_style_hints" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 placeholder-gray-500" placeholder='字幕放在画面下方三分之一区域，不要遮挡主播面部'></textarea>
+              <p class="text-xs text-gray-500 mt-1" data-i18n="subStyleHintsHint">描述期望的字幕样式变化规律，AI 会据此为每条字幕分配不同位置、颜色和字号</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subtitle Position Hints (Anchor specific) -->
+      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+        <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('a_pos_body')">
+          <h2 class="text-lg font-semibold text-purple-300" data-i18n="subPositionHints">字幕位置要求</h2>
+          <span id="a_pos_body-arrow" class="text-gray-500 text-xs">▶</span>
+        </div>
+        <div id="a_pos_body" class="collapse-body hidden mt-4">
+          <textarea id="a_sub_position_hints" rows="3" data-i18n-placeholder="subPositionHintsPlaceholder" placeholder="字幕放在画面下方三分之一区域，不要遮挡主播面部" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
+        </div>
+      </div>
+
+      <button id="btn-anchor" onclick="submitAnchor()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="startGenerate">
+        开始生成
+      </button>
+    </div>
+
   </div>
 
   <!-- ═══════════ List Panel ═══════════ -->
@@ -614,7 +776,24 @@ const T = {
     task_: '任务', genFailed: '任务生成失败', genFailedMsg: '请查看控制台日志排查问题，然后到任务列表续传。',
     gotoResume: '前往任务列表续传', connLost: '连接中断',
     connLostMsg: '与服务端的实时连接已断开。服务可能仍在后台运行。可到任务列表查看状态并续传。',
-    gotoList: '前往任务列表', reconnecting: '实时连接断开，正在重试...',
+    gotoList: '前往任务列表',     reconnecting: '实时连接断开，正在重试...',
+    ttAnchor: '数字人口播',
+    anchorSettings: '数字人设置',
+    anchorPrompt: '主播形象描述',
+    anchorPromptPlaceholder: '一位专业的新闻主播，穿着正式西装，坐在现代化的新闻演播室中...',
+    anchorRefImage: '参考图 (可选)',
+    anchorRefImageHint: '可选。上传后以该图为基底微调主播形象；不上传则纯 AI 生成',
+    scriptText: '口播稿件',
+    scriptTextPlaceholder: '输入主播要朗读的口播稿件...',
+    resPortraitHD: '竖屏 9:16 (HD)',
+    subPositionHints: '字幕位置要求',
+    subPositionHintsPlaceholder: '字幕放在画面下方三分之一区域，不要遮挡主播面部',
+    typeAnchor: '数字人',
+    aStepGenerateAnchor: '数字人形象生成',
+    aStepGenerateClip: '主播片段生成',
+    aStepAudio: '音频生成',
+    aStepSubtitle: '字幕生成',
+    aStepComposite: '视频合成',
   },
   en: {
     subtitle: 'AI Video, One Click',
@@ -676,6 +855,23 @@ const T = {
     gotoResume: 'Go to task list', connLost: 'Connection Lost',
     connLostMsg: 'Connection lost. Server may still be running. Check task list for status.',
     gotoList: 'Go to task list', reconnecting: 'Connection lost, retrying...',
+    ttAnchor: 'Digital Human',
+    anchorSettings: 'Digital Human Settings',
+    anchorPrompt: 'Anchor Appearance',
+    anchorPromptPlaceholder: 'A professional news anchor in a suit, sitting in a modern news studio...',
+    anchorRefImage: 'Reference Image (Optional)',
+    anchorRefImageHint: 'Optional. Upload to fine-tune the anchor appearance; leave blank for pure AI generation.',
+    scriptText: 'Script Text',
+    scriptTextPlaceholder: 'Enter the script for the anchor to read...',
+    resPortraitHD: 'Portrait 9:16 (HD)',
+    subPositionHints: 'Subtitle Position Hints',
+    subPositionHintsPlaceholder: 'Place subtitles in the lower third, avoid covering the anchor\'s face',
+    typeAnchor: 'Anchor',
+    aStepGenerateAnchor: 'Anchor Image Gen',
+    aStepGenerateClip: 'Anchor Clip Gen',
+    aStepAudio: 'Audio Gen',
+    aStepSubtitle: 'Subtitle Gen',
+    aStepComposite: 'Composite',
   },
   ru: {
     subtitle: 'AI Видео, Один клик',
@@ -735,6 +931,23 @@ const T = {
     task_: 'Задача', genFailed: 'Ошибка', genFailedMsg: 'Проверьте логи.',
     gotoResume: 'К списку задач', connLost: 'Соединение потеряно',
     connLostMsg: 'Соединение потеряно.', gotoList: 'К списку', reconnecting: 'Переподключение...',
+    ttAnchor: 'Цифровой человек',
+    anchorSettings: 'Настройки ведущего',
+    anchorPrompt: 'Внешность ведущего',
+    anchorPromptPlaceholder: 'Профессиональный ведущий новостей в костюме, в современной студии...',
+    anchorRefImage: 'Референс (опционально)',
+    anchorRefImageHint: 'Опционально. Загрузите для точной настройки внешности ведущего.',
+    scriptText: 'Текст сценария',
+    scriptTextPlaceholder: 'Введите текст для ведущего...',
+    resPortraitHD: 'Вертикальное 9:16 (HD)',
+    subPositionHints: 'Позиция субтитров',
+    subPositionHintsPlaceholder: 'Разместите субтитры в нижней трети, избегая лица ведущего',
+    typeAnchor: 'Ведущий',
+    aStepGenerateAnchor: 'Генерация образа',
+    aStepGenerateClip: 'Генерация клипа',
+    aStepAudio: 'Аудио',
+    aStepSubtitle: 'Субтитры',
+    aStepComposite: 'Сборка',
   },
   ja: {
     subtitle: 'AI動画、ワンクリック',
@@ -790,7 +1003,24 @@ const T = {
     taskRunningWarn: 'タスク実行中', failCreate: '作成失敗', failResume: '再開失敗', failLoad: '読込失敗', failStop: '停止失敗',
     stopping: '停止中...', submitted: 'タスク送信済み', resumed: '再開済み', watchLog: 'コンソールログを確認。',
     task_: 'タスク', genFailed: '生成失敗', genFailedMsg: 'ログを確認。',
-    gotoResume: 'タスク一覧へ', connLost: '接続切断', connLostMsg: '接続が切れました。', gotoList: '一覧へ', reconnecting: '再接続中...',
+    gotoResume: 'タスク一覧へ', connLost: '接続切断', connLostMsg: '接続が切れました。',     gotoList: '一覧へ', reconnecting: '再接続中...',
+    ttAnchor: 'デジタルヒューマン',
+    anchorSettings: 'アンカー設定',
+    anchorPrompt: 'アンカーの外見',
+    anchorPromptPlaceholder: 'スーツを着たプロのニュースキャスター、最新のニューススタジオで...',
+    anchorRefImage: '参照画像 (任意)',
+    anchorRefImageHint: '任意。アンカーの外見を微調整するためにアップロード。',
+    scriptText: '原稿テキスト',
+    scriptTextPlaceholder: 'アンカーが読み上げる原稿を入力...',
+    resPortraitHD: '縦型 9:16 (HD)',
+    subPositionHints: '字幕位置の指定',
+    subPositionHintsPlaceholder: '字幕は画面下部3分の1に配置、アンカーの顔を隠さないように',
+    typeAnchor: 'アンカー',
+    aStepGenerateAnchor: 'アンカー画像生成',
+    aStepGenerateClip: 'アンカークリップ生成',
+    aStepAudio: '音声生成',
+    aStepSubtitle: '字幕生成',
+    aStepComposite: '合成',
   },
   ko: {
     subtitle: 'AI 영상, 원클릭',
@@ -846,7 +1076,24 @@ const T = {
     taskRunningWarn: '작업 실행 중', failCreate: '생성 실패', failResume: '재개 실패', failLoad: '로딩 실패', failStop: '중지 실패',
     stopping: '중지 중...', submitted: '작업 제출됨', resumed: '재개됨', watchLog: '콘솔 로그를 확인하세요.',
     task_: '작업', genFailed: '생성 실패', genFailedMsg: '로그를 확인하세요.',
-    gotoResume: '작업 목록으로', connLost: '연결 끊김', connLostMsg: '연결이 끊어졌습니다.', gotoList: '목록으로', reconnecting: '재연결 중...',
+    gotoResume: '작업 목록으로', connLost: '연결 끊김', connLostMsg: '연결이 끊어졌습니다.',     gotoList: '목록으로', reconnecting: '재연결 중...',
+    ttAnchor: '디지털 휴먼',
+    anchorSettings: '앵커 설정',
+    anchorPrompt: '앵커 외형',
+    anchorPromptPlaceholder: '정장을 입은 전문 뉴스 앵커, 현대적인 뉴스 스튜디오에서...',
+    anchorRefImage: '참조 이미지 (선택)',
+    anchorRefImageHint: '선택사항. 앵커 외형을 미세 조정하려면 업로드하세요.',
+    scriptText: '대본 텍스트',
+    scriptTextPlaceholder: '앵커가 읽을 대본을 입력하세요...',
+    resPortraitHD: '세로 9:16 (HD)',
+    subPositionHints: '자막 위치 힌트',
+    subPositionHintsPlaceholder: '자막을 화면 하단 1/3에 배치하고 앵커 얼굴을 가리지 않도록 하세요',
+    typeAnchor: '앵커',
+    aStepGenerateAnchor: '앵커 이미지 생성',
+    aStepGenerateClip: '앵커 클립 생성',
+    aStepAudio: '오디오 생성',
+    aStepSubtitle: '자막 생성',
+    aStepComposite: '합성',
   },
   ms: {
     subtitle: 'Video AI, Satu Klik',
@@ -902,7 +1149,24 @@ const T = {
     taskRunningWarn: 'Tugas sedang berjalan', failCreate: 'Gagal mencipta', failResume: 'Gagal sambung', failLoad: 'Gagal memuat', failStop: 'Gagal henti',
     stopping: 'Menghentikan...', submitted: 'Tugas dihantar', resumed: 'Tugas disambung', watchLog: 'Periksa log konsol.',
     task_: 'Tugas', genFailed: 'Gagal', genFailedMsg: 'Periksa log.',
-    gotoResume: 'Ke senarai', connLost: 'Sambungan terputus', connLostMsg: 'Sambungan terputus.', gotoList: 'Ke senarai', reconnecting: 'Menyambung semula...',
+    gotoResume: 'Ke senarai', connLost: 'Sambungan terputus', connLostMsg: 'Sambungan terputus.',     gotoList: 'Ke senarai', reconnecting: 'Menyambung semula...',
+    ttAnchor: 'Digital Human',
+    anchorSettings: 'Tetapan Penyampai',
+    anchorPrompt: 'Penampilan Penyampai',
+    anchorPromptPlaceholder: 'Seorang penyampai berita profesional dalam sut, di studio berita moden...',
+    anchorRefImage: 'Imej Rujukan (Pilihan)',
+    anchorRefImageHint: 'Pilihan. Muat naik untuk memperhalus penampilan penyampai.',
+    scriptText: 'Teks Skrip',
+    scriptTextPlaceholder: 'Masukkan teks untuk dibaca oleh penyampai...',
+    resPortraitHD: 'Potret 9:16 (HD)',
+    subPositionHints: 'Petunjuk Kedudukan Sarikata',
+    subPositionHintsPlaceholder: 'Letakkan sarikata di bahagian bawah skrin, elakkan menutup muka penyampai',
+    typeAnchor: 'Penyampai',
+    aStepGenerateAnchor: 'Generasi Imej Penyampai',
+    aStepGenerateClip: 'Generasi Klip Penyampai',
+    aStepAudio: 'Generasi Audio',
+    aStepSubtitle: 'Generasi Sarikata',
+    aStepComposite: 'Komposit',
   },
   id: {
     subtitle: 'Video AI, Satu Klik',
@@ -957,7 +1221,24 @@ const T = {
     taskRunningWarn: 'Tugas sedang berjalan', failCreate: 'Gagal membuat', failResume: 'Gagal lanjut', failLoad: 'Gagal memuat', failStop: 'Gagal henti',
     stopping: 'Menghentikan...', submitted: 'Tugas dikirim', resumed: 'Tugas dilanjutkan', watchLog: 'Periksa log konsol.',
     task_: 'Tugas', genFailed: 'Gagal', genFailedMsg: 'Periksa log.',
-    gotoResume: 'Ke daftar', connLost: 'Koneksi terputus', connLostMsg: 'Koneksi terputus.', gotoList: 'Ke daftar', reconnecting: 'Menyambung ulang...',
+    gotoResume: 'Ke daftar', connLost: 'Koneksi terputus', connLostMsg: 'Koneksi terputus.',     gotoList: 'Ke daftar', reconnecting: 'Menyambung ulang...',
+    ttAnchor: 'Digital Human',
+    anchorSettings: 'Pengaturan Pembawa Acara',
+    anchorPrompt: 'Penampilan Pembawa Acara',
+    anchorPromptPlaceholder: 'Seorang pembawa berita profesional dalam setelan, di studio berita modern...',
+    anchorRefImage: 'Gambar Referensi (Opsional)',
+    anchorRefImageHint: 'Opsional. Unggah untuk menyesuaikan penampilan pembawa acara.',
+    scriptText: 'Teks Naskah',
+    scriptTextPlaceholder: 'Masukkan naskah untuk dibacakan pembawa acara...',
+    resPortraitHD: 'Potret 9:16 (HD)',
+    subPositionHints: 'Petunjuk Posisi Subtitle',
+    subPositionHintsPlaceholder: 'Tempatkan subtitle di sepertiga bawah layar, hindari menutupi wajah pembawa acara',
+    typeAnchor: 'Pembawa Acara',
+    aStepGenerateAnchor: 'Hasilkan Gambar Pembawa',
+    aStepGenerateClip: 'Hasilkan Klip Pembawa',
+    aStepAudio: 'Hasilkan Audio',
+    aStepSubtitle: 'Hasilkan Subtitle',
+    aStepComposite: 'Gabung',
   },
 };
 
@@ -1056,6 +1337,13 @@ const STEPS = {
     { key: 'subtitle', labelKey: 'mStepSubtitle' },
     { key: 'concatenate', labelKey: 'mStepConcat' },
   ],
+  anchor: [
+    { key: 'generate_anchor', labelKey: 'aStepGenerateAnchor' },
+    { key: 'generate_clip', labelKey: 'aStepGenerateClip' },
+    { key: 'audio', labelKey: 'aStepAudio' },
+    { key: 'subtitle', labelKey: 'aStepSubtitle' },
+    { key: 'composite', labelKey: 'aStepComposite' },
+  ],
 };
 
 // ═══════════════════════════════════════════════════
@@ -1134,7 +1422,7 @@ function switchTaskType(type) {
   });
   document.getElementById('ttype-' + type).className = document.getElementById('ttype-' + type).className.replace(/tab-inactive/, 'tab-active');
 
-  ['simple', 'creative', 'manuscript'].forEach(t => {
+  ['simple', 'creative', 'manuscript', 'anchor'].forEach(t => {
     document.getElementById('form-' + t).classList.toggle('hidden', t !== type);
   });
 }
@@ -1208,7 +1496,7 @@ function addCEndFrameInput() {
 function setRunning(taskId) {
   isTaskRunning = true;
   currentTaskId = taskId;
-  ['btn-simple', 'btn-creative', 'btn-manuscript'].forEach(id => {
+  ['btn-simple', 'btn-creative', 'btn-manuscript', 'btn-anchor'].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) { btn.disabled = true; btn.textContent = t('taskRunning'); }
   });
@@ -1217,7 +1505,7 @@ function setRunning(taskId) {
 function clearRunning() {
   isTaskRunning = false;
   currentTaskId = null;
-  ['btn-simple', 'btn-creative', 'btn-manuscript'].forEach(id => {
+  ['btn-simple', 'btn-creative', 'btn-manuscript', 'btn-anchor'].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) { btn.disabled = false; btn.textContent = t('startGenerate'); }
   });
@@ -1363,6 +1651,59 @@ async function submitManuscript() {
     const d = await r.json();
     if (!d.ok) throw new Error(d.detail || t('failCreate'));
     currentTaskType = 'manuscript';
+    setRunning(d.task_id);
+    currentDirName = d.dir_name;
+    showProgress(d.task_id, d.dir_name);
+    connectWS(d.task_id);
+    showToast(t('submitted'), 5000);
+  } catch(e) {
+    alert(t('failCreate') + ': ' + e.message);
+    btn.disabled = false; btn.textContent = t('startGenerate');
+  }
+}
+
+async function submitAnchor() {
+  const script = document.getElementById('a_script').value.trim();
+  if (!script) return alert(t('enterText'));
+  if (isTaskRunning) return showToast(t('taskRunningWarn'));
+
+  const btn = document.getElementById('btn-anchor');
+  btn.disabled = true; btn.textContent = t('submitting');
+
+  const form = new FormData();
+  form.append('script_text', script);
+  const prompt = document.getElementById('a_prompt').value.trim();
+  if (prompt) form.append('anchor_prompt', prompt);
+  const hints = document.getElementById('a_sub_position_hints').value.trim();
+  if (hints) form.append('subtitle_position_hints', hints);
+  const res = parseResolution(document.getElementById('a_resolution').value);
+  form.append('video_width', res.width);
+  form.append('video_height', res.height);
+
+  const refFile = document.getElementById('a_ref_image').files[0];
+  if (refFile) form.append('anchor_reference_image', refFile);
+
+  // Audio config
+  form.append('audio_enabled', document.getElementById('a_audio_enabled').checked);
+  form.append('audio_voice', document.getElementById('a_voice').value);
+  form.append('audio_rate', document.getElementById('a_rate').value);
+  // Subtitle config
+  form.append('subtitle_enabled', document.getElementById('a_subtitle_enabled').checked);
+  form.append('subtitle_style_mode', document.getElementById('a_sub_style_mode').value);
+  form.append('subtitle_style_hints', document.getElementById('a_sub_style_hints').value);
+  form.append('subtitle_font', document.getElementById('a_sub_font').value);
+  form.append('subtitle_color', document.getElementById('a_sub_color').value);
+  form.append('subtitle_fontsize', document.getElementById('a_sub_fontsize').value);
+  form.append('subtitle_position', document.getElementById('a_sub_position').value);
+  form.append('subtitle_stroke_color', document.getElementById('a_sub_stroke_color').value);
+  form.append('subtitle_stroke_width', document.getElementById('a_sub_stroke_width').value);
+  form.append('subtitle_bg_color', document.getElementById('a_sub_bg_color').value);
+
+  try {
+    const r = await fetch('/api/tasks/anchor', { method: 'POST', body: form });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.detail || t('failCreate'));
+    currentTaskType = 'anchor';
     setRunning(d.task_id);
     currentDirName = d.dir_name;
     showProgress(d.task_id, d.dir_name);
@@ -1581,8 +1922,8 @@ async function loadTaskList() {
     container.innerHTML = tasks.map(task => {
       const statusColors = { completed: 'text-green-400', running: 'text-yellow-400', failed: 'text-red-400', pending: 'text-gray-400' };
       const statusLabels = { completed: t('statusCompleted'), running: t('statusRunning'), failed: t('statusFailed'), pending: t('statusPending') };
-      const typeLabels = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript') };
-      const typeColors = { simple: 'bg-blue-900 text-blue-300', creative: 'bg-purple-900 text-purple-300', manuscript: 'bg-orange-900 text-orange-300' };
+      const typeLabels = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript'), anchor: t('typeAnchor') };
+      const typeColors = { simple: 'bg-blue-900 text-blue-300', creative: 'bg-purple-900 text-purple-300', manuscript: 'bg-orange-900 text-orange-300', anchor: 'bg-pink-900 text-pink-300' };
       const isCompleted = task.status === 'completed';
       const isRunning = task.status === 'running';
       const btnLabel = isCompleted ? t('btnView') : (isRunning ? t('btnViewProgress') : t('btnResume'));
@@ -1590,7 +1931,7 @@ async function loadTaskList() {
       const btnAction = isCompleted ? `viewTask('${tidAttr}')` : (isRunning ? `viewRunningTask('${tidAttr}')` : `resumeTask('${tidAttr}')`);
       const stopBtn = isRunning ? `<button onclick="stopTaskById('${tidAttr}')" class="text-xs px-3 py-1.5 bg-red-700 hover:bg-red-600 text-red-100 rounded-lg transition">${t('btnStop')}</button>` : '';
       const typeBadge = `<span class="text-xs px-2 py-0.5 rounded-full ${typeColors[task.task_type] || 'bg-gray-800 text-gray-400'}">${escapeHtml(typeLabels[task.task_type] || task.task_type)}</span>`;
-      const desc = task.idea || task.prompt || (task.manuscript_text || '').substring(0, 80);
+      const desc = task.idea || task.prompt || (task.manuscript_text || '').substring(0, 80) || (task.script_text || '').substring(0, 80);
       const extra = task.scene_count ? ` · ${task.scene_count}${t('sceneUnit')}` : (task.paragraph_count ? ` · ${task.paragraph_count}${t('paraUnit')}` : '');
       return `<div class="bg-gray-900 rounded-xl p-4 border border-gray-800 flex items-center justify-between">
         <div class="flex-1 min-w-0">
@@ -1708,11 +2049,16 @@ function showTaskDetail(taskId, state) {
     video_gen: 'step_video_generation', audio: 'step_audio',
     subtitle: 'step_subtitle', concatenate: 'step_concatenation',
   };
+  const anchorStepMap = {
+    generate_anchor: 'step_generate_anchor', generate_clip: 'step_generate_clip',
+    audio: 'step_audio', subtitle: 'step_subtitle', composite: 'step_composite',
+  };
 
   const stepsHtml = steps.map(s => {
     let stateField = null;
     if (taskType === 'creative') stateField = creativeStepMap[s.key];
     else if (taskType === 'manuscript') stateField = manuscriptStepMap[s.key];
+    else if (taskType === 'anchor') stateField = anchorStepMap[s.key];
     const isDone = stateField ? state[stateField] === 'completed' : (s.key === 'init' || s.key === 'submit');
     const icon = isDone ? '✓' : '○';
     const iconClass = isDone ? 'bg-green-900 text-green-300' : 'bg-gray-800 text-xs';
@@ -1727,13 +2073,15 @@ function showTaskDetail(taskId, state) {
   document.getElementById('progress-bar').style.width = '100%';
   document.getElementById('progress-pct').textContent = '100%';
 
-  const typeLabel = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript') };
+  const typeLabel = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript'), anchor: t('typeAnchor') };
   let extraInfo = '';
   if (taskType === 'creative') {
     extraInfo = `<p class="text-gray-500">${t('idea_')}: ${escapeHtml((state.idea || '').substring(0, 100))}</p>
       <p class="text-gray-500">${t('sceneCount')}: ${state.scene_count || 0}</p>`;
   } else if (taskType === 'manuscript') {
     extraInfo = `<p class="text-gray-500">${t('paragraphCount')}: ${(state.paragraphs || []).length}</p>`;
+  } else if (taskType === 'anchor') {
+    extraInfo = `<p class="text-gray-500">Script: ${escapeHtml((state.script_text || '').substring(0, 100))}</p>`;
   } else {
     extraInfo = `<p class="text-gray-500">Prompt: ${escapeHtml((state.prompt || '').substring(0, 100))}</p>`;
   }

@@ -33,6 +33,7 @@ class TaskType(str, Enum):
     SIMPLE = "simple"
     CREATIVE = "creative"
     MANUSCRIPT = "manuscript"
+    ANCHOR = "anchor"
 
 
 class VideoMode(str, Enum):
@@ -264,17 +265,56 @@ class ManuscriptVideoTask(BaseTaskState):
     step_concatenation: StepStatus = StepStatus.PENDING
 
 
+class AnchorVideoTask(BaseTaskState):
+    """数字人口播任务（类型 4 / Phase 3）
+
+    用户提供主播形象 prompt 和口播稿件，系统生成主播形象图片，
+    以图片为视觉主体 i2v 生成动态视频片段，配合 TTS 读稿音频和字幕，
+    通过循环拼接合成最终视频。
+    """
+
+    task_type: Literal[TaskType.ANCHOR] = TaskType.ANCHOR
+
+    # 用户输入
+    anchor_prompt: str = ""
+    anchor_reference_image: str = ""
+    script_text: str = ""
+    subtitle_position_hints: str = ""
+
+    # 配置
+    audio_config: AudioConfig = Field(default_factory=AudioConfig)
+    subtitle_config: SubtitleConfig = Field(default_factory=SubtitleConfig)
+
+    # 步骤状态
+    step_generate_anchor: StepStatus = StepStatus.PENDING
+    step_generate_clip: StepStatus = StepStatus.PENDING
+    step_audio: StepStatus = StepStatus.PENDING
+    step_subtitle: StepStatus = StepStatus.PENDING
+    step_composite: StepStatus = StepStatus.PENDING
+
+    # 产物
+    anchor_image_url: str = ""
+    anchor_image_path: str = ""
+    anchor_clip_url: str = ""
+    anchor_clip_path: str = ""
+    audio_path: str = ""
+    srt_path: str = ""
+    styles_path: str = ""
+    final_video_path: str = ""
+
+
 # ═══════════════════════════════════════════════════
 # 联合类型 + 反序列化工厂
 # ═══════════════════════════════════════════════════
 
-AnyTaskState = Union[SimpleVideoTask, CreativeVideoTask, ManuscriptVideoTask]
+AnyTaskState = Union[SimpleVideoTask, CreativeVideoTask, ManuscriptVideoTask, AnchorVideoTask]
 
 # 用于 TaskManager.load()：根据 task_type 字段选择正确的模型类
 _TASK_TYPE_MAP: dict[str, type[BaseTaskState]] = {
     TaskType.SIMPLE: SimpleVideoTask,
     TaskType.CREATIVE: CreativeVideoTask,
     TaskType.MANUSCRIPT: ManuscriptVideoTask,
+    TaskType.ANCHOR: AnchorVideoTask,
 }
 
 
@@ -326,6 +366,19 @@ class CreateManuscriptTaskRequest(BaseModel):
     video_width: int = 768
     video_height: int = 1152
     video_duration: int = 10
+    audio_config: Optional[AudioConfig] = None
+    subtitle_config: Optional[SubtitleConfig] = None
+
+
+class CreateAnchorTaskRequest(BaseModel):
+    """创建数字人口播任务的请求体"""
+
+    anchor_prompt: str = ""
+    anchor_reference_image: str = ""
+    script_text: str
+    subtitle_position_hints: str = ""
+    video_width: int = 768
+    video_height: int = 1344
     audio_config: Optional[AudioConfig] = None
     subtitle_config: Optional[SubtitleConfig] = None
 

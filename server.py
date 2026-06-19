@@ -30,6 +30,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from core.config import get_api_key, set_api_key, delete_api_key, get_api_key_source, get_working_dir, AVAILABLE_VOICES, DURATION_FRAME_MAP
 from core.pipelines import (
+    AnchorPipeline,
     BasePipeline,
     PipelineShutdown,
     SimpleVideoPipeline,
@@ -38,6 +39,7 @@ from core.pipelines import (
 )
 from core.task_manager import TaskManager
 from models.task import (
+    AnchorVideoTask,
     AudioConfig,
     BaseTaskState,
     CreativeVideoTask,
@@ -284,6 +286,10 @@ async def list_tasks():
             elif isinstance(state, ManuscriptVideoTask):
                 t["paragraph_count"] = len(state.paragraphs)
                 t["manuscript_text"] = state.manuscript_text[:100] if state.manuscript_text else ""
+            # 数字人口播
+            elif isinstance(state, AnchorVideoTask):
+                t["script_text"] = state.script_text[:100] if state.script_text else ""
+                t["anchor_prompt"] = state.anchor_prompt[:100] if state.anchor_prompt else ""
             # 简单视频
             elif isinstance(state, SimpleVideoTask):
                 t["prompt"] = state.prompt[:100] if state.prompt else ""
@@ -393,6 +399,13 @@ def _create_pipeline_for_type(
         )
     elif task_type == TaskType.MANUSCRIPT:
         return ManuscriptVideoPipeline(
+            api_key=api_key,
+            task_id=task_id,
+            dir_name=dir_name,
+            shutdown_event=shutdown_event,
+        )
+    elif task_type == TaskType.ANCHOR:
+        return AnchorPipeline(
             api_key=api_key,
             task_id=task_id,
             dir_name=dir_name,
@@ -723,6 +736,87 @@ async def create_manuscript_task(
 
     _launch_background_task(_run_pipeline(pipeline, state))
     logger.info(f"[Manuscript] Task created: {task_id}, text_len={len(manuscript_text)}")
+    return {"ok": True, "task_id": task_id, "dir_name": dir_name}
+
+
+@app.post("/api/tasks/anchor")
+async def create_anchor_task(
+    anchor_prompt: str = Form(""),
+    anchor_reference_image: str = Form(""),
+    script_text: str = Form(...),
+    subtitle_position_hints: str = Form(""),
+    video_width: int = Form(768),
+    video_height: int = Form(1344),
+    audio_enabled: bool = Form(True),
+    audio_voice: str = Form("zh-CN-XiaoxiaoNeural"),
+    audio_rate: str = Form("+0%"),
+    subtitle_enabled: bool = Form(True),
+    subtitle_style_mode: str = Form("fixed"),
+    subtitle_style_hints: str = Form(""),
+    subtitle_font: str = Form("STHeitiMedium.ttc"),
+    subtitle_color: str = Form("white"),
+    subtitle_fontsize: int = Form(42),
+    subtitle_position: str = Form("bottom"),
+    subtitle_stroke_color: str = Form("black"),
+    subtitle_stroke_width: int = Form(2),
+    subtitle_bg_color: str = Form("black@0.5"),
+):
+    """创建数字人口播任务（类型 4 / Phase 3）。"""
+    api_key = get_api_key()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="请先配置 API Key")
+
+    if not script_text.strip():
+        raise HTTPException(status_code=400, detail="口播稿件不能为空")
+    if len(script_text) > 50000:
+        raise HTTPException(status_code=422, detail="口播稿件最多 50000 字符")
+
+    task_id = uuid.uuid4().hex[:12]
+    name = f"anchor_{task_id}"
+    dir_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_id}"
+
+    audio_config = AudioConfig(
+        enabled=audio_enabled,
+        voice=audio_voice,
+        rate=audio_rate,
+    )
+    subtitle_style = SubtitleStyle(
+        font=subtitle_font,
+        color=subtitle_color,
+        fontsize=subtitle_fontsize,
+        position=_build_position(subtitle_position),
+        stroke_color=subtitle_stroke_color,
+        stroke_width=subtitle_stroke_width,
+        bg_color=_parse_bg_color(subtitle_bg_color),
+        style_mode=subtitle_style_mode,
+        style_hints=subtitle_style_hints,
+    )
+    subtitle_config = SubtitleConfig(
+        enabled=subtitle_enabled,
+        style=subtitle_style,
+    )
+
+    state = AnchorVideoTask(
+        task_id=task_id,
+        creative_name=name,
+        anchor_prompt=anchor_prompt,
+        anchor_reference_image=anchor_reference_image,
+        script_text=script_text.strip(),
+        subtitle_position_hints=subtitle_position_hints,
+        video_width=video_width,
+        video_height=video_height,
+        audio_config=audio_config,
+        subtitle_config=subtitle_config,
+    )
+
+    pipeline = _create_pipeline_for_type(TaskType.ANCHOR, api_key, task_id, dir_name)
+    active_pipelines[task_id] = pipeline
+
+    if task_id in active_connections:
+        pipeline.progress_callback = _make_progress_callback(task_id)
+
+    _launch_background_task(_run_pipeline(pipeline, state))
+    logger.info(f"[Anchor] Task created: {task_id}, script_len={len(script_text)}")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
 
 

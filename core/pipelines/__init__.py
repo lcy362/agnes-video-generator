@@ -82,6 +82,7 @@ class BasePipeline(ABC):
 from core.pipelines.simple_video import SimpleVideoPipeline
 from core.pipelines.creative_video import CreativeVideoPipeline
 from core.pipelines.manuscript_video import ManuscriptVideoPipeline
+from core.pipelines.anchor_video import AnchorPipeline
 
 __all__ = [
     "BasePipeline",
@@ -89,4 +90,5 @@ __all__ = [
     "SimpleVideoPipeline",
     "CreativeVideoPipeline",
     "ManuscriptVideoPipeline",
+    "AnchorPipeline",
 ]
