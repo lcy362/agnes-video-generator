@@ -961,7 +961,7 @@ const STEPS = {
     { key: 'concatenate', labelKey: 'cStepConcat' },
   ],
   manuscript: [
-    { key: 'split', labelKey: 'mStepSplit' },
+    { key: 'split_text', labelKey: 'mStepSplit' },
     { key: 'scene_prompts', labelKey: 'mStepScenePrompts' },
     { key: 'video_gen', labelKey: 'mStepVideoGen' },
     { key: 'audio_subtitle', labelKey: 'mStepAudioSub' },
@@ -1192,6 +1192,13 @@ async function submitCreative() {
 
   const refFile = document.getElementById('c_ref_image').files[0];
   if (refFile) form.append('reference_image', refFile);
+
+  // P3: 收集自定义尾帧文件（addCEndFrameInput 创建的所有 file input）
+  if (document.getElementById('c_use_end_frames').checked) {
+    document.querySelectorAll('#c-end-frame-inputs .end-frame-file').forEach(input => {
+      if (input.files[0]) form.append('end_frame_images', input.files[0]);
+    });
+  }
 
   // Audio config
   form.append('audio_enabled', document.getElementById('c_audio_enabled').checked);
@@ -1594,7 +1601,7 @@ function showTaskDetail(taskId, state) {
     concatenate: 'step_concatenation',
   };
   const manuscriptStepMap = {
-    split: 'step_split', scene_prompts: 'step_scene_prompts',
+    split_text: 'step_split', scene_prompts: 'step_scene_prompts',
     video_gen: 'step_video_generation', audio_subtitle: 'step_audio_subtitle',
     concatenate: 'step_concatenation',
   };

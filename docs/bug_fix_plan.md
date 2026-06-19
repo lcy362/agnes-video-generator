@@ -12,7 +12,7 @@
 | 批次 | 主题 | 包含问题 | 改动面 | 状态 |
 |------|------|---------|--------|------|
 | **批次 1** | 事件循环阻塞与并发安全 | P1, P2 | `core/pipelines/*`, `server.py` | ✅ 完成 |
-| **批次 2** | 用户功能失效修复 | P3, P4 | `server.py`, `static/index.html` | ⬜ 待开始 |
+| **批次 2** | 用户功能失效修复 | P3, P4 | `server.py`, `static/index.html` | ✅ 完成 |
 | **批次 3** | LLM 调用健壮性 | P5, P11, P8 | `core/api/agnes_chat.py`, `core/screenwriter.py` | ⬜ 待开始 |
 | **批次 4** | 视频合成与音频健壮性 | P6, P9, P10, P12 | `core/compositor/`, `core/audio/`, `core/api/agnes_video.py` | ⬜ 待开始 |
 | **批次 5** | 参数校验与持久化原子性 | P7, P13, H5 | `server.py`, `core/task_manager.py`, `models/task.py` | ⬜ 待开始 |
@@ -28,8 +28,8 @@
 |----|--------|------|------|------|
 | P1 | 🔴 高 | 拼接步骤同步阻塞事件循环 | 1 | ✅ |
 | P2 | 🔴 高 | active_pipelines 并发竞态 | 1 | ✅ |
-| P3 | 🔴 高 | end_frame_images 死代码（自定义尾帧失效） | 2 | ⬜ |
-| P4 | 🟡 中 | manuscript step key 不匹配（拆分步骤不高亮） | 2 | ⬜ |
+| P3 | 🔴 高 | end_frame_images 死代码（自定义尾帧失效） | 2 | ✅ |
+| P4 | 🟡 中 | manuscript step key 不匹配（拆分步骤不高亮） | 2 | ✅ |
 | P5 | 🔴 高 | chat_json 无降级 | 3 | ⬜ |
 | P11 | 🟡 中 | LLM 调用无重试 | 3 | ⬜ |
 | P8 | 🟡 中 | prompt 注入风险 | 3 | ⬜ |
@@ -120,9 +120,9 @@
 - **验证**：创建稿件任务，观察 WS 消息 + 前端第一步图标在 running 时显示 ◉
 
 #### 批次 2 验证清单
-- [ ] py_compile server.py
-- [ ] 创建带尾帧的创意任务，验证工作目录落盘尾帧文件
-- [ ] 创建稿件任务，验证前端第一步图标状态正确
+- [x] py_compile server.py
+- [x] 前端 submitCreative 收集尾帧文件 + 后端保存落盘
+- [x] 前端 manuscript step key split → split_text
 
 ---
 

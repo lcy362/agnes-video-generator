@@ -21,7 +21,7 @@ import signal
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -503,7 +503,7 @@ async def create_creative_task(
     video_height: int = Form(1152),
     video_duration: int = Form(5),
     reference_image: UploadFile = File(None),
-    end_frame_images: list = None,
+    end_frame_images: List[UploadFile] = File(None),
     use_custom_end_frames: bool = Form(False),
     generate_end_frames_from_ref: bool = Form(True),
     # v2.0 音频配置
@@ -574,6 +574,20 @@ async def create_creative_task(
         with open(upload_path, "wb") as f:
             f.write(await reference_image.read())
         state.reference_image = upload_path
+
+    # P3: 处理自定义尾帧图片上传
+    if use_custom_end_frames and end_frame_images:
+        saved_paths = []
+        for idx, ef_file in enumerate(end_frame_images):
+            if ef_file and ef_file.filename:
+                ext = os.path.splitext(ef_file.filename)[1] or ".png"
+                upload_path = os.path.join(UPLOAD_DIR, f"{task_id}_end_{idx}{ext}")
+                with open(upload_path, "wb") as f:
+                    f.write(await ef_file.read())
+                saved_paths.append(upload_path)
+        if saved_paths:
+            state.end_frame_images = saved_paths
+            logger.info(f"[Pipeline] Saved {len(saved_paths)} custom end frame images for task {task_id}")
 
     pipeline = _create_pipeline_for_type(TaskType.CREATIVE, api_key, task_id, dir_name)
     active_pipelines[task_id] = pipeline
@@ -669,7 +683,7 @@ async def create_task_legacy(
     video_width: int = Form(768),
     video_height: int = Form(1152),
     reference_image: UploadFile = File(None),
-    end_frame_images: list = None,
+    end_frame_images: List[UploadFile] = File(None),
     use_custom_end_frames: bool = Form(False),
     generate_end_frames_from_ref: bool = Form(True),
 ):
