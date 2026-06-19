@@ -204,7 +204,7 @@ class SubtitleGenerator:
                     groups[gi] = (s_s, e_s, txt)
 
         # ── 前后段重叠：每条字幕结束时间向后延伸 overlap_sec ──
-        _OVERLAP_SEC = 0.3
+        _OVERLAP_SEC = 0.8
         for gi in range(len(groups) - 1):
             s_s, e_s, txt = groups[gi]
             next_e = groups[gi + 1][1]
@@ -255,7 +255,7 @@ class SubtitleGenerator:
         word_cues: object = None,
         max_chars_per_group: int = _MAX_SUB_CHARS,
         scene_start_times: Optional[List[float]] = None,
-        overlap_sec: float = 0.3,
+        overlap_sec: float = 0.8,
     ) -> str:
         """为每个场景/段落生成细粒度 SRT，支持场景内再拆分为子段。
 
@@ -333,33 +333,41 @@ class SubtitleGenerator:
             usable_dur = scene_dur * 0.9
             base_dur = usable_dur / seg_count
 
+            # Pass 1: 计算各段起始/结束时间（无重叠）
+            raw_segments: list[tuple[float, float, str]] = []
             current_time = scene_start
             for idx, seg in enumerate(all_segments):
-                # 基础时长
                 seg_dur = base_dur
 
-                # 突出检测 → 时长加成（从前一段或 padding 中借时）
                 mult = SubtitleGenerator._detect_prominence(seg)
                 if mult > 1.0 and idx > 0:
-                    # 从前一段匀 20% 时长给本段
                     borrowed = seg_dur * 0.2
                     seg_dur += borrowed
-                    # 修正前一段结束时间（在 entries 中已修正则为之后生效）
                 elif mult > 1.0:
                     seg_dur *= mult
 
                 seg_start = current_time
                 seg_end = min(seg_start + seg_dur, scene_end - 0.05)
-
                 if seg_end <= seg_start:
-                    seg_end = seg_start + 0.3  # 最低 0.3s
+                    seg_end = seg_start + 0.3
 
+                raw_segments.append((seg_start, seg_end, seg))
+                current_time = seg_end + 0.05
+
+            # Pass 2: 前后段重叠 — 每条字幕结束时间向后延伸 overlap_sec
+            # 使用 next 段的 end 而非 start 作为上限，确保可见重叠
+            for si in range(len(raw_segments) - 1):
+                s_s, e_s, txt = raw_segments[si]
+                next_e = raw_segments[si + 1][1]
+                new_e = min(e_s + overlap_sec, next_e)
+                if new_e > e_s:
+                    raw_segments[si] = (s_s, new_e, txt)
+
+            for seg_start, seg_end, seg in raw_segments:
                 start_srt = SubtitleGenerator.cue_to_srt_time(seg_start)
                 end_srt = SubtitleGenerator.cue_to_srt_time(seg_end)
                 entries.append(f"{global_idx}\n{start_srt} --> {end_srt}\n{seg}\n")
                 global_idx += 1
-                # 前后段重叠：下一段提前 overlap_sec 开始（至少不早于场景起点）
-                current_time = max(seg_end - overlap_sec, scene_start)
 
         return "\n".join(entries)
 
