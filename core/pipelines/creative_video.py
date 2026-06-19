@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 from typing import Callable, List, Optional
 
 from core.api.agnes_image import AgnesImageAPI
@@ -1506,6 +1507,21 @@ class CreativeVideoPipeline(BasePipeline):
         )
 
         num_scenes = len(self._state.scenes)
+
+        # ── 用实际音频时长替代估算值，确保字幕与音频同步 ──
+        actual_audio_dur = 0.0
+        audio_path = self._state.combined_audio or ""
+        if audio_path and os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
+            try:
+                r = subprocess.run(
+                    ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                     "-of", "csv=p=0", audio_path],
+                    capture_output=True, text=True, timeout=15,
+                )
+                actual_audio_dur = float(r.stdout.strip())
+            except Exception:
+                pass
+
         if subtitle_enabled and num_scenes > 1:
             # ── v3.0: 场景感知字幕生成 ──
             # 将单条旁白按场景数切分，每段视频内再拆为多个子字幕段落
@@ -1515,7 +1531,14 @@ class CreativeVideoPipeline(BasePipeline):
                 scene_texts = _split_narration_into_scenes(
                     narration_text, num_scenes,
                 )
-            scene_durations = [float(self._state.video_duration)] * num_scenes
+
+            est_total = float(self._state.video_duration) * num_scenes
+            if actual_audio_dur > 0 and est_total > 0:
+                scale = actual_audio_dur / est_total
+                scene_durations = [float(self._state.video_duration) * scale] * num_scenes
+                logger.info(f"[Pipeline] SRT durations scaled by {scale:.3f} (audio={actual_audio_dur:.2f}s, est={est_total:.2f}s)")
+            else:
+                scene_durations = [float(self._state.video_duration)] * num_scenes
 
             srt_content = SubtitleGenerator._generate_scene_aware_srt(
                 scene_texts, scene_durations,
@@ -1533,7 +1556,7 @@ class CreativeVideoPipeline(BasePipeline):
             SubtitleGenerator.cues_to_srt(sub_maker, combined_srt)
         elif subtitle_enabled and narration_text:
             # No TTS cues → plain text SRT
-            total_duration = float(self._state.video_duration) * num_scenes
+            total_duration = actual_audio_dur if actual_audio_dur > 0 else float(self._state.video_duration) * num_scenes
             SubtitleGenerator.text_to_srt(narration_text, combined_srt, total_duration)
         else:
             # Subtitle disabled: write empty SRT

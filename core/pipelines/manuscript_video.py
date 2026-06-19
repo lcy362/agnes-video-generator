@@ -9,6 +9,7 @@ import logging
 import math
 import os
 import re
+import subprocess
 from typing import Callable, List, Optional, Tuple
 
 from core.api.agnes_video import AgnesVideoAPI
@@ -705,18 +706,39 @@ class ManuscriptVideoPipeline(BasePipeline):
             0.75,
         )
 
+        # ── 用实际音频时长替代估算值，确保字幕与音频同步 ──
+        actual_audio_dur = 0.0
+        audio_path = self._state.combined_audio or ""
+        if audio_path and os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
+            try:
+                r = subprocess.run(
+                    ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                     "-of", "csv=p=0", audio_path],
+                    capture_output=True, text=True, timeout=15,
+                )
+                actual_audio_dur = float(r.stdout.strip())
+            except Exception:
+                pass
+
         num_paras = len(paragraphs)
         if subtitle_config.enabled and num_paras > 1:
             # ── v3.0: 段落感知字幕生成 ──
-            # 每段的文本 + 每段视频估算时长 → 场景感知细粒度 SRT
+            # 每段的文本 + 实际音频时长比例分摊 → 场景感知细粒度 SRT
             para_texts = [p.text for p in paragraphs if p.text]
             para_durations = []
+            total_est = 0.0
             for p in paragraphs:
                 if p.text:
                     dur = max(len(p.text) / _CHARS_PER_SEC, 2.0)
                 else:
                     dur = 5.0
                 para_durations.append(dur)
+                total_est += dur
+
+            if actual_audio_dur > 0 and total_est > 0:
+                scale = actual_audio_dur / total_est
+                para_durations = [d * scale for d in para_durations]
+                logger.info(f"[Manuscript] SRT durations scaled by {scale:.3f} (audio={actual_audio_dur:.2f}s, est={total_est:.2f}s)")
 
             srt_content = SubtitleGenerator._generate_scene_aware_srt(
                 para_texts, para_durations,
@@ -732,7 +754,7 @@ class ManuscriptVideoPipeline(BasePipeline):
         elif subtitle_config.enabled and sub_maker is not None:
             SubtitleGenerator.cues_to_srt(sub_maker, srt_path)
         elif subtitle_config.enabled:
-            total_duration = len(full_text) / _CHARS_PER_SEC
+            total_duration = actual_audio_dur if actual_audio_dur > 0 else len(full_text) / _CHARS_PER_SEC
             SubtitleGenerator.text_to_srt(full_text, srt_path, total_duration)
         else:
             with open(srt_path, "w", encoding="utf-8") as f:
