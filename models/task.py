@@ -271,8 +271,9 @@ class AnchorVideoTask(BaseTaskState):
     """数字人口播任务（类型 4 / Phase 3）
 
     用户提供主播形象 prompt 和口播稿件，系统生成主播形象图片，
-    以图片为视觉主体 i2v 生成动态视频片段，配合 TTS 读稿音频和字幕，
-    通过循环拼接合成最终视频。
+    按朗读时长将稿件拆段（5-12 秒/段），每段生成不同动作的 i2v
+    视频片段，配合 TTS 读稿音频和字幕，拼接合成最终视频。
+    （v3.1 方案 B：分段生成 + 口型近似匹配）
     """
 
     task_type: Literal[TaskType.ANCHOR] = TaskType.ANCHOR
@@ -289,19 +290,20 @@ class AnchorVideoTask(BaseTaskState):
 
     # 步骤状态
     step_generate_anchor: StepStatus = StepStatus.PENDING
-    step_generate_clip: StepStatus = StepStatus.PENDING
+    step_split: StepStatus = StepStatus.PENDING
+    step_clip_prompts: StepStatus = StepStatus.PENDING
+    step_clip_generation: StepStatus = StepStatus.PENDING
     step_audio: StepStatus = StepStatus.PENDING
     step_subtitle: StepStatus = StepStatus.PENDING
-    step_composite: StepStatus = StepStatus.PENDING
+    step_concatenation: StepStatus = StepStatus.PENDING
 
     # 产物
     anchor_image_url: str = ""
     anchor_image_path: str = ""
-    anchor_clip_url: str = ""
-    anchor_clip_path: str = ""
-    audio_path: str = ""
-    srt_path: str = ""
-    styles_path: str = ""
+    paragraphs: List[ManuscriptParagraph] = Field(default_factory=list)
+    combined_audio: str = ""
+    combined_subtitle: str = ""
+    subtitle_styles_path: str = ""
     final_video_path: str = ""
 
 

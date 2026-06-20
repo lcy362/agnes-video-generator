@@ -502,6 +502,18 @@ Phase 1 是基础设施，Phase 2 和 Phase 3 都依赖它。Phase 2 和 Phase 3
 | 3.4 | API 端点 + 前端：`POST /api/tasks/anchor` + 第四 Tab UI + i18n | `server.py`, `static/index.html` | `server.py:742-820` 完整端点（14 个参数）+ `_create_pipeline_for_type` 分发；前端 Tab 表单 + 5 步进度条 + 7 语言完整 i18n（80 个 key） | ✅ |
 | 3.5 | Phase 3 集成验证：三种场景 + 全量回归 | 全部 | (1) 纯 t2i 生成主播 (2) 有参考图 i2i (3) 仅字幕无旁白；每个场景生成完整视频；跑 AGENTS.md 0.4 部署验证清单确认无回归 | ⬜ |
 
+#### v3.1 数字人口播方案 B（分段生成 + 口型近似匹配）
+
+> 取代 v3.0 Phase 3 的「单段 5 秒循环」方案，每段生成不同动作的视频片段。
+
+| 批次 | 内容 | 涉及文件 | 验证方式 | 状态 |
+|------|------|---------|---------|------|
+| B1 | 数据模型重构：`AnchorVideoTask` 新增 `paragraphs`/`combined_audio`/`combined_subtitle`/`subtitle_styles_path` 字段，步骤改为 7 步（generate_anchor → split → clip_prompts → clip_generation → audio → subtitle → concatenation） | `models/task.py` | 语法检查 + `parse_task_state` 反向兼容旧 anchor 任务 | ✅ |
+| B2 | Screenwriter 新增 `generate_anchor_clip_prompt`：基于段落语义 + 主播形象生成不同英文动态 prompt（含口型/手势描述，相邻段落动作变化） | `core/screenwriter.py` | 导入验证 + 不同段落生成不同 prompt | ✅ |
+| B3 | Pipeline 重写：复用稿件视频拆段逻辑（5-12s/段）+ 批量提交 i2v + 两阶段并行 + 统一拼接叠加 | `core/pipelines/anchor_video.py`（重写） | `AnchorPipeline` 7 步流程，断点续传支持，复用 `concat_videos_with_audio_overlay` | ✅ |
+| B4 | 前端更新：7 步骤进度条 + 7 语言 i18n 更新 | `static/index.html` | 进度条显示 7 步，多语言标签正确 | ✅ |
+| B5 | 集成验证 | 全部 | 创建数字人口播任务，验证分段视频生成 + 拼接效果 | ⬜ |
+
 #### 最终验收
 
 | 批次 | 内容 | 验证方式 | 状态 |
@@ -522,4 +534,4 @@ Phase 1 是基础设施，Phase 2 和 Phase 3 都依赖它。Phase 2 和 Phase 3
 | 2026-06-19 | Fix | `SilentTTSEngine.generate()` 返回 `None` 而非 `{}`，修复纯字幕模式下 SRT 文件 0 字节 bug |
 | 2026-06-19 | 2.1-2.6 | Phase 2 全部实现完成：数据模型扩展（style_mode/style_hints）+ LLM 样式决策 + 拼接层逐条样式 + Pipeline 集成 + 前端 UI + 7 语言 i18n，API 端点验证通过 |
 | 2026-06-19 | 3.1-3.4 | Phase 3 代码变更全部实现：AnchorVideoTask 数据模型 + AnchorPipeline 5 步流程（t2i/i2i 主播生成→i2v 动态片段→TTS 读稿→字幕+LLM 样式→循环拼接合成）+ composite_anchor_video（xfade 淡入淡出 + 逐条字幕叠加）+ API 端点 + 前端第四 Tab 表单 + 7 语言 i18n（80 key），文档进度更新为 ✅ |
-| 2026-06-19 | — | 发现 Phase 3 小问题：`composite_anchor_video` 中 `_AUDIO_VOLUME_FACTOR = 1.5`，与 AGENTS.md D11 规定的 2.5 不一致（非阻塞，音量偏小但可用）；`core/config.py` 未添加 `DEFAULT_ANCHOR_CONFIG`（虚拟主播默认 prompt 硬编码在 anchor_video.py 中，功能正常） |
+| 2026-06-20 | B1-B4 | v3.1 方案 B 实现完成：AnchorVideoTask 重构为 7 步流程 + `generate_anchor_clip_prompt` 分段动态 prompt + Pipeline 重写（复用稿件拆段 + i2v 分段 + 统一拼接）+ 前端 7 步骤 7 语言更新 |

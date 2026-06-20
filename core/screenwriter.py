@@ -430,6 +430,73 @@ Generate a detailed English visual prompt for this paragraph.
         logger.info(f"[Screenwriter] Scene prompt: {prompt[:100]}...")
         return prompt
 
+    def generate_anchor_clip_prompt(
+        self,
+        paragraph_text: str,
+        anchor_prompt: str,
+        segment_index: int,
+        total_segments: int,
+    ) -> str:
+        """为数字人口播分段生成英文视频动态 prompt（v3.1 方案 B）。
+
+        基于段落语义和主播形象，为每段生成不同的自然动作描述，
+        确保相邻段落的动作有变化（说话、点头、手势、微笑等），
+        同时保持主播形象一致性，便于 i2v 生成带口型近似匹配的视频。
+
+        Args:
+            paragraph_text: 中文段落文本（本段内容）。
+            anchor_prompt: 主播形象描述（中文）。
+            segment_index: 当前段落索引（0-based）。
+            total_segments: 总段落数。
+
+        Returns:
+            英文视频动态 prompt 字符串。
+        """
+        system_prompt = """\
+You are a professional video director specializing in digital human anchorperson videos.
+Given a segment of Chinese narration text and the anchor's appearance description, \
+generate a SHORT English motion prompt for AI video generation (i2v).
+
+Rules:
+- Describe the anchorperson's NATURAL MOTIONS while speaking this segment.
+- MUST include subtle lip/mouth movements as if speaking the narration.
+- Vary the gestures across segments: speaking with hand gestures, nodding, \
+slight head tilt, smile, earnest expression, thoughtful pause, etc.
+- The motion should MATCH the emotional tone of the text content.
+- Keep the starting and ending posture nearly identical (for smooth concatenation).
+- Motions should be GENTLE and NATURAL — no exaggerated movements.
+- 30-60 words, English only.
+- Do NOT describe the environment or lighting (those are fixed from the anchor image).
+- Do NOT describe the anchor's clothing or appearance (already in the reference image).
+
+Context for variation:
+- This is segment {segment_index} of {total_segments}.
+- Early segments: more energetic, welcoming gestures.
+- Middle segments: focused, explanatory gestures with occasional emphasis.
+- Later segments: conclusive, summarizing gestures.
+
+Output ONLY the motion prompt text, no JSON, no explanation.
+""".format(segment_index=segment_index + 1, total_segments=total_segments)
+
+        user_prompt = f"""\
+<anchor_appearance>
+{anchor_prompt}
+</anchor_appearance>
+
+<narration_segment>
+{paragraph_text}
+</narration_segment>
+
+Generate the English motion prompt for this segment.
+"""
+        logger.info(
+            f"[Screenwriter] Generating anchor clip prompt for segment "
+            f"{segment_index + 1}/{total_segments} ({len(paragraph_text)} chars)..."
+        )
+        prompt = strip_code_fence(self._chat(system_prompt, user_prompt))
+        logger.info(f"[Screenwriter] Anchor clip prompt: {prompt[:100]}...")
+        return prompt
+
     def generate_narration_for_video(
         self, story: str, scenes: List[str], total_duration: float, style: str = ""
     ) -> str:

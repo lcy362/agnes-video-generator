@@ -396,6 +396,7 @@ async def list_tasks():
             elif isinstance(state, AnchorVideoTask):
                 t["script_text"] = state.script_text[:100] if state.script_text else ""
                 t["anchor_prompt"] = state.anchor_prompt[:100] if state.anchor_prompt else ""
+                t["paragraph_count"] = len(state.paragraphs)
             # 简单视频
             elif isinstance(state, SimpleVideoTask):
                 t["prompt"] = state.prompt[:100] if state.prompt else ""
