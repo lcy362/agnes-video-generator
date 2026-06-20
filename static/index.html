@@ -664,17 +664,6 @@
         </div>
       </div>
 
-      <!-- Subtitle Position Hints (Anchor specific) -->
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
-        <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('a_pos_body')">
-          <h2 class="text-lg font-semibold text-purple-300" data-i18n="subPositionHints">字幕位置要求</h2>
-          <span id="a_pos_body-arrow" class="text-gray-500 text-xs">▶</span>
-        </div>
-        <div id="a_pos_body" class="collapse-body hidden mt-4">
-          <textarea id="a_sub_position_hints" rows="3" data-i18n-placeholder="subPositionHintsPlaceholder" placeholder="字幕放在画面下方三分之一区域，不要遮挡主播面部" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
-        </div>
-      </div>
-
       <button id="btn-anchor" onclick="submitAnchor()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="startGenerate">
         开始生成
       </button>
@@ -1804,8 +1793,6 @@ async function submitAnchor() {
   form.append('script_text', script);
   const prompt = document.getElementById('a_prompt').value.trim();
   if (prompt) form.append('anchor_prompt', prompt);
-  const hints = document.getElementById('a_sub_position_hints').value.trim();
-  if (hints) form.append('subtitle_position_hints', hints);
   const res = parseResolution(document.getElementById('a_resolution').value);
   form.append('video_width', res.width);
   form.append('video_height', res.height);

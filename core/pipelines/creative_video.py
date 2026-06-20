@@ -14,12 +14,10 @@ import json
 import logging
 import os
 import re
-import subprocess
 from typing import Callable, List, Optional
 
 from core.api.agnes_image import AgnesImageAPI
 from core.api.agnes_video import AgnesVideoAPI
-from core.audio.subtitle import SubtitleGenerator
 from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
 from core.compositor.concatenator import VideoConcatenator
 from core.pipelines import BasePipeline, PipelineShutdown
@@ -1382,6 +1380,21 @@ class CreativeVideoPipeline(BasePipeline):
         self.task_manager.update_state(narrations=[narration])
         logger.info(f"[Pipeline] Narration generated: {len(narration)} chars for {total_duration:.0f}s video")
 
+        # 记录自动生成的 prompt（脚本 + 旁白）
+        prompts_data = {
+            "scenes": [s.scene_prompt for s in self._state.scenes] if self._state.scenes else [],
+            "narrations": self._state.narrations,
+        }
+        # 合并已有的 script.json 内容
+        script_path = os.path.join(self.working_dir, "script.json")
+        if os.path.exists(script_path):
+            try:
+                with open(script_path, "r", encoding="utf-8") as f:
+                    prompts_data["script"] = json.load(f)
+            except Exception:
+                pass
+        self.save_prompts(prompts_data)
+
     # ==================================================================
     # Step 5: Audio Generation (v3.0 split from subtitle)
     # ==================================================================
@@ -1508,85 +1521,49 @@ class CreativeVideoPipeline(BasePipeline):
 
         num_scenes = len(self._state.scenes)
 
-        # ── 用实际音频时长替代估算值，确保字幕与音频同步 ──
-        actual_audio_dur = 0.0
-        audio_path = self._state.combined_audio or ""
-        if audio_path and os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
-            try:
-                r = subprocess.run(
-                    ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                     "-of", "csv=p=0", audio_path],
-                    capture_output=True, text=True, timeout=15,
-                )
-                actual_audio_dur = float(r.stdout.strip())
-            except Exception:
-                pass
-
-        if subtitle_enabled and num_scenes > 1:
-            # ── v3.0: 场景感知字幕生成 ──
-            # 将单条旁白按场景数切分，每段视频内再拆为多个子字幕段落
+        # ── 准备场景文本和时长 ──
+        if num_scenes > 1:
             scene_texts = self._state.narrations[:]
             if len(scene_texts) == 1 and num_scenes > 1:
-                # 单条旁白 → 按场景数均匀切分（基于字符数比例）
                 scene_texts = _split_narration_into_scenes(
                     narration_text, num_scenes,
                 )
-
-            est_total = float(self._state.video_duration) * num_scenes
-            if actual_audio_dur > 0 and est_total > 0:
-                scale = actual_audio_dur / est_total
-                scene_durations = [float(self._state.video_duration) * scale] * num_scenes
-                logger.info(f"[Pipeline] SRT durations scaled by {scale:.3f} (audio={actual_audio_dur:.2f}s, est={est_total:.2f}s)")
-            else:
-                scene_durations = [float(self._state.video_duration)] * num_scenes
-
-            srt_content = SubtitleGenerator._generate_scene_aware_srt(
-                scene_texts, scene_durations,
-                word_cues=sub_maker if sub_maker is not None else None,
-            )
-            if srt_content.strip():
-                with open(combined_srt, "w", encoding="utf-8") as f:
-                    f.write(srt_content)
-                entry_count = srt_content.count("\n\n") + 1 if "\n\n" in srt_content else 0
-                logger.info(f"[Pipeline] Scene-aware SRT generated: {entry_count} entries across {num_scenes} scenes")
-            else:
-                subtitle_enabled = False
-        elif subtitle_enabled and sub_maker is not None:
-            # TTS cues available → fine-grained SRT
-            SubtitleGenerator.cues_to_srt(sub_maker, combined_srt)
-        elif subtitle_enabled and narration_text:
-            # No TTS cues → plain text SRT
-            total_duration = actual_audio_dur if actual_audio_dur > 0 else float(self._state.video_duration) * num_scenes
-            SubtitleGenerator.text_to_srt(narration_text, combined_srt, total_duration)
         else:
-            # Subtitle disabled: write empty SRT
-            with open(combined_srt, "w", encoding="utf-8") as f:
-                f.write("")
+            scene_texts = [narration_text] if narration_text else [""]
 
-        # Phase 2: LLM 智能样式 — 仅在字幕启用且 style_mode == "llm" 时调用
-        if subtitle_enabled and self._state.subtitle_config.style.style_mode == "llm":
-            styles_path = os.path.join(self.working_dir, "subtitle_styles.json")
-            if not os.path.exists(styles_path) or os.path.getsize(styles_path) == 0:
-                try:
-                    styles = await asyncio.to_thread(
-                        self.screenwriter.generate_subtitle_styles,
-                        srt_path=combined_srt,
-                        video_width=self._state.video_width,
-                        video_height=self._state.video_height,
-                        style_hints=self._state.subtitle_config.style.style_hints,
-                    )
-                    with open(styles_path, "w", encoding="utf-8") as f:
-                        json.dump(styles, f, ensure_ascii=False, indent=2)
-                    self._state.subtitle_styles_path = styles_path
-                    self.task_manager.update_state(subtitle_styles_path=styles_path)
-                    logger.info(f"[Pipeline] LLM subtitle styles saved: {styles_path} ({len(styles)} entries)")
-                except Exception as e:
-                    logger.warning(f"[Pipeline] LLM subtitle styles failed: {e}, falling back to fixed")
-                    self._state.subtitle_styles_path = ""
-                    self.task_manager.update_state(subtitle_styles_path="")
+        scene_durations = [float(self._state.video_duration)] * max(num_scenes, 1)
+
+        srt_path, styles_path = await self.generate_subtitles_common(
+            segment_texts=scene_texts,
+            segment_durations=scene_durations,
+            subtitle_config=self._state.subtitle_config,
+            sub_maker=sub_maker,
+            audio_path=self._state.combined_audio or "",
+            srt_filename="combined_narration.srt",
+            screenwriter=self.screenwriter,
+            video_width=self._state.video_width,
+            video_height=self._state.video_height,
+        )
+
+        if styles_path:
+            self._state.subtitle_styles_path = styles_path
+            self.task_manager.update_state(subtitle_styles_path=styles_path)
+
+            # 追加字幕样式 prompt 到 prompts.json
+            try:
+                prompts_path = os.path.join(self.working_dir, "prompts.json")
+                existing = {}
+                if os.path.exists(prompts_path):
+                    with open(prompts_path, "r", encoding="utf-8") as f:
+                        existing = json.load(f)
+                with open(styles_path, "r", encoding="utf-8") as f:
+                    existing["subtitle_styles"] = json.load(f)
+                self.save_prompts(existing)
+            except Exception:
+                pass
 
         for scene in self._state.scenes:
-            scene.subtitle_srt = combined_srt
+            scene.subtitle_srt = srt_path
         self.task_manager.update_state(
             scenes=[s.model_dump() for s in self._state.scenes],
         )

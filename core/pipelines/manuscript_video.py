@@ -9,15 +9,12 @@ import logging
 import math
 import os
 import re
-import subprocess
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional
 
 from core.api.agnes_video import AgnesVideoAPI
 from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
-from core.audio.subtitle import SubtitleGenerator
 from core.compositor.concatenator import VideoConcatenator
 from core.screenwriter import Screenwriter
-from core.task_manager import TaskManager
 from core.pipelines import BasePipeline, PipelineShutdown
 from models.task import (
     ManuscriptVideoTask,
@@ -436,6 +433,14 @@ class ManuscriptVideoPipeline(BasePipeline):
                 para.index, para.scene_prompt[:80],
             )
 
+        # 记录自动生成的 prompt
+        self.save_prompts({
+            "scene_prompts": [
+                {"index": p.index, "text": p.text, "scene_prompt": p.scene_prompt}
+                for p in paragraphs
+            ],
+        })
+
     # ------------------------------------------------------------------
     # Curl / task persistence helpers (per-paragraph)
     # ------------------------------------------------------------------
@@ -677,111 +682,52 @@ class ManuscriptVideoPipeline(BasePipeline):
         subtitle_config: SubtitleConfig,
         sub_maker: object = None,
     ) -> None:
-        """生成整段 SRT 字幕。
-
-        如果 TTS SubMaker cues 可用则从中生成细粒度 SRT，
-        否则从纯文本估算时间生成 SRT。
-
-        Args:
-            paragraphs: 段落列表。
-            audio_config: 音频配置。
-            subtitle_config: 字幕配置。
-            sub_maker: TTS SubMaker cues (optional).
-        """
-        full_text = "\n\n".join(p.text for p in paragraphs if p.text)
-        if not full_text:
-            logger.warning("[Manuscript] subtitle: empty full text, skipping")
+        """生成整段 SRT 字幕（复用通用字幕生成逻辑）。"""
+        segment_texts = [p.text for p in paragraphs if p.text]
+        if not segment_texts:
+            logger.warning("[Manuscript] subtitle: empty text, skipping")
             return
-
-        srt_path = os.path.join(self.working_dir, "full_subtitle.srt")
-
-        if os.path.exists(srt_path) and os.path.getsize(srt_path) > 0:
-            self._state.combined_subtitle = srt_path
-            logger.info("[Manuscript] subtitle: file already exists, skipping")
-            return
-
+    
+        # 估算各段时长
+        segment_durations = []
+        for p in paragraphs:
+            dur = max(len(p.text) / _CHARS_PER_SEC, 2.0) if p.text else 5.0
+            segment_durations.append(dur)
+    
         await self._emit(
             "subtitle", "running",
-            f"生成整段字幕 ({len(full_text)} 字, {len(paragraphs)} 段)...",
+            f"生成整段字幕 ({sum(len(t) for t in segment_texts)} 字, {len(paragraphs)} 段)...",
             0.75,
         )
-
-        # ── 用实际音频时长替代估算值，确保字幕与音频同步 ──
-        actual_audio_dur = 0.0
-        audio_path = self._state.combined_audio or ""
-        if audio_path and os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
+    
+        srt_path, styles_path = await self.generate_subtitles_common(
+            segment_texts=segment_texts,
+            segment_durations=segment_durations,
+            subtitle_config=subtitle_config,
+            sub_maker=sub_maker,
+            audio_path=self._state.combined_audio or "",
+            screenwriter=self.screenwriter,
+            video_width=self._state.video_width,
+            video_height=self._state.video_height,
+        )
+    
+        if styles_path:
+            self._state.subtitle_styles_path = styles_path
+            self.task_manager.update_state(subtitle_styles_path=styles_path)
+    
+            # 追加字幕样式 prompt 到 prompts.json
             try:
-                r = subprocess.run(
-                    ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                     "-of", "csv=p=0", audio_path],
-                    capture_output=True, text=True, timeout=15,
-                )
-                actual_audio_dur = float(r.stdout.strip())
+                prompts_path = os.path.join(self.working_dir, "prompts.json")
+                existing = {}
+                if os.path.exists(prompts_path):
+                    with open(prompts_path, "r", encoding="utf-8") as f:
+                        existing = json.load(f)
+                with open(styles_path, "r", encoding="utf-8") as f:
+                    existing["subtitle_styles"] = json.load(f)
+                self.save_prompts(existing)
             except Exception:
                 pass
-
-        num_paras = len(paragraphs)
-        if subtitle_config.enabled and num_paras > 1:
-            # ── v3.0: 段落感知字幕生成 ──
-            # 每段的文本 + 实际音频时长比例分摊 → 场景感知细粒度 SRT
-            para_texts = [p.text for p in paragraphs if p.text]
-            para_durations = []
-            total_est = 0.0
-            for p in paragraphs:
-                if p.text:
-                    dur = max(len(p.text) / _CHARS_PER_SEC, 2.0)
-                else:
-                    dur = 5.0
-                para_durations.append(dur)
-                total_est += dur
-
-            if actual_audio_dur > 0 and total_est > 0:
-                scale = actual_audio_dur / total_est
-                para_durations = [d * scale for d in para_durations]
-                logger.info(f"[Manuscript] SRT durations scaled by {scale:.3f} (audio={actual_audio_dur:.2f}s, est={total_est:.2f}s)")
-
-            srt_content = SubtitleGenerator._generate_scene_aware_srt(
-                para_texts, para_durations,
-                word_cues=sub_maker if sub_maker is not None else None,
-            )
-            if srt_content.strip():
-                with open(srt_path, "w", encoding="utf-8") as f:
-                    f.write(srt_content)
-                entry_count = srt_content.count("\n\n") + 1 if "\n\n" in srt_content else 0
-                logger.info(f"[Manuscript] Scene-aware SRT generated: {entry_count} entries across {num_paras} paragraphs")
-            else:
-                subtitle_config.enabled = False
-        elif subtitle_config.enabled and sub_maker is not None:
-            SubtitleGenerator.cues_to_srt(sub_maker, srt_path)
-        elif subtitle_config.enabled:
-            total_duration = actual_audio_dur if actual_audio_dur > 0 else len(full_text) / _CHARS_PER_SEC
-            SubtitleGenerator.text_to_srt(full_text, srt_path, total_duration)
-        else:
-            with open(srt_path, "w", encoding="utf-8") as f:
-                f.write("")
-
-        # Phase 2: LLM 智能样式 — 仅在字幕启用且 style_mode == "llm" 时调用
-        if subtitle_config.enabled and subtitle_config.style.style_mode == "llm":
-            styles_path = os.path.join(self.working_dir, "subtitle_styles.json")
-            if not os.path.exists(styles_path) or os.path.getsize(styles_path) == 0:
-                try:
-                    styles = await asyncio.to_thread(
-                        self.screenwriter.generate_subtitle_styles,
-                        srt_path=srt_path,
-                        video_width=self._state.video_width,
-                        video_height=self._state.video_height,
-                        style_hints=subtitle_config.style.style_hints,
-                    )
-                    with open(styles_path, "w", encoding="utf-8") as f:
-                        json.dump(styles, f, ensure_ascii=False, indent=2)
-                    self._state.subtitle_styles_path = styles_path
-                    self.task_manager.update_state(subtitle_styles_path=styles_path)
-                    logger.info(f"[Manuscript] LLM subtitle styles saved: {styles_path} ({len(styles)} entries)")
-                except Exception as e:
-                    logger.warning(f"[Manuscript] LLM subtitle styles failed: {e}, falling back to fixed")
-                    self._state.subtitle_styles_path = ""
-                    self.task_manager.update_state(subtitle_styles_path="")
-
+    
         self._state.combined_subtitle = srt_path
         self.task_manager.update_state(combined_subtitle=srt_path)
         logger.info("[Manuscript] subtitle: combined → %s", srt_path)

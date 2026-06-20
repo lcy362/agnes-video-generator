@@ -16,12 +16,10 @@ import logging
 import math
 import os
 import re
-import subprocess
 from typing import Callable, List, Optional
 
 from core.api.agnes_image import AgnesImageAPI
 from core.api.agnes_video import AgnesVideoAPI
-from core.audio.subtitle import SubtitleGenerator
 from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
 from core.compositor.concatenator import VideoConcatenator
 from core.pipelines import BasePipeline, PipelineShutdown
@@ -32,7 +30,6 @@ from models.task import (
     StepStatus,
     AudioConfig,
     SubtitleConfig,
-    SubtitleStyle,
 )
 
 logger = logging.getLogger(__name__)
@@ -451,6 +448,15 @@ class AnchorPipeline(BasePipeline):
                 para.index, para.scene_prompt[:80],
             )
 
+        # 记录自动生成的 prompt
+        self.save_prompts({
+            "anchor_prompt": self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT,
+            "clip_prompts": [
+                {"index": p.index, "text": p.text, "scene_prompt": p.scene_prompt}
+                for p in paragraphs
+            ],
+        })
+
     # ------------------------------------------------------------------
     # Step 4: 逐段 i2v 生成视频片段
     # ------------------------------------------------------------------
@@ -672,116 +678,55 @@ class AnchorPipeline(BasePipeline):
     # ------------------------------------------------------------------
 
     async def _step_subtitle(self, sub_maker: object = None) -> None:
-        """生成整段 SRT 字幕（复用稿件视频的段落感知字幕逻辑）。"""
+        """生成整段 SRT 字幕（复用通用字幕生成逻辑）。"""
         paragraphs = self._state.paragraphs
         subtitle_config = self._state.subtitle_config
 
-        full_text = "\n\n".join(p.text for p in paragraphs if p.text)
-        if not full_text:
-            logger.warning("[Anchor] subtitle: empty full text, skipping")
+        segment_texts = [p.text for p in paragraphs if p.text]
+        if not segment_texts:
+            logger.warning("[Anchor] subtitle: empty text, skipping")
             return
 
-        srt_path = os.path.join(self.working_dir, "full_subtitle.srt")
-
-        if os.path.exists(srt_path) and os.path.getsize(srt_path) > 0:
-            self._state.combined_subtitle = srt_path
-            logger.info("[Anchor] subtitle: file already exists, skipping")
-            return
+        # 估算各段时长
+        segment_durations = []
+        for p in paragraphs:
+            dur = max(len(p.text) / _CHARS_PER_SEC, 2.0) if p.text else 5.0
+            segment_durations.append(dur)
 
         await self._emit(
             "subtitle", "running",
-            f"生成整段字幕 ({len(full_text)} 字, {len(paragraphs)} 段)...",
+            f"生成整段字幕 ({sum(len(t) for t in segment_texts)} 字, {len(paragraphs)} 段)...",
             0.65,
         )
 
-        # 获取实际音频时长
-        actual_audio_dur = 0.0
-        audio_path = self._state.combined_audio or ""
-        if audio_path and os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
+        srt_path, styles_path = await self.generate_subtitles_common(
+            segment_texts=segment_texts,
+            segment_durations=segment_durations,
+            subtitle_config=subtitle_config,
+            sub_maker=sub_maker,
+            audio_path=self._state.combined_audio or "",
+            screenwriter=self.screenwriter,
+            video_width=self._state.video_width,
+            video_height=self._state.video_height,
+            role="anchorperson digital human",
+        )
+
+        if styles_path:
+            self._state.subtitle_styles_path = styles_path
+            self.task_manager.update_state(subtitle_styles_path=styles_path)
+
+            # 追加字幕样式 prompt 到 prompts.json
             try:
-                r = subprocess.run(
-                    ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                     "-of", "csv=p=0", audio_path],
-                    capture_output=True, text=True, timeout=15,
-                )
-                actual_audio_dur = float(r.stdout.strip())
+                prompts_path = os.path.join(self.working_dir, "prompts.json")
+                existing = {}
+                if os.path.exists(prompts_path):
+                    with open(prompts_path, "r", encoding="utf-8") as f:
+                        existing = json.load(f)
+                with open(styles_path, "r", encoding="utf-8") as f:
+                    existing["subtitle_styles"] = json.load(f)
+                self.save_prompts(existing)
             except Exception:
                 pass
-
-        num_paras = len(paragraphs)
-        if subtitle_config.enabled and num_paras > 1:
-            # 段落感知字幕生成
-            para_texts = [p.text for p in paragraphs if p.text]
-            para_durations = []
-            total_est = 0.0
-            for p in paragraphs:
-                if p.text:
-                    dur = max(len(p.text) / _CHARS_PER_SEC, 2.0)
-                else:
-                    dur = 5.0
-                para_durations.append(dur)
-                total_est += dur
-
-            if actual_audio_dur > 0 and total_est > 0:
-                scale = actual_audio_dur / total_est
-                para_durations = [d * scale for d in para_durations]
-                logger.info(
-                    f"[Anchor] SRT durations scaled by {scale:.3f} "
-                    f"(audio={actual_audio_dur:.2f}s, est={total_est:.2f}s)"
-                )
-
-            srt_content = SubtitleGenerator._generate_scene_aware_srt(
-                para_texts, para_durations,
-                word_cues=sub_maker if sub_maker is not None else None,
-            )
-            if srt_content.strip():
-                with open(srt_path, "w", encoding="utf-8") as f:
-                    f.write(srt_content)
-                entry_count = srt_content.count("\n\n") + 1 if "\n\n" in srt_content else 0
-                logger.info(
-                    f"[Anchor] Scene-aware SRT generated: {entry_count} entries "
-                    f"across {num_paras} paragraphs"
-                )
-            else:
-                subtitle_config.enabled = False
-        elif subtitle_config.enabled and sub_maker is not None:
-            SubtitleGenerator.cues_to_srt(sub_maker, srt_path)
-        elif subtitle_config.enabled:
-            total_duration = actual_audio_dur if actual_audio_dur > 0 else len(full_text) / _CHARS_PER_SEC
-            SubtitleGenerator.text_to_srt(full_text, srt_path, total_duration)
-        else:
-            with open(srt_path, "w", encoding="utf-8") as f:
-                f.write("")
-
-        # LLM 智能样式
-        if subtitle_config.enabled and subtitle_config.style.style_mode == "llm":
-            styles_path = os.path.join(self.working_dir, "subtitle_styles.json")
-            if not os.path.exists(styles_path) or os.path.getsize(styles_path) == 0:
-                try:
-                    hints = self._state.subtitle_position_hints or subtitle_config.style.style_hints
-                    styles = await asyncio.to_thread(
-                        self.screenwriter.generate_subtitle_styles,
-                        srt_path=srt_path,
-                        video_width=self._state.video_width,
-                        video_height=self._state.video_height,
-                        style_hints=hints,
-                        role="anchorperson digital human",
-                    )
-                    with open(styles_path, "w", encoding="utf-8") as f:
-                        json.dump(styles, f, ensure_ascii=False, indent=2)
-                    self._state.subtitle_styles_path = styles_path
-                    self.task_manager.update_state(subtitle_styles_path=styles_path)
-                    logger.info(
-                        f"[Anchor] LLM subtitle styles saved: {styles_path} "
-                        f"({len(styles)} entries)"
-                    )
-                except Exception as e:
-                    logger.warning(
-                        f"[Anchor] LLM subtitle styles failed: {e}, "
-                        f"falling back to fixed"
-                    )
-                    self._state.subtitle_styles_path = ""
-                    self.task_manager.update_state(subtitle_styles_path="")
 
         self._state.combined_subtitle = srt_path
         self.task_manager.update_state(combined_subtitle=srt_path)
@@ -855,457 +800,4 @@ class AnchorPipeline(BasePipeline):
         """检查是否需要停止流水线。"""
         if self._is_shutdown():
             raise PipelineShutdown("Pipeline shutdown requested")
-"""core.pipelines.anchor_video -- 数字人口播流水线（类型 4 / Phase 3）
 
-流程：
-    1. 生成主播形象图（t2i / i2i）
-    2. i2v 生成动态视频片段（~5 秒）
-    3. TTS 读稿音频
-    4. 字幕生成 + LLM 定位
-    5. 循环拼接 + 叠加音视频字幕
-"""
-
-import asyncio
-import json
-import logging
-import math
-import os
-from typing import Callable, Optional
-
-from core.api.agnes_image import AgnesImageAPI
-from core.api.agnes_video import AgnesVideoAPI
-from core.audio.subtitle import SubtitleGenerator
-from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
-from core.compositor.concatenator import VideoConcatenator
-from core.pipelines import BasePipeline, PipelineShutdown
-from core.screenwriter import Screenwriter
-from models.task import AnchorVideoTask, StepStatus
-
-logger = logging.getLogger(__name__)
-
-# 默认主播 prompt
-_DEFAULT_ANCHOR_PROMPT = (
-    "一位专业的新闻主播，穿着正式西装，坐在现代化的新闻演播室中，"
-    "面带微笑，正面半身照，高清画质，专业灯光"
-)
-
-
-class AnchorPipeline(BasePipeline):
-    """数字人口播视频生成流水线。
-
-    5 步流程：
-        1. 生成主播形象图
-        2. 生成动态视频片段（i2v）
-        3. TTS 读稿
-        4. 字幕 + LLM 定位
-        5. 循环拼接 + 叠加
-    """
-
-    def __init__(
-        self,
-        api_key: str,
-        task_id: str,
-        dir_name: Optional[str] = None,
-        chat_model: str = "agnes-2.0-flash",
-        image_model: str = "agnes-image-2.1-flash",
-        video_model: str = "agnes-video-v2.0",
-        progress_callback: Optional[Callable] = None,
-        shutdown_event: Optional[asyncio.Event] = None,
-    ):
-        super().__init__(api_key, task_id, dir_name, progress_callback, shutdown_event)
-        self.image_generator = AgnesImageAPI(api_key=api_key, model=image_model)
-        self.video_generator = AgnesVideoAPI(api_key=api_key, model=video_model)
-        self.video_generator.shutdown_event = shutdown_event
-        self.screenwriter = Screenwriter(api_key=api_key, model=chat_model)
-        self._state: Optional[AnchorVideoTask] = None
-
-    @property
-    def state(self) -> Optional[AnchorVideoTask]:
-        return self._state
-
-    # ==================================================================
-    # Step 1: Generate anchor image (t2i or i2i)
-    # ==================================================================
-
-    async def _step_generate_anchor(self) -> str:
-        if self._state.step_generate_anchor == StepStatus.COMPLETED:
-            if self._state.anchor_image_path and os.path.exists(self._state.anchor_image_path):
-                logger.info("[Anchor] Step generate_anchor: SKIP (already completed)")
-                return self._state.anchor_image_path
-            logger.warning("[Anchor] Step generate_anchor: file missing, re-running")
-
-        prompt = self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT
-        output_path = os.path.join(self.working_dir, "anchor.png")
-
-        if os.path.exists(output_path):
-            self._state.anchor_image_path = output_path
-            self._state.step_generate_anchor = StepStatus.COMPLETED
-            self.task_manager.update_state(
-                anchor_image_path=output_path,
-                step_generate_anchor=StepStatus.COMPLETED,
-            )
-            return output_path
-
-        ref_image = self._state.anchor_reference_image
-        size = f"{self._state.video_width}x{self._state.video_height}"
-
-        await self._emit(
-            "generate_anchor", "running",
-            "生成主播形象图..." if not ref_image else "基于参考图生成主播形象...",
-            0.05,
-        )
-
-        try:
-            if ref_image and os.path.exists(ref_image):
-                img_output = await self.image_generator.generate_single_image(
-                    prompt=prompt,
-                    reference_image_paths=[ref_image],
-                    size=size,
-                )
-            else:
-                img_output = await self.image_generator.generate_single_image(
-                    prompt=prompt,
-                    size=size,
-                )
-            img_output.save(output_path)
-        except Exception as e:
-            logger.error(f"[Anchor] Anchor image generation failed: {e}")
-            raise RuntimeError(f"主播形象生成失败: {e}")
-
-        self._state.anchor_image_path = output_path
-        self._state.step_generate_anchor = StepStatus.COMPLETED
-        self.task_manager.update_state(
-            anchor_image_path=output_path,
-            step_generate_anchor=StepStatus.COMPLETED,
-        )
-        await self._emit("generate_anchor", "completed", "主播形象生成完成", 0.2)
-        return output_path
-
-    # ==================================================================
-    # Step 2: Generate dynamic clip via I2V
-    # ==================================================================
-
-    async def _step_generate_clip(self, anchor_image_path: str) -> str:
-        if self._state.step_generate_clip == StepStatus.COMPLETED:
-            if self._state.anchor_clip_path and os.path.exists(self._state.anchor_clip_path):
-                logger.info("[Anchor] Step generate_clip: SKIP (already completed)")
-                return self._state.anchor_clip_path
-            logger.warning("[Anchor] Step generate_clip: file missing, re-running")
-
-        output_path = os.path.join(self.working_dir, "anchor_clip.mp4")
-        if os.path.exists(output_path):
-            self._state.anchor_clip_path = output_path
-            self._state.step_generate_clip = StepStatus.COMPLETED
-            self.task_manager.update_state(
-                anchor_clip_path=output_path,
-                step_generate_clip=StepStatus.COMPLETED,
-            )
-            return output_path
-
-        vw = self._state.video_width
-        vh = self._state.video_height
-
-        clip_prompt = (
-            "The anchorperson faces the camera with a natural smile, "
-            "occasionally nodding slightly. The backdrop is a modern news studio "
-            "with soft, warm lighting. Subtle micro-movements of the head and "
-            "shoulders. The overall motion is gentle and natural, "
-            "with the starting and ending posture nearly identical."
-        )
-
-        await self._emit("generate_clip", "running", "生成主播动态视频 (i2v)...", 0.25)
-
-        try:
-            video_id = await self.video_generator.submit_video(
-                prompt=clip_prompt,
-                reference_image_paths=[anchor_image_path],
-                duration=5,
-                width=vw,
-                height=vh,
-            )
-            video_output = await self.video_generator.wait_for_video(video_id)
-            video_output.save(output_path)
-        except Exception as e:
-            logger.error(f"[Anchor] Clip generation failed: {e}")
-            raise RuntimeError(f"主播动态视频生成失败: {e}")
-
-        self._state.anchor_clip_path = output_path
-        self._state.step_generate_clip = StepStatus.COMPLETED
-        self.task_manager.update_state(
-            anchor_clip_path=output_path,
-            step_generate_clip=StepStatus.COMPLETED,
-        )
-        await self._emit("generate_clip", "completed", "主播动态视频生成完成", 0.4)
-        return output_path
-
-    # ==================================================================
-    # Step 3: Generate TTS audio
-    # ==================================================================
-
-    async def _step_generate_audio(self) -> object:
-        if self._state.step_audio == StepStatus.COMPLETED:
-            if self._state.audio_path and os.path.exists(self._state.audio_path):
-                logger.info("[Anchor] Step audio: SKIP (already completed)")
-                return None
-            logger.warning("[Anchor] Step audio: file missing, re-running")
-
-        audio_path = os.path.join(self.working_dir, "narration.mp3")
-        if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
-            self._state.audio_path = audio_path
-            self._state.step_audio = StepStatus.COMPLETED
-            self.task_manager.update_state(
-                audio_path=audio_path,
-                step_audio=StepStatus.COMPLETED,
-            )
-            return None
-
-        script_text = self._state.script_text
-        audio_config = self._state.audio_config
-
-        await self._emit(
-            "audio", "running",
-            f"生成读稿音频 ({len(script_text)} 字)...",
-            0.45,
-        )
-
-        edge_tts = EdgeTTSEngine()
-        silent_tts = SilentTTSEngine()
-        sub_maker = None
-
-        if audio_config.enabled and script_text:
-            try:
-                _, sub_maker = await edge_tts.generate(
-                    text=script_text,
-                    output_path=audio_path,
-                    voice=audio_config.voice,
-                    rate=audio_config.rate,
-                )
-            except RuntimeError as e:
-                logger.warning(f"[Anchor] EdgeTTS failed, falling back to silent: {e}")
-                audio_duration = len(script_text) / 4.0
-                await silent_tts.generate(
-                    text=script_text,
-                    output_path=audio_path,
-                    duration_sec=audio_duration,
-                )
-        else:
-            audio_duration = len(script_text) / 4.0 if script_text else 10.0
-            await silent_tts.generate(
-                text=script_text or "placeholder",
-                output_path=audio_path,
-                duration_sec=audio_duration,
-            )
-
-        self._state.audio_path = audio_path
-        self._state.step_audio = StepStatus.COMPLETED
-        self.task_manager.update_state(
-            audio_path=audio_path,
-            step_audio=StepStatus.COMPLETED,
-        )
-        await self._emit("audio", "completed", "读稿音频生成完成", 0.6)
-        return sub_maker
-
-    # ==================================================================
-    # Step 4: Generate subtitles + LLM styles
-    # ==================================================================
-
-    async def _step_generate_subtitle(self, sub_maker: object = None) -> None:
-        if self._state.step_subtitle == StepStatus.COMPLETED:
-            logger.info("[Anchor] Step subtitle: SKIP (already completed)")
-            return
-
-        srt_path = os.path.join(self.working_dir, "narration.srt")
-        if os.path.exists(srt_path) and os.path.getsize(srt_path) > 0:
-            self._state.srt_path = srt_path
-            self._state.step_subtitle = StepStatus.COMPLETED
-            self.task_manager.update_state(
-                srt_path=srt_path,
-                step_subtitle=StepStatus.COMPLETED,
-            )
-            return
-
-        script_text = self._state.script_text
-        subtitle_config = self._state.subtitle_config
-        audio_path = self._state.audio_path
-
-        await self._emit(
-            "subtitle", "running",
-            "生成字幕..." if subtitle_config.enabled else "跳过字幕生成",
-            0.65,
-        )
-
-        if subtitle_config.enabled and sub_maker is not None:
-            SubtitleGenerator.cues_to_srt(sub_maker, srt_path)
-        elif subtitle_config.enabled and script_text:
-            audio_duration = len(script_text) / 4.0
-            if audio_path and os.path.exists(audio_path):
-                from moviepy import AudioFileClip
-                try:
-                    audio_clip = AudioFileClip(audio_path)
-                    audio_duration = audio_clip.duration
-                    audio_clip.close()
-                except Exception:
-                    pass
-            SubtitleGenerator.text_to_srt(script_text, srt_path, audio_duration)
-        else:
-            with open(srt_path, "w", encoding="utf-8") as f:
-                f.write("")
-
-        # LLM 智能样式
-        if subtitle_config.enabled and subtitle_config.style.style_mode == "llm":
-            styles_path = os.path.join(self.working_dir, "subtitle_styles.json")
-            if not os.path.exists(styles_path) or os.path.getsize(styles_path) == 0:
-                try:
-                    hints = self._state.subtitle_position_hints or subtitle_config.style.style_hints
-                    styles = await asyncio.to_thread(
-                        self.screenwriter.generate_subtitle_styles,
-                        srt_path=srt_path,
-                        video_width=self._state.video_width,
-                        video_height=self._state.video_height,
-                        style_hints=hints,
-                        role="anchorperson digital human",
-                    )
-                    with open(styles_path, "w", encoding="utf-8") as f:
-                        json.dump(styles, f, ensure_ascii=False, indent=2)
-                    self._state.styles_path = styles_path
-                except Exception as e:
-                    logger.warning(f"[Anchor] LLM subtitle styles failed: {e}, falling back to fixed")
-                    self._state.styles_path = ""
-                self.task_manager.update_state(styles_path=self._state.styles_path)
-                logger.info(f"[Anchor] LLM subtitle styles saved: {styles_path}")
-
-        self._state.srt_path = srt_path
-        self._state.step_subtitle = StepStatus.COMPLETED
-        self.task_manager.update_state(
-            srt_path=srt_path,
-            step_subtitle=StepStatus.COMPLETED,
-        )
-        await self._emit("subtitle", "completed", "字幕生成完成", 0.75)
-
-    # ==================================================================
-    # Step 5: Composite - loop clip + audio + subtitle
-    # ==================================================================
-
-    async def _step_composite(self) -> str:
-        if self._state.step_composite == StepStatus.COMPLETED:
-            if self._state.final_video_path and os.path.exists(self._state.final_video_path):
-                logger.info("[Anchor] Step composite: SKIP (already completed)")
-                return self._state.final_video_path
-            logger.warning("[Anchor] Step composite: file missing, re-running")
-
-        output_path = os.path.join(self.working_dir, "final_video.mp4")
-        if os.path.exists(output_path):
-            self._state.final_video_path = output_path
-            self._state.step_composite = StepStatus.COMPLETED
-            self._state.final_video_file = output_path
-            self.task_manager.update_state(
-                final_video_path=output_path,
-                final_video_file=output_path,
-                step_composite=StepStatus.COMPLETED,
-            )
-            return output_path
-
-        clip_path = self._state.anchor_clip_path
-        audio_path = self._state.audio_path
-        srt_path = self._state.srt_path
-        subtitle_config = self._state.subtitle_config
-        srt_exists = bool(srt_path and os.path.exists(srt_path) and os.path.getsize(srt_path) > 0)
-
-        # 获取音频时长
-        audio_duration = 10.0
-        if audio_path and os.path.exists(audio_path):
-            from moviepy import AudioFileClip
-            try:
-                audio_clip = AudioFileClip(audio_path)
-                audio_duration = audio_clip.duration
-                audio_clip.close()
-            except Exception:
-                audio_duration = len(self._state.script_text) / 4.0 if self._state.script_text else 10.0
-        else:
-            audio_duration = len(self._state.script_text) / 4.0 if self._state.script_text else 10.0
-
-        await self._emit(
-            "composite", "running",
-            f"循环拼接 + 叠加音视频 (音频 {audio_duration:.1f}s)...",
-            0.8,
-        )
-
-        styles_path = self._state.styles_path or ""
-        if styles_path and not os.path.exists(styles_path):
-            styles_path = ""
-
-        try:
-            await asyncio.to_thread(
-                VideoConcatenator.composite_anchor_video,
-                clip_path=clip_path,
-                audio_path=audio_path,
-                srt_path=srt_path if (subtitle_config.enabled and srt_exists) else None,
-                output_path=output_path,
-                audio_duration=audio_duration,
-                subtitle_style=subtitle_config.style if subtitle_config.enabled else None,
-                subtitle_styles_path=styles_path if styles_path else None,
-                video_width=self._state.video_width,
-                video_height=self._state.video_height,
-            )
-        except Exception as e:
-            logger.error(f"[Anchor] Composite failed: {e}")
-            raise RuntimeError(f"视频合成失败: {e}")
-
-        self._state.final_video_path = output_path
-        self._state.final_video_file = output_path
-        self._state.step_composite = StepStatus.COMPLETED
-        self.task_manager.update_state(
-            final_video_path=output_path,
-            final_video_file=output_path,
-            step_composite=StepStatus.COMPLETED,
-        )
-        await self._emit("composite", "completed", "视频合成完成", 0.95)
-        return output_path
-
-    # ==================================================================
-    # Main Run
-    # ==================================================================
-
-    async def run(self, state: AnchorVideoTask) -> str:
-        self._state = state
-        self._state.status = StepStatus.RUNNING
-        self.task_manager.create(self._state)
-
-        await self._emit("init", "running", "开始数字人口播生成...", 0.0)
-
-        try:
-            anchor_image_path = await self._step_generate_anchor()
-            if self._is_shutdown():
-                raise PipelineShutdown("interrupted after anchor image")
-
-            clip_path = await self._step_generate_clip(anchor_image_path)
-            if self._is_shutdown():
-                raise PipelineShutdown("interrupted after clip generation")
-
-            sub_maker = await self._step_generate_audio()
-            if self._is_shutdown():
-                raise PipelineShutdown("interrupted after audio")
-
-            await self._step_generate_subtitle(sub_maker)
-            if self._is_shutdown():
-                raise PipelineShutdown("interrupted after subtitle")
-
-            final_video = await self._step_composite()
-
-            self._state.status = StepStatus.COMPLETED
-            self.task_manager.update_state(status=StepStatus.COMPLETED)
-            await self._emit(
-                "done", "completed", "数字人口播生成完成!", 1.0,
-                {"final_video": final_video},
-            )
-            return final_video
-
-        except PipelineShutdown as e:
-            logger.info(f"[Anchor] Shutdown: {e}")
-            await self._emit("error", "failed", "任务已被中断，可从任务列表续传", 0.0)
-            raise
-        except Exception as e:
-            self._state.status = StepStatus.FAILED
-            self.task_manager.update_state(status=StepStatus.FAILED)
-            await self._emit("error", "failed", str(e), 0.0)
-            raise

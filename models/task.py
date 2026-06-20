@@ -282,7 +282,6 @@ class AnchorVideoTask(BaseTaskState):
     anchor_prompt: str = ""
     anchor_reference_image: str = ""
     script_text: str = ""
-    subtitle_position_hints: str = ""
 
     # 配置
     audio_config: AudioConfig = Field(default_factory=AudioConfig)
@@ -397,7 +396,6 @@ class CreateAnchorTaskRequest(BaseModel):
     anchor_prompt: str = ""
     anchor_reference_image: str = ""
     script_text: str
-    subtitle_position_hints: str = ""
     video_width: int = 768
     video_height: int = 1344
     audio_config: Optional[AudioConfig] = None
