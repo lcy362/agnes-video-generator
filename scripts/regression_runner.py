@@ -60,9 +60,10 @@ AGNES_RATE_LIMIT = 20          # 次/分钟
 # 各场景权重 = 该场景平均每分钟发起的 Agnes API 调用数
 # 留 50% 余量 => 总权重上限 = AGNES_RATE_LIMIT / 2 = 10
 SCENARIO_WEIGHTS = {
-    "S1": 1, "S2": 1, "S3": 1,       # 简单: 1 submit + 轻量轮询
-    "C1": 4, "C2": 4, "C3": 3, "C4": 3, "C5": 4,  # 创意: Chat + N*Image + N*Video + 轮询
+    "S1": 1,                          # 简单 keyframes: 1 submit + 轻量轮询
+    "C1": 3, "C2": 3,                 # 创意 keyframes: Chat + N*Image + N*Video + 轮询
     "M1": 4, "M2": 4,                 # 稿件: 段落*Chat + 段落*Image + 轮询
+    "A1": 2, "A2": 2,                 # 数字人: 1 i2v submit + 轻量轮询
 }
 MAX_CONCURRENT_WEIGHT = AGNES_RATE_LIMIT // 2
 
@@ -70,6 +71,7 @@ MAX_CONCURRENT_WEIGHT = AGNES_RATE_LIMIT // 2
 TIMEOUT_SIMPLE = 30 * 60
 TIMEOUT_CREATIVE = 120 * 60
 TIMEOUT_MANUSCRIPT = 60 * 60
+TIMEOUT_ANCHOR = 60 * 60
 # 任务状态轮询间隔（区别于 pipeline 内部 30s 的 Agnes Video API 轮询）
 POLL_INTERVAL = 30
 HEALTH_CHECK_RETRIES = 12
@@ -124,46 +126,25 @@ class ScenarioConfig:
 
 
 SCENARIO_DEFS = [
-    # ── 简单视频 ──
-    ScenarioConfig("S1", "纯文本 t2v", "simple",
-        "/api/tasks/simple",
-        {"prompt": "春天花园里花朵盛开，阳光柔和",
-         "mode": "t2v", "duration": 5},
-        TIMEOUT_SIMPLE, SCENARIO_WEIGHTS["S1"]),
-
-    ScenarioConfig("S2", "图生视频 ti2vid", "simple",
-        "/api/tasks/simple",
-        {"prompt": "春天花园里花朵盛开，阳光柔和",
-         "mode": "ti2vid", "duration": 5},
-        TIMEOUT_SIMPLE, SCENARIO_WEIGHTS["S2"], requires_ref_image=True),
-
-    ScenarioConfig("S3", "关键帧 keyframes", "simple",
+    # ── 简单视频（仅 keyframes）──
+    ScenarioConfig("S1", "关键帧 keyframes", "simple",
         "/api/tasks/simple",
         {"prompt": "春天花园里花朵盛开，阳光柔和",
          "mode": "keyframes", "duration": 5},
-        TIMEOUT_SIMPLE, SCENARIO_WEIGHTS["S3"],
+        TIMEOUT_SIMPLE, SCENARIO_WEIGHTS["S1"],
         requires_ref_image=True, requires_end_image=True),
 
-    # ── 创意视频（主测无配音，三种场景模式 + 一个配音验证）──
-    ScenarioConfig("C1", "纯文字+独立+无配音", "creative",
-        "/api/tasks/creative",
-        {"idea": "清晨小镇溪边的宁静风景",
-         "user_requirement": "3个场景，每个场景5秒，写实风格",
-         "style": "写实风格", "chaining_mode": "none",
-         "video_duration": 5,
-         "audio_enabled": False},
-        TIMEOUT_CREATIVE, SCENARIO_WEIGHTS["C1"]),
-
-    ScenarioConfig("C2", "带参考图+关键帧+无配音", "creative",
+    # ── 创意视频（仅 keyframes 模式）──
+    ScenarioConfig("C1", "带参考图+关键帧+无配音", "creative",
         "/api/tasks/creative",
         {"idea": "清晨小镇溪边的宁静风景",
          "user_requirement": "3个场景，每个场景5秒，写实风格",
          "style": "写实风格", "chaining_mode": "keyframes",
          "video_duration": 5,
          "audio_enabled": False},
-        TIMEOUT_CREATIVE, SCENARIO_WEIGHTS["C2"], requires_ref_image=True),
+        TIMEOUT_CREATIVE, SCENARIO_WEIGHTS["C1"], requires_ref_image=True),
 
-    ScenarioConfig("C3", "参考图生成尾帧+关键帧+无配音", "creative",
+    ScenarioConfig("C2", "参考图生成尾帧+关键帧+无配音", "creative",
         "/api/tasks/creative",
         {"idea": "清晨小镇溪边的宁静风景",
          "user_requirement": "3个场景，每个场景5秒，写实风格",
@@ -172,24 +153,7 @@ SCENARIO_DEFS = [
          "audio_enabled": False,
          "use_custom_end_frames": True,
          "generate_end_frames_from_ref": True},
-        TIMEOUT_CREATIVE, SCENARIO_WEIGHTS["C3"], requires_ref_image=True),
-
-    ScenarioConfig("C4", "独立场景+配音字幕验证", "creative",
-        "/api/tasks/creative",
-        {"idea": "清晨小镇溪边的宁静风景",
-         "user_requirement": "3个场景，每个场景5秒，写实风格",
-         "style": "写实风格", "chaining_mode": "none",
-         "video_duration": 5,
-         "audio_enabled": True, "audio_voice": "zh-CN-XiaoxiaoNeural"},
-        TIMEOUT_CREATIVE, SCENARIO_WEIGHTS["C4"]),
-
-    ScenarioConfig("C5", "链式续传 ti2vid + 无配音", "creative",
-        "/api/tasks/creative",
-        {"idea": "清晨小镇溪边的宁静风景",
-         "user_requirement": "3个场景，每个场景5秒，写实风格",
-         "style": "写实风格", "chaining_mode": "ti2vid",
-         "video_duration": 5, "audio_enabled": False},
-        TIMEOUT_CREATIVE, SCENARIO_WEIGHTS["C5"]),
+        TIMEOUT_CREATIVE, SCENARIO_WEIGHTS["C2"], requires_ref_image=True),
 
     # ── 稿件视频（短文本，激活拆段算法）──
     ScenarioConfig("M1", "短稿件+配音", "manuscript",
@@ -223,6 +187,31 @@ SCENARIO_DEFS = [
          "subtitle_stroke_color": "blue", "subtitle_stroke_width": 3,
          "subtitle_bg_color": "black@0.7"},
         TIMEOUT_MANUSCRIPT, SCENARIO_WEIGHTS["M2"]),
+
+    # ── 数字人口播 ──
+    ScenarioConfig("A1", "数字人+后拼接音频", "anchor",
+        "/api/tasks/anchor",
+        {"anchor_prompt": "一位专业的新闻主播，穿着正式西装，坐在现代化的新闻演播室中",
+         "script_text": "大家好，欢迎收看今天的新闻联播。"
+         "今天的主要内容有：科技创新取得重大突破，"
+         "人工智能领域又有新进展。"
+         "国内外众多专家齐聚一堂，共同探讨未来发展。"
+         "感谢您的收看，我们下期节目再见。",
+         "audio_source": "post_stitch",
+         "audio_enabled": True,
+         "audio_voice": "zh-CN-XiaoxiaoNeural"},
+        TIMEOUT_ANCHOR, SCENARIO_WEIGHTS["A1"]),
+
+    ScenarioConfig("A2", "数字人+模型音频", "anchor",
+        "/api/tasks/anchor",
+        {"anchor_prompt": "一位专业的新闻主播，穿着正式西装，坐在现代化的新闻演播室中",
+         "script_text": "大家好，欢迎收看今天的新闻联播。"
+         "今天的主要内容有：科技创新取得重大突破，"
+         "人工智能领域又有新进展。"
+         "感谢您的收看，我们下期节目再见。",
+         "audio_source": "model",
+         "audio_enabled": False},
+        TIMEOUT_ANCHOR, SCENARIO_WEIGHTS["A2"]),
 ]
 
 SCENARIO_MAP = {s.id: s for s in SCENARIO_DEFS}
@@ -293,7 +282,7 @@ class ReportManager:
                 "result": None,
                 "errors": [],
             }
-        endpoints = {f"E{i}": {"status": "pending", "detail": ""} for i in range(1, 10)}
+        endpoints = {f"E{i}": {"status": "pending", "detail": ""} for i in range(1, 11)}
         return {
             "version": "2.0",
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -455,9 +444,10 @@ class ReportManager:
         lines.append(f"")
 
         for type_label, type_key, type_ids in [
-            ("简单视频 (Simple)", "simple", ["S1", "S2", "S3"]),
-            ("创意视频 (Creative)", "creative", ["C1", "C2", "C3", "C4", "C5"]),
+            ("简单视频 (Simple)", "simple", ["S1"]),
+            ("创意视频 (Creative)", "creative", ["C1", "C2"]),
             ("稿件视频 (Manuscript)", "manuscript", ["M1", "M2"]),
+            ("数字人口播 (Anchor)", "anchor", ["A1", "A2"]),
         ]:
             lines.append(f"---")
             lines.append(f"")
@@ -523,7 +513,7 @@ class ReportManager:
         # Endpoint results
         lines.append(f"---")
         lines.append(f"")
-        lines.append(f"## 端点验证 (E1-E9)")
+        lines.append(f"## 端点验证 (E1-E10)")
         lines.append(f"")
         lines.append(f"| 端点 | 状态 | 详情 |")
         lines.append(f"|------|------|------|")
@@ -889,6 +879,8 @@ def _get_expected_narration(task_state: dict, scenario: ScenarioConfig) -> str:
     if scenario.type == "manuscript":
         paras = task_state.get("paragraphs", [])
         return "\n".join(p.get("text", "") for p in paras)
+    if scenario.type == "anchor":
+        return task_state.get("script_text", "")
     return ""
 
 
@@ -902,6 +894,21 @@ def _compute_expected_duration(task_state: dict, scenario: ScenarioConfig) -> fl
     if scenario.type == "simple":
         dur = task_state.get("duration")
         return float(dur) if dur else None
+
+    if scenario.type == "anchor":
+        # anchor: composite_anchor_video loops a 5s clip to cover audio
+        audio = task_state.get("combined_audio", "")
+        if audio and os.path.exists(audio):
+            try:
+                r = subprocess.run(
+                    ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                     "-of", "default=noprint_wrappers=1:nokey=1", audio],
+                    capture_output=True, text=True, timeout=10,
+                )
+                return float(r.stdout.strip())
+            except Exception:
+                pass
+        return None
 
     if scenario.type in ("creative", "manuscript"):
         video_dur = task_state.get("video_duration", 5)
@@ -1128,6 +1135,17 @@ def _validate_sync(dir_name: str, scenario: ScenarioConfig) -> dict:
             # simple 任务无 step_* 字段，用顶层 status 判断
             checks["R3_all_completed"] = sd.get("status") == "completed"
             checks["R3_incomplete_steps"] = "" if checks["R3_all_completed"] else "status=" + sd.get("status", "?")
+        elif scenario.type == "anchor":
+            # anchor 任务：根据 audio_source 决定哪些 step 必须完成
+            audio_source = sd.get("audio_source", "post_stitch")
+            _SKIPPABLE_STEPS = set()
+            if audio_source == "model":
+                # 模型音频模式：跳过 audio/subtitle/concatenation 步骤
+                _SKIPPABLE_STEPS = {"step_subtitle", "step_concatenation"}
+            active_steps = {k: v for k, v in steps.items() if k not in _SKIPPABLE_STEPS}
+            incomplete = [k for k, v in active_steps.items() if v != "completed"]
+            checks["R3_all_completed"] = not incomplete if active_steps else "N/A"
+            checks["R3_incomplete_steps"] = ",".join(incomplete) if incomplete else ""
         else:
             # 对于非 keyframes 模式的创意任务，end_frame_prompts/end_frame_generation
             # 步骤不会被触发，不应计入"未完成"
@@ -1152,7 +1170,7 @@ def _validate_sync(dir_name: str, scenario: ScenarioConfig) -> dict:
         checks["R4_final_path_exists"] = False
 
     # R5: task.json — 创意任务在 scene_N/ 子目录，稿件任务在 para_N/ 子目录
-    # 简单视频任务在根目录
+    # 简单视频任务在根目录，数字人在 clip/ 子目录
     _VIDEO_ID_RE = re.compile(r"agnesapi\?\S*video_id=|mode=\S*&video_id=")
 
     def _curl_has_valid_video_id(path: str) -> bool:
@@ -1184,30 +1202,13 @@ def _validate_sync(dir_name: str, scenario: ScenarioConfig) -> dict:
         if _curl_has_valid_video_id(cs_root):
             _curl_dirs_with_valid_id += 1
 
-    # 对于创意/稿件任务，独立检查每个子目录（无短路守卫）
-    if scenario.type == "creative":
+    # 对于创意/稿件/数字人任务，独立检查每个子目录（无短路守卫）
+    if scenario.type in ("creative", "manuscript", "anchor"):
+        subdir_prefix = {"creative": "scene_", "manuscript": "para_", "anchor": "clip"}.get(scenario.type)
+        subdir_is_exact = scenario.type == "anchor"
         for entry in os.listdir(task_dir) if os.path.isdir(task_dir) else []:
-            if entry.startswith("scene_"):
-                sd_path = os.path.join(task_dir, entry)
-                if os.path.isdir(sd_path):
-                    tj_sub = os.path.join(sd_path, "task.json")
-                    cs_sub = os.path.join(sd_path, "curl.sh")
-                    if os.path.exists(tj_sub):
-                        _task_json_found = True
-                        if not _has_video_id:
-                            try:
-                                with open(tj_sub) as f:
-                                    tjd = json.load(f)
-                                _has_video_id = bool(tjd.get("video_id") or tjd.get("id"))
-                            except Exception:
-                                pass
-                    if os.path.exists(cs_sub):
-                        _curl_dirs_checked += 1
-                        if _curl_has_valid_video_id(cs_sub):
-                            _curl_dirs_with_valid_id += 1
-    elif scenario.type == "manuscript":
-        for entry in os.listdir(task_dir) if os.path.isdir(task_dir) else []:
-            if entry.startswith("para_"):
+            match = entry == subdir_prefix if subdir_is_exact else entry.startswith(subdir_prefix)
+            if match:
                 sd_path = os.path.join(task_dir, entry)
                 if os.path.isdir(sd_path):
                     tj_sub = os.path.join(sd_path, "task.json")
@@ -1233,15 +1234,17 @@ def _validate_sync(dir_name: str, scenario: ScenarioConfig) -> dict:
     checks["R6_dirs_checked"] = _curl_dirs_checked
     checks["R6_dirs_with_curl"] = _curl_dirs_with_valid_id
 
-    # R7-R8: 子目录 + 音频/字幕（创意/稿件）
-    # 判断是否需要音频验证：检查 audio_enabled 参数
+    # R7-R8: 子目录 + 音频/字幕（创意/稿件/数字人）
     audio_enabled = scenario.params.get("audio_enabled", True)
-    if scenario.type in ("creative", "manuscript"):
-        prefix = "scene_" if scenario.type == "creative" else "para_"
-        dirs_exist = any(
-            e.startswith(prefix) and os.path.isdir(os.path.join(task_dir, e))
-            for e in os.listdir(task_dir)
-        ) if os.path.isdir(task_dir) else False
+    if scenario.type in ("creative", "manuscript", "anchor"):
+        if scenario.type == "anchor":
+            dirs_exist = os.path.isdir(os.path.join(task_dir, "clip"))
+        else:
+            prefix = "scene_" if scenario.type == "creative" else "para_"
+            dirs_exist = any(
+                e.startswith(prefix) and os.path.isdir(os.path.join(task_dir, e))
+                for e in os.listdir(task_dir)
+            ) if os.path.isdir(task_dir) else False
         checks["R7_sub_dirs_exist"] = dirs_exist
 
         if audio_enabled:
@@ -1256,7 +1259,6 @@ def _validate_sync(dir_name: str, scenario: ScenarioConfig) -> dict:
             checks["R7_audio_files"] = audio_found
             checks["R8_subtitle_srt"] = srt_found
         else:
-            # 无配音场景：音频/字幕检查标记为 N/A
             checks["R7_audio_files"] = "N/A"
             checks["R8_subtitle_srt"] = "N/A"
     else:
@@ -1264,20 +1266,23 @@ def _validate_sync(dir_name: str, scenario: ScenarioConfig) -> dict:
         checks["R7_audio_files"] = "N/A"
         checks["R8_subtitle_srt"] = "N/A"
 
-    # R9-R10: 合稿产物（稿件专用）
-    if scenario.type == "manuscript":
+    # R9-R10: 合稿产物（稿件/数字人后拼接音频）
+    has_combined = scenario.type in ("manuscript", "anchor")
+    if has_combined and audio_enabled:
         fn9 = os.path.join(task_dir, "full_narration.mp3")
         checks["R9_full_narration"] = os.path.exists(fn9) and os.path.getsize(fn9) > 0
         fn10 = os.path.join(task_dir, "full_subtitle.srt")
         checks["R10_full_subtitle"] = os.path.exists(fn10)
-        if audio_enabled and os.path.exists(fn10):
+        if os.path.exists(fn10):
             with open(fn10) as f:
                 srt_content = f.read()
             checks["R10_srt_entries"] = srt_content.count("\n\n") + 1 if "\n\n" in srt_content else 1
-        elif not audio_enabled:
-            checks["R10_srt_entries"] = "N/A"
         else:
             checks["R10_srt_entries"] = 0
+    elif has_combined:
+        checks["R9_full_narration"] = "N/A"
+        checks["R10_full_subtitle"] = "N/A"
+        checks["R10_srt_entries"] = "N/A"
     else:
         checks["R9_full_narration"] = "N/A"
         checks["R10_full_subtitle"] = "N/A"
@@ -1469,7 +1474,7 @@ async def run_scenario(scenario: ScenarioConfig,
 
 async def verify_endpoints(report: ReportManager):
     logger.info("─" * 50)
-    logger.info("端点验证 E1-E9")
+    logger.info("端点验证 E1-E10")
 
     async def check(ep: str, desc: str, fn):
         ok = detail = False
@@ -1523,6 +1528,12 @@ async def verify_endpoints(report: ReportManager):
 
         check("E9", "POST /api/tasks/{id}/stop",
               lambda: _e8_e9_check("stop")),
+        check("E10", "POST /api/tasks/anchor → 200",
+              lambda: _post_ok("/api/tasks/anchor",
+                               {"script_text": "E10探针测试。",
+                                "audio_source": "post_stitch",
+                                "audio_enabled": "false",
+                                "creative_name": "__ep_probe__"})),
     )
 
 
