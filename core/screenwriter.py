@@ -497,6 +497,110 @@ Generate the English motion prompt for this segment.
         logger.info(f"[Screenwriter] Anchor clip prompt: {prompt[:100]}...")
         return prompt
 
+    def generate_anchor_smooth_loop_prompt(
+        self,
+        anchor_prompt: str,
+    ) -> str:
+        """为数字人口播后拼接音频模式生成单段循环优化的英文动态 prompt。
+
+        只生成一段 5 秒的 i2v 视频，循环播放配合完整 TTS 音频。
+        prompt 强调微小幅度动作，确保起止姿态高度一致，循环衔接流畅。
+
+        Args:
+            anchor_prompt: 主播形象描述（中文）。
+
+        Returns:
+            英文视频动态 prompt 字符串。
+        """
+        system_prompt = """\
+You are a professional video director specializing in digital human anchorperson videos.
+Generate a SHORT English motion prompt for AI video generation (i2v).
+
+This video will be LOOPED (played on repeat) to cover the full narration duration.
+Therefore the motion MUST be designed for seamless loop playback.
+
+CRITICAL RULES:
+- The ending posture MUST be nearly IDENTICAL to the starting posture.
+- Motions must be EXTREMELY SUBTLE — barely perceptible micro-movements only.
+- NO large gestures, NO head turning, NO hand raising.
+- ONLY subtle breathing motion in the chest/shoulders.
+- VERY slight micro-nod or micro-smile changes (under 5% amplitude).
+- The face and body position should appear nearly frozen — as if a static image
+  with the faintest living-person micro-motions.
+- Mouth should have near-zero movement (this is a loop-clip, audio is added in post).
+- Think "living portrait" — a photo that barely breathes.
+- 20-40 words, English only.
+- Do NOT describe environment, lighting, clothing, or appearance.
+
+Output ONLY the motion prompt text, no JSON, no explanation.
+"""
+
+        user_prompt = f"""\
+<anchor_appearance>
+{anchor_prompt}
+</anchor_appearance>
+
+Generate the smooth-loop motion prompt for a 5-second looping clip.
+"""
+        logger.info(
+            f"[Screenwriter] Generating anchor smooth-loop prompt "
+            f"({len(anchor_prompt)} chars)..."
+        )
+        prompt = strip_code_fence(self._chat(system_prompt, user_prompt))
+        logger.info(f"[Screenwriter] Anchor smooth-loop prompt: {prompt[:100]}...")
+        return prompt
+
+    def generate_anchor_model_audio_prompt(
+        self,
+        anchor_prompt: str,
+        script_text: str,
+    ) -> str:
+        """为数字人口播模型音频模式生成含口播文本的视频 prompt。
+
+        模型音频模式下，视频模型同时生成视频和音频，
+        prompt 需包含说话口型描述和口播文本内容。
+
+        Args:
+            anchor_prompt: 主播形象描述（中文）。
+            script_text: 口播稿件全文。
+
+        Returns:
+            英文视频 prompt 字符串。
+        """
+        system_prompt = """\
+You are a professional video director specializing in digital human anchorperson videos.
+Generate a SHORT English video prompt for AI video generation (i2v).
+
+The video model will generate BOTH video and audio (the anchor speaking the narration).
+Therefore:
+- Include the anchor's lip/mouth movements matching the speech.
+- The motion should be gentle and natural — subtle head nods, slight hand gestures.
+- Keep body position relatively stable.
+- 30-50 words, English only.
+- Do NOT describe environment, lighting, clothing, or appearance.
+
+Output ONLY the prompt text, no JSON, no explanation.
+"""
+
+        user_prompt = f"""\
+<anchor_appearance>
+{anchor_prompt}
+</anchor_appearance>
+
+<narration>
+{script_text[:500]}
+</narration>
+
+Generate the video prompt for this anchor segment with built-in audio.
+"""
+        logger.info(
+            f"[Screenwriter] Generating anchor model-audio prompt "
+            f"({len(anchor_prompt)} chars, {len(script_text)} script chars)..."
+        )
+        prompt = strip_code_fence(self._chat(system_prompt, user_prompt))
+        logger.info(f"[Screenwriter] Anchor model-audio prompt: {prompt[:100]}...")
+        return prompt
+
     def generate_narration_for_video(
         self, story: str, scenes: List[str], total_duration: float, style: str = ""
     ) -> str:

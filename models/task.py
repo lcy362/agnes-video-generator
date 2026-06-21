@@ -274,6 +274,10 @@ class AnchorVideoTask(BaseTaskState):
     按朗读时长将稿件拆段（5-12 秒/段），每段生成不同动作的 i2v
     视频片段，配合 TTS 读稿音频和字幕，拼接合成最终视频。
     （v3.1 方案 B：分段生成 + 口型近似匹配）
+
+    audio_source 支持两种模式：
+      - "post_stitch": 生成一段短 i2v 视频循环 + TTS 后拼接音频（音频可控，嘴型较难匹配）
+      - "model": 交由视频模型自身生成音频（音频由模型控制，效果不可控）
     """
 
     task_type: Literal[TaskType.ANCHOR] = TaskType.ANCHOR
@@ -284,6 +288,7 @@ class AnchorVideoTask(BaseTaskState):
     script_text: str = ""
 
     # 配置
+    audio_source: str = "post_stitch"  # "post_stitch" | "model"
     audio_config: AudioConfig = Field(default_factory=AudioConfig)
     subtitle_config: SubtitleConfig = Field(default_factory=SubtitleConfig)
 

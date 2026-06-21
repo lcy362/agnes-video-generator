@@ -566,35 +566,72 @@
           <span id="a_audio_body-arrow" class="text-gray-500 text-xs">▶</span>
         </div>
         <div id="a_audio_body" class="collapse-body hidden mt-4">
-          <div class="flex items-center gap-3 mb-4">
-            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input type="checkbox" id="a_audio_enabled" checked class="rounded bg-gray-800 border-gray-600">
-              <span data-i18n="enableNarration">启用旁白配音</span>
-            </label>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
-              <select id="a_voice" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
-                <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (温柔女声)</option>
-                <option value="zh-CN-YunyangNeural">Yunyang (沉稳男声)</option>
-                <option value="zh-CN-XiaoyiNeural">Xiaoyi (活泼女声)</option>
-                <option value="zh-CN-YunxiNeural">Yunxi (年轻男声)</option>
-              </select>
+          <!-- Audio Source Selector (Anchor only) -->
+          <div class="mb-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+            <label class="block text-sm text-gray-400 mb-2" data-i18n="audioSource">音频来源</label>
+            <div class="flex flex-col gap-2">
+              <label class="flex items-start gap-3 cursor-pointer group">
+                <input type="radio" name="a_audio_source" value="post_stitch" checked class="mt-0.5 accent-purple-500">
+                <div>
+                  <span class="text-sm text-gray-200 group-hover:text-white transition" data-i18n="audioPostStitch">后拼接音频</span>
+                  <p class="text-xs text-gray-500 mt-0.5" data-i18n="audioPostStitchDesc">音频效果可控（可选语音、语速），但嘴型较难匹配</p>
+                </div>
+              </label>
+              <label class="flex items-start gap-3 cursor-pointer group">
+                <input type="radio" name="a_audio_source" value="model" class="mt-0.5 accent-purple-500">
+                <div>
+                  <span class="text-sm text-gray-200 group-hover:text-white transition" data-i18n="audioModel">模型音频</span>
+                  <p class="text-xs text-gray-500 mt-0.5" data-i18n="audioModelDesc">音频由模型控制，效果不可控；无语音角色/语速选项</p>
+                </div>
+              </label>
             </div>
-            <div>
-              <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
-              <select id="a_rate" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
-                <option value="-30%">-30% (慢)</option>
-                <option value="-15%">-15%</option>
-                <option value="+0%" selected data-i18n="rateNormal">正常</option>
-                <option value="+15%">+15%</option>
-                <option value="+30%">+30% (快)</option>
-              </select>
+          </div>
+          <div id="a_audio_controls">
+            <div class="flex items-center gap-3 mb-4">
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="checkbox" id="a_audio_enabled" checked class="rounded bg-gray-800 border-gray-600">
+                <span data-i18n="enableNarration">启用旁白配音</span>
+              </label>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
+                <select id="a_voice" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+                  <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (温柔女声)</option>
+                  <option value="zh-CN-YunyangNeural">Yunyang (沉稳男声)</option>
+                  <option value="zh-CN-XiaoyiNeural">Xiaoyi (活泼女声)</option>
+                  <option value="zh-CN-YunxiNeural">Yunxi (年轻男声)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
+                <select id="a_rate" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+                  <option value="-30%">-30% (慢)</option>
+                  <option value="-15%">-15%</option>
+                  <option value="+0%" selected data-i18n="rateNormal">正常</option>
+                  <option value="+15%">+15%</option>
+                  <option value="+30%">+30% (快)</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
       </div>
+      <script>
+        document.querySelectorAll('input[name="a_audio_source"]').forEach(r => {
+          r.addEventListener('change', function() {
+            const ctrl = document.getElementById('a_audio_controls');
+            const cb = document.getElementById('a_audio_enabled');
+            if (this.value === 'model') {
+              ctrl.classList.add('opacity-40', 'pointer-events-none');
+              cb.checked = false;
+            } else {
+              ctrl.classList.remove('opacity-40', 'pointer-events-none');
+              cb.checked = true;
+            }
+          });
+        });
+      </script>
 
       <!-- Subtitle Config (Anchor) -->
       <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
@@ -852,6 +889,11 @@ const T = {
     subPositionHints: '字幕位置要求',
     subPositionHintsPlaceholder: '字幕放在画面下方三分之一区域，不要遮挡主播面部',
     typeAnchor: '数字人',
+    audioSource: '音频来源',
+    audioPostStitch: '后拼接音频',
+    audioPostStitchDesc: '音频效果可控（可选语音、语速），但嘴型较难匹配',
+    audioModel: '模型音频',
+    audioModelDesc: '音频由模型控制，效果不可控；无语音角色/语速选项',
     aStepGenerateAnchor: '数字人形象生成',
     aStepSplit: '稿件拆分',
     aStepClipPrompts: '动态描述生成',
@@ -938,6 +980,11 @@ const T = {
     subPositionHints: 'Subtitle Position Hints',
     subPositionHintsPlaceholder: 'Place subtitles in the lower third, avoid covering the anchor\'s face',
     typeAnchor: 'Anchor',
+    audioSource: 'Audio Source',
+    audioPostStitch: 'Post-stitch Audio',
+    audioPostStitchDesc: 'Audio quality controllable (voice, speed), but lip sync harder to match',
+    audioModel: 'Model Audio',
+    audioModelDesc: 'Audio controlled by model, effect unpredictable; no voice/speed options',
     aStepGenerateAnchor: 'Anchor Image Gen',
     aStepSplit: 'Script Split',
     aStepClipPrompts: 'Clip Prompts Gen',
@@ -1022,6 +1069,11 @@ const T = {
     subPositionHints: 'Позиция субтитров',
     subPositionHintsPlaceholder: 'Разместите субтитры в нижней трети, избегая лица ведущего',
     typeAnchor: 'Ведущий',
+    audioSource: 'Источник аудио',
+    audioPostStitch: 'Аудио после монтажа',
+    audioPostStitchDesc: 'Качество аудио контролируемо (голос, скорость), но синхронизация губ сложнее',
+    audioModel: 'Аудио модели',
+    audioModelDesc: 'Аудио управляется моделью, эффект непредсказуем',
     aStepGenerateAnchor: 'Генерация образа',
     aStepSplit: 'Разбиение текста',
     aStepClipPrompts: 'Генерация промптов',
@@ -1103,6 +1155,11 @@ const T = {
     subPositionHints: '字幕位置の指定',
     subPositionHintsPlaceholder: '字幕は画面下部3分の1に配置、アンカーの顔を隠さないように',
     typeAnchor: 'アンカー',
+    audioSource: '音声ソース',
+    audioPostStitch: '後付け音声',
+    audioPostStitchDesc: '音声品質は制御可能（声・速度）だが、口の動きとの一致は困難',
+    audioModel: 'モデル音声',
+    audioModelDesc: '音声はモデルが生成、効果は予測不可',
     aStepGenerateAnchor: 'アンカー画像生成',
     aStepSplit: '原稿分割',
     aStepClipPrompts: '動的描述生成',
@@ -1184,6 +1241,11 @@ const T = {
     subPositionHints: '자막 위치 힌트',
     subPositionHintsPlaceholder: '자막을 화면 하단 1/3에 배치하고 앵커 얼굴을 가리지 않도록 하세요',
     typeAnchor: '앵커',
+    audioSource: '오디오 소스',
+    audioPostStitch: '후처리 오디오',
+    audioPostStitchDesc: '오디오 품질 제어 가능(음성, 속도), 그러나 입 움직임 매칭이 어려움',
+    audioModel: '모델 오디오',
+    audioModelDesc: '오디오가 모델에 의해 생성되며 효과를 예측할 수 없음',
     aStepGenerateAnchor: '앵커 이미지 생성',
     aStepSplit: '원고 분할',
     aStepClipPrompts: '동적 설명 생성',
@@ -1265,6 +1327,11 @@ const T = {
     subPositionHints: 'Petunjuk Kedudukan Sarikata',
     subPositionHintsPlaceholder: 'Letakkan sarikata di bahagian bawah skrin, elakkan menutup muka penyampai',
     typeAnchor: 'Penyampai',
+    audioSource: 'Sumber Audio',
+    audioPostStitch: 'Audio Pasca-cantum',
+    audioPostStitchDesc: 'Kualiti audio terkawal (suara, kelajuan), tetapi sukar padanan bibir',
+    audioModel: 'Audio Model',
+    audioModelDesc: 'Audio dikawal oleh model, kesan tidak dapat diramal',
     aStepGenerateAnchor: 'Generasi Imej Penyampai',
     aStepSplit: 'Pecah Skrip',
     aStepClipPrompts: 'Hasilkan Penerangan',
@@ -1345,6 +1412,11 @@ const T = {
     subPositionHints: 'Petunjuk Posisi Subtitle',
     subPositionHintsPlaceholder: 'Tempatkan subtitle di sepertiga bawah layar, hindari menutupi wajah pembawa acara',
     typeAnchor: 'Pembawa Acara',
+    audioSource: 'Sumber Audio',
+    audioPostStitch: 'Audio Pasca-gabung',
+    audioPostStitchDesc: 'Kualitas audio terkontrol (suara, kecepatan), namun sulit mencocokkan gerakan bibir',
+    audioModel: 'Audio Model',
+    audioModelDesc: 'Audio dikendalikan model, efek tidak dapat diprediksi',
     aStepGenerateAnchor: 'Hasilkan Gambar Pembawa',
     aStepSplit: 'Pecah Skrip',
     aStepClipPrompts: 'Hasilkan Keterangan',
@@ -1800,6 +1872,9 @@ async function submitAnchor() {
   const refFile = document.getElementById('a_ref_image').files[0];
   if (refFile) form.append('anchor_reference_image', refFile);
 
+  // Audio source
+  const audioSource = document.querySelector('input[name="a_audio_source"]:checked');
+  form.append('audio_source', audioSource ? audioSource.value : 'post_stitch');
   // Audio config
   form.append('audio_enabled', document.getElementById('a_audio_enabled').checked);
   form.append('audio_voice', document.getElementById('a_voice').value);

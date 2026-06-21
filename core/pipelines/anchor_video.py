@@ -1,13 +1,8 @@
-"""core.pipelines.anchor_video -- 数字人口播流水线（类型 4 / Phase 3 / v3.1 方案 B）
+"""core.pipelines.anchor_video -- 数字人口播流水线（类型 4）
 
-分段生成 + 口型近似匹配方案：
-    1. 生成主播形象图（t2i / i2i）
-    2. 按朗读时长拆分稿件（复用稿件视频拆段逻辑，5-12 秒/段）
-    3. 为每段生成不同的英文动态 prompt（LLM 驱动，包含口型/手势描述）
-    4. 逐段 i2v 生成不同动作的视频片段（以主播形象图为输入）
-    5. TTS 读稿音频（整段连续）
-    6. 字幕生成 + LLM 智能定位
-    7. 拼接所有片段 + 叠加音频 + 字幕
+支持两种音频模式：
+  - post_stitch: 生成一段短 i2v 视频循环 + TTS 后拼接音频（音频可控，嘴型较难匹配）
+  - model: 交由视频模型自身生成音频（音频由模型控制，效果不可控）
 """
 
 import asyncio
@@ -34,30 +29,21 @@ from models.task import (
 
 logger = logging.getLogger(__name__)
 
-# 默认主播 prompt
 _DEFAULT_ANCHOR_PROMPT = (
     "一位专业的新闻主播，穿着正式西装，坐在现代化的新闻演播室中，"
     "面带微笑，正面半身照，高清画质，专业灯光"
 )
 
-# ── 拆段常量（复用稿件视频逻辑）──
 _SENTENCE_END_RE = re.compile(r"(?<=[。！？])")
 _CHARS_PER_SEC = 4.0
-_MAX_SEGMENT_DURATION = 12.0
-_MIN_SEGMENT_DURATION = 5.0
 
 
 class AnchorPipeline(BasePipeline):
-    """数字人口播视频生成流水线（v3.1 方案 B：分段生成）。
+    """数字人口播视频生成流水线。
 
-    7 步流程：
-        1. 生成主播形象图
-        2. 拆分稿件为 5-12 秒段落
-        3. 为每段生成英文动态 prompt（含口型/手势描述）
-        4. 逐段 i2v 生成不同动作的视频片段
-        5. TTS 读稿音频（整段连续）
-        6. 字幕生成 + LLM 定位
-        7. 拼接所有片段 + 叠加音频 + 字幕
+    根据 audio_source 分两种模式：
+      - post_stitch: 生成一段短 i2v 视频 → 循环播放 → TTS + 字幕叠加
+      - model:      生成一段视频（模型自带音频）→ 不含 TTS/字幕叠加
     """
 
     def __init__(
@@ -91,52 +77,19 @@ class AnchorPipeline(BasePipeline):
         self._state.status = StepStatus.RUNNING
         self.task_manager.create(self._state)
 
-        await self._emit("init", "running", "开始数字人口播生成（分段模式）...", 0.0)
+        audio_source = self._state.audio_source or "post_stitch"
+        mode_label = "模型音频" if audio_source == "model" else "后拼接音频"
+        await self._emit("init", "running", f"开始数字人口播生成（{mode_label}）...", 0.0)
 
         try:
-            # ── Step 1: 生成主播形象图 ────────────────────────────────
+            # Step 1: 生成主播形象图
             self._check_shutdown()
             anchor_image_path = await self._step_generate_anchor()
 
-            # ── Step 2: 拆分稿件 ─────────────────────────────────────
-            self._check_shutdown()
-            paragraphs = await self._run_step_split_text()
-
-            # ── Step 3: 为每段生成动态 prompt ─────────────────────────
-            self._check_shutdown()
-            await self._run_step_generate_clip_prompts(paragraphs)
-
-            # ── Step 4: TTS 读稿音频（先行，获取实际时长）────────────
-            self._check_shutdown()
-            sub_maker = await self._run_step_audio()
-
-            # ── Step 5: 逐段 i2v 生成视频片段（用实际音频时长）──────
-            self._check_shutdown()
-            actual_audio_dur = self.get_audio_duration(self._state.combined_audio or "")
-            await self._run_step_generate_clips(
-                paragraphs, anchor_image_path, actual_audio_dur,
-            )
-
-            # ── Step 6: 字幕生成 ─────────────────────────────────────
-            self._check_shutdown()
-            await self._run_step_subtitle(sub_maker)
-
-            # ── Step 7: 拼接 ────────────────────────────────────────
-            self._check_shutdown()
-            final_video = await self._run_step_concatenate(paragraphs)
-
-            # ── 完成 ────────────────────────────────────────────────
-            self._state.status = StepStatus.COMPLETED
-            self._state.final_video_file = final_video
-            self.task_manager.update_state(
-                status=StepStatus.COMPLETED,
-                final_video_file=final_video,
-            )
-            await self._emit(
-                "done", "completed", "数字人口播生成完成!", 1.0,
-                {"final_video": final_video},
-            )
-            return final_video
+            if audio_source == "model":
+                return await self._run_model_audio(anchor_image_path)
+            else:
+                return await self._run_post_stitch(anchor_image_path)
 
         except PipelineShutdown as e:
             logger.info(f"[Anchor] Shutdown: {e}")
@@ -149,123 +102,79 @@ class AnchorPipeline(BasePipeline):
             raise
 
     # ==================================================================
-    # Step runners (wrap step logic + persistence + progress)
+    # 模式 A: 后拼接音频 — 单段视频 + 循环 + TTS + 字幕
     # ==================================================================
 
-    async def _run_step_split_text(self) -> List[ManuscriptParagraph]:
-        """运行 Step 2: 文本拆分，带 resume 支持。"""
-        if self._state.step_split == StepStatus.COMPLETED and self._state.paragraphs:
-            logger.info("[Anchor] Step 2 (split_text): already completed, resuming")
-            return self._state.paragraphs
+    async def _run_post_stitch(self, anchor_image_path: str) -> str:
+        """后拼接音频模式：一段短 i2v 循环播放 + TTS + 字幕叠加。"""
+        # Step 2: TTS 读稿音频（先行，获取时长和 sub_maker）
+        self._check_shutdown()
+        sub_maker = await self._run_step_audio()
 
-        self.task_manager.update_step("step_split", StepStatus.RUNNING)
-        await self._emit("split_text", "running", "拆分口播稿件...", 0.10)
+        # Step 3: 生成单段循环优化的 i2v prompt
+        self._check_shutdown()
+        smooth_prompt = await self._step_generate_smooth_prompt()
 
-        paragraphs = self._step_split_text(self._state.script_text)
-        self._state.paragraphs = paragraphs
-        self.task_manager.update_state(paragraphs=paragraphs)
-        self.task_manager.update_step("step_split", StepStatus.COMPLETED)
-
-        await self._emit(
-            "split_text", "completed",
-            f"稿件已拆分为 {len(paragraphs)} 段", 0.12,
+        # Step 4: 生成单段 i2v 视频（5 秒）
+        self._check_shutdown()
+        clip_path = await self._step_generate_single_clip(
+            anchor_image_path, smooth_prompt,
         )
-        return paragraphs
 
-    async def _run_step_generate_clip_prompts(
-        self, paragraphs: List[ManuscriptParagraph],
-    ) -> None:
-        """运行 Step 3: 为每段生成动态 prompt，带 resume 支持。"""
-        if self._state.step_clip_prompts == StepStatus.COMPLETED:
-            logger.info("[Anchor] Step 3 (clip_prompts): already completed, resuming")
-            return
+        # Step 5: 字幕生成
+        self._check_shutdown()
+        await self._run_step_subtitle(sub_maker)
 
-        self.task_manager.update_step("step_clip_prompts", StepStatus.RUNNING)
-        await self._emit("clip_prompts", "running", "生成段落动态描述...", 0.12)
+        # Step 6: 循环拼接 + 叠加音频 + 字幕
+        self._check_shutdown()
+        final_video = await self._step_composite_anchor(clip_path)
 
-        await self._step_generate_clip_prompts(paragraphs)
-
-        self.task_manager.update_state(paragraphs=paragraphs)
-        self.task_manager.update_step("step_clip_prompts", StepStatus.COMPLETED)
-        await self._emit("clip_prompts", "completed", "段落动态描述生成完成", 0.18)
-
-    async def _run_step_generate_clips(
-        self, paragraphs: List[ManuscriptParagraph], anchor_image_path: str,
-        actual_audio_dur: float = 0.0,
-    ) -> None:
-        """运行 Step 5: 逐段 i2v 视频生成，带 resume 支持。"""
-        if self._state.step_clip_generation == StepStatus.COMPLETED:
-            logger.info("[Anchor] Step 5 (clip_generation): already completed, resuming")
-            return
-
-        self.task_manager.update_step("step_clip_generation", StepStatus.RUNNING)
-        await self._emit("clip_gen", "running", "生成段落视频片段...", 0.28)
-
-        await self._step_generate_clips(paragraphs, anchor_image_path, actual_audio_dur)
-
-        self.task_manager.update_state(paragraphs=paragraphs)
-        self.task_manager.update_step("step_clip_generation", StepStatus.COMPLETED)
-        await self._emit("clip_gen", "completed", "所有段落视频已生成", 0.55)
-
-    async def _run_step_audio(self) -> object:
-        """运行 Step 4: TTS 读稿，带 resume 支持。返回 sub_maker 供字幕步骤使用。"""
-        if self._state.step_audio == StepStatus.COMPLETED:
-            logger.info("[Anchor] Step 4 (audio): already completed, resuming")
-            return None
-
-        self.task_manager.update_step("step_audio", StepStatus.RUNNING)
-        await self._emit("audio", "running", "生成读稿音频...", 0.18)
-
-        sub_maker = await self._step_audio()
-
-        self.task_manager.update_state(combined_audio=self._state.combined_audio)
-        self.task_manager.update_step("step_audio", StepStatus.COMPLETED)
-        await self._emit("audio", "completed", "读稿音频生成完成", 0.28)
-        return sub_maker
-
-    async def _run_step_subtitle(self, sub_maker: object = None) -> None:
-        """运行 Step 6: 字幕生成，带 resume 支持。"""
-        if self._state.step_subtitle == StepStatus.COMPLETED:
-            logger.info("[Anchor] Step 6 (subtitle): already completed, resuming")
-            return
-
-        self.task_manager.update_step("step_subtitle", StepStatus.RUNNING)
-        await self._emit("subtitle", "running", "生成字幕...", 0.65)
-
-        await self._step_subtitle(sub_maker)
-
+        self._state.status = StepStatus.COMPLETED
+        self._state.final_video_file = final_video
         self.task_manager.update_state(
-            combined_subtitle=self._state.combined_subtitle,
-            subtitle_styles_path=self._state.subtitle_styles_path,
+            status=StepStatus.COMPLETED,
+            final_video_file=final_video,
         )
-        self.task_manager.update_step("step_subtitle", StepStatus.COMPLETED)
-        await self._emit("subtitle", "completed", "字幕生成完成", 0.75)
-
-    async def _run_step_concatenate(
-        self, paragraphs: List[ManuscriptParagraph],
-    ) -> str:
-        """运行 Step 7: 视频拼接，带 resume 支持。"""
-        if self._state.step_concatenation == StepStatus.COMPLETED:
-            logger.info("[Anchor] Step 7 (concatenation): already completed, resuming")
-            if self._state.final_video_file:
-                return self._state.final_video_file
-
-        self.task_manager.update_step("step_concatenation", StepStatus.RUNNING)
-        await self._emit("concatenate", "running", "拼接最终视频...", 0.75)
-
-        final_video = await self._step_concatenate(paragraphs)
-
-        self.task_manager.update_state(final_video_file=final_video)
-        self.task_manager.update_step("step_concatenation", StepStatus.COMPLETED)
-        await self._emit("concatenate", "completed", "视频拼接完成", 0.95)
+        await self._emit(
+            "done", "completed", "数字人口播生成完成!", 1.0,
+            {"final_video": final_video},
+        )
         return final_video
+
+    # ==================================================================
+    # 模式 B: 模型音频 — 视频由模型自带音频，不做后处理
+    # ==================================================================
+
+    async def _run_model_audio(self, anchor_image_path: str) -> str:
+        """模型音频模式：一段视频由模型自带音频，不做后处理。"""
+        # Step 2: 为全文生成单段 i2v prompt（含口播文本提示）
+        self._check_shutdown()
+        prompt = await self._step_generate_audio_prompt()
+
+        # Step 3: 生成单段 i2v 视频（完整文本时长）
+        self._check_shutdown()
+        clip_path = await self._step_generate_single_clip(
+            anchor_image_path, prompt,
+        )
+
+        self._state.status = StepStatus.COMPLETED
+        self._state.final_video_file = clip_path
+        self.task_manager.update_state(
+            status=StepStatus.COMPLETED,
+            final_video_file=clip_path,
+        )
+        await self._emit(
+            "done", "completed", "数字人口播生成完成（模型音频）!", 1.0,
+            {"final_video": clip_path},
+        )
+        return clip_path
 
     # ==================================================================
     # Step implementations
     # ==================================================================
 
     async def _step_generate_anchor(self) -> str:
-        """Step 1: 生成主播形象图（t2i / i2i），与之前版本一致。"""
+        """Step 1: 生成主播形象图（t2i / i2i）。"""
         if self._state.step_generate_anchor == StepStatus.COMPLETED:
             if self._state.anchor_image_path and os.path.exists(self._state.anchor_image_path):
                 logger.info("[Anchor] Step generate_anchor: SKIP (already completed)")
@@ -319,347 +228,121 @@ class AnchorPipeline(BasePipeline):
         await self._emit("generate_anchor", "completed", "主播形象生成完成", 0.08)
         return output_path
 
-    # ------------------------------------------------------------------
-    # Step 2: 拆分稿件（复用稿件视频拆段逻辑）
-    # ------------------------------------------------------------------
-
-    def _step_split_text(self, text: str) -> List[ManuscriptParagraph]:
-        """将口播稿件按朗读时长拆分为段落列表（5-12 秒/段）。
-
-        策略与 ManuscriptVideoPipeline._step_split_text 完全一致：
-            1. 按换行符切粗段落。
-            2. 按中文句末标点切候选句。
-            3. 贪心合并：<= 12s，>= 5s。
-            4. 短句合并到前一段。
-        """
-        # 防御性修复：检测并修复双重 UTF-8 编码
-        text = self.fix_double_utf8(text)
-        if text != self._state.script_text:
-            logger.info("[Anchor] split_text: fixed double-encoded UTF-8 text")
-            self._state.script_text = text
-            self.task_manager.update_state(script_text=text)
-
-        if self._state.paragraphs:
-            logger.info(
-                "[Anchor] split_text: %d paragraphs already exist, resuming",
-                len(self._state.paragraphs),
-            )
-            return self._state.paragraphs
-
-        logger.info("[Anchor] split_text: splitting %d chars...", len(text))
-
-        raw_blocks = [b.strip() for b in text.split("\n") if b.strip()]
-
-        candidate_sentences: List[str] = []
-        for block in raw_blocks:
-            parts = _SENTENCE_END_RE.split(block)
-            for part in parts:
-                part = part.strip()
-                if part:
-                    candidate_sentences.append(part)
-
-        if not candidate_sentences:
-            logger.warning("[Anchor] split_text: no sentences found in text")
-            return []
-
-        # 贪心合并
-        merged: List[str] = []
-        current_text = ""
-        current_duration = 0.0
-
-        for sentence in candidate_sentences:
-            sentence_duration = len(sentence) / _CHARS_PER_SEC
-
-            if not current_text:
-                current_text = sentence
-                current_duration = sentence_duration
-                continue
-
-            prospective_duration = current_duration + sentence_duration
-
-            if prospective_duration <= _MAX_SEGMENT_DURATION:
-                current_text += sentence
-                current_duration = prospective_duration
-            else:
-                merged.append(current_text)
-                current_text = sentence
-                current_duration = sentence_duration
-
-        if current_text:
-            merged.append(current_text)
-
-        # 短句后处理
-        final_texts: List[str] = []
-        for segment in merged:
-            seg_duration = len(segment) / _CHARS_PER_SEC
-            if seg_duration < _MIN_SEGMENT_DURATION and final_texts:
-                final_texts[-1] += segment
-            else:
-                final_texts.append(segment)
-
-        paragraphs: List[ManuscriptParagraph] = []
-        for idx, para_text in enumerate(final_texts):
-            est_duration = len(para_text) / _CHARS_PER_SEC
-            para = ManuscriptParagraph(
-                index=idx,
-                text=para_text,
-            )
-            paragraphs.append(para)
-            logger.info(
-                "[Anchor] Paragraph %d: %d chars, ~%.1fs",
-                idx, len(para_text), est_duration,
-            )
-
-        logger.info("[Anchor] split_text: %d paragraphs created", len(paragraphs))
-        return paragraphs
-
-    # ------------------------------------------------------------------
-    # Step 3: 为每段生成动态 prompt
-    # ------------------------------------------------------------------
-
-    async def _step_generate_clip_prompts(
-        self, paragraphs: List[ManuscriptParagraph],
-    ) -> None:
-        """为每个段落生成英文 i2v 动态 prompt（含口型/手势描述）。"""
-        total = len(paragraphs)
-        anchor_prompt = self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT
-
-        for i, para in enumerate(paragraphs):
-            self._check_shutdown()
-
-            if para.scene_prompt:
-                logger.info(
-                    "[Anchor] clip_prompt: paragraph %d already has prompt, skipping",
-                    para.index,
-                )
-                continue
-
-            logger.info(
-                "[Anchor] clip_prompt: generating for paragraph %d/%d...",
-                i + 1, total,
-            )
-            await self._emit(
-                "clip_prompts", "running",
-                f"生成动态描述 {i + 1}/{total}",
-                0.12 + 0.06 * (i / max(total, 1)),
-            )
-
-            prompt = await asyncio.to_thread(
-                self.screenwriter.generate_anchor_clip_prompt,
-                paragraph_text=para.text,
-                anchor_prompt=anchor_prompt,
-                segment_index=i,
-                total_segments=total,
-            )
-            para.scene_prompt = prompt.strip()
-
-            self.task_manager.update_state(paragraphs=paragraphs)
-            logger.info(
-                "[Anchor] clip_prompt %d: %s...",
-                para.index, para.scene_prompt[:80],
-            )
-
-        # 记录自动生成的 prompt
-        self.save_prompts({
-            "anchor_prompt": self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT,
-            "clip_prompts": [
-                {"index": p.index, "text": p.text, "scene_prompt": p.scene_prompt}
-                for p in paragraphs
-            ],
-        })
-
-    # ------------------------------------------------------------------
-    # Step 4: 逐段 i2v 生成视频片段
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _make_curl(video_id: str) -> str:
-        return (
-            f'curl -s -H "Authorization: Bearer $AGNES_API_KEY" '
-            f'"https://apihub.agnes-ai.com/agnesapi?video_id={video_id}"'
+    async def _step_generate_smooth_prompt(self) -> str:
+        """为后拼接音频模式生成循环优化的单段 prompt。"""
+        await self._emit(
+            "clip_prompts", "running",
+            "生成循环优化动态描述...", 0.12,
         )
 
-    def _save_para_task(self, para_dir: str, video_id: str) -> None:
-        os.makedirs(para_dir, exist_ok=True)
-        task_file = os.path.join(para_dir, "task.json")
-        with open(task_file, "w") as f:
-            json.dump({"video_id": video_id}, f, indent=2)
-        curl_file = os.path.join(para_dir, "curl.sh")
-        with open(curl_file, "w") as f:
-            f.write(self._make_curl(video_id) + "\n")
+        anchor_prompt = self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT
+        prompt = await asyncio.to_thread(
+            self.screenwriter.generate_anchor_smooth_loop_prompt,
+            anchor_prompt=anchor_prompt,
+        )
+        prompt = prompt.strip()
 
-    def _load_para_task(self, para_dir: str) -> Optional[str]:
-        task_file = os.path.join(para_dir, "task.json")
-        if os.path.exists(task_file):
-            try:
-                with open(task_file, "r") as f:
-                    data = json.load(f)
-                return data.get("video_id") or data.get("task_id")
-            except Exception as e:
-                logger.debug(f"[Anchor] Failed to load cached task.json: {e}")
-        return None
+        self.save_prompts({
+            "anchor_prompt": self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT,
+            "smooth_loop_prompt": prompt,
+        })
 
-    async def _step_generate_clips(
-        self,
-        paragraphs: List[ManuscriptParagraph],
-        anchor_image_path: str,
-        actual_audio_dur: float = 0.0,
-    ) -> None:
-        """为每个段落调用 i2v 生成视频片段（两阶段并行提交+等待）。
+        logger.info("[Anchor] smooth_loop_prompt: %s...", prompt[:80])
+        await self._emit(
+            "clip_prompts", "completed",
+            "循环优化动态描述生成完成", 0.18,
+        )
+        return prompt
 
-        如果提供了 actual_audio_dur，则按段落字符数比例分配实际音频时长，
-        确保生成的视频与音频时长匹配。
-        """
-        _SUBMIT_RETRIES = 3
-        _WAIT_RETRIES = 3
-        total = len(paragraphs)
+    async def _step_generate_audio_prompt(self) -> str:
+        """为模型音频模式生成含口播文本的视频 prompt。"""
+        await self._emit(
+            "clip_prompts", "running",
+            "生成含口播的视频描述...", 0.12,
+        )
+
+        full_text = self._state.script_text
+        anchor_prompt = self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT
+
+        prompt = await asyncio.to_thread(
+            self.screenwriter.generate_anchor_model_audio_prompt,
+            anchor_prompt=anchor_prompt,
+            script_text=full_text,
+        )
+        prompt = prompt.strip()
+
+        self.save_prompts({
+            "anchor_prompt": self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT,
+            "model_audio_prompt": prompt,
+        })
+
+        logger.info("[Anchor] model_audio_prompt: %s...", prompt[:80])
+        await self._emit(
+            "clip_prompts", "completed",
+            "含口播的视频描述生成完成", 0.18,
+        )
+        return prompt
+
+    async def _step_generate_single_clip(
+        self, anchor_image_path: str, prompt: str,
+    ) -> str:
+        """生成单段 i2v 视频（5 秒，循环用）。"""
+        if self._state.step_clip_generation == StepStatus.COMPLETED:
+            clip_dir = os.path.join(self.working_dir, "clip")
+            clip_path = os.path.join(clip_dir, "clip.mp4")
+            if os.path.exists(clip_path):
+                logger.info("[Anchor] single clip already exists, skipping")
+                return clip_path
+
+        self.task_manager.update_step("step_clip_generation", StepStatus.RUNNING)
+        await self._emit("clip_gen", "running", "生成单段循环视频...", 0.28)
+
+        clip_dir = os.path.join(self.working_dir, "clip")
+        os.makedirs(clip_dir, exist_ok=True)
+        clip_path = os.path.join(clip_dir, "clip.mp4")
+
         vw = self._state.video_width
         vh = self._state.video_height
 
-        # 如果有实际音频时长，按字符数比例分配每段时长
-        per_para_audio_dur: List[float] = []
-        if actual_audio_dur > 0 and total > 0:
-            total_chars = sum(len(p.text) for p in paragraphs if p.text)
-            for p in paragraphs:
-                if p.text and total_chars > 0:
-                    dur = actual_audio_dur * (len(p.text) / total_chars)
-                else:
-                    dur = actual_audio_dur / total
-                per_para_audio_dur.append(dur)
-            logger.info(
-                "[Anchor] clip: using actual audio dur %.1fs, per-para: %s",
-                actual_audio_dur,
-                [f"{d:.1f}s" for d in per_para_audio_dur],
-            )
-
-        # ── Phase 1: 批量提交 ────────────────────────────────────
-        pending: list[tuple[int, str, str]] = []
-
-        for i, para in enumerate(paragraphs):
-            self._check_shutdown()
-
-            para_dir = os.path.join(self.working_dir, f"clip_{para.index}")
-            video_path = os.path.join(para_dir, "clip.mp4")
-
-            if os.path.exists(video_path):
-                para.video_file = video_path
-                logger.info(
-                    "[Anchor] clip: paragraph %d already exists, skipping",
-                    para.index,
+        for attempt in range(3):
+            try:
+                video_id = await self.video_generator.submit_video(
+                    prompt=prompt,
+                    reference_image_paths=[anchor_image_path],
+                    duration=5,
+                    width=vw,
+                    height=vh,
                 )
-                continue
-
-            if not para.scene_prompt:
-                logger.warning(
-                    "[Anchor] clip: paragraph %d has no scene_prompt, skipping",
-                    para.index,
-                )
-                continue
-
-            os.makedirs(para_dir, exist_ok=True)
-
-            saved_video_id = self._load_para_task(para_dir)
-            if saved_video_id:
-                para.video_id = saved_video_id
-                logger.info(
-                    "[Anchor] clip: paragraph %d resuming video_id %s...",
-                    para.index, saved_video_id[:16],
-                )
-                pending.append((para.index, saved_video_id, video_path))
-                continue
-
-            logger.info(
-                "[Anchor] clip: submitting paragraph %d/%d...",
-                i + 1, total,
-            )
-            await self._emit(
-                "clip_gen", "running",
-                f"提交视频 {i + 1}/{total}",
-                0.28 + 0.12 * (i / max(total, 1)),
-            )
-
-            # 优先使用实际音频时长，否则用文本估算
-            if per_para_audio_dur and i < len(per_para_audio_dur):
-                para_duration = max(int(math.ceil(per_para_audio_dur[i])), 3)
-            else:
-                para_duration = max(int(math.ceil(len(para.text) / _CHARS_PER_SEC)), 3)
-
-            for retry in range(_SUBMIT_RETRIES):
-                try:
-                    video_id = await self.video_generator.submit_video(
-                        prompt=para.scene_prompt,
-                        reference_image_paths=[anchor_image_path],
-                        duration=para_duration,
-                        width=vw,
-                        height=vh,
+                video_output = await self.video_generator.wait_for_video(video_id)
+                video_output.save(clip_path)
+                break
+            except Exception as e:
+                if attempt < 2:
+                    logger.warning(
+                        "[Anchor] single clip attempt %d failed: %s, retrying...",
+                        attempt + 1, e,
                     )
-                    para.video_id = video_id
-                    self._save_para_task(para_dir, video_id)
-                    pending.append((para.index, video_id, video_path))
-                    break
-                except Exception as e:
-                    if retry < _SUBMIT_RETRIES - 1:
-                        delay = 15 * (retry + 1)
-                        logger.warning(
-                            "[Anchor] clip: paragraph %d submit failed "
-                            "(%s), retry %d/%d in %ds...",
-                            para.index, e, retry + 1, _SUBMIT_RETRIES, delay,
-                        )
-                        await asyncio.sleep(delay)
-                    else:
-                        raise
+                    await asyncio.sleep(15 * (attempt + 1))
+                else:
+                    raise
 
-        self.task_manager.update_state(paragraphs=paragraphs)
-        logger.info(
-            "[Anchor] clip: all %d paragraphs submitted, now waiting...",
-            len(pending),
-        )
-
-        # ── Phase 2: 逐个等待完成 ────────────────────────────────
-        for j, (para_idx, video_id, video_path) in enumerate(pending):
-            self._check_shutdown()
-
-            para = paragraphs[para_idx]
-            await self._emit(
-                "clip_gen", "running",
-                f"等待视频 {j + 1}/{len(pending)} ({video_id[:16]}...)",
-                0.33 + 0.22 * (j / max(len(pending), 1)),
-            )
-
-            for retry in range(_WAIT_RETRIES):
-                try:
-                    video_output = await self.video_generator.wait_for_video(video_id)
-                    video_output.save(video_path)
-                    break
-                except Exception as e:
-                    if retry < _WAIT_RETRIES - 1:
-                        delay = 20 * (retry + 1)
-                        logger.warning(
-                            "[Anchor] clip: paragraph %d wait failed "
-                            "(%s), retry %d/%d in %ds...",
-                            para_idx, e, retry + 1, _WAIT_RETRIES, delay,
-                        )
-                        await asyncio.sleep(delay)
-                    else:
-                        raise
-
-            para.video_file = video_path
-            self.task_manager.update_state(paragraphs=paragraphs)
-            logger.info(
-                "[Anchor] clip: paragraph %d saved → %s (video_id=%s)",
-                para_idx, video_path, video_id[:16],
-            )
-
-    # ------------------------------------------------------------------
-    # Step 5: TTS 读稿音频（整段连续）
-    # ------------------------------------------------------------------
+        self._state.step_clip_generation = StepStatus.COMPLETED
+        self.task_manager.update_state(step_clip_generation=StepStatus.COMPLETED)
+        await self._emit("clip_gen", "completed", "单段循环视频生成完成", 0.55)
+        return clip_path
 
     async def _step_audio(self) -> object:
-        """生成整段连续 TTS 音频（复用稿件视频模式）。"""
-        paragraphs = self._state.paragraphs
-        full_text = "\n\n".join(p.text for p in paragraphs if p.text)
+        """生成整段 TTS 音频，返回 sub_maker 供字幕步骤。"""
+        if self._state.step_audio == StepStatus.COMPLETED:
+            logger.info("[Anchor] Step audio: already completed, resuming")
+            return None
+
+        self.task_manager.update_step("step_audio", StepStatus.RUNNING)
+        await self._emit("audio", "running", "生成读稿音频...", 0.18)
+
+        full_text = self._state.script_text
         if not full_text:
-            logger.warning("[Anchor] audio: empty full text, skipping")
+            logger.warning("[Anchor] audio: empty text, skipping")
             return None
 
         audio_path = os.path.join(self.working_dir, "full_narration.mp3")
@@ -706,32 +389,33 @@ class AnchorPipeline(BasePipeline):
 
         self._state.combined_audio = audio_path
         self.task_manager.update_state(combined_audio=audio_path)
-        logger.info("[Anchor] audio: combined → %s", audio_path)
+        self.task_manager.update_step("step_audio", StepStatus.COMPLETED)
+        await self._emit("audio", "completed", "读稿音频生成完成", 0.28)
         return sub_maker
 
-    # ------------------------------------------------------------------
-    # Step 6: 字幕生成 + LLM 智能样式
-    # ------------------------------------------------------------------
-
     async def _step_subtitle(self, sub_maker: object = None) -> None:
-        """生成整段 SRT 字幕（复用通用字幕生成逻辑）。"""
-        paragraphs = self._state.paragraphs
-        subtitle_config = self._state.subtitle_config
+        """生成整段 SRT 字幕。"""
+        if self._state.step_subtitle == StepStatus.COMPLETED:
+            logger.info("[Anchor] Step subtitle: already completed, resuming")
+            return
 
-        segment_texts = [p.text for p in paragraphs if p.text]
-        if not segment_texts:
+        self.task_manager.update_step("step_subtitle", StepStatus.RUNNING)
+        await self._emit("subtitle", "running", "生成字幕...", 0.65)
+
+        full_text = self._state.script_text
+        if not full_text:
             logger.warning("[Anchor] subtitle: empty text, skipping")
             return
 
-        # 估算各段时长
-        segment_durations = []
-        for p in paragraphs:
-            dur = max(len(p.text) / _CHARS_PER_SEC, 2.0) if p.text else 5.0
-            segment_durations.append(dur)
+        subtitle_config = self._state.subtitle_config
+        audio_duration = max(len(full_text) / _CHARS_PER_SEC, 2.0)
+
+        segment_texts = [full_text]
+        segment_durations = [audio_duration]
 
         await self._emit(
             "subtitle", "running",
-            f"生成整段字幕 ({sum(len(t) for t in segment_texts)} 字, {len(paragraphs)} 段)...",
+            f"生成整段字幕 ({len(full_text)} 字)...",
             0.65,
         )
 
@@ -751,89 +435,58 @@ class AnchorPipeline(BasePipeline):
             self._state.subtitle_styles_path = styles_path
             self.task_manager.update_state(subtitle_styles_path=styles_path)
 
-            # 追加字幕样式 prompt 到 prompts.json
-            try:
-                prompts_path = os.path.join(self.working_dir, "prompts.json")
-                existing = {}
-                if os.path.exists(prompts_path):
-                    with open(prompts_path, "r", encoding="utf-8") as f:
-                        existing = json.load(f)
-                with open(styles_path, "r", encoding="utf-8") as f:
-                    existing["subtitle_styles"] = json.load(f)
-                self.save_prompts(existing)
-            except Exception:
-                pass
-
         self._state.combined_subtitle = srt_path
         self.task_manager.update_state(combined_subtitle=srt_path)
-        logger.info("[Anchor] subtitle: combined → %s", srt_path)
+        self.task_manager.update_step("step_subtitle", StepStatus.COMPLETED)
+        await self._emit("subtitle", "completed", "字幕生成完成", 0.75)
 
-    # ------------------------------------------------------------------
-    # Step 7: 拼接所有片段 + 叠加音频 + 字幕
-    # ------------------------------------------------------------------
-
-    async def _step_concatenate(
-        self, paragraphs: List[ManuscriptParagraph],
-    ) -> str:
-        """拼接所有段落视频 + 叠加整段音频 + 整段字幕。"""
+    async def _step_composite_anchor(self, clip_path: str) -> str:
+        """循环单段视频 + 叠加音频 + 字幕（使用 composite_anchor_video）。"""
         output_path = os.path.join(self.working_dir, "final_video.mp4")
 
         if os.path.exists(output_path):
-            logger.info("[Anchor] concatenate: final video already exists, skipping")
+            logger.info("[Anchor] composite: final video already exists, skipping")
             return output_path
 
-        video_paths = [
-            p.video_file for p in paragraphs
-            if p.video_file and os.path.exists(p.video_file)
-        ]
-        if not video_paths:
-            raise RuntimeError("[Anchor] concatenate: no valid videos to concatenate")
-
-        has_audio = self._state.audio_config.enabled and bool(self._state.combined_audio)
-        subtitle_config = self._state.subtitle_config
-        has_subtitle = subtitle_config.enabled and bool(self._state.combined_subtitle)
-
-        styles_path = self._state.subtitle_styles_path or ""
-        if styles_path and not os.path.exists(styles_path):
-            styles_path = ""
-
-        logger.info(
-            "[Anchor] concatenate: %d clips + audio=%s + subtitle=%s → %s",
-            len(video_paths), has_audio, has_subtitle, output_path,
+        self.task_manager.update_step("step_concatenation", StepStatus.RUNNING)
+        await self._emit(
+            "concatenate", "running",
+            "循环拼接视频+音频+字幕...", 0.80,
         )
 
-        if has_audio or has_subtitle:
-            await self._emit(
-                "concatenate", "running",
-                f"拼接 {len(video_paths)} 段视频+音频+字幕...", 0.80,
-            )
-            await asyncio.to_thread(
-                VideoConcatenator.concat_videos_with_audio_overlay,
-                video_paths=video_paths,
-                audio_path=self._state.combined_audio or "",
-                srt_path=self._state.combined_subtitle if has_subtitle else None,
-                output_path=output_path,
-                subtitle_style=subtitle_config.style if has_subtitle else None,
-                subtitle_styles_path=styles_path if styles_path else None,
-            )
-        else:
-            await self._emit(
-                "concatenate", "running",
-                f"拼接 {len(video_paths)} 段视频（无音频字幕）...", 0.80,
-            )
-            await asyncio.to_thread(
-                VideoConcatenator.concat_videos, video_paths, output_path,
-            )
+        audio_path = self._state.combined_audio or ""
+        audio_duration = 0.0
+        if audio_path and os.path.exists(audio_path):
+            from core.compositor.concatenator import VideoConcatenator as VC
+            audio_duration = VC._get_duration(audio_path)
 
-        logger.info("[Anchor] concatenate: final video → %s", output_path)
+        has_subtitle = (
+            self._state.subtitle_config.enabled
+            and bool(self._state.combined_subtitle)
+        )
+
+        await asyncio.to_thread(
+            VideoConcatenator.composite_anchor_video,
+            clip_path=clip_path,
+            audio_path=audio_path,
+            srt_path=self._state.combined_subtitle if has_subtitle else None,
+            output_path=output_path,
+            audio_duration=audio_duration,
+            subtitle_style=self._state.subtitle_config.style if has_subtitle else None,
+            subtitle_styles_path=self._state.subtitle_styles_path or None,
+            video_width=self._state.video_width,
+            video_height=self._state.video_height,
+        )
+
+        self._state.step_concatenation = StepStatus.COMPLETED
+        self.task_manager.update_state(step_concatenation=StepStatus.COMPLETED)
+        await self._emit("concatenate", "completed", "循环拼接完成", 0.95)
         return output_path
 
-    # ------------------------------------------------------------------
+    # ==================================================================
     # Utilities
-    # ------------------------------------------------------------------
+    # ==================================================================
 
     def _check_shutdown(self) -> None:
-        """检查是否需要停止流水线。"""
         if self._is_shutdown():
             raise PipelineShutdown("Pipeline shutdown requested")
-
