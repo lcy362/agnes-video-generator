@@ -6,27 +6,112 @@
 <title>Agnes Video Generator</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
+  /* ── Base Animations ── */
   @keyframes spin { to { transform: rotate(360deg); } }
   .animate-spin { animation: spin 1s linear infinite; }
   @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
   .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+  @keyframes glow-pulse { 0%,100%{box-shadow:0 0 15px rgba(59,130,246,0.15)} 50%{box-shadow:0 0 25px rgba(59,130,246,0.3)} }
+  @keyframes gradient-shift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+  @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+
+  /* ── Glass Card ── */
+  .glass-card {
+    background: rgba(17,24,39,0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.07);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .glass-card:hover {
+    border-color: rgba(59,130,246,0.2);
+    box-shadow: 0 0 20px rgba(59,130,246,0.06);
+  }
+
+  /* ── Glow Button ── */
+  .glow-btn {
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(37,99,235,0.25), 0 0 30px rgba(37,99,235,0.1);
+    transition: all 0.3s ease;
+  }
+  .glow-btn:hover:not(:disabled) {
+    box-shadow: 0 4px 25px rgba(37,99,235,0.4), 0 0 50px rgba(37,99,235,0.15);
+    transform: translateY(-1px);
+  }
+  .glow-btn::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; width: 200%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+    animation: shimmer 3s ease-in-out infinite;
+  }
+
+  /* ── Input Glow ── */
+  .glass-input {
+    background: rgba(31,41,55,0.5);
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all 0.3s ease;
+  }
+  .glass-input:focus {
+    border-color: rgba(59,130,246,0.5);
+    box-shadow: 0 0 12px rgba(59,130,246,0.15);
+    background: rgba(31,41,55,0.7);
+  }
+
+  /* ── Tabs ── */
+  .tab-active {
+    background: linear-gradient(135deg, #2563eb, #0ea5e9, #f59e0b);
+    background-size: 200% 200%;
+    animation: gradient-shift 4s ease infinite;
+    color: white;
+    box-shadow: 0 2px 12px rgba(37,99,235,0.3), 0 0 20px rgba(245,158,11,0.1);
+  }
+  .tab-inactive {
+    background: rgba(31,41,55,0.4);
+    backdrop-filter: blur(8px);
+    color: #9ca3af;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  .tab-inactive:hover {
+    background: rgba(55,65,81,0.5);
+    border-color: rgba(255,255,255,0.1);
+    color: #d1d5db;
+  }
+
+  /* ── Progress Bar Glow ── */
+  .progress-glow {
+    box-shadow: 0 0 10px rgba(59,130,246,0.4), 0 0 20px rgba(245,158,11,0.2);
+  }
+
+  /* ── Step Connector ── */
   .step-line { transition: all 0.5s ease; }
-  pre { white-space: pre-wrap; word-break: break-all; }
-  .tab-active { background: linear-gradient(135deg, #7c3aed, #db2777); color: white; }
-  .tab-inactive { background: #1f2937; color: #d1d5db; }
-  .tab-inactive:hover { background: #374151; }
+
+  /* ── Collapse ── */
   .collapse-header { cursor: pointer; user-select: none; }
   .collapse-body { overflow: hidden; transition: max-height 0.3s ease; }
+
+  /* ── Misc ── */
+  pre { white-space: pre-wrap; word-break: break-all; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+  /* ── Selection ── */
+  ::selection { background: rgba(59,130,246,0.3); color: white; }
 </style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen font-sans">
+<body class="text-gray-100 min-h-screen font-sans" style="background: radial-gradient(ellipse at 50% 0%, rgba(30,64,175,0.12) 0%, transparent 60%), radial-gradient(ellipse at 80% 100%, rgba(245,158,11,0.06) 0%, transparent 50%), #030712;">
 
 <div class="max-w-4xl mx-auto px-4 py-8">
 
   <!-- Header -->
   <div class="text-center mb-10 relative">
     <div class="absolute right-0 top-0">
-      <select id="lang-selector" onchange="switchLang(this.value)" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-purple-500 transition cursor-pointer">
+      <select id="lang-selector" onchange="switchLang(this.value)" class="glass-input rounded-lg px-3 py-1.5 text-sm cursor-pointer text-gray-100">
         <option value="zh">🇨🇳 中文</option>
         <option value="en">🇺🇸 English</option>
         <option value="ru">🇷🇺 Русский</option>
@@ -36,22 +121,22 @@
         <option value="id">🇮🇩 Bahasa Indonesia</option>
       </select>
     </div>
-    <h1 class="text-4xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
+    <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-300 to-amber-400 bg-clip-text text-transparent" style="filter: drop-shadow(0 0 20px rgba(59,130,246,0.2));">
       Agnes Video Generator
     </h1>
-    <p class="text-gray-400 mt-2" data-i18n="subtitle">AI 视频，一键生成</p>
+    <p class="text-gray-500 mt-2 text-sm tracking-wide" data-i18n="subtitle">AI 视频，一键生成</p>
   </div>
 
   <!-- API Key -->
-  <div id="apikey-section" class="bg-gray-900 rounded-2xl p-6 mb-6 border border-gray-800">
+  <div id="apikey-section" class="glass-card rounded-2xl p-6 mb-6">
     <div class="flex items-center justify-between mb-3">
-      <h2 class="text-lg font-semibold text-purple-300" data-i18n="apiKeyTitle">API Key 配置</h2>
+      <h2 class="text-lg font-semibold text-blue-300" data-i18n="apiKeyTitle">API Key 配置</h2>
       <span id="apikey-status" class="text-xs px-2 py-1 rounded-full bg-gray-800 text-gray-400" data-i18n="apiKeyNotConfigured">未配置</span>
     </div>
     <div class="flex gap-3">
-      <input id="apikey-input" type="password" data-i18n-placeholder="apiKeyPlaceholder" placeholder="输入 Agnes API Key" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
-      <button id="apikey-save" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm font-medium transition" data-i18n="save">保存</button>
-      <button id="apikey-clear" class="px-5 py-2.5 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-medium transition hidden" data-i18n="clear">清除</button>
+      <input id="apikey-input" type="password" data-i18n-placeholder="apiKeyPlaceholder" placeholder="输入 Agnes API Key" class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
+      <button id="apikey-save" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition shadow-lg shadow-blue-600/20" data-i18n="save">保存</button>
+      <button id="apikey-clear" class="px-5 py-2.5 bg-red-600/80 hover:bg-red-500 rounded-lg text-sm font-medium transition hidden" data-i18n="clear">清除</button>
     </div>
   </div>
 
@@ -85,18 +170,18 @@
 
     <!-- ═══════ Tab 1: Simple Video ═══════ -->
     <div id="form-simple" class="hidden">
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
-        <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="simpleSettings">简单视频设置</h2>
+      <div class="glass-card rounded-2xl p-6 mb-4">
+        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="simpleSettings">简单视频设置</h2>
 
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="promptLabel">视频描述</span> (prompt) <span class="text-red-400">*</span></label>
-          <textarea id="s_prompt" rows="3" data-i18n-placeholder="promptPlaceholder" placeholder="描述你想要的视频画面..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
+          <textarea id="s_prompt" rows="3" data-i18n-placeholder="promptPlaceholder" placeholder="描述你想要的视频画面..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
             <label class="block text-sm text-gray-400 mb-1.5" data-i18n="genMode">生成模式</label>
-            <select id="s_mode" onchange="onSimpleModeChange()" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+            <select id="s_mode" onchange="onSimpleModeChange()" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
               <option value="t2v" data-i18n="modeT2v">文生视频</option>
               <option value="i2v" data-i18n="modeI2v">图生视频</option>
               <option value="keyframes" data-i18n="modeKeyframesSimple">关键帧</option>
@@ -104,7 +189,7 @@
           </div>
           <div>
             <label class="block text-sm text-gray-400 mb-1.5" data-i18n="duration">时长</label>
-            <select id="s_duration" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+            <select id="s_duration" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
               <option value="5">5s</option>
               <option value="10">10s</option>
               <option value="15">15s</option>
@@ -114,7 +199,7 @@
           </div>
           <div>
             <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
-            <select id="s_resolution" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+            <select id="s_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
               <option value="768x1152" data-i18n="resPortrait">竖屏 9:16</option>
               <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
               <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
@@ -126,7 +211,7 @@
         <div id="s_ref_section" class="hidden mb-4">
           <label class="block text-sm text-gray-400 mb-1.5" data-i18n="refImageSimple">参考图</label>
           <div class="flex items-center gap-4">
-            <label class="cursor-pointer px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm transition inline-block">
+            <label class="cursor-pointer px-4 py-2.5 glass-input rounded-lg text-sm transition inline-block hover:border-blue-500/30">
               <span data-i18n="chooseImage">选择参考图</span>
               <input id="s_ref_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('s_ref_image','s_ref_name')">
             </label>
@@ -138,7 +223,7 @@
         <div id="s_end_section" class="hidden mb-4">
           <label class="block text-sm text-gray-400 mb-1.5" data-i18n="endFrameImage">尾帧图</label>
           <div class="flex items-center gap-4">
-            <label class="cursor-pointer px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm transition inline-block">
+            <label class="cursor-pointer px-4 py-2.5 glass-input rounded-lg text-sm transition inline-block hover:border-blue-500/30">
               <span data-i18n="chooseImage">选择参考图</span>
               <input id="s_end_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('s_end_image','s_end_name')">
             </label>
@@ -147,7 +232,7 @@
         </div>
 
         <!-- Advanced (collapsible) -->
-        <div class="border-t border-gray-800 pt-4 mt-4">
+        <div class="border-t border-white/5 pt-4 mt-4">
           <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('s_advanced')">
             <span class="text-sm text-gray-400" data-i18n="advancedSettings">高级设置</span>
             <span id="s_advanced-arrow" class="text-gray-500 text-xs">▶</span>
@@ -156,61 +241,61 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm text-gray-400 mb-1.5">Seed (<span data-i18n="optional">可选</span>)</label>
-                <input id="s_seed" type="number" placeholder="留空随机" data-i18n-placeholder="seedPlaceholder" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+                <input id="s_seed" type="number" placeholder="留空随机" data-i18n-placeholder="seedPlaceholder" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
               </div>
               <div>
                 <label class="block text-sm text-gray-400 mb-1.5">Negative Prompt (<span data-i18n="optional">可选</span>)</label>
-                <input id="s_negative" data-i18n-placeholder="negativePlaceholder" placeholder="排除不希望出现的元素" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+                <input id="s_negative" data-i18n-placeholder="negativePlaceholder" placeholder="排除不希望出现的元素" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
               </div>
             </div>
             <div class="mt-4">
               <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="systemPrompt">系统提示词</span> (<span data-i18n="optional">可选</span>)</label>
-              <textarea id="s_system" rows="2" data-i18n-placeholder="systemPromptPlaceholder" placeholder="给模型的额外提示指令（如风格、质量要求），不影响生成内容的主体描述" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
+              <textarea id="s_system" rows="2" data-i18n-placeholder="systemPromptPlaceholder" placeholder="给模型的额外提示指令（如风格、质量要求），不影响生成内容的主体描述" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
             </div>
           </div>
         </div>
       </div>
 
-      <button id="btn-simple" onclick="submitSimple()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="startGenerate">
+      <button id="btn-simple" onclick="submitSimple()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
         开始生成视频
       </button>
     </div>
 
     <!-- ═══════ Tab 2: Creative Video ═══════ -->
     <div id="form-creative">
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
-        <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="creativeSettings">创意设置</h2>
+      <div class="glass-card rounded-2xl p-6 mb-4">
+        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="creativeSettings">创意设置</h2>
 
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5" data-i18n="taskName">任务名称</label>
-          <input id="c_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+          <input id="c_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
         </div>
 
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="ideaLabel">创意描述</span> (idea) <span class="text-red-400">*</span></label>
-          <textarea id="c_idea" rows="4" data-i18n-placeholder="ideaPlaceholder" placeholder="描述你心中的故事、场景和角色..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
+          <textarea id="c_idea" rows="4" data-i18n-placeholder="ideaPlaceholder" placeholder="描述你心中的故事、场景和角色..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
             <label class="block text-sm text-gray-400 mb-1.5" data-i18n="userRequirement">用户要求</label>
-            <input id="c_requirement" value="3个场景，每个场景5秒，电影质感" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+            <input id="c_requirement" value="3个场景，每个场景5秒，电影质感" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
           </div>
           <div>
             <label class="block text-sm text-gray-400 mb-1.5" data-i18n="visualStyle">视觉风格</label>
-            <input id="c_style" value="电影质感写实风格" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+            <input id="c_style" value="电影质感写实风格" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
           </div>
         </div>
       </div>
 
       <!-- Advanced Config -->
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
-        <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="advancedSettings">高级设置</h2>
+      <div class="glass-card rounded-2xl p-6 mb-4">
+        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="advancedSettings">高级设置</h2>
 
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
           <div>
             <label class="block text-sm text-gray-400 mb-1.5" data-i18n="chainingMode">串联模式</label>
-            <select id="c_chaining" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+            <select id="c_chaining" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
               <option value="keyframes" data-i18n="modeKeyframes">keyframes (推荐)</option>
               <option value="ti2vid" data-i18n="modeTi2vid">ti2vid (过渡帧)</option>
               <option value="none" data-i18n="modeNone">none (独立场景)</option>
@@ -218,7 +303,7 @@
           </div>
           <div>
             <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
-            <select id="c_resolution" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+            <select id="c_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
               <option value="768x1152" data-i18n="resPortrait">竖屏 9:16</option>
               <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
               <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
@@ -230,7 +315,7 @@
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5" data-i18n="referenceImage">参考图 (可选)</label>
           <div class="flex items-center gap-4">
-            <label class="cursor-pointer px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm transition inline-block">
+            <label class="cursor-pointer px-4 py-2.5 glass-input rounded-lg text-sm transition inline-block hover:border-blue-500/30">
               <span data-i18n="chooseImage">选择参考图</span>
               <input id="c_ref_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('c_ref_image','c_ref_name')">
             </label>
@@ -262,15 +347,15 @@
                 <input type="file" accept="image/*" class="end-frame-file flex-1 text-sm text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-gray-700 file:text-gray-200 hover:file:bg-gray-600">
               </div>
             </div>
-            <button onclick="addCEndFrameInput()" class="text-xs text-purple-400 hover:text-purple-300 mt-2" data-i18n="addEndFrame">+ 添加尾帧</button>
+            <button onclick="addCEndFrameInput()" class="text-xs text-amber-400 hover:text-blue-300 mt-2" data-i18n="addEndFrame">+ 添加尾帧</button>
           </div>
         </div>
       </div>
 
       <!-- Audio Config (Creative) — v3.0 audio only -->
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+      <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('c_audio_body')">
-          <h2 class="text-lg font-semibold text-purple-300" data-i18n="audioConfig">音频配置</h2>
+          <h2 class="text-lg font-semibold text-blue-300" data-i18n="audioConfig">音频配置</h2>
           <span id="c_audio_body-arrow" class="text-gray-500 text-xs">▶</span>
         </div>
         <div id="c_audio_body" class="collapse-body hidden mt-4">
@@ -283,7 +368,7 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
-              <select id="c_voice" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+              <select id="c_voice" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
                 <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (温柔女声)</option>
                 <option value="zh-CN-YunyangNeural">Yunyang (沉稳男声)</option>
                 <option value="zh-CN-XiaoyiNeural">Xiaoyi (活泼女声)</option>
@@ -292,7 +377,7 @@
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
-              <select id="c_rate" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+              <select id="c_rate" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
                 <option value="-30%">-30% (慢)</option>
                 <option value="-15%">-15%</option>
                 <option value="+0%" selected data-i18n="rateNormal">正常</option>
@@ -305,9 +390,9 @@
       </div>
 
       <!-- Subtitle Config (Creative) — v3.0 independent -->
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+      <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('c_subtitle_body')">
-          <h2 class="text-lg font-semibold text-purple-300" data-i18n="subtitleConfig">字幕配置</h2>
+          <h2 class="text-lg font-semibold text-blue-300" data-i18n="subtitleConfig">字幕配置</h2>
           <span id="c_subtitle_body-arrow" class="text-gray-500 text-xs">▶</span>
         </div>
         <div id="c_subtitle_body" class="collapse-body hidden mt-4">
@@ -317,10 +402,10 @@
               <span data-i18n="enableSubtitle">启用字幕</span>
             </label>
           </div>
-          <div class="border-t border-gray-800 pt-4">
+          <div class="border-t border-white/5 pt-4">
             <div class="mb-4">
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleMode">样式模式</label>
-              <select id="c_sub_style_mode" onchange="toggleSubStyleMode('c')" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
+              <select id="c_sub_style_mode" onchange="toggleSubStyleMode('c')" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
                 <option value="fixed" data-i18n="subStyleFixed">固定样式</option>
                 <option value="llm" data-i18n="subStyleLLM">AI 智能样式</option>
               </select>
@@ -332,19 +417,19 @@
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subFont">字体</label>
-                  <input id="c_sub_font" value="STHeitiMedium.ttc" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="c_sub_font" value="STHeitiMedium.ttc" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subColor">颜色</label>
-                  <input id="c_sub_color" value="white" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="c_sub_color" value="white" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subSize">字号</label>
-                  <input id="c_sub_fontsize" type="number" value="48" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="c_sub_fontsize" type="number" value="48" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subPosition">位置</label>
-                  <select id="c_sub_position" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <select id="c_sub_position" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                     <option value="bottom" data-i18n="posBottom">底部</option>
                     <option value="top" data-i18n="posTop">顶部</option>
                   </select>
@@ -353,15 +438,15 @@
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeColor">描边色</label>
-                  <input id="c_sub_stroke_color" value="black" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="c_sub_stroke_color" value="black" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeWidth">描边宽</label>
-                  <input id="c_sub_stroke_width" type="number" value="2" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="c_sub_stroke_width" type="number" value="2" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subBgColor">背景色</label>
-                  <input id="c_sub_bg_color" value="black@0.5" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="c_sub_bg_color" value="black@0.5" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
               </div>
             </div>
@@ -369,37 +454,37 @@
             <!-- LLM style controls -->
             <div id="c_sub_llm_controls" class="hidden">
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleHints">样式偏好描述</label>
-              <textarea id="c_sub_style_hints" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 placeholder-gray-500" placeholder='强调词用红色大号字，普通叙述白色小字放底部'></textarea>
+              <textarea id="c_sub_style_hints" rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500" placeholder='强调词用红色大号字，普通叙述白色小字放底部'></textarea>
               <p class="text-xs text-gray-500 mt-1" data-i18n="subStyleHintsHint">描述你期望的字幕样式变化规律，AI 会据此为每条字幕分配不同位置、颜色和字号</p>
             </div>
           </div>
         </div>
       </div>
 
-      <button id="btn-creative" onclick="submitCreative()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="startGenerate">
+      <button id="btn-creative" onclick="submitCreative()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
         开始生成视频
       </button>
     </div>
 
     <!-- ═══════ Tab 3: Manuscript Video ═══════ -->
     <div id="form-manuscript" class="hidden">
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
-        <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="manuscriptSettings">稿件设置</h2>
+      <div class="glass-card rounded-2xl p-6 mb-4">
+        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="manuscriptSettings">稿件设置</h2>
 
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5" data-i18n="taskName">任务名称</label>
-          <input id="m_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+          <input id="m_name" data-i18n-placeholder="taskNamePlaceholder" placeholder="可选，留空自动生成" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
         </div>
 
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="manuscriptText">稿件正文</span> <span class="text-red-400">*</span></label>
-          <textarea id="m_text" rows="10" data-i18n-placeholder="manuscriptPlaceholder" placeholder="粘贴你的文章、新闻稿、公众号文章等..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y font-mono"></textarea>
+          <textarea id="m_text" rows="10" data-i18n-placeholder="manuscriptPlaceholder" placeholder="粘贴你的文章、新闻稿、公众号文章等..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600 font-mono"></textarea>
           <p class="text-xs text-gray-500 mt-1"><span data-i18n="charCount">字数</span>: <span id="m_char_count">0</span></p>
         </div>
 
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
-          <select id="m_resolution" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+          <select id="m_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
             <option value="768x1152" data-i18n="resPortrait">竖屏 9:16</option>
             <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
             <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
@@ -408,9 +493,9 @@
       </div>
 
       <!-- Audio Config (Manuscript) — v3.0 audio only -->
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+      <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('m_audio_body')">
-          <h2 class="text-lg font-semibold text-purple-300" data-i18n="audioConfig">音频配置</h2>
+          <h2 class="text-lg font-semibold text-blue-300" data-i18n="audioConfig">音频配置</h2>
           <span id="m_audio_body-arrow" class="text-gray-500 text-xs">▶</span>
         </div>
         <div id="m_audio_body" class="collapse-body hidden mt-4">
@@ -423,7 +508,7 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
-              <select id="m_voice" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+              <select id="m_voice" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
                 <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (温柔女声)</option>
                 <option value="zh-CN-YunyangNeural">Yunyang (沉稳男声)</option>
                 <option value="zh-CN-XiaoyiNeural">Xiaoyi (活泼女声)</option>
@@ -432,7 +517,7 @@
             </div>
             <div>
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
-              <select id="m_rate" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+              <select id="m_rate" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
                 <option value="-30%">-30% (慢)</option>
                 <option value="-15%">-15%</option>
                 <option value="+0%" selected data-i18n="rateNormal">正常</option>
@@ -445,9 +530,9 @@
       </div>
 
       <!-- Subtitle Config (Manuscript) — v3.0 independent -->
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+      <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('m_subtitle_body')">
-          <h2 class="text-lg font-semibold text-purple-300" data-i18n="subtitleConfig">字幕配置</h2>
+          <h2 class="text-lg font-semibold text-blue-300" data-i18n="subtitleConfig">字幕配置</h2>
           <span id="m_subtitle_body-arrow" class="text-gray-500 text-xs">▶</span>
         </div>
         <div id="m_subtitle_body" class="collapse-body hidden mt-4">
@@ -457,10 +542,10 @@
               <span data-i18n="enableSubtitle">启用字幕</span>
             </label>
           </div>
-          <div class="border-t border-gray-800 pt-4">
+          <div class="border-t border-white/5 pt-4">
             <div class="mb-4">
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleMode">样式模式</label>
-              <select id="m_sub_style_mode" onchange="toggleSubStyleMode('m')" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
+              <select id="m_sub_style_mode" onchange="toggleSubStyleMode('m')" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
                 <option value="fixed" data-i18n="subStyleFixed">固定样式</option>
                 <option value="llm" data-i18n="subStyleLLM">AI 智能样式</option>
               </select>
@@ -472,19 +557,19 @@
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subFont">字体</label>
-                  <input id="m_sub_font" value="STHeitiMedium.ttc" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="m_sub_font" value="STHeitiMedium.ttc" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subColor">颜色</label>
-                  <input id="m_sub_color" value="white" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="m_sub_color" value="white" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subSize">字号</label>
-                  <input id="m_sub_fontsize" type="number" value="48" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="m_sub_fontsize" type="number" value="48" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subPosition">位置</label>
-                  <select id="m_sub_position" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <select id="m_sub_position" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                     <option value="bottom" data-i18n="posBottom">底部</option>
                     <option value="top" data-i18n="posTop">顶部</option>
                   </select>
@@ -493,15 +578,15 @@
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeColor">描边色</label>
-                  <input id="m_sub_stroke_color" value="black" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="m_sub_stroke_color" value="black" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeWidth">描边宽</label>
-                  <input id="m_sub_stroke_width" type="number" value="2" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="m_sub_stroke_width" type="number" value="2" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subBgColor">背景色</label>
-                  <input id="m_sub_bg_color" value="black@0.5" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="m_sub_bg_color" value="black@0.5" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
               </div>
             </div>
@@ -509,32 +594,32 @@
             <!-- LLM style controls -->
             <div id="m_sub_llm_controls" class="hidden">
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleHints">样式偏好描述</label>
-              <textarea id="m_sub_style_hints" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 placeholder-gray-500" placeholder='强调词用红色大号字，普通叙述白色小字放底部'></textarea>
+              <textarea id="m_sub_style_hints" rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500" placeholder='强调词用红色大号字，普通叙述白色小字放底部'></textarea>
               <p class="text-xs text-gray-500 mt-1" data-i18n="subStyleHintsHint">描述你期望的字幕样式变化规律，AI 会据此为每条字幕分配不同位置、颜色和字号</p>
             </div>
           </div>
         </div>
       </div>
 
-      <button id="btn-manuscript" onclick="submitManuscript()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="startGenerate">
+      <button id="btn-manuscript" onclick="submitManuscript()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
         开始生成视频
       </button>
     </div>
 
     <!-- ═══════ Tab 4: Anchor Video ═══════ -->
     <div id="form-anchor" class="hidden">
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
-        <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="anchorSettings">数字人设置</h2>
+      <div class="glass-card rounded-2xl p-6 mb-4">
+        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="anchorSettings">数字人设置</h2>
 
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5" data-i18n="anchorPrompt">主播形象描述</label>
-          <textarea id="a_prompt" rows="3" data-i18n-placeholder="anchorPromptPlaceholder" placeholder="一位专业的新闻主播，穿着正式西装，坐在现代化的新闻演播室中..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
+          <textarea id="a_prompt" rows="3" data-i18n-placeholder="anchorPromptPlaceholder" placeholder="一位专业的新闻主播，穿着正式西装，坐在现代化的新闻演播室中..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
         </div>
 
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5" data-i18n="anchorRefImage">参考图 (可选)</label>
           <div class="flex items-center gap-4">
-            <label class="cursor-pointer px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm transition inline-block">
+            <label class="cursor-pointer px-4 py-2.5 glass-input rounded-lg text-sm transition inline-block hover:border-blue-500/30">
               <span data-i18n="chooseImage">选择参考图</span>
               <input id="a_ref_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('a_ref_image','a_ref_name')">
             </label>
@@ -545,13 +630,13 @@
 
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="scriptText">口播稿件</span> <span class="text-red-400">*</span></label>
-          <textarea id="a_script" rows="8" data-i18n-placeholder="scriptTextPlaceholder" placeholder="输入主播要朗读的口播稿件..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y font-mono"></textarea>
+          <textarea id="a_script" rows="8" data-i18n-placeholder="scriptTextPlaceholder" placeholder="输入主播要朗读的口播稿件..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600 font-mono"></textarea>
           <p class="text-xs text-gray-500 mt-1"><span data-i18n="charCount">字数</span>: <span id="a_char_count">0</span></p>
         </div>
 
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5" data-i18n="resolution">分辨率</label>
-          <select id="a_resolution" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+          <select id="a_resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
             <option value="768x1344" data-i18n="resPortraitHD">竖屏 9:16 (HD)</option>
             <option value="1152x768" data-i18n="resLandscape">横屏 16:9</option>
             <option value="1024x1024" data-i18n="resSquare">方形 1:1</option>
@@ -560,9 +645,9 @@
       </div>
 
       <!-- Audio Config (Anchor) -->
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+      <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('a_audio_body')">
-          <h2 class="text-lg font-semibold text-purple-300" data-i18n="audioConfig">音频配置</h2>
+          <h2 class="text-lg font-semibold text-blue-300" data-i18n="audioConfig">音频配置</h2>
           <span id="a_audio_body-arrow" class="text-gray-500 text-xs">▶</span>
         </div>
         <div id="a_audio_body" class="collapse-body hidden mt-4">
@@ -571,14 +656,14 @@
             <label class="block text-sm text-gray-400 mb-2" data-i18n="audioSource">音频来源</label>
             <div class="flex flex-col gap-2">
               <label class="flex items-start gap-3 cursor-pointer group">
-                <input type="radio" name="a_audio_source" value="post_stitch" checked class="mt-0.5 accent-purple-500">
+                <input type="radio" name="a_audio_source" value="post_stitch" checked class="mt-0.5 accent-blue-500">
                 <div>
                   <span class="text-sm text-gray-200 group-hover:text-white transition" data-i18n="audioPostStitch">后拼接音频</span>
                   <p class="text-xs text-gray-500 mt-0.5" data-i18n="audioPostStitchDesc">音频效果可控（可选语音、语速），但嘴型较难匹配</p>
                 </div>
               </label>
               <label class="flex items-start gap-3 cursor-pointer group">
-                <input type="radio" name="a_audio_source" value="model" class="mt-0.5 accent-purple-500">
+                <input type="radio" name="a_audio_source" value="model" class="mt-0.5 accent-blue-500">
                 <div>
                   <span class="text-sm text-gray-200 group-hover:text-white transition" data-i18n="audioModel">模型音频</span>
                   <p class="text-xs text-gray-500 mt-0.5" data-i18n="audioModelDesc">音频由模型控制，效果不可控；无语音角色/语速选项</p>
@@ -596,7 +681,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label class="block text-sm text-gray-400 mb-1.5" data-i18n="voiceRole">语音角色</label>
-                <select id="a_voice" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+                <select id="a_voice" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
                   <option value="zh-CN-XiaoxiaoNeural">Xiaoxiao (温柔女声)</option>
                   <option value="zh-CN-YunyangNeural">Yunyang (沉稳男声)</option>
                   <option value="zh-CN-XiaoyiNeural">Xiaoyi (活泼女声)</option>
@@ -605,7 +690,7 @@
               </div>
               <div>
                 <label class="block text-sm text-gray-400 mb-1.5" data-i18n="speechRate">语速</label>
-                <select id="a_rate" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+                <select id="a_rate" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
                   <option value="-30%">-30% (慢)</option>
                   <option value="-15%">-15%</option>
                   <option value="+0%" selected data-i18n="rateNormal">正常</option>
@@ -634,9 +719,9 @@
       </script>
 
       <!-- Subtitle Config (Anchor) -->
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
+      <div class="glass-card rounded-2xl p-6 mb-4">
         <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('a_subtitle_body')">
-          <h2 class="text-lg font-semibold text-purple-300" data-i18n="subtitleConfig">字幕配置</h2>
+          <h2 class="text-lg font-semibold text-blue-300" data-i18n="subtitleConfig">字幕配置</h2>
           <span id="a_subtitle_body-arrow" class="text-gray-500 text-xs">▶</span>
         </div>
         <div id="a_subtitle_body" class="collapse-body hidden mt-4">
@@ -646,10 +731,10 @@
               <span data-i18n="enableSubtitle">启用字幕</span>
             </label>
           </div>
-          <div class="border-t border-gray-800 pt-4">
+          <div class="border-t border-white/5 pt-4">
             <div class="mb-4">
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleMode">样式模式</label>
-              <select id="a_sub_style_mode" onchange="toggleSubStyleMode('a')" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500">
+              <select id="a_sub_style_mode" onchange="toggleSubStyleMode('a')" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
                 <option value="fixed" data-i18n="subStyleFixed">固定样式</option>
                 <option value="llm" data-i18n="subStyleLLM">AI 智能样式</option>
               </select>
@@ -659,19 +744,19 @@
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subFont">字体</label>
-                  <input id="a_sub_font" value="STHeitiMedium.ttc" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="a_sub_font" value="STHeitiMedium.ttc" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subColor">颜色</label>
-                  <input id="a_sub_color" value="white" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="a_sub_color" value="white" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subSize">字号</label>
-                  <input id="a_sub_fontsize" type="number" value="42" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="a_sub_fontsize" type="number" value="42" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subPosition">位置</label>
-                  <select id="a_sub_position" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <select id="a_sub_position" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                     <option value="bottom" data-i18n="posBottom">底部</option>
                     <option value="top" data-i18n="posTop">顶部</option>
                   </select>
@@ -680,45 +765,45 @@
               <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeColor">描边色</label>
-                  <input id="a_sub_stroke_color" value="black" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="a_sub_stroke_color" value="black" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subStrokeWidth">描边宽</label>
-                  <input id="a_sub_stroke_width" type="number" value="2" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="a_sub_stroke_width" type="number" value="2" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
                 <div>
                   <label class="block text-xs text-gray-500 mb-1" data-i18n="subBgColor">背景色</label>
-                  <input id="a_sub_bg_color" value="black@0.5" class="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-purple-500">
+                  <input id="a_sub_bg_color" value="black@0.5" class="w-full glass-input rounded px-2 py-1.5 text-xs text-gray-100">
                 </div>
               </div>
             </div>
             <div id="a_sub_llm_controls" class="hidden">
               <label class="block text-sm text-gray-400 mb-1.5" data-i18n="subStyleHints">样式偏好描述</label>
-              <textarea id="a_sub_style_hints" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-purple-500 placeholder-gray-500" placeholder='字幕放在画面下方三分之一区域，不要遮挡主播面部'></textarea>
+              <textarea id="a_sub_style_hints" rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500" placeholder='字幕放在画面下方三分之一区域，不要遮挡主播面部'></textarea>
               <p class="text-xs text-gray-500 mt-1" data-i18n="subStyleHintsHint">描述期望的字幕样式变化规律，AI 会据此为每条字幕分配不同位置、颜色和字号</p>
             </div>
           </div>
         </div>
       </div>
 
-      <button id="btn-anchor" onclick="submitAnchor()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="startGenerate">
+      <button id="btn-anchor" onclick="submitAnchor()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
         开始生成
       </button>
     </div>
 
     <!-- ═══════ Tab 5: Simple Image ═══════ -->
     <div id="form-image" class="hidden">
-      <div class="bg-gray-900 rounded-2xl p-6 mb-4 border border-gray-800">
-        <h2 class="text-lg font-semibold text-purple-300 mb-4" data-i18n="imageSettings">图片设置</h2>
+      <div class="glass-card rounded-2xl p-6 mb-4">
+        <h2 class="text-lg font-semibold text-blue-300 mb-4" data-i18n="imageSettings">图片设置</h2>
 
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="imagePrompt">图片描述</span> (prompt) <span class="text-red-400">*</span></label>
-          <textarea id="i_prompt" rows="3" data-i18n-placeholder="imagePromptPlaceholder" placeholder="描述你想要的图片画面..." class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
+          <textarea id="i_prompt" rows="3" data-i18n-placeholder="imagePromptPlaceholder" placeholder="描述你想要的图片画面..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
         </div>
 
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5" data-i18n="imageSize">图片尺寸</label>
-          <select id="i_size" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+          <select id="i_size" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
             <option value="1024x1024" data-i18n="resSquare">方形 1:1 (1024x1024)</option>
             <option value="768x1152" data-i18n="resPortrait">竖屏 9:16 (768x1152)</option>
             <option value="1152x768" data-i18n="resLandscape">横屏 16:9 (1152x768)</option>
@@ -732,7 +817,7 @@
         <div class="mb-4">
           <label class="block text-sm text-gray-400 mb-1.5" data-i18n="refImageSimple">参考图</label>
           <div class="flex items-center gap-4">
-            <label class="cursor-pointer px-4 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm transition inline-block">
+            <label class="cursor-pointer px-4 py-2.5 glass-input rounded-lg text-sm transition inline-block hover:border-blue-500/30">
               <span data-i18n="chooseImage">选择参考图</span>
               <input id="i_ref_image" type="file" accept="image/*" class="hidden" onchange="updateLabel('i_ref_image','i_ref_name')">
             </label>
@@ -741,7 +826,7 @@
           <p class="text-xs text-gray-500 mt-1" data-i18n="refImageHint">可选。上传后以该图为基底生成变体；不上传则纯 AI 生成</p>
         </div>
 
-        <div class="border-t border-gray-800 pt-4 mt-4">
+        <div class="border-t border-white/5 pt-4 mt-4">
           <div class="collapse-header flex items-center justify-between" onclick="toggleCollapse('i_advanced')">
             <span class="text-sm text-gray-400" data-i18n="advancedSettings">高级设置</span>
             <span id="i_advanced-arrow" class="text-gray-500 text-xs">▶</span>
@@ -749,21 +834,21 @@
           <div id="i_advanced" class="collapse-body hidden mt-3">
             <div>
               <label class="block text-sm text-gray-400 mb-1.5">Negative Prompt (<span data-i18n="optional">可选</span>)</label>
-              <input id="i_negative" data-i18n-placeholder="negativePlaceholder" placeholder="排除不希望出现的元素" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition">
+              <input id="i_negative" data-i18n-placeholder="negativePlaceholder" placeholder="排除不希望出现的元素" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-gray-100">
             </div>
             <div class="mt-4">
               <label class="block text-sm text-gray-400 mb-1.5"><span data-i18n="systemPrompt">系统提示词</span> (<span data-i18n="optional">可选</span>)</label>
-              <textarea id="i_system" rows="2" data-i18n-placeholder="systemPromptPlaceholder" placeholder="给模型的额外提示指令（如风格、质量要求），不影响生成内容的主体描述" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-purple-500 transition resize-y"></textarea>
+              <textarea id="i_system" rows="2" data-i18n-placeholder="systemPromptPlaceholder" placeholder="给模型的额外提示指令（如风格、质量要求），不影响生成内容的主体描述" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
             </div>
           </div>
         </div>
       </div>
 
-      <button id="btn-image" onclick="submitImage()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed" data-i18n="imgGenerate">
+      <button id="btn-image" onclick="submitImage()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="imgGenerate">
         开始生成图片
       </button>
 
-      <div id="image-result" class="hidden mt-4 p-4 bg-gray-800 rounded-lg">
+      <div id="image-result" class="hidden mt-4 p-4 glass-card rounded-lg">
         <p class="text-green-400 text-sm font-medium mb-2" data-i18n="imgComplete">图片生成完成!</p>
         <img id="result-image" class="w-full rounded-lg max-h-96 object-contain">
       </div>
@@ -779,24 +864,24 @@
   </div>
 
   <!-- ═══════════ Progress Panel ═══════════ -->
-  <div id="progress-panel" class="hidden bg-gray-900 rounded-2xl p-6 mt-6 border border-gray-800">
+  <div id="progress-panel" class="hidden glass-card rounded-2xl p-6 mt-6">
     <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold text-purple-300" data-i18n="progress">生成进度</h2>
+      <h2 class="text-lg font-semibold text-blue-300" data-i18n="progress">生成进度</h2>
       <div class="flex items-center gap-3">
         <span id="progress-pct" class="text-sm text-gray-400">0%</span>
-        <button id="btn-stop" onclick="stopTask()" class="hidden text-xs px-3 py-1.5 bg-red-700 hover:bg-red-600 text-red-100 rounded-lg transition" data-i18n="stopTask">中断任务</button>
+        <button id="btn-stop" onclick="stopTask()" class="hidden text-xs px-3 py-1.5 bg-red-700/80 hover:bg-red-600 text-red-100 rounded-lg transition" data-i18n="stopTask">中断任务</button>
       </div>
     </div>
 
-    <div class="w-full bg-gray-800 rounded-full h-2.5 mb-6">
-      <div id="progress-bar" class="bg-gradient-to-r from-purple-500 to-pink-500 h-2.5 rounded-full transition-all duration-500" style="width:0%"></div>
+    <div class="w-full bg-gray-800/50 rounded-full h-2.5 mb-6 overflow-hidden">
+      <div id="progress-bar" class="bg-gradient-to-r from-blue-500 via-sky-400 to-amber-400 h-2.5 rounded-full transition-all duration-500 progress-glow" style="width:0%"></div>
     </div>
 
     <div class="space-y-2" id="steps-container"></div>
 
     <div id="progress-message" class="mt-4 text-sm text-gray-400"></div>
 
-    <div id="result-area" class="hidden mt-4 p-4 bg-gray-800 rounded-lg">
+    <div id="result-area" class="hidden mt-4 p-4 glass-card rounded-lg">
       <p class="text-green-400 text-sm font-medium mb-2" data-i18n="videoComplete">视频生成完成!</p>
       <video id="result-video" controls class="w-full rounded-lg max-h-96"></video>
     </div>
@@ -1997,8 +2082,8 @@ function connectWS(taskId) {
       const label = stepEl.querySelector('.step-label');
       if (msg.status === 'running') {
         icon.textContent = '◉';
-        icon.className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-purple-900 text-purple-300 text-xs animate-pulse-dot';
-        label.className = 'step-label text-purple-300';
+        icon.className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-blue-900 text-blue-300 text-xs animate-pulse-dot';
+        label.className = 'step-label text-blue-300';
       } else if (msg.status === 'completed') {
         icon.textContent = '✓';
         icon.className = 'step-icon w-5 h-5 flex items-center justify-center rounded-full bg-green-900 text-green-300 text-xs';
@@ -2153,7 +2238,7 @@ async function loadTaskList() {
       const statusColors = { completed: 'text-green-400', running: 'text-yellow-400', failed: 'text-red-400', pending: 'text-gray-400' };
       const statusLabels = { completed: t('statusCompleted'), running: t('statusRunning'), failed: t('statusFailed'), pending: t('statusPending') };
       const typeLabels = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript'), anchor: t('typeAnchor'), image: t('typeImage') };
-      const typeColors = { simple: 'bg-blue-900 text-blue-300', creative: 'bg-purple-900 text-purple-300', manuscript: 'bg-orange-900 text-orange-300', anchor: 'bg-pink-900 text-pink-300' };
+      const typeColors = { simple: 'bg-blue-900 text-blue-300', creative: 'bg-blue-900 text-blue-300', manuscript: 'bg-orange-900 text-orange-300', anchor: 'bg-amber-900 text-amber-300' };
       const isCompleted = task.status === 'completed';
       const isRunning = task.status === 'running';
       const btnLabel = isCompleted ? t('btnView') : (isRunning ? t('btnViewProgress') : t('btnResume'));
@@ -2163,7 +2248,7 @@ async function loadTaskList() {
       const typeBadge = `<span class="text-xs px-2 py-0.5 rounded-full ${typeColors[task.task_type] || 'bg-gray-800 text-gray-400'}">${escapeHtml(typeLabels[task.task_type] || task.task_type)}</span>`;
       const desc = task.idea || task.prompt || (task.manuscript_text || '').substring(0, 80) || (task.script_text || '').substring(0, 80);
       const extra = task.scene_count ? ` · ${task.scene_count}${t('sceneUnit')}` : (task.paragraph_count ? ` · ${task.paragraph_count}${t('paraUnit')}` : '');
-      return `<div class="bg-gray-900 rounded-xl p-4 border border-gray-800 flex items-center justify-between">
+      return `<div class="glass-card rounded-xl p-4 flex items-center justify-between">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">${typeBadge}<p class="text-sm font-medium truncate">${escapeHtml(task.creative_name || task.task_id)}</p></div>
           <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(task.task_id)}${extra}</p>
@@ -2171,7 +2256,7 @@ async function loadTaskList() {
         </div>
         <div class="flex items-center gap-3 ml-3">
           <span class="text-xs ${statusColors[task.status] || 'text-gray-400'}">${statusLabels[task.status] || task.status}</span>
-          <button onclick="${btnAction}" class="text-xs px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg transition">${btnLabel}</button>
+          <button onclick="${btnAction}" class="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg transition">${btnLabel}</button>
           ${stopBtn}
         </div>
       </div>`;
