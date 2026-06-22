@@ -56,6 +56,61 @@ from models.task import (
 )
 
 
+# ═══════════════════════════════════════════════════
+# 并发控制（复用回归流程的加权信号量逻辑）
+# ═══════════════════════════════════════════════════
+
+# Agnes API 每分钟调用上限（与 rate_limiter.py / regression_runner.py 一致）
+_AGNES_RATE_LIMIT = int(os.environ.get("AGNES_RATE_LIMIT", "20"))
+# 各任务类型权重 = 该类型预估的每分钟 Agnes API 调用数
+# 留 50% 余量 => 总权重上限 = _AGNES_RATE_LIMIT / 2
+TASK_TYPE_WEIGHTS = {
+    TaskType.SIMPLE: 1,       # 1 submit + 轻量轮询
+    TaskType.CREATIVE: 3,     # Chat + N*Image + N*Video + 轮询
+    TaskType.MANUSCRIPT: 4,   # 段落*Chat + 段落*Image + 轮询
+    TaskType.ANCHOR: 2,       # 1 i2v submit + 轻量轮询
+    TaskType.IMAGE: 1,        # 1 image submit
+}
+MAX_CONCURRENT_WEIGHT = _AGNES_RATE_LIMIT // 2  # 默认 10
+
+
+class WeightedSemaphore:
+    """加权信号量：控制并发任务的总权重不超过上限。
+
+    每个任务类型的权重 = 该类型预估的每分钟 Agnes API 调用数。
+    控制并发任务数，确保总 API 调用 ≤ AGNES_RATE_LIMIT/分钟。
+    逻辑与 regression_runner.py 的 WeightedSemaphore 完全一致。
+    """
+    def __init__(self, max_weight: int):
+        self.max_weight = max_weight
+        self.current = 0
+        self._lock = asyncio.Lock()
+        self._cond = asyncio.Condition(self._lock)
+
+    async def acquire(self, weight: int):
+        if weight > self.max_weight:
+            raise ValueError(f"task weight {weight} > max {self.max_weight}")
+        async with self._lock:
+            while self.current + weight > self.max_weight:
+                await self._cond.wait()
+            self.current += weight
+
+    async def release(self, weight: int):
+        async with self._lock:
+            self.current -= weight
+            self._cond.notify_all()
+
+    @property
+    def utilization(self) -> float:
+        return self.current / self.max_weight if self.max_weight else 0
+
+
+# 全局加权信号量（服务端所有任务共享）
+_pipeline_semaphore = WeightedSemaphore(MAX_CONCURRENT_WEIGHT)
+# 排队中的任务: task_id -> weight
+_queued_tasks: Dict[str, int] = {}
+
+
 def _parse_bg_color(raw: str) -> tuple:
     """将 bg_color 字符串解析为 moviepy 2.x 兼容的 RGBA 元组。"""
     if isinstance(raw, tuple):
@@ -141,7 +196,8 @@ async def lifespan(app: FastAPI):
                 try:
                     with open(task_file, "r") as f:
                         data = json.load(f)
-                    if data.get("status") == "running":
+                    if data.get("status") in ("running", "queued"):
+                        old_status = data["status"]
                         data["status"] = "pending"
                         # H5: 原子写（临时文件 + os.replace），避免写入中途崩溃损坏 JSON
                         tmp_fd, tmp_path = tempfile.mkstemp(
@@ -155,7 +211,7 @@ async def lifespan(app: FastAPI):
                             if os.path.exists(tmp_path):
                                 os.remove(tmp_path)
                             raise
-                        logger.info(f"[Startup] Reset stale running task {name} -> pending")
+                        logger.info(f"[Startup] Reset stale {old_status} task {name} -> pending")
                 except Exception as e:
                     logger.debug(f"[Startup] Failed to reset stale task {name}: {e}")
 
@@ -562,6 +618,66 @@ async def _run_pipeline(pipeline: BasePipeline, state: BaseTaskState):
             del active_pipelines[pipeline.task_id]
 
 
+async def _run_pipeline_with_concurrency(
+    pipeline: BasePipeline,
+    state: BaseTaskState,
+    task_manager: TaskManager,
+):
+    """带并发控制的 Pipeline 执行包装器。
+
+    复用回归流程的加权信号量逻辑：
+    1. 先将任务标记为 queued（排队中）
+    2. 等待加权信号量（总并发权重 ≤ MAX_CONCURRENT_WEIGHT）
+    3. 获取到信号量后启动 pipeline
+    4. pipeline 结束后释放信号量
+    """
+    weight = TASK_TYPE_WEIGHTS.get(state.task_type, 1)
+    task_id = pipeline.task_id
+    _queued_tasks[task_id] = weight
+
+    logger.info(
+        f"[Concurrency] Task {task_id} queued (weight={weight}, "
+        f"current={_pipeline_semaphore.current}/{_pipeline_semaphore.max_weight})"
+    )
+
+    # 标记排队状态
+    task_manager.update_state(status=StepStatus.QUEUED)
+
+    try:
+        # 等待并发槽位
+        await _pipeline_semaphore.acquire(weight)
+        # 已获取槽位，从排队列表移除
+        _queued_tasks.pop(task_id, None)
+
+        logger.info(
+            f"[Concurrency] Task {task_id} acquired slot (weight={weight}, "
+            f"current={_pipeline_semaphore.current}/{_pipeline_semaphore.max_weight})"
+        )
+
+        # 检查是否在排队期间被 stop
+        if getattr(pipeline, '_stop_event', None) and pipeline._stop_event.is_set():
+            logger.info(f"[Concurrency] Task {task_id} was stopped while queued, skipping")
+            return
+
+        # 启动 pipeline
+        await _run_pipeline(pipeline, state)
+    except asyncio.CancelledError:
+        # 任务被取消（如 stop 操作）
+        _queued_tasks.pop(task_id, None)
+        logger.info(f"[Concurrency] Task {task_id} cancelled while queued")
+    finally:
+        # 释放信号量
+        try:
+            await _pipeline_semaphore.release(weight)
+            logger.info(
+                f"[Concurrency] Task {task_id} released slot (weight={weight}, "
+                f"current={_pipeline_semaphore.current}/{_pipeline_semaphore.max_weight})"
+            )
+        except Exception:
+            pass
+        _queued_tasks.pop(task_id, None)
+
+
 def _launch_background_task(coro):
     """Launch a background task with a strong reference to prevent GC."""
     task = asyncio.create_task(coro)
@@ -653,8 +769,10 @@ async def create_simple_task(
     if task_id in active_connections:
         pipeline.progress_callback = _make_progress_callback(task_id)
 
-    _launch_background_task(_run_pipeline(pipeline, state))
-    logger.info(f"[Simple] Task created: {task_id}, mode={mode}, duration={duration}s")
+    tm = TaskManager(task_id, dir_name=dir_name)
+    tm.create(state)
+    _launch_background_task(_run_pipeline_with_concurrency(pipeline, state, tm))
+    logger.info(f"[Simple] Task created: {task_id}, mode={mode}, duration={duration}s (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
 
 
@@ -778,7 +896,10 @@ async def create_creative_task(
     if task_id in active_connections:
         pipeline.progress_callback = _make_progress_callback(task_id)
 
-    _launch_background_task(_run_pipeline(pipeline, state))
+    tm = TaskManager(task_id, dir_name=dir_name)
+    tm.create(state)
+    _launch_background_task(_run_pipeline_with_concurrency(pipeline, state, tm))
+    logger.info(f"[Creative] Task created: {task_id}, idea={idea[:40]}... (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
 
 
@@ -860,8 +981,10 @@ async def create_manuscript_task(
     if task_id in active_connections:
         pipeline.progress_callback = _make_progress_callback(task_id)
 
-    _launch_background_task(_run_pipeline(pipeline, state))
-    logger.info(f"[Manuscript] Task created: {task_id}, text_len={len(manuscript_text)}")
+    tm = TaskManager(task_id, dir_name=dir_name)
+    tm.create(state)
+    _launch_background_task(_run_pipeline_with_concurrency(pipeline, state, tm))
+    logger.info(f"[Manuscript] Task created: {task_id}, text_len={len(manuscript_text)} (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
 
 
@@ -941,8 +1064,10 @@ async def create_anchor_task(
     if task_id in active_connections:
         pipeline.progress_callback = _make_progress_callback(task_id)
 
-    _launch_background_task(_run_pipeline(pipeline, state))
-    logger.info(f"[Anchor] Task created: {task_id}, script_len={len(script_text)}")
+    tm = TaskManager(task_id, dir_name=dir_name)
+    tm.create(state)
+    _launch_background_task(_run_pipeline_with_concurrency(pipeline, state, tm))
+    logger.info(f"[Anchor] Task created: {task_id}, script_len={len(script_text)} (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
 
 
@@ -1035,27 +1160,64 @@ async def resume_task(task_id: str):
             logger.info(f"[Resume] Binding existing WebSocket for task {task_id}")
             pipeline.progress_callback = _make_progress_callback(task_id)
 
-        _launch_background_task(_run_pipeline(pipeline, state))
+        _launch_background_task(_run_pipeline_with_concurrency(pipeline, state, tm))
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
 
 
 @app.post("/api/tasks/{task_id}/stop")
 async def stop_task(task_id: str):
-    if task_id not in active_pipelines:
+    if task_id not in active_pipelines and task_id not in _queued_tasks:
         raise HTTPException(status_code=400, detail="Task is not running")
 
-    pipeline = active_pipelines[task_id]
-    pipeline.stop()
+    # 停止运行中的 pipeline
+    if task_id in active_pipelines:
+        pipeline = active_pipelines[task_id]
+        pipeline.stop()
 
     dir_name = _find_dir_name(task_id)
     tm = TaskManager(task_id, dir_name=dir_name)
     state = tm.load()
-    if state and state.status == StepStatus.RUNNING:
+    if state and state.status in (StepStatus.RUNNING, StepStatus.QUEUED):
         tm.update_state(status=StepStatus.PENDING)
         logger.info(f"[Stop] Task {task_id} status -> pending")
 
     logger.info(f"[Stop] Task {task_id} stop requested")
     return {"ok": True, "task_id": task_id}
+
+
+# ═══════════════════════════════════════════════════
+# 并发状态接口
+# ═══════════════════════════════════════════════════
+
+
+@app.get("/api/concurrency")
+async def get_concurrency_status():
+    """返回当前并发控制状态：已用权重、上限、排队任务列表。"""
+    running_tasks = []
+    for tid, pl in active_pipelines.items():
+        if tid not in _queued_tasks:
+            # 真正在运行的（已获取信号量）
+            running_tasks.append({
+                "task_id": tid,
+                "type": getattr(pl, '_task_type', 'unknown'),
+            })
+
+    queued = [
+        {"task_id": tid, "weight": w}
+        for tid, w in _queued_tasks.items()
+    ]
+
+    return {
+        "ok": True,
+        "max_weight": _pipeline_semaphore.max_weight,
+        "current_weight": _pipeline_semaphore.current,
+        "utilization": round(_pipeline_semaphore.utilization, 2),
+        "running_count": len(running_tasks),
+        "queued_count": len(queued),
+        "queued_tasks": queued,
+        "rate_limit_per_min": _AGNES_RATE_LIMIT,
+        "task_weights": {k.value: v for k, v in TASK_TYPE_WEIGHTS.items()},
+    }
 
 
 # ═══════════════════════════════════════════════════

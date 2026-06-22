@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field, field_validator
 
 class StepStatus(str, Enum):
     PENDING = "pending"
+    QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"

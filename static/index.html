@@ -952,7 +952,7 @@ const T = {
     videoComplete: '视频生成完成!', taskComplete: '任务已完成',
     taskId: '任务ID', dir: '目录', idea_: '创意', sceneCount: '场景数', chainingMode_: '串联模式',
     artifact: '产物', paragraphCount: '段落数',
-    statusCompleted: '已完成', statusRunning: '进行中', statusFailed: '失败', statusPending: '待处理',
+    statusCompleted: '已完成', statusRunning: '进行中', statusFailed: '失败', statusPending: '待处理', statusQueued: '排队中',
     btnView: '查看', btnViewProgress: '查看进度', btnResume: '续传', btnStop: '中断',
     sceneUnit: '个场景', paraUnit: '段',
     typeSimple: '简单', typeCreative: '创意', typeManuscript: '稿件', typeImage: '图片',
@@ -960,7 +960,7 @@ const T = {
     stopConfirmById: '确定要中断该任务吗？中断后可续传。',
     stopped: '任务已中断，可在任务列表中续传', stoppedById: '任务已中断',
     enterApiKey: '请输入 API Key', enterPrompt: '请输入视频描述', enterIdea: '请输入创意描述', enterText: '请输入稿件内容',
-    taskRunningWarn: '已有任务正在运行中，请等待完成',
+    taskRunningWarn: '已有任务正在运行或排队中，请等待完成',
     failCreate: '创建失败', failResume: '续传失败', failLoad: '加载任务详情失败', failStop: '中断失败',
     stopping: '正在中断...', submitted: '任务已提交，请耐心等待',
     resumed: '续传已开始，请耐心等待', watchLog: '提示：请观察控制台日志，耐心等待生成完成。',
@@ -1044,7 +1044,7 @@ const T = {
     videoComplete: 'Video generation complete!', taskComplete: 'Task completed',
     taskId: 'Task ID', dir: 'Directory', idea_: 'Idea', sceneCount: 'Scenes', chainingMode_: 'Chaining',
     artifact: 'Output', paragraphCount: 'Paragraphs',
-    statusCompleted: 'Completed', statusRunning: 'Running', statusFailed: 'Failed', statusPending: 'Pending',
+    statusCompleted: 'Completed', statusRunning: 'Running', statusFailed: 'Failed', statusPending: 'Pending', statusQueued: 'Queued',
     btnView: 'View', btnViewProgress: 'Progress', btnResume: 'Resume', btnStop: 'Stop',
     sceneUnit: ' scenes', paraUnit: ' paragraphs',
     typeSimple: 'Simple', typeCreative: 'Creative', typeManuscript: 'Article', typeImage: 'Image',
@@ -1052,7 +1052,7 @@ const T = {
     stopConfirmById: 'Stop this task? It can be resumed later.',
     stopped: 'Task stopped, resumable from task list', stoppedById: 'Task stopped',
     enterApiKey: 'Please enter your API Key', enterPrompt: 'Please describe the video', enterIdea: 'Please describe your idea', enterText: 'Please enter article text',
-    taskRunningWarn: 'A task is already running',
+    taskRunningWarn: 'A task is already running or queued',
     failCreate: 'Failed to create', failResume: 'Failed to resume', failLoad: 'Failed to load', failStop: 'Failed to stop',
     stopping: 'Stopping...', submitted: 'Task submitted, please wait',
     resumed: 'Task resumed, please wait', watchLog: 'Please check console logs and wait patiently.',
@@ -1136,14 +1136,14 @@ const T = {
     videoComplete: 'Видео готово!', taskComplete: 'Задача выполнена',
     taskId: 'ID', dir: 'Папка', idea_: 'Идея', sceneCount: 'Сцены', chainingMode_: 'Режим',
     artifact: 'Результат', paragraphCount: 'Параграфов',
-    statusCompleted: 'Готово', statusRunning: 'Работает', statusFailed: 'Ошибка', statusPending: 'Ожидание',
+    statusCompleted: 'Готово', statusRunning: 'Работает', statusFailed: 'Ошибка', statusPending: 'Ожидание', statusQueued: 'В очереди',
     btnView: 'Просмотр', btnViewProgress: 'Прогресс', btnResume: 'Продолжить', btnStop: 'Стоп',
     sceneUnit: ' сцен', paraUnit: ' параграфов',
     typeSimple: 'Простое', typeCreative: 'Креатив', typeManuscript: 'Статья', typeImage: 'Изображение',
     stopConfirm: 'Остановить задачу?', stopConfirmById: 'Остановить?',
     stopped: 'Остановлена', stoppedById: 'Остановлена',
     enterApiKey: 'Введите API Key', enterPrompt: 'Опишите видео', enterIdea: 'Опишите идею', enterText: 'Введите текст',
-    taskRunningWarn: 'Задача уже выполняется',
+    taskRunningWarn: 'Задача уже выполняется или в очереди',
     failCreate: 'Ошибка создания', failResume: 'Ошибка возобновления', failLoad: 'Ошибка загрузки', failStop: 'Ошибка остановки',
     stopping: 'Остановка...', submitted: 'Задача отправлена',
     resumed: 'Задача возобновлена', watchLog: 'Следите за логами.',
@@ -1226,14 +1226,14 @@ const T = {
     videoComplete: '動画完了!', taskComplete: 'タスク完了',
     taskId: 'ID', dir: 'ディレクトリ', idea_: 'アイデア', sceneCount: 'シーン', chainingMode_: '連鎖',
     artifact: '出力', paragraphCount: '段落数',
-    statusCompleted: '完了', statusRunning: '実行中', statusFailed: '失敗', statusPending: '保留',
+    statusCompleted: '完了', statusRunning: '実行中', statusFailed: '失敗', statusPending: '保留', statusQueued: '待機中',
     btnView: '表示', btnViewProgress: '進捗', btnResume: '再開', btnStop: '停止',
     sceneUnit: ' シーン', paraUnit: ' 段落',
     typeSimple: 'シンプル', typeCreative: 'クリエイティブ', typeManuscript: '記事', typeImage: '画像',
     stopConfirm: '中断しますか？', stopConfirmById: '中断しますか？',
     stopped: '中断しました', stoppedById: '中断しました',
     enterApiKey: 'API Keyを入力', enterPrompt: '動画を記述', enterIdea: 'アイデアを記述', enterText: 'テキストを入力',
-    taskRunningWarn: 'タスク実行中', failCreate: '作成失敗', failResume: '再開失敗', failLoad: '読込失敗', failStop: '停止失敗',
+    taskRunningWarn: 'タスク実行中または待機中', failCreate: '作成失敗', failResume: '再開失敗', failLoad: '読込失敗', failStop: '停止失敗',
     stopping: '停止中...', submitted: 'タスク送信済み', resumed: '再開済み', watchLog: 'コンソールログを確認。',
     task_: 'タスク', genFailed: '生成失敗', genFailedMsg: 'ログを確認。',
     gotoResume: 'タスク一覧へ', connLost: '接続切断', connLostMsg: '接続が切れました。',     gotoList: '一覧へ', reconnecting: '再接続中...',
@@ -1313,14 +1313,14 @@ const T = {
     videoComplete: '영상 완료!', taskComplete: '작업 완료',
     taskId: 'ID', dir: '디렉토리', idea_: '아이디어', sceneCount: '장면', chainingMode_: '체인',
     artifact: '출력', paragraphCount: '문단 수',
-    statusCompleted: '완료', statusRunning: '실행 중', statusFailed: '실패', statusPending: '대기',
+    statusCompleted: '완료', statusRunning: '실행 중', statusFailed: '실패', statusPending: '대기', statusQueued: '대기열',
     btnView: '보기', btnViewProgress: '진행', btnResume: '재개', btnStop: '중지',
     sceneUnit: '개 장면', paraUnit: '개 문단',
     typeSimple: '간단', typeCreative: '크리에이티브', typeManuscript: '기사', typeImage: '이미지',
     stopConfirm: '중단하시겠습니까?', stopConfirmById: '중단하시겠습니까?',
     stopped: '중단됨', stoppedById: '중단됨',
     enterApiKey: 'API Key 입력', enterPrompt: '영상 설명', enterIdea: '아이디어 입력', enterText: '텍스트 입력',
-    taskRunningWarn: '작업 실행 중', failCreate: '생성 실패', failResume: '재개 실패', failLoad: '로딩 실패', failStop: '중지 실패',
+    taskRunningWarn: '작업 실행 중 또는 대기열', failCreate: '생성 실패', failResume: '재개 실패', failLoad: '로딩 실패', failStop: '중지 실패',
     stopping: '중지 중...', submitted: '작업 제출됨', resumed: '재개됨', watchLog: '콘솔 로그를 확인하세요.',
     task_: '작업', genFailed: '생성 실패', genFailedMsg: '로그를 확인하세요.',
     gotoResume: '작업 목록으로', connLost: '연결 끊김', connLostMsg: '연결이 끊어졌습니다.',     gotoList: '목록으로', reconnecting: '재연결 중...',
@@ -1400,14 +1400,14 @@ const T = {
     videoComplete: 'Video selesai!', taskComplete: 'Tugas selesai',
     taskId: 'ID', dir: 'Direktori', idea_: 'Idea', sceneCount: 'Babak', chainingMode_: 'Rantai',
     artifact: 'Hasil', paragraphCount: 'Perenggan',
-    statusCompleted: 'Selesai', statusRunning: 'Berjalan', statusFailed: 'Gagal', statusPending: 'Menunggu',
+    statusCompleted: 'Selesai', statusRunning: 'Berjalan', statusFailed: 'Gagal', statusPending: 'Menunggu', statusQueued: 'Dalam barisan',
     btnView: 'Lihat', btnViewProgress: 'Kemajuan', btnResume: 'Sambung', btnStop: 'Henti',
     sceneUnit: ' babak', paraUnit: ' perenggan',
     typeSimple: 'Ringkas', typeCreative: 'Kreatif', typeManuscript: 'Artikel', typeImage: 'Imej',
     stopConfirm: 'Hentikan tugas?', stopConfirmById: 'Hentikan?',
     stopped: 'Dihentikan', stoppedById: 'Dihentikan',
     enterApiKey: 'Masukkan API Key', enterPrompt: 'Terangkan video', enterIdea: 'Terangkan idea', enterText: 'Masukkan teks',
-    taskRunningWarn: 'Tugas sedang berjalan', failCreate: 'Gagal mencipta', failResume: 'Gagal sambung', failLoad: 'Gagal memuat', failStop: 'Gagal henti',
+    taskRunningWarn: 'Tugas sedang berjalan atau dalam barisan', failCreate: 'Gagal mencipta', failResume: 'Gagal sambung', failLoad: 'Gagal memuat', failStop: 'Gagal henti',
     stopping: 'Menghentikan...', submitted: 'Tugas dihantar', resumed: 'Tugas disambung', watchLog: 'Periksa log konsol.',
     task_: 'Tugas', genFailed: 'Gagal', genFailedMsg: 'Periksa log.',
     gotoResume: 'Ke senarai', connLost: 'Sambungan terputus', connLostMsg: 'Sambungan terputus.',     gotoList: 'Ke senarai', reconnecting: 'Menyambung semula...',
@@ -1486,14 +1486,14 @@ const T = {
     videoComplete: 'Video selesai!', taskComplete: 'Tugas selesai',
     taskId: 'ID', dir: 'Direktori', idea_: 'Ide', sceneCount: 'Adegan', chainingMode_: 'Rantai',
     artifact: 'Hasil', paragraphCount: 'Paragraf',
-    statusCompleted: 'Selesai', statusRunning: 'Berjalan', statusFailed: 'Gagal', statusPending: 'Menunggu',
+    statusCompleted: 'Selesai', statusRunning: 'Berjalan', statusFailed: 'Gagal', statusPending: 'Menunggu', statusQueued: 'Antrian',
     btnView: 'Lihat', btnViewProgress: 'Kemajuan', btnResume: 'Lanjutkan', btnStop: 'Henti',
     sceneUnit: ' adegan', paraUnit: ' paragraf',
     typeSimple: 'Simpel', typeCreative: 'Kreatif', typeManuscript: 'Artikel', typeImage: 'Gambar',
     stopConfirm: 'Hentikan tugas?', stopConfirmById: 'Hentikan?',
     stopped: 'Dihentikan', stoppedById: 'Dihentikan',
     enterApiKey: 'Masukkan API Key', enterPrompt: 'Jelaskan video', enterIdea: 'Jelaskan ide', enterText: 'Masukkan teks',
-    taskRunningWarn: 'Tugas sedang berjalan', failCreate: 'Gagal membuat', failResume: 'Gagal lanjut', failLoad: 'Gagal memuat', failStop: 'Gagal henti',
+    taskRunningWarn: 'Tugas sedang berjalan atau antrian', failCreate: 'Gagal membuat', failResume: 'Gagal lanjut', failLoad: 'Gagal memuat', failStop: 'Gagal henti',
     stopping: 'Menghentikan...', submitted: 'Tugas dikirim', resumed: 'Tugas dilanjutkan', watchLog: 'Periksa log konsol.',
     task_: 'Tugas', genFailed: 'Gagal', genFailedMsg: 'Periksa log.',
     gotoResume: 'Ke daftar', connLost: 'Koneksi terputus', connLostMsg: 'Koneksi terputus.',     gotoList: 'Ke daftar', reconnecting: 'Menyambung ulang...',
@@ -1792,15 +1792,13 @@ function addCEndFrameInput() {
 function setRunning(taskId) {
   isTaskRunning = true;
   currentTaskId = taskId;
-  ['btn-simple', 'btn-creative', 'btn-manuscript', 'btn-anchor'].forEach(id => {
-    const btn = document.getElementById(id);
-    if (btn) { btn.disabled = true; btn.textContent = t('taskRunning'); }
-  });
+  // 不再禁用提交按钮，支持并发提交多个任务（服务端自动排队）
 }
 
 function clearRunning() {
   isTaskRunning = false;
   currentTaskId = null;
+  // 恢复提交按钮
   ['btn-simple', 'btn-creative', 'btn-manuscript', 'btn-anchor'].forEach(id => {
     const btn = document.getElementById(id);
     if (btn) { btn.disabled = false; btn.textContent = t('startGenerate'); }
@@ -1811,7 +1809,6 @@ function clearRunning() {
 async function submitSimple() {
   const prompt = document.getElementById('s_prompt').value.trim();
   if (!prompt) return alert(t('enterPrompt'));
-  if (isTaskRunning) return showToast(t('taskRunningWarn'));
 
   const btn = document.getElementById('btn-simple');
   btn.disabled = true; btn.textContent = t('submitting');
@@ -1854,7 +1851,6 @@ async function submitSimple() {
 async function submitCreative() {
   const idea = document.getElementById('c_idea').value.trim();
   if (!idea) return alert(t('enterIdea'));
-  if (isTaskRunning) return showToast(t('taskRunningWarn'));
 
   const btn = document.getElementById('btn-creative');
   btn.disabled = true; btn.textContent = t('submitting');
@@ -1916,7 +1912,6 @@ async function submitCreative() {
 async function submitManuscript() {
   const text = document.getElementById('m_text').value.trim();
   if (!text) return alert(t('enterText'));
-  if (isTaskRunning) return showToast(t('taskRunningWarn'));
 
   const btn = document.getElementById('btn-manuscript');
   btn.disabled = true; btn.textContent = t('submitting');
@@ -1963,7 +1958,6 @@ async function submitManuscript() {
 async function submitAnchor() {
   const script = document.getElementById('a_script').value.trim();
   if (!script) return alert(t('enterText'));
-  if (isTaskRunning) return showToast(t('taskRunningWarn'));
 
   const btn = document.getElementById('btn-anchor');
   btn.disabled = true; btn.textContent = t('submitting');
@@ -2021,7 +2015,6 @@ async function submitAnchor() {
 async function submitImage() {
   const prompt = document.getElementById('i_prompt').value.trim();
   if (!prompt) return alert(t('enterImagePrompt'));
-  if (isTaskRunning) return showToast(t('taskRunningWarn'));
 
   const btn = document.getElementById('btn-image');
   btn.disabled = true; btn.textContent = t('generating');
@@ -2197,7 +2190,7 @@ async function autoReconnectRunningTask() {
   try {
     const r = await fetch('/api/tasks');
     const d = await r.json();
-    const running = (d.tasks || []).find(t => t.status === 'running');
+    const running = (d.tasks || []).find(t => t.status === 'running' || t.status === 'queued');
     if (running) {
       currentTaskType = running.task_type || 'creative';
       setRunning(running.task_id);
@@ -2257,12 +2250,12 @@ async function loadTaskList() {
       return;
     }
     container.innerHTML = tasks.map(task => {
-      const statusColors = { completed: 'text-green-400', running: 'text-yellow-400', failed: 'text-red-400', pending: 'text-gray-400' };
-      const statusLabels = { completed: t('statusCompleted'), running: t('statusRunning'), failed: t('statusFailed'), pending: t('statusPending') };
+      const statusColors = { completed: 'text-green-400', running: 'text-yellow-400', failed: 'text-red-400', pending: 'text-gray-400', queued: 'text-cyan-400' };
+      const statusLabels = { completed: t('statusCompleted'), running: t('statusRunning'), failed: t('statusFailed'), pending: t('statusPending'), queued: t('statusQueued') };
       const typeLabels = { simple: t('typeSimple'), creative: t('typeCreative'), manuscript: t('typeManuscript'), anchor: t('typeAnchor'), image: t('typeImage') };
       const typeColors = { simple: 'bg-blue-900 text-blue-300', creative: 'bg-blue-900 text-blue-300', manuscript: 'bg-orange-900 text-orange-300', anchor: 'bg-amber-900 text-amber-300' };
       const isCompleted = task.status === 'completed';
-      const isRunning = task.status === 'running';
+      const isRunning = task.status === 'running' || task.status === 'queued';
       const btnLabel = isCompleted ? t('btnView') : (isRunning ? t('btnViewProgress') : t('btnResume'));
       const tidAttr = escapeAttr(task.task_id);
       const btnAction = isCompleted ? `viewTask('${tidAttr}')` : (isRunning ? `viewRunningTask('${tidAttr}')` : `resumeTask('${tidAttr}')`);
@@ -2310,7 +2303,6 @@ async function viewRunningTask(taskId) {
 }
 
 async function resumeTask(taskId) {
-  if (isTaskRunning) return showToast(t('taskRunningWarn'));
   try {
     const r = await fetch('/api/tasks/' + taskId + '/resume', { method: 'POST' });
     const d = await r.json();
