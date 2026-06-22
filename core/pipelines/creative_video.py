@@ -1381,18 +1381,20 @@ class CreativeVideoPipeline(BasePipeline):
         logger.info(f"[Pipeline] Narration generated: {len(narration)} chars for {total_duration:.0f}s video")
 
         # 记录自动生成的 prompt（脚本 + 旁白）
-        prompts_data = {
-            "scenes": [s.scene_prompt for s in self._state.scenes] if self._state.scenes else [],
-            "narrations": self._state.narrations,
-        }
-        # 合并已有的 script.json 内容
+        # 场景 prompt 存储在 script.json 中，而非 SceneTask 对象上
+        script_prompts: list = []
         script_path = os.path.join(self.working_dir, "script.json")
         if os.path.exists(script_path):
             try:
                 with open(script_path, "r", encoding="utf-8") as f:
-                    prompts_data["script"] = json.load(f)
+                    script_prompts = json.load(f)
             except Exception:
                 pass
+        prompts_data = {
+            "scenes": script_prompts,
+            "narrations": self._state.narrations,
+            "script": script_prompts,
+        }
         self.save_prompts(prompts_data)
 
     # ==================================================================
