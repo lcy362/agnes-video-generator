@@ -1,38 +1,73 @@
-# 自动生成 Prompt 语言跟随修复 — 遗漏清理
+# 自动生成 Prompt 语言跟随 — 完整修复
 
-## 修复概述
+## 第一轮：遗漏清理
 
-修复了 5 个文件中自动生成的 prompt 硬编码特定语言（而非跟随用户输入语言）的遗漏问题。
+修复了 5 个文件中自动生成的 prompt 硬编码特定语言的遗漏问题。
 
-## 修复清单
+| 文件 | 问题 | 修复 |
+|---|---|---|
+| `simple_video.py` | 英文分隔符 | 根据 prompt 语言自适应 |
+| `anchor_video.py` | 中文默认主播描述 | 中英双语 + 语言检测 |
+| `creative_video.py` | 英文尾帧/标签/过渡 (3处) | 3 个本地化辅助函数 |
+| `server.py` | 英文解密指令 | 根据 system_prompt 语言自适应 |
+| `screenwriter.py` | 中文标签 + 英文文本提示 | `language_hint` 参数 |
 
-### 1. `core/pipelines/simple_video.py` (HIGH)
-- **行 136**：视频 prompt 分隔符 `"--- Generate image/video strictly based on..."` 硬编码英文
-- **修复**：根据 `self._state.prompt` 检测语言，中文用户使用 `"--- 请严格按照以下描述生成图像/视频 ---"`
+## 第二轮：System Prompt 全量中文化
 
-### 2. `core/pipelines/anchor_video.py` (HIGH)
-- **行 32-35**：默认主播形象描述 `_DEFAULT_ANCHOR_PROMPT` 硬编码中文
-- **修复**：拆分为 `_DEFAULT_ANCHOR_PROMPT_ZH` / `_DEFAULT_ANCHOR_PROMPT_EN`，新增 `_get_default_anchor_prompt()` 方法根据 `script_text` 语言返回对应版本
+将 `core/screenwriter.py` 中所有用于生成提示词的 meta-prompt（system_prompt 和 user_prompt 指令）全部转换为中英双语版本。
 
-### 3. `core/pipelines/creative_video.py` (HIGH — 3处)
-- **行 647/698/1163**：尾帧回退描述 `"cinematic end frame"` 硬编码英文
-- **行 653-658/1173-1179**：`[PRESERVE]/[CHANGE]` 标签及身份保持指令硬编码英文
-- **行 1056-1059**：过渡帧 prompt 硬编码英文
-- **修复**：新增 3 个辅助函数 `_fallback_end_frame()`、`_localize_transition_prompt()`、`_localize_preserve_tags()`，根据场景文本语言返回对应版本
+### 架构设计
 
-### 4. `server.py` (MEDIUM)
-- **行 649-659**：`_build_encrypted_image_prompt()` 中的 Base64 解密指令硬编码英文
-- **修复**：根据 `system_prompt` 语言返回对应的中文/英文解密说明
+```
+Screenwriter.__init__(api_key, model, language=None)
+    │
+    ├── language 参数:
+    │   ├── None → 使用 PROMPT_LANGUAGE 环境变量（默认 "zh"）
+    │   ├── "zh" → 所有 meta-prompt 使用中文
+    │   └── "en" → 所有 meta-prompt 使用英文
+    │
+    └── _prompt(zh_text, en_text) → 根据 self.language 返回对应语言版本
+```
 
-### 5. `core/screenwriter.py` (LOW)
-- **行 92/94**：图片描述标签 `"起始帧"` / `"尾帧 {i-1}"` 硬编码中文
-- **行 142**：`_describe_with_retry` 中的 `"Describe this image."` 硬编码英文
-- **修复**：`describe_images()` 新增 `language_hint` 参数，根据用户输入语言使用对应标签和提示文本
+### 切换方式
 
-## 未修改的（已有语言跟随机制）
+```bash
+# 默认使用中文提示词（无需设置）
+# 切换为英文提示词：
+export PROMPT_LANGUAGE=en
 
-`core/screenwriter.py` 中所有 12 个 system prompt 函数已在前期修复中包含 `"SAME LANGUAGE as the input"` 指令，模型会根据输入语言自动适配输出语言，无需额外处理。
+# 或在代码中显式指定：
+Screenwriter(api_key="...", language="en")
+```
+
+### 已中文化的 14 个方法
+
+| 方法 | 转换内容 |
+|---|---|
+| `describe_images` | system_prompt + describe_text + 标签 |
+| `_describe_with_retry` | 默认 text_prompt |
+| `develop_story` | system_prompt + image_context 指令 |
+| `write_script` | system_prompt |
+| `extract_character_description` | system_prompt + user_prompt 指令 |
+| `get_character_appearance` | system_prompt |
+| `generate_end_frame_prompts` | context_block + system_prompt + user_prompt 指令 |
+| `design_shots_for_scene` | system_prompt |
+| `generate_scene_prompt_for_paragraph` | system_prompt + user_prompt 指令 |
+| `generate_anchor_clip_prompt` | system_prompt + user_prompt 指令 |
+| `generate_anchor_smooth_loop_prompt` | system_prompt + user_prompt 指令 |
+| `generate_anchor_model_audio_prompt` | system_prompt + user_prompt 指令 |
+| `generate_narration_for_video` | system_prompt + user_prompt 指令 |
+| `generate_subtitle_styles` | role_context + system_prompt + user_prompt 指令 |
+
+### 已修复的管道层双语化（第一轮）
+
+| 文件 | 修复内容 |
+|---|---|
+| `creative_video.py` | `_fallback_end_frame()`、`_localize_transition_prompt()`、`_localize_preserve_tags()` |
+| `anchor_video.py` | `_DEFAULT_ANCHOR_PROMPT_ZH` / `_DEFAULT_ANCHOR_PROMPT_EN` + 语言检测 |
+| `simple_video.py` | 分隔符根据 prompt 语言自适应 |
+| `server.py` | `_build_encrypted_image_prompt` 解密指令双语化 |
 
 ## 验证
 
-所有 5 个修改文件通过 `py_compile` 语法检查，无错误。
+所有修改文件通过 `py_compile` 语法检查，无错误。
