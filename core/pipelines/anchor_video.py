@@ -29,9 +29,15 @@ from models.task import (
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_ANCHOR_PROMPT = (
+_DEFAULT_ANCHOR_PROMPT_ZH = (
     "一位专业的新闻主播，穿着正式西装，坐在现代化的新闻演播室中，"
     "面带微笑，正面半身照，高清画质，专业灯光"
+)
+
+_DEFAULT_ANCHOR_PROMPT_EN = (
+    "A professional news anchor in formal business attire, seated in a modern "
+    "news studio, smiling warmly, front-facing half-body shot, high definition, "
+    "professional studio lighting"
 )
 
 _SENTENCE_END_RE = re.compile(r"(?<=[。！？])")
@@ -173,6 +179,13 @@ class AnchorPipeline(BasePipeline):
     # Step implementations
     # ==================================================================
 
+    def _get_default_anchor_prompt(self) -> str:
+        """根据 script_text 语言返回合适的主播默认描述。"""
+        text = (self._state.script_text or "").strip()
+        if re.search(r'[\u4e00-\u9fff]', text):
+            return _DEFAULT_ANCHOR_PROMPT_ZH
+        return _DEFAULT_ANCHOR_PROMPT_EN
+
     async def _step_generate_anchor(self) -> str:
         """Step 1: 生成主播形象图（t2i / i2i）。"""
         if self._state.step_generate_anchor == StepStatus.COMPLETED:
@@ -181,7 +194,7 @@ class AnchorPipeline(BasePipeline):
                 return self._state.anchor_image_path
             logger.warning("[Anchor] Step generate_anchor: file missing, re-running")
 
-        prompt = self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT
+        prompt = self._state.anchor_prompt or self._get_default_anchor_prompt()
         output_path = os.path.join(self.working_dir, "anchor.png")
 
         if os.path.exists(output_path):
@@ -235,7 +248,7 @@ class AnchorPipeline(BasePipeline):
             "生成循环优化动态描述...", 0.12,
         )
 
-        anchor_prompt = self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT
+        anchor_prompt = self._state.anchor_prompt or self._get_default_anchor_prompt()
         prompt = await asyncio.to_thread(
             self.screenwriter.generate_anchor_smooth_loop_prompt,
             anchor_prompt=anchor_prompt,
@@ -243,7 +256,7 @@ class AnchorPipeline(BasePipeline):
         prompt = prompt.strip()
 
         self.save_prompts({
-            "anchor_prompt": self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT,
+            "anchor_prompt": self._state.anchor_prompt or self._get_default_anchor_prompt(),
             "smooth_loop_prompt": prompt,
         })
 
@@ -262,7 +275,7 @@ class AnchorPipeline(BasePipeline):
         )
 
         full_text = self._state.script_text
-        anchor_prompt = self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT
+        anchor_prompt = self._state.anchor_prompt or self._get_default_anchor_prompt()
 
         prompt = await asyncio.to_thread(
             self.screenwriter.generate_anchor_model_audio_prompt,
@@ -272,7 +285,7 @@ class AnchorPipeline(BasePipeline):
         prompt = prompt.strip()
 
         self.save_prompts({
-            "anchor_prompt": self._state.anchor_prompt or _DEFAULT_ANCHOR_PROMPT,
+            "anchor_prompt": self._state.anchor_prompt or self._get_default_anchor_prompt(),
             "model_audio_prompt": prompt,
         })
 

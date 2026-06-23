@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from typing import Callable, Optional
 
 from core.api.agnes_video import AgnesVideoAPI
@@ -133,7 +134,10 @@ class SimpleVideoPipeline(BasePipeline):
 
         await self._emit("video_gen", "running", f"提交视频任务 (mode={self._state.mode})...", 0.1)
 
-        full_prompt = f"{self._state.system_prompt.strip()}\n\n--- Generate image/video strictly based on the following description ---\n{self._state.prompt}" if self._state.system_prompt.strip() else self._state.prompt
+        # 分隔符跟随用户 prompt 语言
+        _has_chinese = bool(re.search(r'[\u4e00-\u9fff]', self._state.prompt))
+        _sep = "--- 请严格按照以下描述生成图像/视频 ---" if _has_chinese else "--- Generate image/video strictly based on the following description ---"
+        full_prompt = f"{self._state.system_prompt.strip()}\n\n{_sep}\n{self._state.prompt}" if self._state.system_prompt.strip() else self._state.prompt
         video_id = await self.video_api.submit_video(
             prompt=full_prompt,
             reference_image_paths=ref_images,

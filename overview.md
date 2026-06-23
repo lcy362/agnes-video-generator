@@ -1,64 +1,38 @@
-# Agnes Video Generator v2.1 — 代码与回归流程优化报告
+# 自动生成 Prompt 语言跟随修复 — 遗漏清理
 
-## 修复日期
-2026-06-15
+## 修复概述
 
-## 一、字幕分割粒度过粗（核心修复）
+修复了 5 个文件中自动生成的 prompt 硬编码特定语言（而非跟随用户输入语言）的遗漏问题。
 
-**问题**：14 秒视频只有 5 条字幕，5 秒视频可能只有 1 条。edge_tts 默认生成的是句子级字幕。
+## 修复清单
 
-**修复**：`core/audio/subtitle.py`
+### 1. `core/pipelines/simple_video.py` (HIGH)
+- **行 136**：视频 prompt 分隔符 `"--- Generate image/video strictly based on..."` 硬编码英文
+- **修复**：根据 `self._state.prompt` 检测语言，中文用户使用 `"--- 请严格按照以下描述生成图像/视频 ---"`
 
-1. 新增 `_generate_fine_srt_from_word_cues()` — 利用 edge_tts 7.x SubMaker 的词级时间戳（`cues` 属性），按以下规则贪心分组：
-   - 每条字幕最大 2.5 秒 / 18 字符
-   - 优先在较长停顿处（>0.4s）断开
-   - 尾部短组（<0.8s）仅在合并后不超限时才合并
-2. 阈值保护：词级 cues < 6 个时回退到默认 SRT 生成
-3. 容错处理：edge_tts 7.2.8 + 部分 srt 库的 `proprietary` 字段冲突会导致 `get_srt()` 崩溃，已添加 try/except 回退到手动构造
+### 2. `core/pipelines/anchor_video.py` (HIGH)
+- **行 32-35**：默认主播形象描述 `_DEFAULT_ANCHOR_PROMPT` 硬编码中文
+- **修复**：拆分为 `_DEFAULT_ANCHOR_PROMPT_ZH` / `_DEFAULT_ANCHOR_PROMPT_EN`，新增 `_get_default_anchor_prompt()` 方法根据 `script_text` 语言返回对应版本
 
-**效果**：14 秒视频预期从 5 条字幕提升到 6-7 条。
+### 3. `core/pipelines/creative_video.py` (HIGH — 3处)
+- **行 647/698/1163**：尾帧回退描述 `"cinematic end frame"` 硬编码英文
+- **行 653-658/1173-1179**：`[PRESERVE]/[CHANGE]` 标签及身份保持指令硬编码英文
+- **行 1056-1059**：过渡帧 prompt 硬编码英文
+- **修复**：新增 3 个辅助函数 `_fallback_end_frame()`、`_localize_transition_prompt()`、`_localize_preserve_tags()`，根据场景文本语言返回对应版本
 
-## 二、回归验证器误报修复
+### 4. `server.py` (MEDIUM)
+- **行 649-659**：`_build_encrypted_image_prompt()` 中的 Base64 解密指令硬编码英文
+- **修复**：根据 `system_prompt` 语言返回对应的中文/英文解密说明
 
-**问题**：上一轮回归报告中 C1/C4/M1/M2 共有 22 个"失败"检查，其中大多数是误报。
+### 5. `core/screenwriter.py` (LOW)
+- **行 92/94**：图片描述标签 `"起始帧"` / `"尾帧 {i-1}"` 硬编码中文
+- **行 142**：`_describe_with_retry` 中的 `"Describe this image."` 硬编码英文
+- **修复**：`describe_images()` 新增 `language_hint` 参数，根据用户输入语言使用对应标签和提示文本
 
-**修复**：`scripts/regression_runner.py`
+## 未修改的（已有语言跟随机制）
 
-| 修复项 | 根因 | 修复方式 |
-|--------|------|---------|
-| R3_all_completed | 非 keyframes 模式不运行 end_frame_prompts/generation 步骤 | 跳过模式特定步骤的检查 |
-| R5_task_json / R5_has_video_id | 创意/稿件任务在子目录存储 task.json | 增加 scene_N//para_N/ 子目录扫描 |
-| R6_curl_sh / R6_has_video_id_in_curl | 同理 | 同上 |
-| R7_audio_files | 无配音场景判为 false | 根据 audio_enabled 参数判为 N/A |
-| R10_srt_entries | 无配音场景仍检查 | 根据 audio_enabled 判为 N/A |
-| 任务目录不存在 | C2/C3 因缺素材失败后验证崩溃 | 添加防御性处理 |
+`core/screenwriter.py` 中所有 12 个 system prompt 函数已在前期修复中包含 `"SAME LANGUAGE as the input"` 指令，模型会根据输入语言自动适配输出语言，无需额外处理。
 
-## 三、回归流程文档完善
+## 验证
 
-**修复**：`docs/regression_test_plan.md`
-
-1. **新增「八、工具依赖与问题排查」**：whisper/ffmpeg/moviepy 安装指南、常见问题、健康检查脚本
-2. **新增「九、回归流程自迭代机制」**：执行时问题记录、迭代流程图、每次回归检查清单、验证逻辑修改原则
-3. **新增测试素材自动生成**：PIL 可用时自动创建 test_ref.png/test_end.png
-4. **章节重新编号**：原八→十，原九→十一
-
-## 四、回归脚本增强
-
-**修复**：`scripts/regression_runner.py`
-
-- 新增 `_ensure_test_assets()` — 自动生成缺失的测试素材图片
-- 在 `main()` 启动前调用素材检查
-
-## 影响范围
-
-| 文件 | 变更类型 | 风险 |
-|------|---------|------|
-| `core/audio/subtitle.py` | 新增细粒度 SRT + 容错 | 低（回退机制完整） |
-| `scripts/regression_runner.py` | 修复验证误报 + 素材自动生成 | 低（仅改验证逻辑） |
-| `docs/regression_test_plan.md` | 新增文档章节 | 无风险 |
-
-## 后续建议
-
-1. 下次执行回归时，关注字幕条目数是否合理（R10_srt_entries 预期 > 4）
-2. C2/C3 需要准备 test_ref.png 才能正常通过
-3. 如果 edge_tts 未来版本修复了 srt_composer 兼容性，可简化回退逻辑
+所有 5 个修改文件通过 `py_compile` 语法检查，无错误。

@@ -27,6 +27,41 @@ from models.task import CreativeVideoTask, SceneTask, StepStatus, SubtitleConfig
 _CHARS_PER_SEC = 4.0
 _SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[。！？.!?])")
 
+def _fallback_end_frame(text: str) -> str:
+    """返回与输入文本语言一致的尾帧回退描述。"""
+    if re.search(r'[\u4e00-\u9fff]', text or ""):
+        return "电影感尾帧画面"
+    return "cinematic end frame"
+
+def _localize_transition_prompt(next_scene_text: str) -> str:
+    """返回与 next_scene_text 语言一致的过渡帧描述。"""
+    has_chinese = bool(re.search(r'[\u4e00-\u9fff]', next_scene_text or ""))
+    if has_chinese:
+        return (
+            f"电影感过渡画面，从当前场景平滑过渡到下一场景。"
+            f"保持相同的人物和面部。下一场景：{next_scene_text[:200]}"
+        )
+    return (
+        f"Cinematic transition frame, blending the end of the current scene "
+        f"into the beginning of the next. Keep the same person and face exactly. "
+        f"Next scene: {next_scene_text[:200]}"
+    )
+
+def _localize_preserve_tags(scene_text: str) -> dict:
+    """返回与场景文本语言一致的 [PRESERVE]/[CHANGE] 标签和指令。"""
+    has_chinese = bool(re.search(r'[\u4e00-\u9fff]', scene_text or ""))
+    if has_chinese:
+        return {
+            "preserve": "[保留 — 严格保持]",
+            "change": "[变化 — 过渡到本场景尾帧]",
+            "keep_identity": "保持相同的人物、相同的面部、相同的服装。不要改变身份。",
+        }
+    return {
+        "preserve": "[PRESERVE — keep exactly]",
+        "change": "[CHANGE — end frame of this scene]",
+        "keep_identity": "Keep the same person, same face, same clothing. Do NOT alter identity.",
+    }
+
 
 async def _run_ffmpeg_async(cmd: List[str], timeout: float = 30.0) -> None:
     """异步执行 ffmpeg 命令，等价于 ``subprocess.run(cmd, check=True, timeout=...)``。
@@ -232,7 +267,9 @@ class CreativeVideoPipeline(BasePipeline):
 
         await self._emit("image_analysis", "running", f"分析 {len(images_to_analyze)} 张图片...", 0.0)
         image_context = await asyncio.to_thread(
-            self.screenwriter.describe_images, images_to_analyze, cache_dir=self.working_dir
+            self.screenwriter.describe_images, images_to_analyze,
+            cache_dir=self.working_dir,
+            language_hint=self._state.idea or "",
         )
 
         analysis_file = os.path.join(self.working_dir, "image_analysis.txt")
@@ -644,17 +681,18 @@ class CreativeVideoPipeline(BasePipeline):
                 end_frame_prompt = (
                     end_frame_prompts[scene_idx]
                     if scene_idx < len(end_frame_prompts)
-                    else "cinematic end frame"
+                    else _fallback_end_frame(scenes[scene_idx])
                 )
                 # 程序化拼入 [PRESERVE] 角色外观硬约束，确保 i2i 身份一致性（批次3）
                 # 用户提供了参考图时跳过：文本描述从故事提取，可能与参考图衣着矛盾，
                 # 此时让 i2i 模型直接看参考图保持身份一致性。
                 if self._state.character_appearance and not self._state.reference_image:
+                    _tags = _localize_preserve_tags(scenes[scene_idx])
                     end_frame_prompt = (
-                        "[PRESERVE — keep exactly]\n"
+                        f"{_tags['preserve']}\n"
                         f"{self._state.character_appearance}\n"
-                        "Keep the same person, same face, same clothing. Do NOT alter identity.\n\n"
-                        "[CHANGE — end frame of this scene]\n"
+                        f"{_tags['keep_identity']}\n\n"
+                        f"{_tags['change']}\n"
                         f"{end_frame_prompt}"
                     )
                 # 规范化角色参考图到目标尺寸，避免 i2i 拉伸/构图错位
@@ -695,7 +733,7 @@ class CreativeVideoPipeline(BasePipeline):
                 end_frame_prompt = (
                     end_frame_prompts[scene_idx]
                     if scene_idx < len(end_frame_prompts)
-                    else "cinematic end frame"
+                    else _fallback_end_frame(scenes[scene_idx])
                 )
                 await self._emit(
                     "end_frame_gen", "running",
@@ -1053,11 +1091,7 @@ class CreativeVideoPipeline(BasePipeline):
                 last_frame_url = await self.video_generator._resolve_image_ref(last_frame_path)
 
                 next_scene_text = scenes[scene_idx + 1]
-                transition_prompt = (
-                    f"Cinematic transition frame, blending the end of the current scene "
-                    f"into the beginning of the next. Keep the same person and face exactly. "
-                    f"Next scene: {next_scene_text[:200]}"
-                )
+                transition_prompt = _localize_transition_prompt(next_scene_text)
                 transition_path = os.path.join(scene_dir, f"transition_to_{scene_idx+1}.png")
 
                 img_output = await self.image_generator.generate_single_image(
@@ -1160,7 +1194,7 @@ class CreativeVideoPipeline(BasePipeline):
                         end_frame_prompt = (
                             end_frame_prompts[scene_idx]
                             if scene_idx < len(end_frame_prompts)
-                            else "cinematic end frame"
+                            else _fallback_end_frame(scene_text)
                         )
                         use_i2i = (
                             self._state.generate_end_frames_from_ref
@@ -1170,12 +1204,12 @@ class CreativeVideoPipeline(BasePipeline):
                             # 程序化拼入 [PRESERVE] 角色外观硬约束
                             # 用户提供了参考图时跳过，避免文本描述与参考图矛盾
                             if self._state.character_appearance and not self._state.reference_image:
+                                _tags = _localize_preserve_tags(scene_text)
                                 end_frame_prompt = (
-                                    "[PRESERVE — keep exactly]\n"
+                                    f"{_tags['preserve']}\n"
                                     f"{self._state.character_appearance}\n"
-                                    "Keep the same person, same face, same clothing. "
-                                    "Do NOT alter identity.\n\n"
-                                    "[CHANGE — end frame of this scene]\n"
+                                    f"{_tags['keep_identity']}\n\n"
+                                    f"{_tags['change']}\n"
                                     f"{end_frame_prompt}"
                                 )
                             normalized_ref = await self._get_normalized_character_ref(reference_image)

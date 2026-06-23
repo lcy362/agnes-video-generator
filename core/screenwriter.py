@@ -4,6 +4,7 @@ import json
 import logging
 import mimetypes
 import os
+import re
 import time as _time
 import requests
 from typing import List
@@ -49,11 +50,27 @@ class Screenwriter:
     def _chat_multimodal(self, system_prompt: str, text_prompt: str, image_paths: List[str]) -> str:
         return self.chat_api.chat_multimodal(system_prompt, text_prompt, image_paths)
 
-    def describe_images(self, image_paths: List[str], cache_dir: str = "") -> str:
+    def describe_images(self, image_paths: List[str], cache_dir: str = "", language_hint: str = "") -> str:
         if not image_paths:
             return ""
 
-        single_prompt = """\
+        has_chinese = (
+            bool(re.search(r'[\u4e00-\u9fff]', language_hint))
+            if language_hint
+            else False
+        )
+
+        if has_chinese:
+            single_prompt = """\
+请用丰富的视觉细节描述这张图片。包括角色（服装、体型、发型、姿势）、\
+环境、色彩与光线、艺术风格和氛围。用自然语言写 3-5 句话——就像口述给\
+故事编剧一样。不要写"图片展示了"——直接描述你看到的内容。用中文输出。
+"""
+            describe_text = "请描述这张图片。"
+            label_start = "起始帧"
+            label_end = "尾帧"
+        else:
+            single_prompt = """\
 Describe this image in rich visual detail. Note the character(s), their \
 appearance (clothing, body type, hair, pose), the environment, colors and \
 lighting, art style, and mood. Write 3-5 sentences in natural language — as if \
@@ -61,6 +78,9 @@ dictating to a story writer. Do NOT say "the image shows" — just describe what
 you see directly. Write in Chinese if the content appears Chinese, English \
 otherwise.
 """
+            describe_text = "Describe this image."
+            label_start = "Start Frame"
+            label_end = "End Frame"
 
         total = len(image_paths)
 
@@ -89,9 +109,9 @@ otherwise.
         descriptions = []
         for i, img_path in enumerate(image_paths):
             if i == 0:
-                label = "起始帧"
+                label = label_start
             else:
-                label = f"尾帧 {i - 1}"
+                label = f"{label_end} {i - 1}"
 
             cache_key = str(i)
             if cache_key in cached_descriptions:
@@ -99,7 +119,7 @@ otherwise.
                 descriptions.append(f"[{label}] {desc.strip()}")
                 continue
 
-            desc = self._describe_with_retry(single_prompt, img_path, label)
+            desc = self._describe_with_retry(single_prompt, img_path, label, describe_text)
             descriptions.append(f"[{label}] {desc.strip()}")
 
             if cache_file:
@@ -117,10 +137,10 @@ otherwise.
         logger.info(f"[Screenwriter] All {total} images described: {len(combined)} chars")
         return combined
 
-    def _describe_with_retry(self, prompt: str, img_path: str, label: str, max_retries: int = 3) -> str:
+    def _describe_with_retry(self, prompt: str, img_path: str, label: str, text_prompt: str = "Describe this image.", max_retries: int = 3) -> str:
         for attempt in range(max_retries):
             try:
-                return self._chat_multimodal(prompt, "Describe this image.", [img_path])
+                return self._chat_multimodal(prompt, text_prompt, [img_path])
             except Exception as e:
                 if attempt < max_retries - 1:
                     delay = 15 * (attempt + 1)
