@@ -158,9 +158,9 @@ SCENARIO_DEFS = [
 
     ScenarioConfig("C3", "带字幕+配音+关键帧", "creative",
         "/api/tasks/creative",
-        {"idea": "海边日落时分的浪漫故事",
-         "user_requirement": "3个场景，每个场景5秒，电影质感",
-         "style": "电影质感写实风格", "chaining_mode": "keyframes",
+        {"idea": "一只橘猫在阳光下的客厅里打盹",
+         "user_requirement": "2个场景，每个场景5秒，温馨治愈风格",
+         "style": "温馨写实风格", "chaining_mode": "keyframes",
          "video_duration": 5,
          "audio_enabled": True,
          "audio_voice": "zh-CN-XiaoxiaoNeural",
@@ -170,14 +170,14 @@ SCENARIO_DEFS = [
     # ── 稿件视频（短文本，激活拆段算法）──
     ScenarioConfig("M1", "短稿件+配音", "manuscript",
         "/api/tasks/manuscript",
-        {"manuscript_text": "清晨的小镇，一条小溪静静流过石桥。"
-         "溪水清澈见底，映着蓝天白云的倒影。"
-         "岸边的柳树轻轻摇摆，叶子随风飘动。"
-         "阳光洒在水面上，泛起点点金光。"
-         "微风吹过，带来泥土和青草的气息。"
-         "远处的屋顶上升起缕缕炊烟，宁静而安详。"
-         "春天来了，古镇的景色越发迷人。"
-         "桃花开满了枝头，柳树抽出嫩绿的新芽。",
+        {"manuscript_text": "今天天气真好，阳光暖暖地照在大地上。"
+         "公园里的花开了，红的黄的紫的，五颜六色。"
+         "小鸟在枝头唱歌，叽叽喳喳真好听。"
+         "孩子们在草地上奔跑，笑声传得很远。"
+         "老爷爷在长椅上看报纸，偶尔喝一口茶。"
+         "小狗在主人脚边转来转去，摇着小尾巴。"
+         "远处的喷泉哗啦啦地响着，水花闪闪发亮。"
+         "这就是一个普通的周末，简单又快乐。",
          "video_duration": 5, "audio_enabled": True,
          "audio_voice": "zh-CN-XiaoxiaoNeural"},
         TIMEOUT_MANUSCRIPT, SCENARIO_WEIGHTS["M1"]),
@@ -1268,9 +1268,9 @@ def _validate_sync(dir_name: str, scenario: ScenarioConfig) -> dict:
             # 对于非 keyframes 模式的创意任务，end_frame_prompts/end_frame_generation
             # 步骤不会被触发，不应计入"未完成"
             chaining_mode = sd.get("chaining_mode", "none")
-            _SKIPPABLE_STEPS = set()
+            _SKIPPABLE_STEPS = {"step_audio_subtitle"}  # v2.0 legacy, never set by v3.0
             if scenario.type == "creative" and chaining_mode not in ("keyframes",):
-                _SKIPPABLE_STEPS = {"step_end_frame_prompts", "step_end_frame_generation"}
+                _SKIPPABLE_STEPS |= {"step_end_frame_prompts", "step_end_frame_generation"}
 
             active_steps = {k: v for k, v in steps.items() if k not in _SKIPPABLE_STEPS}
             incomplete = [k for k, v in active_steps.items() if v != "completed"]

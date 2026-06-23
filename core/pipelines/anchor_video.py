@@ -109,7 +109,7 @@ class AnchorPipeline(BasePipeline):
         """后拼接音频模式：一段短 i2v 循环播放 + TTS + 字幕叠加。"""
         # Step 2: TTS 读稿音频（先行，获取时长和 sub_maker）
         self._check_shutdown()
-        sub_maker = await self._run_step_audio()
+        sub_maker = await self._step_audio()
 
         # Step 3: 生成单段循环优化的 i2v prompt
         self._check_shutdown()
@@ -123,7 +123,7 @@ class AnchorPipeline(BasePipeline):
 
         # Step 5: 字幕生成
         self._check_shutdown()
-        await self._run_step_subtitle(sub_maker)
+        await self._step_subtitle(sub_maker)
 
         # Step 6: 循环拼接 + 叠加音频 + 字幕
         self._check_shutdown()

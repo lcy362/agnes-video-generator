@@ -1,0 +1,349 @@
+{
+  "version": "2.0",
+  "created_at": "2026-06-23T03:42:50.385545+00:00",
+  "updated_at": "2026-06-23T04:12:09.178026+00:00",
+  "git_commit": "5c8c4a4 fix: 补齐 scene_runner.py 验证逻辑至与 regression_runner.py 对等",
+  "scenarios": {
+    "S1": {
+      "label": "关键帧 keyframes",
+      "type": "simple",
+      "status": "completed",
+      "result": {
+        "task_id": "e452bd984aa0",
+        "dir_name": "20260623_114250_e452bd984aa0",
+        "duration_s": 330.5,
+        "started_at": "1970-01-01T14:28:01.222019+00:00",
+        "completed_at": "2026-06-23T03:48:21.306012+00:00",
+        "checks": {
+          "F1_final_video_exists": true,
+          "F1_final_video_nonempty": true,
+          "F2_duration": 5.04,
+          "F2_duration_gt_0": true,
+          "F3_width": 832,
+          "F3_height": 1088,
+          "F3_resolution_matches": true,
+          "F4_has_audio_stream": true,
+          "F7_expected_duration": 5.0,
+          "F7_duration_reasonable": true,
+          "F4_has_speech": "N/A",
+          "F6_asr_text": "N/A",
+          "F6_text_match": "N/A",
+          "R1_task_state_valid": true,
+          "R2_task_type": "simple",
+          "R2_task_type_matches": true,
+          "R3_step_count": 0,
+          "R3_all_completed": true,
+          "R3_incomplete_steps": "",
+          "R4_final_path_exists": true,
+          "R5_task_json": true,
+          "R5_has_video_id": true,
+          "R6_curl_sh": true,
+          "R6_has_video_id_in_curl": true,
+          "R6_dirs_checked": 1,
+          "R6_dirs_with_curl": 1,
+          "R7_sub_dirs_exist": "N/A",
+          "R7_audio_files": "N/A",
+          "R8_subtitle_srt": "N/A",
+          "R9_full_narration": "N/A",
+          "R10_full_subtitle": "N/A",
+          "R10_srt_entries": "N/A"
+        }
+      },
+      "errors": []
+    },
+    "C1": {
+      "label": "带参考图+关键帧+无配音",
+      "type": "creative",
+      "status": "completed",
+      "result": {
+        "task_id": "2d6f55c21b83",
+        "dir_name": "20260623_114250_2d6f55c21b83",
+        "duration_s": 30.0,
+        "started_at": "1970-01-01T14:48:45.570974+00:00",
+        "completed_at": "2026-06-23T04:04:05.186121+00:00",
+        "checks": {
+          "F1_final_video_exists": true,
+          "F1_final_video_nonempty": true,
+          "F2_duration": 15.05,
+          "F2_duration_gt_0": true,
+          "F3_width": 832,
+          "F3_height": 1088,
+          "F3_resolution_matches": true,
+          "F4_has_audio_stream": true,
+          "F7_expected_duration": 15.0,
+          "F7_duration_reasonable": true,
+          "F4_has_speech": "N/A",
+          "F6_asr_text": "N/A",
+          "F6_text_match": "N/A",
+          "R1_task_state_valid": true,
+          "R2_task_type": "creative",
+          "R2_task_type_matches": true,
+          "R3_step_count": 11,
+          "R3_all_completed": false,
+          "R3_incomplete_steps": "step_audio_subtitle",
+          "R4_final_path_exists": true,
+          "R5_task_json": true,
+          "R5_has_video_id": true,
+          "R6_curl_sh": true,
+          "R6_has_video_id_in_curl": true,
+          "R6_dirs_checked": 3,
+          "R6_dirs_with_curl": 3,
+          "R7_sub_dirs_exist": true,
+          "R7_audio_files": "N/A",
+          "R8_subtitle_srt": "N/A",
+          "R9_full_narration": "N/A",
+          "R10_full_subtitle": "N/A",
+          "R10_srt_entries": "N/A"
+        }
+      },
+      "errors": [
+        "R3_all_completed"
+      ]
+    },
+    "C2": {
+      "label": "参考图生成尾帧+关键帧+无配音",
+      "type": "creative",
+      "status": "completed",
+      "result": {
+        "task_id": "045aaf81aaa4",
+        "dir_name": "20260623_114250_045aaf81aaa4",
+        "duration_s": 240.1,
+        "started_at": "1970-01-01T14:38:13.244024+00:00",
+        "completed_at": "2026-06-23T03:57:02.930719+00:00",
+        "checks": {
+          "F1_final_video_exists": true,
+          "F1_final_video_nonempty": true,
+          "F2_duration": 15.05,
+          "F2_duration_gt_0": true,
+          "F3_width": 832,
+          "F3_height": 1088,
+          "F3_resolution_matches": true,
+          "F4_has_audio_stream": true,
+          "F7_expected_duration": 15.0,
+          "F7_duration_reasonable": true,
+          "F4_has_speech": "N/A",
+          "F6_asr_text": "N/A",
+          "F6_text_match": "N/A",
+          "R1_task_state_valid": true,
+          "R2_task_type": "creative",
+          "R2_task_type_matches": true,
+          "R3_step_count": 11,
+          "R3_all_completed": false,
+          "R3_incomplete_steps": "step_audio_subtitle",
+          "R4_final_path_exists": true,
+          "R5_task_json": true,
+          "R5_has_video_id": true,
+          "R6_curl_sh": true,
+          "R6_has_video_id_in_curl": true,
+          "R6_dirs_checked": 3,
+          "R6_dirs_with_curl": 3,
+          "R7_sub_dirs_exist": true,
+          "R7_audio_files": "N/A",
+          "R8_subtitle_srt": "N/A",
+          "R9_full_narration": "N/A",
+          "R10_full_subtitle": "N/A",
+          "R10_srt_entries": "N/A"
+        }
+      },
+      "errors": [
+        "R3_all_completed"
+      ]
+    },
+    "C3": {
+      "label": "带字幕+配音+关键帧",
+      "type": "creative",
+      "status": "failed",
+      "result": {
+        "task_id": "084472cbfe9e",
+        "dir_name": "20260623_114250_084472cbfe9e",
+        "duration_s": 110.0
+      },
+      "errors": [
+        "status=failed: ?"
+      ]
+    },
+    "M1": {
+      "label": "短稿件+配音",
+      "type": "manuscript",
+      "status": "failed",
+      "result": {
+        "task_id": "2cc9797da78d",
+        "dir_name": "20260623_114250_2cc9797da78d",
+        "duration_s": 200.1
+      },
+      "errors": [
+        "status=failed: ?"
+      ]
+    },
+    "M2": {
+      "label": "短稿件+自定义字幕",
+      "type": "manuscript",
+      "status": "completed",
+      "result": {
+        "task_id": "503cad6854f2",
+        "dir_name": "20260623_114250_503cad6854f2",
+        "duration_s": 510.1,
+        "started_at": "1970-01-01T14:48:45.572513+00:00",
+        "completed_at": "2026-06-23T04:12:09.113884+00:00",
+        "checks": {
+          "F1_final_video_exists": true,
+          "F1_final_video_nonempty": true,
+          "F2_duration": 34.31,
+          "F2_duration_gt_0": true,
+          "F3_width": 832,
+          "F3_height": 1088,
+          "F3_resolution_matches": true,
+          "F4_has_audio_stream": true,
+          "F7_expected_duration": 34.0,
+          "F7_duration_reasonable": true,
+          "F4_has_speech": true,
+          "F6_asr_text": "清澈的小震 一條小西靜靜流過十橋西水清澈間底 應著藍天白雲的道應暗邊的流術清清搖擺 葉子隨風飄動陽光撒在水面上 飯起點點金光微風吹過 大蘭泥土和清草的氣息遠處的屋頂上 升起履履吹淹 明靜而安翔春天來了 古震的景色越發迷人淘花開滿了芝頭 留樹抽出嫩綠的心壓",
+          "F4_speech_duration": 0.0,
+          "F6_text_match": true,
+          "R1_task_state_valid": true,
+          "R2_task_type": "manuscript",
+          "R2_task_type_matches": true,
+          "R3_step_count": 7,
+          "R3_all_completed": false,
+          "R3_incomplete_steps": "step_audio_subtitle",
+          "R4_final_path_exists": true,
+          "R5_task_json": true,
+          "R5_has_video_id": true,
+          "R6_curl_sh": true,
+          "R6_has_video_id_in_curl": true,
+          "R6_dirs_checked": 3,
+          "R6_dirs_with_curl": 3,
+          "R7_sub_dirs_exist": true,
+          "R7_audio_files": true,
+          "R8_subtitle_srt": true,
+          "R9_full_narration": true,
+          "R10_full_subtitle": true,
+          "R10_srt_entries": 16
+        }
+      },
+      "errors": [
+        "R3_all_completed"
+      ]
+    },
+    "A1": {
+      "label": "数字人+后拼接音频",
+      "type": "anchor",
+      "status": "failed",
+      "result": {
+        "task_id": "0f8e40f6967b",
+        "dir_name": "20260623_114250_0f8e40f6967b",
+        "duration_s": 110.0
+      },
+      "errors": [
+        "status=failed: ?"
+      ]
+    },
+    "A2": {
+      "label": "数字人+模型音频",
+      "type": "anchor",
+      "status": "completed",
+      "result": {
+        "task_id": "06a84f2ed1d4",
+        "dir_name": "20260623_114250_06a84f2ed1d4",
+        "duration_s": 330.1,
+        "started_at": "1970-01-01T14:38:13.246358+00:00",
+        "completed_at": "2026-06-23T03:58:32.614502+00:00",
+        "checks": {
+          "F1_final_video_exists": false,
+          "F1_final_video_nonempty": false,
+          "F2_duration": 0,
+          "F2_duration_gt_0": false,
+          "F4_has_audio_stream": false,
+          "F7_duration_reasonable": false,
+          "F4_has_speech": "N/A",
+          "F6_asr_text": "N/A",
+          "F6_text_match": "N/A",
+          "R1_task_state_valid": true,
+          "R2_task_type": "anchor",
+          "R2_task_type_matches": true,
+          "R3_step_count": 7,
+          "R3_all_completed": false,
+          "R3_incomplete_steps": "step_split,step_clip_prompts,step_audio",
+          "R4_final_path_exists": true,
+          "R5_task_json": false,
+          "R5_has_video_id": false,
+          "R6_curl_sh": false,
+          "R6_has_video_id_in_curl": false,
+          "R6_dirs_checked": 0,
+          "R6_dirs_with_curl": 0,
+          "R7_sub_dirs_exist": true,
+          "R7_audio_files": "N/A",
+          "R8_subtitle_srt": "N/A",
+          "R9_full_narration": "N/A",
+          "R10_full_subtitle": "N/A",
+          "R10_srt_entries": "N/A"
+        }
+      },
+      "errors": [
+        "F1_final_video_exists",
+        "F1_final_video_nonempty",
+        "F2_duration_gt_0",
+        "F4_has_audio_stream",
+        "F7_duration_reasonable",
+        "R3_all_completed",
+        "R5_task_json",
+        "R5_has_video_id",
+        "R6_curl_sh",
+        "R6_has_video_id_in_curl"
+      ]
+    }
+  },
+  "endpoints": {
+    "E1": {
+      "status": "passed",
+      "detail": "200"
+    },
+    "E2": {
+      "status": "passed",
+      "detail": "200"
+    },
+    "E3": {
+      "status": "passed",
+      "detail": "200"
+    },
+    "E4": {
+      "status": "passed",
+      "detail": "200"
+    },
+    "E5": {
+      "status": "passed",
+      "detail": "200"
+    },
+    "E6": {
+      "status": "passed",
+      "detail": "200"
+    },
+    "E7": {
+      "status": "passed",
+      "detail": "fb5ffdd78ed7 type=creative"
+    },
+    "E8": {
+      "status": "passed",
+      "detail": "2cc9797da78d 200"
+    },
+    "E9": {
+      "status": "passed",
+      "detail": "fb5ffdd78ed7 200"
+    },
+    "E10": {
+      "status": "passed",
+      "detail": "200"
+    }
+  },
+  "summary": {
+    "total": 8,
+    "completed": 5,
+    "failed": 3,
+    "skipped": 0,
+    "running": 0,
+    "pending": 0,
+    "passed_checks": 66,
+    "total_checks": 109
+  },
+  "server_pid": null
+}
