@@ -110,7 +110,7 @@
 
   <!-- Header -->
   <div class="text-center mb-10 relative">
-    <div class="absolute right-0 top-0">
+    <div class="absolute right-0 top-0" style="z-index: 10;">
       <select id="lang-selector" onchange="switchLang(this.value)" class="glass-input rounded-lg px-3 py-1.5 text-sm cursor-pointer text-gray-100">
         <option value="zh">🇨🇳 中文</option>
         <option value="en">🇺🇸 English</option>
@@ -121,7 +121,7 @@
         <option value="id">🇮🇩 Bahasa Indonesia</option>
       </select>
     </div>
-    <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-300 to-amber-400 bg-clip-text text-transparent" style="filter: drop-shadow(0 0 20px rgba(59,130,246,0.2));">
+    <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-300 to-amber-400 bg-clip-text text-transparent" style="filter: drop-shadow(0 0 20px rgba(59,130,246,0.2)); position: relative; z-index: 0;">
       Agnes Video Generator
     </h1>
     <p class="text-gray-500 mt-2 text-sm tracking-wide" data-i18n="subtitle">AI 视频，一键生成</p>
