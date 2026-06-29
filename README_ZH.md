@@ -412,6 +412,15 @@ agnes-video-generator/
 
 欢迎通过 [GitHub Issues](../../issues) 提交问题反馈或功能建议。
 
+## 💝 支持开发者
+
+Agnes Video Generator 完全免费且开源，**本项目绝不会提供付费计划、增值服务或订阅模式**——无论现在还是将来。
+
+如果你觉得这个项目对你有帮助，可以通过以下方式支持它持续发展：
+
+- **在官网关闭去广告插件** — 在 [video.lichuanyang.top](https://video.lichuanyang.top) 上关闭 AdBlock 等去广告工具，看到感兴趣的广告可以点一下。举手之劳，却是实实在在的支持。
+- **分享你的创作** — 将你用 Agnes Video Generator 生成的视频发布到社交媒体（抖音、YouTube、小红书等）并标注本项目。让更多人知道这个工具，更多的用户意味着更多的反馈，项目也会变得更好。
+
 ## 📄 License
 
 MIT
