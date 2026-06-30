@@ -907,12 +907,15 @@ async def create_simple_task(
 async def create_creative_task(
     idea: str = Form(...),
     creative_name: str = Form(""),
-    user_requirement: str = Form("3个场景，每个场景10秒，电影质感"),
     style: str = Form("电影质感写实风格"),
     chaining_mode: str = Form("keyframes"),
     video_width: int = Form(768),
     video_height: int = Form(1152),
-    video_duration: int = Form(5),
+    # ── v3.x 场景配置 ──
+    duration_source: str = Form("manual"),
+    scene_count: int = Form(3),
+    uniform_duration: bool = Form(True),
+    scene_durations_json: str = Form("[5,5,5]"),
     reference_image: UploadFile = File(None),
     end_frame_images: List[UploadFile] = File(None),
     use_custom_end_frames: bool = Form(False),
@@ -941,18 +944,28 @@ async def create_creative_task(
     # P7: 参数校验
     if len(idea) > 10000:
         raise HTTPException(status_code=422, detail="idea 最多 10000 字符")
-    if video_duration < 1 or video_duration > 30:
-        raise HTTPException(status_code=422, detail="video_duration 范围 1-30 秒")
+    if duration_source not in ("manual", "prompt"):
+        raise HTTPException(status_code=422, detail="duration_source 必须为 manual 或 prompt")
+    if duration_source == "manual":
+        if scene_count < 1 or scene_count > 30:
+            raise HTTPException(status_code=422, detail="scene_count 范围 1-30")
+        # 解析场景时长 JSON
+        try:
+            scene_durations = json.loads(scene_durations_json)
+            if not isinstance(scene_durations, list):
+                raise ValueError("not a list")
+        except Exception:
+            raise HTTPException(status_code=422, detail="scene_durations_json 必须为 JSON 数组")
+        # 校验每个时长
+        for i, d in enumerate(scene_durations):
+            if not isinstance(d, (int, float)) or d < 2 or d > 30:
+                raise HTTPException(status_code=422, detail=f"场景 {i+1} 时长范围 2-30 秒")
+    else:
+        scene_durations = []
 
     task_id = uuid.uuid4().hex[:12]
     name = creative_name.strip() if creative_name else f"video_{task_id}"
     dir_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_id}"
-
-    # 解析时长：user_requirement 中显式提到时长时用它，否则用 video_duration 参数
-    parsed_duration = _parse_duration(user_requirement)
-    req_has_explicit_duration = _has_explicit_duration(user_requirement)
-    if not req_has_explicit_duration and video_duration > 0:
-        parsed_duration = video_duration
 
     # 构建音频配置
     audio_config = AudioConfig(
@@ -981,19 +994,25 @@ async def create_creative_task(
         task_id=task_id,
         creative_name=name,
         idea=idea,
-        user_requirement=user_requirement,
         style=style,
         chaining_mode=chaining_mode,
         video_width=video_width,
         video_height=video_height,
-        video_duration=parsed_duration,
+        video_duration=5,
+        duration_source=duration_source,
+        scene_count=scene_count,
+        uniform_duration=uniform_duration,
+        scene_durations=scene_durations,
         use_custom_end_frames=use_custom_end_frames,
         generate_end_frames_from_ref=generate_end_frames_from_ref,
         audio_config=audio_config,
         subtitle_config=subtitle_config,
     )
 
-    logger.info(f"[Pipeline] Parsed video_duration={parsed_duration}s from user_requirement={user_requirement!r}")
+    logger.info(
+        f"[Pipeline] Scene config: source={duration_source}, "
+        f"scenes={scene_count}, durations={scene_durations}, uniform={uniform_duration}"
+    )
 
     # 处理参考图上传（L4: 用 UUID 替代客户端文件名，避免路径穿越）
     if reference_image and reference_image.filename:
