@@ -180,15 +180,26 @@ class CreativeVideoTask(BaseTaskState):
 
     # ── 现有字段（保持兼容）──
     idea: str = ""
-    user_requirement: str = ""
     style: str = ""
     chaining_mode: str = "none"
-    video_duration: int = 5
+    video_duration: int = 5  # 兜底默认值，实际场景时长由 SceneTask.duration 控制
+
+    # ── v3.x 场景配置（替代 user_requirement）──
+    duration_source: str = "manual"  # "manual" | "prompt" — 场景数和时长来源
+    scene_count: int = 3
+    uniform_duration: bool = True
+    scene_durations: List[int] = Field(default_factory=lambda: [5, 5, 5])
+
+    # ── 向后兼容（已废弃，保留以兼容旧数据）──
+    user_requirement: str = ""
 
     reference_image: str = ""
     end_frame_images: List[str] = Field(default_factory=list)
     use_custom_end_frames: bool = False
     generate_end_frames_from_ref: bool = True  # i2i 尾帧优化后默认开启
+
+    # ── v3.x 场景配置步骤 ──
+    step_scene_config: StepStatus = StepStatus.PENDING
 
     step_story: StepStatus = StepStatus.PENDING
     story_file: str = ""
@@ -200,7 +211,6 @@ class CreativeVideoTask(BaseTaskState):
 
     step_script: StepStatus = StepStatus.PENDING
     script_file: str = ""
-    scene_count: int = 0
 
     step_end_frame_prompts: StepStatus = StepStatus.PENDING
     end_frame_prompts_file: str = ""
@@ -377,12 +387,17 @@ class CreateCreativeTaskRequest(BaseModel):
     """创建创意长视频任务的请求体"""
 
     idea: str
-    user_requirement: str = "3个场景，每个场景10秒，电影质感"
     style: str = "电影质感写实风格"
     chaining_mode: str = "keyframes"
     video_width: int = 768
     video_height: int = 1152
-    video_duration: int = 5
+
+    # ── 场景配置 ──
+    duration_source: str = "manual"  # "manual" | "prompt"
+    scene_count: int = 3
+    uniform_duration: bool = True
+    scene_durations: List[int] = Field(default_factory=lambda: [5, 5, 5])
+
     audio_config: Optional[AudioConfig] = None
     subtitle_config: Optional[SubtitleConfig] = None
 

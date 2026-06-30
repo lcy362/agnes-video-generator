@@ -376,15 +376,61 @@
           <textarea id="c_idea" rows="4" data-i18n-placeholder="ideaPlaceholder" placeholder="描述你心中的故事、场景和角色..." class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-gray-100 placeholder-gray-600"></textarea>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="userRequirement">用户要求</label>
-            <input id="c_requirement" value="3个场景，每个场景5秒，电影质感" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
+        <!-- Scene Configuration -->
+        <div class="mb-4 p-4 rounded-xl bg-gray-800/30 border border-gray-700/50">
+          <h3 class="text-sm font-medium text-blue-300 mb-3" data-i18n="sceneConfig">场景配置</h3>
+
+          <!-- Duration source toggle -->
+          <div class="mb-4">
+            <label class="block text-sm text-gray-400 mb-2" data-i18n="durationSource">场景信息获取方式</label>
+            <div class="flex gap-2">
+              <label class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-800/50 border border-gray-700 cursor-pointer hover:border-blue-500/30 transition" id="c_source_manual_label">
+                <input type="radio" name="c_duration_source" value="manual" checked onchange="toggleSceneSource()" class="text-blue-500">
+                <span class="text-sm text-gray-300" data-i18n="sourceManual">手动设置</span>
+              </label>
+              <label class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-800/50 border border-gray-700 cursor-pointer hover:border-blue-500/30 transition" id="c_source_prompt_label">
+                <input type="radio" name="c_duration_source" value="prompt" onchange="toggleSceneSource()" class="text-blue-500">
+                <span class="text-sm text-gray-300" data-i18n="sourcePrompt">从创意描述中提取</span>
+              </label>
+            </div>
+            <p id="c_source_hint" class="text-xs text-gray-500 mt-1.5" data-i18n="sourceManualHint">手动指定场景数量和每场景时长</p>
           </div>
-          <div>
-            <label class="block text-sm text-gray-400 mb-1.5" data-i18n="visualStyle">视觉风格</label>
-            <input id="c_style" value="电影质感写实风格" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
+
+          <!-- Manual config (shown when manual is selected) -->
+          <div id="c_manual_scene_config">
+            <div class="mb-3">
+              <label class="block text-xs text-gray-400 mb-1" data-i18n="sceneCount">场景数量</label>
+              <input id="c_scene_count" type="number" min="1" max="30" value="3" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+            </div>
+
+            <div class="mb-3">
+              <label class="block text-xs text-gray-400 mb-1.5" data-i18n="durationMode">各场景时长</label>
+              <div class="flex gap-2 mb-2">
+                <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                  <input type="radio" name="c_uniform" value="1" checked onchange="toggleDurationMode()" class="text-blue-500">
+                  <span data-i18n="uniformDuration">统一</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                  <input type="radio" name="c_uniform" value="0" onchange="toggleDurationMode()" class="text-blue-500">
+                  <span data-i18n="independentDuration">独立</span>
+                </label>
+              </div>
+              <div id="c_uniform_duration_wrap">
+                <input id="c_uniform_duration" type="number" min="2" max="30" value="5" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-gray-100">
+                <span class="text-xs text-gray-500 ml-1" data-i18n="seconds">秒</span>
+              </div>
+              <div id="c_independent_durations_wrap" class="hidden space-y-2">
+                <div id="c_duration_inputs">
+                  <!-- dynamic inputs -->
+                </div>
+              </div>
+            </div>
           </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm text-gray-400 mb-1.5" data-i18n="visualStyle">视觉风格</label>
+          <input id="c_style" value="电影质感写实风格" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-gray-100 placeholder-gray-600">
         </div>
       </div>
 
@@ -958,7 +1004,7 @@ const T = {
     advancedSettings: '高级设置', optional: '可选', seedPlaceholder: '留空随机', negativePlaceholder: '排除不希望出现的元素',
     taskName: '任务名称', taskNamePlaceholder: '可选，留空自动生成',
     ideaLabel: '创意描述', ideaPlaceholder: '描述你心中的故事、场景和角色...',
-    userRequirement: '用户要求', visualStyle: '视觉风格',
+    visualStyle: '视觉风格',
     requirementDefault: '3个场景，每个场景5秒，电影质感', styleDefault: '电影质感写实风格',
     chainingMode: '串联模式', modeKeyframes: 'keyframes (推荐)', modeTi2vid: 'ti2vid (过渡帧)', modeNone: 'none (独立场景)',
     referenceImage: '参考图 (可选)', refDescription: '可选。提供后所有场景将以该图为视觉锚点；不提供则自动从故事中生成角色参考图',
@@ -979,13 +1025,19 @@ const T = {
     // Progress steps — simple
     sStepSubmit: '提交任务', sStepVideoGen: '视频生成',
     // Progress steps — creative
-    cStepInit: '初始化', cStepImageAnalysis: '图片分析', cStepStory: '故事生成',
+    cStepInit: '初始化', cStepSceneConfig: '场景配置', cStepImageAnalysis: '图片分析', cStepStory: '故事生成',
     cStepCharacterRef: '角色参考图', cStepScript: '脚本编写', cStepEndFramePrompts: '尾帧提示词',
     cStepEndFrameGen: '尾帧生成', cStepVideoGen: '视频生成', cStepAudio: '音频生成', cStepSubtitle: '字幕生成', cStepConcat: '视频拼接',
     // Progress steps — manuscript
     mStepSplit: '文本拆分', mStepScenePrompts: '场景Prompt', mStepVideoGen: '视频生成', mStepAudio: '音频生成', mStepSubtitle: '字幕生成', mStepConcat: '视频拼接',
     videoComplete: '视频生成完成!', taskComplete: '任务已完成',
     taskId: '任务ID', dir: '目录', idea_: '创意', sceneCount: '场景数', chainingMode_: '串联模式',
+    // v3.x scene config
+    sceneConfig: '场景配置', durationSource: '场景信息获取方式',
+    sourceManual: '手动设置', sourcePrompt: '从创意描述中提取',
+    sourceManualHint: '手动指定场景数量和每场景时长',
+    sourcePromptHint: 'AI 将从创意描述中自动分析场景数和时长',
+    durationMode: '各场景时长', uniformDuration: '统一', independentDuration: '独立', seconds: '秒',
     artifact: '产物', paragraphCount: '段落数',
     statusCompleted: '已完成', statusRunning: '进行中', statusFailed: '失败', statusPending: '待处理', statusQueued: '排队中',
     btnView: '查看', btnViewProgress: '查看进度', btnResume: '续传', btnStop: '中断',
@@ -1060,7 +1112,7 @@ const T = {
     advancedSettings: 'Advanced Settings', optional: 'Optional', seedPlaceholder: 'Leave blank for random', negativePlaceholder: 'Elements to exclude',
     taskName: 'Task Name', taskNamePlaceholder: 'Optional, auto-generated if blank',
     ideaLabel: 'Idea Description', ideaPlaceholder: 'Describe your story, scenes, and characters...',
-    userRequirement: 'Requirements', visualStyle: 'Visual Style',
+    visualStyle: 'Visual Style',
     requirementDefault: '3 scenes, 5 seconds each, cinematic quality', styleDefault: 'cinematic realistic style',
     chainingMode: 'Chaining Mode', modeKeyframes: 'keyframes (recommended)', modeTi2vid: 'ti2vid (transition)', modeNone: 'none (independent)',
     referenceImage: 'Reference Image (Optional)', refDescription: 'Optional. All scenes use this as visual anchor. Auto-generated if not provided.',
@@ -1079,12 +1131,17 @@ const T = {
     loading: 'Loading...', noTasks: 'No tasks', loadFailed: 'Load failed',
     progress: 'Progress', stopTask: 'Stop Task',
     sStepSubmit: 'Submit', sStepVideoGen: 'Video Generation',
-    cStepInit: 'Init', cStepImageAnalysis: 'Image Analysis', cStepStory: 'Story',
+    cStepInit: 'Init', cStepSceneConfig: 'Scene Config', cStepImageAnalysis: 'Image Analysis', cStepStory: 'Story',
     cStepCharacterRef: 'Character Ref', cStepScript: 'Script', cStepEndFramePrompts: 'End Frame Prompts',
     cStepEndFrameGen: 'End Frame Gen', cStepVideoGen: 'Video Gen', cStepAudio: 'Audio', cStepSubtitle: 'Subtitle', cStepConcat: 'Concatenate',
     mStepSplit: 'Text Split', mStepScenePrompts: 'Scene Prompts', mStepVideoGen: 'Video Gen', mStepAudio: 'Audio', mStepSubtitle: 'Subtitle', mStepConcat: 'Concatenate',
     videoComplete: 'Video generation complete!', taskComplete: 'Task completed',
     taskId: 'Task ID', dir: 'Directory', idea_: 'Idea', sceneCount: 'Scenes', chainingMode_: 'Chaining',
+    sceneConfig: 'Scene Config', durationSource: 'Scene Info Source',
+    sourceManual: 'Manual', sourcePrompt: 'Extract from Idea',
+    sourceManualHint: 'Specify scene count and per-scene duration manually',
+    sourcePromptHint: 'AI will analyze scene count and durations from the idea',
+    durationMode: 'Scene Duration', uniformDuration: 'Uniform', independentDuration: 'Independent', seconds: 's',
     artifact: 'Output', paragraphCount: 'Paragraphs',
     statusCompleted: 'Completed', statusRunning: 'Running', statusFailed: 'Failed', statusPending: 'Pending', statusQueued: 'Queued',
     btnView: 'View', btnViewProgress: 'Progress', btnResume: 'Resume', btnStop: 'Stop',
@@ -1159,7 +1216,7 @@ const T = {
     advancedSettings: 'Расширенные', optional: 'Опционально', seedPlaceholder: 'Пусто = случайно', negativePlaceholder: 'Исключить элементы',
     taskName: 'Название', taskNamePlaceholder: 'Необязательно',
     ideaLabel: 'Идея', ideaPlaceholder: 'Опишите историю, сцены, персонажей...',
-    userRequirement: 'Требования', visualStyle: 'Стиль',
+    visualStyle: 'Стиль',
     requirementDefault: '3 сцены, по 5 секунд, кинематографическое качество', styleDefault: 'кинематографический реалистичный стиль',
     chainingMode: 'Связывание', modeKeyframes: 'keyframes', modeTi2vid: 'ti2vid', modeNone: 'none',
     referenceImage: 'Референс', refDescription: 'Все сцены используют это изображение.',
@@ -1178,12 +1235,17 @@ const T = {
     loading: 'Загрузка...', noTasks: 'Нет задач', loadFailed: 'Ошибка загрузки',
     progress: 'Прогресс', stopTask: 'Остановить',
     sStepSubmit: 'Отправка', sStepVideoGen: 'Генерация видео',
-    cStepInit: 'Инициализация', cStepImageAnalysis: 'Анализ', cStepStory: 'Сюжет',
+    cStepInit: 'Инициализация', cStepSceneConfig: 'Настройки сцен', cStepImageAnalysis: 'Анализ', cStepStory: 'Сюжет',
     cStepCharacterRef: 'Персонаж', cStepScript: 'Сценарий', cStepEndFramePrompts: 'Промпты кадров',
     cStepEndFrameGen: 'Генерация кадров', cStepVideoGen: 'Генерация видео', cStepAudio: 'Аудио', cStepSubtitle: 'Субтитры', cStepConcat: 'Сборка',
     mStepSplit: 'Разбиение', mStepScenePrompts: 'Промпты', mStepVideoGen: 'Генерация видео', mStepAudio: 'Аудио', mStepSubtitle: 'Субтитры', mStepConcat: 'Сборка',
     videoComplete: 'Видео готово!', taskComplete: 'Задача выполнена',
     taskId: 'ID', dir: 'Папка', idea_: 'Идея', sceneCount: 'Сцены', chainingMode_: 'Режим',
+    sceneConfig: 'Настройки сцен', durationSource: 'Источник',
+    sourceManual: 'Вручную', sourcePrompt: 'Извлечь из идеи',
+    sourceManualHint: 'Укажите количество сцен и длительность',
+    sourcePromptHint: 'ИИ проанализирует идею',
+    durationMode: 'Длительность', uniformDuration: 'Одинаковая', independentDuration: 'Разная', seconds: 'с',
     artifact: 'Результат', paragraphCount: 'Параграфов',
     statusCompleted: 'Готово', statusRunning: 'Работает', statusFailed: 'Ошибка', statusPending: 'Ожидание', statusQueued: 'В очереди',
     btnView: 'Просмотр', btnViewProgress: 'Прогресс', btnResume: 'Продолжить', btnStop: 'Стоп',
@@ -1256,7 +1318,7 @@ const T = {
     advancedSettings: '詳細設定', optional: '任意', seedPlaceholder: '空欄=ランダム', negativePlaceholder: '除外要素',
     taskName: 'タスク名', taskNamePlaceholder: '任意',
     ideaLabel: 'アイデア', ideaPlaceholder: 'ストーリーを記述...',
-    userRequirement: '要件', visualStyle: 'スタイル',
+    visualStyle: 'スタイル',
     requirementDefault: '3シーン、各5秒、映画品質', styleDefault: '映画のようなリアルなスタイル',
     chainingMode: '連鎖', modeKeyframes: 'keyframes', modeTi2vid: 'ti2vid', modeNone: 'none',
     referenceImage: '参照画像', refDescription: '全シーンの視覚アンカー。',
@@ -1275,12 +1337,17 @@ const T = {
     loading: '読込中...', noTasks: 'タスクなし', loadFailed: '読込失敗',
     progress: '進捗', stopTask: '中断',
     sStepSubmit: '送信', sStepVideoGen: '動画生成',
-    cStepInit: '初期化', cStepImageAnalysis: '画像分析', cStepStory: 'ストーリー',
+    cStepInit: '初期化', cStepSceneConfig: 'シーン設定', cStepImageAnalysis: '画像分析', cStepStory: 'ストーリー',
     cStepCharacterRef: 'キャラ参照', cStepScript: '脚本', cStepEndFramePrompts: '最終フレームP',
     cStepEndFrameGen: '最終フレーム生成', cStepVideoGen: '動画生成', cStepAudio: '音声生成', cStepSubtitle: '字幕生成', cStepConcat: '結合',
     mStepSplit: 'テキスト分割', mStepScenePrompts: 'シーンP', mStepVideoGen: '動画生成', mStepAudio: '音声生成', mStepSubtitle: '字幕生成', mStepConcat: '結合',
     videoComplete: '動画完了!', taskComplete: 'タスク完了',
     taskId: 'ID', dir: 'ディレクトリ', idea_: 'アイデア', sceneCount: 'シーン', chainingMode_: '連鎖',
+    sceneConfig: 'シーン設定', durationSource: '情報ソース',
+    sourceManual: '手動設定', sourcePrompt: 'アイデアから抽出',
+    sourceManualHint: 'シーン数と時間を手動で指定',
+    sourcePromptHint: 'AIがアイデアから分析します',
+    durationMode: 'シーン時間', uniformDuration: '統一', independentDuration: '個別', seconds: '秒',
     artifact: '出力', paragraphCount: '段落数',
     statusCompleted: '完了', statusRunning: '実行中', statusFailed: '失敗', statusPending: '保留', statusQueued: '待機中',
     btnView: '表示', btnViewProgress: '進捗', btnResume: '再開', btnStop: '停止',
@@ -1350,7 +1417,7 @@ const T = {
     advancedSettings: '고급 설정', optional: '선택', seedPlaceholder: '비우기=랜덤', negativePlaceholder: '제외 요소',
     taskName: '작업 이름', taskNamePlaceholder: '선택사항',
     ideaLabel: '아이디어', ideaPlaceholder: '스토리를 설명하세요...',
-    userRequirement: '요구사항', visualStyle: '스타일',
+    visualStyle: '스타일',
     requirementDefault: '3개 장면, 각 5초, 영화 품질', styleDefault: '영화 같은 사실적인 스타일',
     chainingMode: '체인', modeKeyframes: 'keyframes', modeTi2vid: 'ti2vid', modeNone: 'none',
     referenceImage: '참조 이미지', refDescription: '모든 장면의 시각 기준.',
@@ -1369,12 +1436,17 @@ const T = {
     loading: '로딩...', noTasks: '작업 없음', loadFailed: '로딩 실패',
     progress: '진행', stopTask: '중단',
     sStepSubmit: '제출', sStepVideoGen: '영상 생성',
-    cStepInit: '초기화', cStepImageAnalysis: '이미지 분석', cStepStory: '스토리',
+    cStepInit: '초기화', cStepSceneConfig: '장면 설정', cStepImageAnalysis: '이미지 분석', cStepStory: '스토리',
     cStepCharacterRef: '캐릭터', cStepScript: '대본', cStepEndFramePrompts: '엔드 프레임 P',
     cStepEndFrameGen: '엔드 프레임 생성', cStepVideoGen: '영상 생성', cStepAudio: '오디오 생성', cStepSubtitle: '자막 생성', cStepConcat: '결합',
     mStepSplit: '텍스트 분할', mStepScenePrompts: '씬 프롬프트', mStepVideoGen: '영상 생성', mStepAudio: '오디오 생성', mStepSubtitle: '자막 생성', mStepConcat: '결합',
     videoComplete: '영상 완료!', taskComplete: '작업 완료',
     taskId: 'ID', dir: '디렉토리', idea_: '아이디어', sceneCount: '장면', chainingMode_: '체인',
+    sceneConfig: '장면 설정', durationSource: '정보 출처',
+    sourceManual: '수동 설정', sourcePrompt: '아이디어에서 추출',
+    sourceManualHint: '장면 수와 시간을 수동으로 지정',
+    sourcePromptHint: 'AI가 아이디어에서 분석합니다',
+    durationMode: '장면 시간', uniformDuration: '통일', independentDuration: '개별', seconds: '초',
     artifact: '출력', paragraphCount: '문단 수',
     statusCompleted: '완료', statusRunning: '실행 중', statusFailed: '실패', statusPending: '대기', statusQueued: '대기열',
     btnView: '보기', btnViewProgress: '진행', btnResume: '재개', btnStop: '중지',
@@ -1444,7 +1516,7 @@ const T = {
     advancedSettings: 'Tetapan Lanjutan', optional: 'Pilihan', seedPlaceholder: 'Kosong=rawak', negativePlaceholder: 'Kecualikan elemen',
     taskName: 'Nama Tugas', taskNamePlaceholder: 'Pilihan',
     ideaLabel: 'Idea', ideaPlaceholder: 'Terangkan cerita anda...',
-    userRequirement: 'Keperluan', visualStyle: 'Gaya',
+    visualStyle: 'Gaya',
     requirementDefault: '3 babak, 5 saat setiap satu, kualiti sinematik', styleDefault: 'gaya realistik sinematik',
     chainingMode: 'Rantai', modeKeyframes: 'keyframes', modeTi2vid: 'ti2vid', modeNone: 'none',
     referenceImage: 'Imej Rujukan', refDescription: 'Semua babak guna imej ini.',
@@ -1463,12 +1535,17 @@ const T = {
     loading: 'Memuat...', noTasks: 'Tiada tugas', loadFailed: 'Gagal memuat',
     progress: 'Kemajuan', stopTask: 'Henti',
     sStepSubmit: 'Hantar', sStepVideoGen: 'Hasilkan Video',
-    cStepInit: 'Permulaan', cStepImageAnalysis: 'Analisis', cStepStory: 'Cerita',
+    cStepInit: 'Permulaan', cStepSceneConfig: 'Konfigurasi Babak', cStepImageAnalysis: 'Analisis', cStepStory: 'Cerita',
     cStepCharacterRef: 'Watak', cStepScript: 'Skrip', cStepEndFramePrompts: 'Bingkai Akhir P',
     cStepEndFrameGen: 'Bingkai Akhir', cStepVideoGen: 'Video', cStepAudio: 'Audio', cStepSubtitle: 'Sarikata', cStepConcat: 'Gabung',
     mStepSplit: 'Pecah Teks', mStepScenePrompts: 'Prompt', mStepVideoGen: 'Video', mStepAudio: 'Audio', mStepSubtitle: 'Sarikata', mStepConcat: 'Gabung',
     videoComplete: 'Video selesai!', taskComplete: 'Tugas selesai',
     taskId: 'ID', dir: 'Direktori', idea_: 'Idea', sceneCount: 'Babak', chainingMode_: 'Rantai',
+    sceneConfig: 'Konfigurasi Babak', durationSource: 'Sumber Maklumat',
+    sourceManual: 'Manual', sourcePrompt: 'Ekstrak dari Idea',
+    sourceManualHint: 'Tentukan bilangan dan tempoh babak secara manual',
+    sourcePromptHint: 'AI akan menganalisis idea',
+    durationMode: 'Tempoh Babak', uniformDuration: 'Seragam', independentDuration: 'Bebas', seconds: 's',
     artifact: 'Hasil', paragraphCount: 'Perenggan',
     statusCompleted: 'Selesai', statusRunning: 'Berjalan', statusFailed: 'Gagal', statusPending: 'Menunggu', statusQueued: 'Dalam barisan',
     btnView: 'Lihat', btnViewProgress: 'Kemajuan', btnResume: 'Sambung', btnStop: 'Henti',
@@ -1538,7 +1615,7 @@ const T = {
     advancedSettings: 'Pengaturan Lanjutan', optional: 'Opsional', seedPlaceholder: 'Kosong=acak', negativePlaceholder: 'Kecualikan elemen',
     taskName: 'Nama Tugas', taskNamePlaceholder: 'Opsional',
     ideaLabel: 'Ide', ideaPlaceholder: 'Jelaskan cerita Anda...',
-    userRequirement: 'Persyaratan', visualStyle: 'Gaya',
+    visualStyle: 'Gaya',
     requirementDefault: '3 adegan, masing-masing 5 detik, kualitas sinematik', styleDefault: 'gaya realistis sinematik',
     chainingMode: 'Rantai', modeKeyframes: 'keyframes', modeTi2vid: 'ti2vid', modeNone: 'none',
     referenceImage: 'Gambar Referensi', refDescription: 'Semua adegan pakai gambar ini.',
@@ -1556,12 +1633,17 @@ const T = {
     loading: 'Memuat...', noTasks: 'Tidak ada tugas', loadFailed: 'Gagal memuat',
     progress: 'Kemajuan', stopTask: 'Hentikan',
     sStepSubmit: 'Kirim', sStepVideoGen: 'Hasilkan Video',
-    cStepInit: 'Inisialisasi', cStepImageAnalysis: 'Analisis', cStepStory: 'Cerita',
+    cStepInit: 'Inisialisasi', cStepSceneConfig: 'Konfigurasi Adegan', cStepImageAnalysis: 'Analisis', cStepStory: 'Cerita',
     cStepCharacterRef: 'Karakter', cStepScript: 'Skenario', cStepEndFramePrompts: 'Bingkai Akhir P',
     cStepEndFrameGen: 'Bingkai Akhir', cStepVideoGen: 'Video', cStepAudio: 'Audio', cStepSubtitle: 'Sarikata', cStepConcat: 'Gabung',
     mStepSplit: 'Pecah Teks', mStepScenePrompts: 'Prompt', mStepVideoGen: 'Video', mStepAudio: 'Audio', mStepSubtitle: 'Sarikata', mStepConcat: 'Gabung',
     videoComplete: 'Video selesai!', taskComplete: 'Tugas selesai',
     taskId: 'ID', dir: 'Direktori', idea_: 'Ide', sceneCount: 'Adegan', chainingMode_: 'Rantai',
+    sceneConfig: 'Konfigurasi Adegan', durationSource: 'Sumber Maklumat',
+    sourceManual: 'Manual', sourcePrompt: 'Ekstrak dari Ide',
+    sourceManualHint: 'Tentukan jumlah dan durasi adegan secara manual',
+    sourcePromptHint: 'AI akan menganalisis ide',
+    durationMode: 'Durasi Adegan', uniformDuration: 'Seragam', independentDuration: 'Mandiri', seconds: 'd',
     artifact: 'Hasil', paragraphCount: 'Paragraf',
     statusCompleted: 'Selesai', statusRunning: 'Berjalan', statusFailed: 'Gagal', statusPending: 'Menunggu', statusQueued: 'Antrian',
     btnView: 'Lihat', btnViewProgress: 'Kemajuan', btnResume: 'Lanjutkan', btnStop: 'Henti',
@@ -1658,7 +1740,6 @@ function applyLanguage(lang) {
       el.value = t(i18nKey);
     }
   };
-  updateDefault('c_requirement', 'requirementDefault');
   updateDefault('c_style', 'styleDefault');
 }
 
@@ -1683,6 +1764,7 @@ const STEPS = {
   ],
   creative: [
     { key: 'init', labelKey: 'cStepInit' },
+    { key: 'scene_config', labelKey: 'cStepSceneConfig' },
     { key: 'image_analysis', labelKey: 'cStepImageAnalysis' },
     { key: 'story', labelKey: 'cStepStory' },
     { key: 'character_ref', labelKey: 'cStepCharacterRef' },
@@ -1926,6 +2008,38 @@ async function submitSimple() {
   }
 }
 
+// ── Scene Configuration UI ──
+function toggleSceneSource() {
+  const isPrompt = document.querySelector('input[name="c_duration_source"]:checked').value === 'prompt';
+  document.getElementById('c_manual_scene_config').style.display = isPrompt ? 'none' : 'block';
+  document.getElementById('c_source_hint').textContent = isPrompt
+    ? t('sourcePromptHint') : t('sourceManualHint');
+}
+function toggleDurationMode() {
+  const isUniform = document.querySelector('input[name="c_uniform"]:checked').value === '1';
+  document.getElementById('c_uniform_duration_wrap').style.display = isUniform ? 'block' : 'none';
+  document.getElementById('c_independent_durations_wrap').style.display = isUniform ? 'none' : 'block';
+}
+function buildDurationInputs() {
+  const count = parseInt(document.getElementById('c_scene_count').value) || 3;
+  const container = document.getElementById('c_duration_inputs');
+  const currentCount = container.querySelectorAll('.dur-input').length;
+  if (currentCount === count) return;
+  let html = '';
+  for (let i = 0; i < count; i++) {
+    html += '<div class="flex items-center gap-2 mb-1.5 dur-input">'
+      + '<span class="text-xs text-gray-500 w-12">' + t('scene_') + (i+1) + '</span>'
+      + '<input type="number" min="2" max="30" value="5" class="w-20 glass-input rounded-lg px-3 py-1.5 text-sm text-gray-100 scene-dur-val">'
+      + '<span class="text-xs text-gray-500">' + t('seconds') + '</span></div>';
+  }
+  container.innerHTML = html;
+}
+document.getElementById('c_scene_count').addEventListener('change', function() {
+  if (document.querySelector('input[name="c_uniform"]:checked').value === '0') {
+    buildDurationInputs();
+  }
+});
+
 async function submitCreative() {
   const idea = document.getElementById('c_idea').value.trim();
   if (!idea) return alert(t('enterIdea'));
@@ -1936,9 +2050,32 @@ async function submitCreative() {
   const form = new FormData();
   form.append('idea', idea);
   form.append('creative_name', document.getElementById('c_name').value.trim());
-  form.append('user_requirement', document.getElementById('c_requirement').value);
   form.append('style', document.getElementById('c_style').value);
   form.append('chaining_mode', document.getElementById('c_chaining').value);
+
+  // ── Scene config ──
+  const durationSource = document.querySelector('input[name="c_duration_source"]:checked').value;
+  form.append('duration_source', durationSource);
+  if (durationSource === 'manual') {
+    const sceneCount = parseInt(document.getElementById('c_scene_count').value) || 3;
+    form.append('scene_count', sceneCount);
+    const isUniform = document.querySelector('input[name="c_uniform"]:checked').value === '1';
+    form.append('uniform_duration', isUniform);
+    if (isUniform) {
+      const dur = parseInt(document.getElementById('c_uniform_duration').value) || 5;
+      const arr = Array(sceneCount).fill(dur);
+      form.append('scene_durations_json', JSON.stringify(arr));
+    } else {
+      const vals = Array.from(document.querySelectorAll('#c_duration_inputs .scene-dur-val'))
+        .map(el => parseInt(el.value) || 5);
+      form.append('scene_durations_json', JSON.stringify(vals.slice(0, sceneCount)));
+    }
+  } else {
+    form.append('scene_count', 0);
+    form.append('uniform_duration', true);
+    form.append('scene_durations_json', JSON.stringify([]));
+  }
+
   const res = parseResolution(document.getElementById('c_resolution').value);
   form.append('video_width', res.width);
   form.append('video_height', res.height);
@@ -2445,7 +2582,8 @@ function showTaskDetail(taskId, state) {
 
   // Map step keys to state fields for creative
   const creativeStepMap = {
-    image_analysis: 'step_image_analysis', story: 'step_story',
+    scene_config: 'step_scene_config', image_analysis: 'step_image_analysis',
+    story: 'step_story',
     character_ref: 'step_character_ref', script: 'step_script',
     end_frame_prompts: 'step_end_frame_prompts', end_frame_gen: 'step_end_frame_generation',
     video_gen: 'step_video_generation', audio: 'step_audio',

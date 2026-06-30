@@ -177,7 +177,135 @@ otherwise.
                         f"图片分析失败（{label}）: {e}"
                     ) from e
 
-    def develop_story(self, idea: str, user_requirement: str, style: str, image_context: str = "") -> str:
+    def extract_scene_info_from_idea(self, idea: str, style: str) -> dict:
+        """从创意描述中提取场景数和每个场景的时长。
+
+        当用户选择「从 prompt 中获取」时调用，让 LLM 分析 idea 文本，
+        提取其中暗含的场景数量和每场景时长。如果提取失败，抛出异常。
+
+        Args:
+            idea: 用户的创意描述文本。
+            style: 视觉风格描述。
+
+        Returns:
+            dict{"scene_count": int, "durations": [int, ...]}
+
+        Raises:
+            RuntimeError: 无法从 idea 中提取到场景信息。
+        """
+        system_prompt = self._prompt(
+            zh_text="""\
+你是一个视频制作需求分析专家。仔细阅读用户的创意描述，提取其中关于
+场景数量和每场景时长的信息。
+
+输出一个 JSON 对象：
+{
+  "scene_count": 3,
+  "durations": [5, 8, 12],
+  "reasoning": "分析依据的简要说明"
+}
+
+规则：
+- scene_count: 从描述中推断的场景数量，整数。如果描述中提到"几个场景"、\
+"几幕"等，提取明确的数字。如果描述是故事性叙述（如"一个小男孩在森林里迷路了，\
+后来遇到了精灵..."），根据故事情节合理拆分（一般 3-6 个场景）。
+- durations: 每个场景的建议时长（秒），列表长度等于 scene_count。\
+如果描述中提到具体时长（如"每个场景5秒"、"第一幕10秒"、"3个8秒的场景"），\
+使用这些值；否则根据每个场景的内容复杂度合理估计（3-15 秒之间）。
+- reasoning: 用与输入相同的语言，简要说明提取/推断的依据。
+
+约束：
+- 如果 idea 中完全没有任何关于场景数或时长的线索，返回一个空对象 {}，\
+表示提取失败。
+- 不要编造不存在的数字。
+- 每个场景时长不超过 30 秒，不少于 2 秒。
+""",
+            en_text="""\
+You are a video production requirements analyst. Read the user's creative idea
+carefully and extract information about the number of scenes and per-scene duration.
+
+Output a JSON object:
+{
+  "scene_count": 3,
+  "durations": [5, 8, 12],
+  "reasoning": "Brief explanation of the analysis"
+}
+
+Rules:
+- scene_count: the number of scenes inferred from the description, as an integer.
+- durations: suggested duration (in seconds) for each scene. List length must equal\
+scene_count. If specific durations are mentioned, use those values; otherwise estimate\
+based on content complexity (3-15 seconds).
+- reasoning: in the same language as input, briefly explain the extraction logic.
+
+Constraints:
+- If the idea contains NO clues about scene count or durations, return an empty object\
+{}, indicating extraction failure.
+- Do not fabricate numbers that don't exist in the text.
+- Each scene duration must be between 2 and 30 seconds.
+""",
+        )
+        user_prompt = f"""\
+<style>{style}</style>
+
+<idea>
+{idea}
+</idea>
+"""
+        logger.info("[Screenwriter] Extracting scene info from idea...")
+        result = self._chat_json(system_prompt, user_prompt)
+
+        scene_count = result.get("scene_count")
+        durations = result.get("durations")
+
+        if not scene_count or not durations or len(durations) != scene_count:
+            reasoning = result.get("reasoning", "")
+            logger.error(
+                f"[Screenwriter] Failed to extract scene info from idea: "
+                f"scene_count={scene_count}, durations={durations}, reasoning={reasoning}"
+            )
+            raise RuntimeError(
+                "无法从创意描述中提取场景数和时长信息。"
+                "请手动设置场景数和每场景时长，或修改创意描述使其包含更明确的场景信息。"
+            )
+
+        # 校验时长范围
+        for i, d in enumerate(durations):
+            if d < 2 or d > 30:
+                durations[i] = max(2, min(30, d))
+
+        logger.info(
+            f"[Screenwriter] Extracted scene info: {scene_count} scenes, "
+            f"durations={durations}"
+        )
+        return {"scene_count": scene_count, "durations": durations}
+
+    def develop_story(self, idea: str, user_requirement: str = "", style: str = "",
+                      image_context: str = "", scene_count: int = 0,
+                      scene_durations: List[int] = None) -> str:
+        """Develop a story from the idea, with optional scene configuration.
+
+        Args:
+            idea: Creative idea text.
+            user_requirement: (deprecated) Old-style user requirement string.
+                Kept for backward compat; overridden by scene_count/scene_durations
+                when provided.
+            style: Visual style description.
+            image_context: Optional image analysis context.
+            scene_count: Number of scenes (v3.x).
+            scene_durations: Per-scene durations in seconds (v3.x).
+        """
+        # Build scene requirement string for the LLM prompt
+        if scene_count > 0 and scene_durations:
+            durations_str = "、".join(f"场景{i+1} {d}秒" for i, d in enumerate(scene_durations))
+            requirement_text = f"共 {scene_count} 个场景，时长分别为：{durations_str}"
+        elif scene_count > 0:
+            requirement_text = f"共 {scene_count} 个场景"
+        elif user_requirement:
+            requirement_text = user_requirement
+        else:
+            requirement_text = "3个场景，每场景5秒，电影质感"
+
         system_prompt = self._prompt(
             zh_text="""\
 你是一位经验丰富的创意故事生成专家。你将创意想法扩展为结构清晰、\
@@ -240,7 +368,7 @@ FEELS, using language suitable for cinematic interpretation.
 </idea>
 
 <user_requirement>
-{_xml_escape(user_requirement)}
+{_xml_escape(requirement_text)}
 </user_requirement>
 
 <style>
@@ -268,7 +396,33 @@ characters, settings, colors, and mood.""",
         logger.info(f"[Screenwriter] Story developed: {len(story)} chars")
         return story
 
-    def write_script(self, story: str, user_requirement: str, style: str) -> List[str]:
+    def write_script(self, story: str, user_requirement: str = "", style: str = "",
+                     scene_count: int = 0, scene_durations: List[int] = None) -> List[str]:
+        """Write a scene-by-scene visual script.
+
+        Args:
+            story: Full story text.
+            user_requirement: (deprecated) Old-style requirement string.
+                Overridden by scene_count/scene_durations when provided.
+            style: Visual style.
+            scene_count: Target number of scenes (v3.x).
+            scene_durations: Per-scene durations in seconds (v3.x).
+        """
+        # Build scene requirement string
+        if scene_count > 0 and scene_durations:
+            durations_str = "、".join(f"场景{i+1} {d}秒" for i, d in enumerate(scene_durations))
+            requirement_text = (
+                f"共 {scene_count} 个场景，时长分别为：{durations_str}。"
+                f"每个场景的视觉提示词应与其时长匹配——时长较短的场景简洁有力，"
+                f"时长较长的场景细节丰富。"
+            )
+        elif scene_count > 0:
+            requirement_text = f"共 {scene_count} 个场景"
+        elif user_requirement:
+            requirement_text = user_requirement
+        else:
+            requirement_text = "3个场景，每场景5秒，电影质感"
+
         system_prompt = self._prompt(
             zh_text="""\
 你是一位专业的视频导演和视觉提示词工程师。请将给定的故事改编为\
@@ -359,7 +513,7 @@ language that focuses on what the camera sees and how it feels.
 </story>
 
 <user_requirement>
-{user_requirement}
+{requirement_text}
 </user_requirement>
 
 <style>

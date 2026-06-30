@@ -286,6 +286,115 @@ class CreativeVideoPipeline(BasePipeline):
         return image_context
 
     # ==================================================================
+    # Step 0: Resolve Scene Configuration (v3.x)
+    # ==================================================================
+
+    async def _step_resolve_scene_config(self) -> None:
+        """Resolve scene count and per-scene durations.
+
+        Two modes:
+        - ``duration_source == "prompt"``: LLM extracts scene info from the
+          user's idea.  Aborts the task on extraction failure.
+        - ``duration_source == "manual"``: Use user-provided
+          ``scene_count`` and ``scene_durations`` directly.
+        """
+        duration_source = self._state.duration_source
+        idea = self._state.idea
+        scene_count = self._state.scene_count
+        scene_durations = list(self._state.scene_durations) if self._state.scene_durations else []
+
+        logger.info(
+            f"[Pipeline] Resolving scene config: source={duration_source}, "
+            f"manual_count={scene_count}, manual_durations={scene_durations}"
+        )
+
+        if duration_source == "prompt":
+            await self._emit(
+                "scene_config", "running",
+                "正在从创意描述中提取场景信息...", 0.01,
+            )
+            try:
+                info = await asyncio.to_thread(
+                    self.screenwriter.extract_scene_info_from_idea,
+                    idea,
+                    self._state.style,
+                )
+                extracted_count = info["scene_count"]
+                extracted_durations = info["durations"]
+                self._state.scene_count = extracted_count
+                self._state.scene_durations = extracted_durations
+                self.task_manager.update_state(
+                    scene_count=extracted_count,
+                    scene_durations=extracted_durations,
+                )
+                logger.info(
+                    f"[Pipeline] Extracted from prompt: "
+                    f"{extracted_count} scenes, durations={extracted_durations}"
+                )
+                await self._emit(
+                    "scene_config", "completed",
+                    f"从 prompt 提取: {extracted_count} 个场景, "
+                    f"时长 {extracted_durations}",
+                    0.02,
+                    {
+                        "scene_count": extracted_count,
+                        "durations": extracted_durations,
+                        "source": "prompt",
+                    },
+                )
+            except Exception as e:
+                logger.error(f"[Pipeline] Failed to extract scene info from prompt: {e}")
+                await self._emit(
+                    "scene_config", "failed",
+                    f"无法从创意描述中提取场景信息: {e}",
+                    0.0,
+                )
+                raise PipelineShutdown(
+                    f"场景信息提取失败: {e}. "
+                    f"请手动设置场景数和每场景时长后重试。"
+                ) from e
+        else:
+            # manual mode: apply user-provided values
+            if scene_count <= 0:
+                scene_count = 1
+                self._state.scene_count = scene_count
+            if not scene_durations:
+                # fallback: all scenes 5s
+                scene_durations = [5] * scene_count
+            elif len(scene_durations) < scene_count:
+                # pad with last value
+                while len(scene_durations) < scene_count:
+                    scene_durations.append(scene_durations[-1])
+            elif len(scene_durations) > scene_count:
+                scene_durations = scene_durations[:scene_count]
+
+            self._state.scene_durations = scene_durations
+            self.task_manager.update_state(
+                scene_count=scene_count,
+                scene_durations=scene_durations,
+            )
+            logger.info(
+                f"[Pipeline] Manual scene config: "
+                f"{scene_count} scenes, durations={scene_durations}"
+            )
+            await self._emit(
+                "scene_config", "completed",
+                f"场景配置: {scene_count} 个场景, "
+                f"时长 {scene_durations}",
+                0.02,
+                {
+                    "scene_count": scene_count,
+                    "durations": scene_durations,
+                    "source": "manual",
+                },
+            )
+
+        self._state.step_scene_config = StepStatus.COMPLETED
+        self.task_manager.update_step(
+            "step_scene_config", StepStatus.COMPLETED
+        )
+
+    # ==================================================================
     # Step 1: Story
     # ==================================================================
 
@@ -311,9 +420,11 @@ class CreativeVideoPipeline(BasePipeline):
         story = await asyncio.to_thread(
             self.screenwriter.develop_story,
             self._state.idea,
-            self._state.user_requirement,
+            "",
             self._state.style,
             image_context,
+            self._state.scene_count,
+            self._state.scene_durations,
         )
 
         story_path = os.path.join(self.working_dir, "story.txt")
@@ -432,7 +543,10 @@ class CreativeVideoPipeline(BasePipeline):
         logger.info("[Pipeline] Step script: RUNNING")
         await self._emit("script", "running", "正在编写脚本...", 0.15)
         scenes = await asyncio.to_thread(
-            self.screenwriter.write_script, story, self._state.user_requirement, self._state.style
+            self.screenwriter.write_script, story, "",
+            self._state.style,
+            self._state.scene_count,
+            self._state.scene_durations,
         )
 
         script_path = os.path.join(self.working_dir, "script.json")
@@ -440,11 +554,38 @@ class CreativeVideoPipeline(BasePipeline):
             json.dump(scenes, f, ensure_ascii=False, indent=2)
 
         self._state.scene_count = len(scenes)
+        # Map durations to scenes: use scene_durations list, pad/trim as needed
+        durations = list(self._state.scene_durations) if self._state.scene_durations else []
+        if not durations:
+            durations = [int(self._state.video_duration)] * len(scenes)
+        elif len(durations) < len(scenes):
+            while len(durations) < len(scenes):
+                durations.append(durations[-1])
+        elif len(durations) > len(scenes):
+            durations = durations[:len(scenes)]
+
         if not self._state.scenes:
             self._state.scenes = [
-                SceneTask(index=i, duration=self._state.video_duration)
+                SceneTask(index=i, duration=durations[i] if i < len(durations) else 5)
                 for i in range(len(scenes))
             ]
+        elif len(self._state.scenes) != len(scenes):
+            # Re-create scenes to match new scene count (resume with different config)
+            self._state.scenes = [
+                SceneTask(index=i, duration=durations[i] if i < len(durations) else 5)
+                for i in range(len(scenes))
+            ]
+        else:
+            # Update existing scenes' durations from the resolved config
+            for i, scene_obj in enumerate(self._state.scenes):
+                if i < len(durations):
+                    scene_obj.duration = durations[i]
+
+        self._state.scene_durations = durations
+        logger.info(
+            f"[Pipeline] Script: {len(scenes)} scenes, "
+            f"durations={[s.duration for s in self._state.scenes]}"
+        )
 
         self._state.step_script = StepStatus.COMPLETED
         self._state.script_file = script_path
@@ -1753,6 +1894,9 @@ class CreativeVideoPipeline(BasePipeline):
         await self._emit("init", "running", "开始视频生成流程...", 0.0)
 
         try:
+            # ── v3.x: Scene info — extract or validate ──
+            await self._step_resolve_scene_config()
+
             image_context = await self._step_image_analysis(
                 self._state.reference_image, self._state.end_frame_images
             )
