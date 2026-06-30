@@ -2047,6 +2047,7 @@ function toggleDurationMode() {
   const isUniform = document.querySelector('input[name="c_uniform"]:checked').value === '1';
   document.getElementById('c_uniform_duration_wrap').style.display = isUniform ? 'block' : 'none';
   document.getElementById('c_independent_durations_wrap').style.display = isUniform ? 'none' : 'block';
+  if (!isUniform) buildDurationInputs();
 }
 function buildDurationInputs() {
   const count = parseInt(document.getElementById('c_scene_count').value) || 3;
