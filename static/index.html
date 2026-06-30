@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agnes Video Generator</title>
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+<link rel="icon" type="image/png" sizes="1024x1024" href="/static/icon.png">
+<link rel="apple-touch-icon" href="/static/icon.png">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   /* ── Base Animations ── */
@@ -318,6 +321,15 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Watermark toggle -->
+      <div class="flex items-center justify-between px-1 py-2">
+        <p class="text-xs text-gray-500 leading-relaxed mr-3 watermark-promo"></p>
+        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Video Watermark">
+          <input type="checkbox" class="watermark-toggle sr-only peer" onchange="toggleWatermark(this)">
+          <div class="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
       </div>
 
       <button id="btn-simple" onclick="submitSimple()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
@@ -635,6 +647,15 @@
         </div>
       </div>
 
+      <!-- Watermark toggle -->
+      <div class="flex items-center justify-between px-1 py-2 mb-4">
+        <p class="text-xs text-gray-500 leading-relaxed mr-3 watermark-promo"></p>
+        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Video Watermark">
+          <input type="checkbox" class="watermark-toggle sr-only peer" onchange="toggleWatermark(this)">
+          <div class="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+
       <button id="btn-creative" onclick="submitCreative()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
         开始生成视频
       </button>
@@ -773,6 +794,15 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Watermark toggle -->
+      <div class="flex items-center justify-between px-1 py-2 mb-4">
+        <p class="text-xs text-gray-500 leading-relaxed mr-3 watermark-promo"></p>
+        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Video Watermark">
+          <input type="checkbox" class="watermark-toggle sr-only peer" onchange="toggleWatermark(this)">
+          <div class="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
       </div>
 
       <button id="btn-manuscript" onclick="submitManuscript()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
@@ -960,6 +990,15 @@
         </div>
       </div>
 
+      <!-- Watermark toggle -->
+      <div class="flex items-center justify-between px-1 py-2 mb-4">
+        <p class="text-xs text-gray-500 leading-relaxed mr-3 watermark-promo"></p>
+        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Video Watermark">
+          <input type="checkbox" class="watermark-toggle sr-only peer" onchange="toggleWatermark(this)">
+          <div class="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+
       <button id="btn-anchor" onclick="submitAnchor()" class="w-full py-3.5 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-500 hover:via-blue-400 hover:to-blue-500 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn" data-i18n="startGenerate">
         开始生成
       </button>
@@ -1020,6 +1059,8 @@ const T = {
     workspaceRegressionHint: '当前为回归测试专用空间，由环境变量锁定，无法在界面修改。',
     workspaceRemoveConfirm: '确定要从列表移除该工作目录吗？（不会删除磁盘文件）',
     tabCreate: '新建任务', tabList: '任务列表',
+    watermarkTitle: '视频水印', watermarkPromo: '为视频添加 Agnes Video Generator 水印，分享时让更多人发现这个工具',
+    watermarkEnabled: '已开启视频水印', watermarkDisabled: '已关闭视频水印',
     ttSimple: '简易图像视频', ttCreative: '创意长视频', ttManuscript: '稿件长视频',
     subModeLabel: '生成类型', subModeVideo: '🎬 视频', subModeImage: '🖼️ 图像',
     simpleSettings: '简单视频设置', creativeSettings: '创意设置', manuscriptSettings: '稿件设置',
@@ -1128,6 +1169,8 @@ const T = {
     workspaceRegressionHint: 'This is a regression test workspace, locked by environment variable and cannot be changed from the UI.',
     workspaceRemoveConfirm: 'Remove this working directory from the list? (Disk files are not deleted)',
     tabCreate: 'New Task', tabList: 'Task List',
+    watermarkTitle: 'Video Watermark', watermarkPromo: 'Add an Agnes Video Generator watermark to help more creators discover this tool',
+    watermarkEnabled: 'Video watermark enabled', watermarkDisabled: 'Video watermark disabled',
     ttSimple: 'Image & Video', ttCreative: 'Creative Video', ttManuscript: 'Article Video',
     subModeLabel: 'Type', subModeVideo: '🎬 Video', subModeImage: '🖼️ Image',
     simpleSettings: 'Simple Video Settings', creativeSettings: 'Creative Settings', manuscriptSettings: 'Article Settings',
@@ -1232,6 +1275,8 @@ const T = {
     workspaceRegressionHint: 'Это рабочее пространство для регрессионных тестов, заблокировано переменной окружения и не может быть изменено в интерфейсе.',
     workspaceRemoveConfirm: 'Удалить этот рабочий каталог из списка? (Файлы на диске не удаляются)',
     tabCreate: 'Новая задача', tabList: 'Список задач',
+    watermarkTitle: 'Водяной знак', watermarkPromo: 'Добавить водяной знак Agnes Video Generator — пусть о проекте узнает больше людей',
+    watermarkEnabled: 'Водяной знак включен', watermarkDisabled: 'Водяной знак выключен',
     ttSimple: 'Изобр. и видео', ttCreative: 'Креативное видео', ttManuscript: 'Видео из статьи',
     subModeLabel: 'Тип', subModeVideo: '🎬 Видео', subModeImage: '🖼️ Изображение',
     simpleSettings: 'Настройки простого видео', creativeSettings: 'Настройки сценария', manuscriptSettings: 'Настройки статьи',
@@ -1334,6 +1379,8 @@ const T = {
     workspaceRegressionHint: '現在は回帰テスト専用スペースです。環境変数でロックされており、画面では変更できません。',
     workspaceRemoveConfirm: 'この作業ディレクトリをリストから削除しますか？（ディスク上のファイルは削除されません）',
     tabCreate: '新規タスク', tabList: 'タスク一覧',
+    watermarkTitle: 'ビデオ透かし', watermarkPromo: 'Agnes Video Generator の透かしを追加して、より多くのクリエイターに届けよう',
+    watermarkEnabled: 'ビデオ透かしをオンにしました', watermarkDisabled: 'ビデオ透かしをオフにしました',
     ttSimple: '画像＆動画', ttCreative: 'クリエイティブ動画', ttManuscript: '記事動画',
     subModeLabel: '生成タイプ', subModeVideo: '🎬 動画', subModeImage: '🖼️ 画像',
     simpleSettings: 'シンプル設定', creativeSettings: 'クリエイティブ設定', manuscriptSettings: '記事設定',
@@ -1433,6 +1480,8 @@ const T = {
     workspaceRegressionHint: '현재 회귀 테스트 전용 공간입니다. 환경 변수로 잠겨 있어 화면에서 변경할 수 없습니다.',
     workspaceRemoveConfirm: '이 작업 디렉토리를 목록에서 제거하시겠습니까? (디스크 파일은 삭제되지 않음)',
     tabCreate: '새 작업', tabList: '작업 목록',
+    watermarkTitle: '비디오 워터마크', watermarkPromo: 'Agnes Video Generator 워터마크를 추가하여 더 많은 크리에이터에게 도구를 알리세요',
+    watermarkEnabled: '비디오 워터마크 켜짐', watermarkDisabled: '비디오 워터마크 꺼짐',
     ttSimple: '이미지 & 영상', ttCreative: '크리에이티브 영상', ttManuscript: '기사 영상',
     subModeLabel: '생성 유형', subModeVideo: '🎬 영상', subModeImage: '🖼️ 이미지',
     simpleSettings: '간단 설정', creativeSettings: '크리에이티브 설정', manuscriptSettings: '기사 설정',
@@ -1532,6 +1581,8 @@ const T = {
     workspaceRegressionHint: 'Ini ruang kerja khusus untuk ujian regresi, dikunci oleh pembolehubah persekitaran dan tidak boleh diubah dari UI.',
     workspaceRemoveConfirm: 'Buang direktori kerja ini dari senarai? (Fail pada cakera tidak dipadam)',
     tabCreate: 'Tugas Baru', tabList: 'Senarai Tugas',
+    watermarkTitle: 'Tera Air Video', watermarkPromo: 'Tambahkan tera air Agnes Video Generator untuk membantu lebih ramai pencipta menemui alat ini',
+    watermarkEnabled: 'Tera air video dihidupkan', watermarkDisabled: 'Tera air video dimatikan',
     ttSimple: 'Imej & Video', ttCreative: 'Video Kreatif', ttManuscript: 'Video Artikel',
     subModeLabel: 'Jenis', subModeVideo: '🎬 Video', subModeImage: '🖼️ Imej',
     simpleSettings: 'Tetapan Ringkas', creativeSettings: 'Tetapan Kreatif', manuscriptSettings: 'Tetapan Artikel',
@@ -1631,6 +1682,8 @@ const T = {
     workspaceRegressionHint: 'Ini ruang kerja khusus untuk uji regresi, dikunci oleh variabel lingkungan dan tidak dapat diubah dari UI.',
     workspaceRemoveConfirm: 'Hapus direktori kerja ini dari daftar? (File di disk tidak dihapus)',
     tabCreate: 'Tugas Baru', tabList: 'Daftar Tugas',
+    watermarkTitle: 'Watermark Video', watermarkPromo: 'Tambahkan watermark Agnes Video Generator untuk membantu lebih banyak kreator menemukan alat ini',
+    watermarkEnabled: 'Watermark video diaktifkan', watermarkDisabled: 'Watermark video dinonaktifkan',
     ttSimple: 'Gambar & Video', ttCreative: 'Video Kreatif', ttManuscript: 'Video Artikel',
     subModeLabel: 'Jenis', subModeVideo: '🎬 Video', subModeImage: '🖼️ Gambar',
     simpleSettings: 'Pengaturan Simpel', creativeSettings: 'Pengaturan Kreatif', manuscriptSettings: 'Pengaturan Artikel',
@@ -1759,7 +1812,7 @@ function applyLanguage(lang) {
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
-  // 更新"用户要求"和"视觉风格"默认值（仅在用户未修改时）
+    // 更新"用户要求"和"视觉风格"默认值（仅在用户未修改时）
   const updateDefault = (inputId, i18nKey) => {
     const el = document.getElementById(inputId);
     if (!el) return;
@@ -1769,6 +1822,8 @@ function applyLanguage(lang) {
     }
   };
   updateDefault('c_style', 'styleDefault');
+  // 更新水印宣传文案
+  document.querySelectorAll('.watermark-promo').forEach(el => el.textContent = t('watermarkPromo'));
 }
 
 function switchLang(lang) { applyLanguage(lang); }
@@ -1838,6 +1893,10 @@ const STEPS = {
       setApiKeyConfiguredUI(d.source, d.can_clear);
     }
     renderWorkspaces(d.workspaces || [], d.active_workspace || '', d.working_dir_source || 'config');
+    // 加载水印配置
+    if (d.watermark !== undefined) {
+      document.querySelectorAll('.watermark-toggle').forEach(el => el.checked = !!d.watermark.enabled);
+    }
   } catch(e) {}
 
   // Character count for manuscript
@@ -2865,6 +2924,23 @@ document.getElementById('apikey-clear').onclick = async () => {
     alert('Network error');
   }
 };
+
+// ═══════════════════════════════════════════════════
+// 水印开关
+// ═══════════════════════════════════════════════════
+
+async function toggleWatermark(el) {
+  const enabled = el.checked;
+  const form = new FormData();
+  form.append('enabled', enabled);
+  try {
+    const r = await fetch('/api/config/watermark', { method: 'POST', body: form });
+    if (r.ok) {
+      document.querySelectorAll('.watermark-toggle').forEach(t => t.checked = enabled);
+      showToast(enabled ? t('watermarkEnabled') : t('watermarkDisabled'));
+    }
+  } catch(e) {}
+}
 
 // ═══════════════════════════════════════════════════
 // 工作目录管理

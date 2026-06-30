@@ -328,6 +328,48 @@ def get_default_audio_config() -> AudioConfig:
 
 
 # ═══════════════════════════════════════════════════
+# 水印配置
+# ═══════════════════════════════════════════════════
+
+DEFAULT_WATERMARK_ENABLED = False
+DEFAULT_WATERMARK_LANGUAGE = "auto"  # "auto" | "zh" | "en"
+
+WATERMARK_PROMO_TEXT_ZH = "为视频添加 Agnes Video Generator 水印，分享时让更多人发现这个工具"
+WATERMARK_PROMO_TEXT_EN = "Add an Agnes Video Generator watermark to help more creators discover this tool"
+
+
+def get_watermark_config() -> dict:
+    """返回水印配置。
+
+    Returns:
+        {"enabled": bool, "language": str}
+    """
+    config = load_config()
+    wm = config.get("watermark", {})
+    return {
+        "enabled": wm.get("enabled", DEFAULT_WATERMARK_ENABLED),
+        "language": wm.get("language", DEFAULT_WATERMARK_LANGUAGE),
+    }
+
+
+def set_watermark_config(enabled: bool = None, language: str = None):
+    """设置水印配置。
+
+    Args:
+        enabled: 是否开启水印，None 表示不修改
+        language: 水印语言，None 表示不修改
+    """
+    config = load_config()
+    wm = config.get("watermark", {})
+    if enabled is not None:
+        wm["enabled"] = enabled
+    if language is not None:
+        wm["language"] = language
+    config["watermark"] = wm
+    save_config(config)
+
+
+# ═══════════════════════════════════════════════════
 # 视频参数预设（D7）
 # ═══════════════════════════════════════════════════
 

@@ -202,7 +202,7 @@ class AgnesVideoAPI:
                 best = (nf, fr)
         return best or DURATION_PRESETS[5]
 
-    async def _poll_task(self, video_id: str, interval: int = 30,
+    async def _poll_task(self, video_id: str, interval: int = 60,
                           max_poll_duration: int = 1800,
                           max_consecutive_failures: int = 10,
                           progress_callback=None) -> dict:
