@@ -196,22 +196,6 @@
     </div>
   </div>
 
-  <!-- Watermark toggle -->
-  <div id="watermark-section" class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
-    <div class="p-5">
-      <div class="flex items-center justify-between">
-        <div class="flex-1">
-          <h2 class="text-sm font-medium text-gray-300" data-i18n="watermarkTitle">视频水印</h2>
-          <p id="watermark-promo" class="text-xs text-gray-500 mt-1 leading-relaxed"></p>
-        </div>
-        <label class="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
-          <input type="checkbox" id="watermark-toggle" class="sr-only peer" onchange="toggleWatermark()">
-          <div class="w-10 h-5 bg-gray-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-blue-500/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-        </label>
-      </div>
-    </div>
-  </div>
-
   <!-- Main Tabs: 新建任务 / 任务列表 -->
   <div class="flex gap-2 mb-6">
     <button onclick="switchMainTab('create')" id="mtab-create" class="mtab-btn px-5 py-2.5 rounded-lg text-sm font-medium tab-active transition" data-i18n="tabCreate">新建任务</button>
@@ -1011,6 +995,19 @@
     <div id="result-area" class="hidden mt-4 p-4 glass-card rounded-lg">
       <p class="text-green-400 text-sm font-medium mb-2" data-i18n="videoComplete">视频生成完成!</p>
       <video id="result-video" controls class="w-full rounded-lg max-h-96"></video>
+    </div>
+  </div>
+
+  <!-- Watermark toggle (less prominent) -->
+  <div class="border-t border-gray-800/50 pt-3 mt-4">
+    <div class="flex items-center justify-between px-1">
+      <div class="flex-1 min-w-0 mr-3">
+        <p class="text-xs text-gray-500 leading-relaxed" id="watermark-promo"></p>
+      </div>
+      <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" title="Video Watermark">
+        <input type="checkbox" id="watermark-toggle" class="sr-only peer" onchange="toggleWatermark()">
+        <div class="w-10 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+      </label>
     </div>
   </div>
 
