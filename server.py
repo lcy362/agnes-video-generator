@@ -946,19 +946,22 @@ async def create_creative_task(
         raise HTTPException(status_code=422, detail="idea 最多 10000 字符")
     if duration_source not in ("manual", "prompt"):
         raise HTTPException(status_code=422, detail="duration_source 必须为 manual 或 prompt")
-    if scene_count < 1 or scene_count > 30:
-        raise HTTPException(status_code=422, detail="scene_count 范围 1-30")
-    # 解析场景时长 JSON
-    try:
-        scene_durations = json.loads(scene_durations_json)
-        if not isinstance(scene_durations, list):
-            raise ValueError("not a list")
-    except Exception:
-        raise HTTPException(status_code=422, detail="scene_durations_json 必须为 JSON 数组")
-    # 校验每个时长
-    for i, d in enumerate(scene_durations):
-        if not isinstance(d, (int, float)) or d < 2 or d > 30:
-            raise HTTPException(status_code=422, detail=f"场景 {i+1} 时长范围 2-30 秒")
+    if duration_source == "manual":
+        if scene_count < 1 or scene_count > 30:
+            raise HTTPException(status_code=422, detail="scene_count 范围 1-30")
+        # 解析场景时长 JSON
+        try:
+            scene_durations = json.loads(scene_durations_json)
+            if not isinstance(scene_durations, list):
+                raise ValueError("not a list")
+        except Exception:
+            raise HTTPException(status_code=422, detail="scene_durations_json 必须为 JSON 数组")
+        # 校验每个时长
+        for i, d in enumerate(scene_durations):
+            if not isinstance(d, (int, float)) or d < 2 or d > 30:
+                raise HTTPException(status_code=422, detail=f"场景 {i+1} 时长范围 2-30 秒")
+    else:
+        scene_durations = []
 
     task_id = uuid.uuid4().hex[:12]
     name = creative_name.strip() if creative_name else f"video_{task_id}"
