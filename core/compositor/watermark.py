@@ -143,9 +143,15 @@ def add_watermark(
     font_size = _compute_font_size(video_height)
     url_font_size = max(10, round(font_size * 0.85))
     right_margin = max(16, round(video_width * 0.02))
-    bottom_margin = max(12, round(video_height * 0.015))
+    # 底边距加大，避开字幕区域（字幕默认 bottom-80，水印在 ~12% 高度处）
+    bottom_margin = max(100, round(video_height * 0.12))
     line_spacing = max(2, round(font_size * 0.15))
     box_padding = max(4, round(font_size * 0.35))
+
+    # 品牌蓝色系
+    brand_blue = (30, 64, 175)   # blue-800
+    text_color = "white"
+    stroke_color = "black"
 
     text = _build_watermark_text(language)
 
@@ -165,8 +171,8 @@ def add_watermark(
                 text=line1_text,
                 font=font_path,
                 font_size=font_size,
-                color="white",
-                stroke_color="black",
+                color=text_color,
+                stroke_color=stroke_color,
                 stroke_width=1,
             )
 
@@ -175,8 +181,8 @@ def add_watermark(
                 text=line2_text,
                 font=font_path,
                 font_size=url_font_size,
-                color="white",
-                stroke_color="black",
+                color=text_color,
+                stroke_color=stroke_color,
                 stroke_width=1,
             )
 
@@ -190,13 +196,13 @@ def add_watermark(
             pos_x = video.w - box_w - right_margin
             pos_y = video.h - box_h - bottom_margin
 
-            # 创建背景框（半透明黑色矩形）
+            # 创建背景框（半透明品牌蓝色矩形）
             from moviepy import ColorClip
             bg = ColorClip(
                 size=(int(box_w), int(box_h)),
-                color=(0, 0, 0, 0),
+                color=brand_blue,
             )
-            bg = bg.with_opacity(0.35)
+            bg = bg.with_opacity(0.30)
             bg = bg.with_position((pos_x, pos_y))
 
             # 放置文字（在背景框内居中）
