@@ -17,6 +17,8 @@ from core.api.agnes_image import AgnesImageAPI
 from core.api.agnes_video import AgnesVideoAPI
 from core.audio.tts import EdgeTTSEngine, SilentTTSEngine
 from core.compositor.concatenator import VideoConcatenator
+from core.compositor.watermark import add_watermark, detect_language
+from core.config import get_watermark_config
 from core.pipelines import BasePipeline, PipelineShutdown
 from core.screenwriter import Screenwriter
 from models.task import (
@@ -135,6 +137,21 @@ class AnchorPipeline(BasePipeline):
         self._check_shutdown()
         final_video = await self._step_composite_anchor(clip_path)
 
+        # 水印后处理
+        wm_config = get_watermark_config()
+        if wm_config.get("enabled") and os.path.exists(final_video):
+            lang = wm_config.get("language", "auto")
+            if lang == "auto":
+                lang = detect_language(self._state.script_text)
+            wm_output = final_video + ".wm_tmp.mp4"
+            if add_watermark(
+                final_video, wm_output,
+                video_width=self._state.video_width,
+                video_height=self._state.video_height,
+                language=lang,
+            ):
+                os.replace(wm_output, final_video)
+
         self._state.status = StepStatus.COMPLETED
         self._state.final_video_file = final_video
         self.task_manager.update_state(
@@ -162,6 +179,21 @@ class AnchorPipeline(BasePipeline):
         clip_path = await self._step_generate_single_clip(
             anchor_image_path, prompt,
         )
+
+        # 水印后处理
+        wm_config = get_watermark_config()
+        if wm_config.get("enabled") and os.path.exists(clip_path):
+            lang = wm_config.get("language", "auto")
+            if lang == "auto":
+                lang = detect_language(self._state.script_text)
+            wm_output = clip_path + ".wm_tmp.mp4"
+            if add_watermark(
+                clip_path, wm_output,
+                video_width=self._state.video_width,
+                video_height=self._state.video_height,
+                language=lang,
+            ):
+                os.replace(wm_output, clip_path)
 
         self._state.status = StepStatus.COMPLETED
         self._state.final_video_file = clip_path

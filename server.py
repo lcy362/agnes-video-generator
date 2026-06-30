@@ -31,7 +31,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, F
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
-from core.config import get_api_key, set_api_key, delete_api_key, get_api_key_source, get_working_dir, AVAILABLE_VOICES, DURATION_FRAME_MAP, get_workspaces, add_workspace, remove_workspace, set_active_workspace, get_active_workspace, REGRESSION_WORKING_DIR_ENV
+from core.config import get_api_key, set_api_key, delete_api_key, get_api_key_source, get_working_dir, AVAILABLE_VOICES, DURATION_FRAME_MAP, get_workspaces, add_workspace, remove_workspace, set_active_workspace, get_active_workspace, REGRESSION_WORKING_DIR_ENV, get_watermark_config, set_watermark_config, WATERMARK_PROMO_TEXT_ZH, WATERMARK_PROMO_TEXT_EN
 from core.pipelines import (
     AnchorPipeline,
     BasePipeline,
@@ -294,6 +294,7 @@ async def get_config():
     key = get_api_key()
     source = get_api_key_source()
     active_ws = get_active_workspace()
+    wm = get_watermark_config()
     data = {
         "api_key": key[:8] + "..." if key else "",
         "source": source,
@@ -301,6 +302,9 @@ async def get_config():
         "workspaces": get_workspaces(),
         "active_workspace": active_ws,
         "working_dir_source": "regression" if os.environ.get(REGRESSION_WORKING_DIR_ENV) else "config",
+        "watermark": wm,
+        "watermark_promo_zh": WATERMARK_PROMO_TEXT_ZH,
+        "watermark_promo_en": WATERMARK_PROMO_TEXT_EN,
     }
     return data
 
@@ -322,6 +326,18 @@ async def clear_config():
         )
     delete_api_key()
     return {"ok": True}
+
+
+# ═══════════════════════════════════════════════════
+# 水印配置
+# ═══════════════════════════════════════════════════
+
+
+@app.post("/api/config/watermark")
+async def save_watermark_config(enabled: bool = Form(False)):
+    """Save watermark toggle."""
+    set_watermark_config(enabled=enabled)
+    return {"ok": True, "enabled": enabled}
 
 
 # ═══════════════════════════════════════════════════

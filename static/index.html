@@ -196,6 +196,22 @@
     </div>
   </div>
 
+  <!-- Watermark toggle -->
+  <div id="watermark-section" class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
+    <div class="p-5">
+      <div class="flex items-center justify-between">
+        <div class="flex-1">
+          <h2 class="text-sm font-medium text-gray-300" data-i18n="watermarkTitle">视频水印</h2>
+          <p id="watermark-promo" class="text-xs text-gray-500 mt-1 leading-relaxed"></p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
+          <input type="checkbox" id="watermark-toggle" class="sr-only peer" onchange="toggleWatermark()">
+          <div class="w-10 h-5 bg-gray-700 peer-focus:outline-none peer-focus:ring-1 peer-focus:ring-blue-500/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+    </div>
+  </div>
+
   <!-- Main Tabs: 新建任务 / 任务列表 -->
   <div class="flex gap-2 mb-6">
     <button onclick="switchMainTab('create')" id="mtab-create" class="mtab-btn px-5 py-2.5 rounded-lg text-sm font-medium tab-active transition" data-i18n="tabCreate">新建任务</button>
@@ -1020,6 +1036,8 @@ const T = {
     workspaceRegressionHint: '当前为回归测试专用空间，由环境变量锁定，无法在界面修改。',
     workspaceRemoveConfirm: '确定要从列表移除该工作目录吗？（不会删除磁盘文件）',
     tabCreate: '新建任务', tabList: '任务列表',
+    watermarkTitle: '视频水印', watermarkPromo: '通过在社交媒体发布 Agnes Video Generator 生成的视频来支持开发者',
+    watermarkEnabled: '已开启视频水印', watermarkDisabled: '已关闭视频水印',
     ttSimple: '简易图像视频', ttCreative: '创意长视频', ttManuscript: '稿件长视频',
     subModeLabel: '生成类型', subModeVideo: '🎬 视频', subModeImage: '🖼️ 图像',
     simpleSettings: '简单视频设置', creativeSettings: '创意设置', manuscriptSettings: '稿件设置',
@@ -1128,6 +1146,8 @@ const T = {
     workspaceRegressionHint: 'This is a regression test workspace, locked by environment variable and cannot be changed from the UI.',
     workspaceRemoveConfirm: 'Remove this working directory from the list? (Disk files are not deleted)',
     tabCreate: 'New Task', tabList: 'Task List',
+    watermarkTitle: 'Video Watermark', watermarkPromo: 'Support the developer by sharing Agnes Video Generator videos on social media',
+    watermarkEnabled: 'Video watermark enabled', watermarkDisabled: 'Video watermark disabled',
     ttSimple: 'Image & Video', ttCreative: 'Creative Video', ttManuscript: 'Article Video',
     subModeLabel: 'Type', subModeVideo: '🎬 Video', subModeImage: '🖼️ Image',
     simpleSettings: 'Simple Video Settings', creativeSettings: 'Creative Settings', manuscriptSettings: 'Article Settings',
@@ -1232,6 +1252,8 @@ const T = {
     workspaceRegressionHint: 'Это рабочее пространство для регрессионных тестов, заблокировано переменной окружения и не может быть изменено в интерфейсе.',
     workspaceRemoveConfirm: 'Удалить этот рабочий каталог из списка? (Файлы на диске не удаляются)',
     tabCreate: 'Новая задача', tabList: 'Список задач',
+    watermarkTitle: 'Водяной знак', watermarkPromo: 'Поддержите разработчика, делясь видео Agnes Video Generator в соцсетях',
+    watermarkEnabled: 'Водяной знак включен', watermarkDisabled: 'Водяной знак выключен',
     ttSimple: 'Изобр. и видео', ttCreative: 'Креативное видео', ttManuscript: 'Видео из статьи',
     subModeLabel: 'Тип', subModeVideo: '🎬 Видео', subModeImage: '🖼️ Изображение',
     simpleSettings: 'Настройки простого видео', creativeSettings: 'Настройки сценария', manuscriptSettings: 'Настройки статьи',
@@ -1334,6 +1356,8 @@ const T = {
     workspaceRegressionHint: '現在は回帰テスト専用スペースです。環境変数でロックされており、画面では変更できません。',
     workspaceRemoveConfirm: 'この作業ディレクトリをリストから削除しますか？（ディスク上のファイルは削除されません）',
     tabCreate: '新規タスク', tabList: 'タスク一覧',
+    watermarkTitle: 'ビデオ透かし', watermarkPromo: 'Agnes Video Generator の動画をSNSで共有して開発者を応援',
+    watermarkEnabled: 'ビデオ透かしをオンにしました', watermarkDisabled: 'ビデオ透かしをオフにしました',
     ttSimple: '画像＆動画', ttCreative: 'クリエイティブ動画', ttManuscript: '記事動画',
     subModeLabel: '生成タイプ', subModeVideo: '🎬 動画', subModeImage: '🖼️ 画像',
     simpleSettings: 'シンプル設定', creativeSettings: 'クリエイティブ設定', manuscriptSettings: '記事設定',
@@ -1433,6 +1457,8 @@ const T = {
     workspaceRegressionHint: '현재 회귀 테스트 전용 공간입니다. 환경 변수로 잠겨 있어 화면에서 변경할 수 없습니다.',
     workspaceRemoveConfirm: '이 작업 디렉토리를 목록에서 제거하시겠습니까? (디스크 파일은 삭제되지 않음)',
     tabCreate: '새 작업', tabList: '작업 목록',
+    watermarkTitle: '비디오 워터마크', watermarkPromo: 'Agnes Video Generator 영상을 SNS에 공유하여 개발자를 지원하세요',
+    watermarkEnabled: '비디오 워터마크 켜짐', watermarkDisabled: '비디오 워터마크 꺼짐',
     ttSimple: '이미지 & 영상', ttCreative: '크리에이티브 영상', ttManuscript: '기사 영상',
     subModeLabel: '생성 유형', subModeVideo: '🎬 영상', subModeImage: '🖼️ 이미지',
     simpleSettings: '간단 설정', creativeSettings: '크리에이티브 설정', manuscriptSettings: '기사 설정',
@@ -1532,6 +1558,8 @@ const T = {
     workspaceRegressionHint: 'Ini ruang kerja khusus untuk ujian regresi, dikunci oleh pembolehubah persekitaran dan tidak boleh diubah dari UI.',
     workspaceRemoveConfirm: 'Buang direktori kerja ini dari senarai? (Fail pada cakera tidak dipadam)',
     tabCreate: 'Tugas Baru', tabList: 'Senarai Tugas',
+    watermarkTitle: 'Tera Air Video', watermarkPromo: 'Sokong pembangun dengan berkongsi video Agnes Video Generator di media sosial',
+    watermarkEnabled: 'Tera air video dihidupkan', watermarkDisabled: 'Tera air video dimatikan',
     ttSimple: 'Imej & Video', ttCreative: 'Video Kreatif', ttManuscript: 'Video Artikel',
     subModeLabel: 'Jenis', subModeVideo: '🎬 Video', subModeImage: '🖼️ Imej',
     simpleSettings: 'Tetapan Ringkas', creativeSettings: 'Tetapan Kreatif', manuscriptSettings: 'Tetapan Artikel',
@@ -1631,6 +1659,8 @@ const T = {
     workspaceRegressionHint: 'Ini ruang kerja khusus untuk uji regresi, dikunci oleh variabel lingkungan dan tidak dapat diubah dari UI.',
     workspaceRemoveConfirm: 'Hapus direktori kerja ini dari daftar? (File di disk tidak dihapus)',
     tabCreate: 'Tugas Baru', tabList: 'Daftar Tugas',
+    watermarkTitle: 'Watermark Video', watermarkPromo: 'Dukung pengembang dengan membagikan video Agnes Video Generator di media sosial',
+    watermarkEnabled: 'Watermark video diaktifkan', watermarkDisabled: 'Watermark video dinonaktifkan',
     ttSimple: 'Gambar & Video', ttCreative: 'Video Kreatif', ttManuscript: 'Video Artikel',
     subModeLabel: 'Jenis', subModeVideo: '🎬 Video', subModeImage: '🖼️ Gambar',
     simpleSettings: 'Pengaturan Simpel', creativeSettings: 'Pengaturan Kreatif', manuscriptSettings: 'Pengaturan Artikel',
@@ -1759,7 +1789,7 @@ function applyLanguage(lang) {
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
   });
-  // 更新"用户要求"和"视觉风格"默认值（仅在用户未修改时）
+    // 更新"用户要求"和"视觉风格"默认值（仅在用户未修改时）
   const updateDefault = (inputId, i18nKey) => {
     const el = document.getElementById(inputId);
     if (!el) return;
@@ -1769,6 +1799,9 @@ function applyLanguage(lang) {
     }
   };
   updateDefault('c_style', 'styleDefault');
+  // 更新水印宣传文案
+  const promoEl = document.getElementById('watermark-promo');
+  if (promoEl) promoEl.textContent = t('watermarkPromo');
 }
 
 function switchLang(lang) { applyLanguage(lang); }
@@ -1838,6 +1871,10 @@ const STEPS = {
       setApiKeyConfiguredUI(d.source, d.can_clear);
     }
     renderWorkspaces(d.workspaces || [], d.active_workspace || '', d.working_dir_source || 'config');
+    // 加载水印配置
+    if (d.watermark !== undefined) {
+      document.getElementById('watermark-toggle').checked = !!d.watermark.enabled;
+    }
   } catch(e) {}
 
   // Character count for manuscript
@@ -2865,6 +2902,22 @@ document.getElementById('apikey-clear').onclick = async () => {
     alert('Network error');
   }
 };
+
+// ═══════════════════════════════════════════════════
+// 水印开关
+// ═══════════════════════════════════════════════════
+
+async function toggleWatermark() {
+  const enabled = document.getElementById('watermark-toggle').checked;
+  const form = new FormData();
+  form.append('enabled', enabled);
+  try {
+    const r = await fetch('/api/config/watermark', { method: 'POST', body: form });
+    if (r.ok) {
+      showToast(enabled ? t('watermarkEnabled') : t('watermarkDisabled'));
+    }
+  } catch(e) {}
+}
 
 // ═══════════════════════════════════════════════════
 // 工作目录管理
