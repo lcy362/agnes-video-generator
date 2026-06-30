@@ -442,7 +442,8 @@ class CreativeVideoPipeline(BasePipeline):
         self._state.scene_count = len(scenes)
         if not self._state.scenes:
             self._state.scenes = [
-                SceneTask(index=i) for i in range(len(scenes))
+                SceneTask(index=i, duration=self._state.video_duration)
+                for i in range(len(scenes))
             ]
 
         self._state.step_script = StepStatus.COMPLETED
@@ -891,6 +892,16 @@ class CreativeVideoPipeline(BasePipeline):
     # Video generation strategies
     # ------------------------------------------------------------------
 
+    def _scene_duration(self, scene_idx: int) -> float:
+        """Get the video duration for a specific scene by index.
+
+        Falls back to ``self._state.video_duration`` when the scene object
+        is not available (e.g. before scenes are created).
+        """
+        if scene_idx < len(self._state.scenes):
+            return float(self._state.scenes[scene_idx].duration)
+        return float(self._state.video_duration)
+
     async def _generate_independent_scenes(
         self, scenes: list, character_ref_path: str, vw: int, vh: int
     ) -> list:
@@ -942,7 +953,7 @@ class CreativeVideoPipeline(BasePipeline):
             video_id = await self.video_generator.submit_video(
                 prompt=scene_text,
                 reference_image_paths=[character_ref_path],
-                duration=self._state.video_duration,
+                duration=self._scene_duration(scene_idx),
                 width=vw,
                 height=vh,
             )
@@ -1050,7 +1061,7 @@ class CreativeVideoPipeline(BasePipeline):
                 video_id = await self.video_generator.submit_video(
                     prompt=scene_text,
                     reference_image_paths=[current_image],
-                    duration=self._state.video_duration,
+                    duration=self._scene_duration(scene_idx),
                     width=vw,
                     height=vh,
                 )
@@ -1266,7 +1277,7 @@ class CreativeVideoPipeline(BasePipeline):
             video_id = await self.video_generator.submit_video(
                 prompt=info["scene_text"],
                 reference_image_paths=[info["first_frame_url"], info["end_frame_url"]],
-                duration=self._state.video_duration,
+                duration=self._scene_duration(scene_idx),
                 width=vw,
                 height=vh,
             )
@@ -1340,10 +1351,19 @@ class CreativeVideoPipeline(BasePipeline):
 
         # On resume, re-trim existing narrations (old untrimmed data may persist)
         if self._state.narrations:
-            max_chars = max(int(self._state.video_duration * _CHARS_PER_SEC), 20)
-            needs_update = any(len(n) > max_chars for n in self._state.narrations)
+            _scenes = self._state.scenes
+            needs_update = any(
+                len(n) > max(int((_scenes[i].duration if i < len(_scenes) else self._state.video_duration) * _CHARS_PER_SEC), 20)
+                for i, n in enumerate(self._state.narrations)
+            )
             if needs_update:
-                self._state.narrations = [_trim_to_sentence(n, max_chars) for n in self._state.narrations]
+                self._state.narrations = [
+                    _trim_to_sentence(
+                        n,
+                        max(int((_scenes[i].duration if i < len(_scenes) else self._state.video_duration) * _CHARS_PER_SEC), 20),
+                    )
+                    for i, n in enumerate(self._state.narrations)
+                ]
                 self.task_manager.update_state(narrations=self._state.narrations)
             return
 
@@ -1367,9 +1387,15 @@ class CreativeVideoPipeline(BasePipeline):
             narrations.append("\n".join(narrative_paras[idx : idx + count]))
             idx += count
 
-        # Trim each narration to fit within video_duration * 4 chars/sec speaking rate
-        max_chars = max(int(self._state.video_duration * _CHARS_PER_SEC), 20)
-        narrations = [_trim_to_sentence(n, max_chars) for n in narrations]
+        # Trim each narration to fit within its scene's duration * 4 chars/sec speaking rate
+        _scenes = self._state.scenes
+        narrations = [
+            _trim_to_sentence(
+                n,
+                max(int((_scenes[i].duration if i < len(_scenes) else self._state.video_duration) * _CHARS_PER_SEC), 20),
+            )
+            for i, n in enumerate(narrations)
+        ]
 
         self._state.narrations = narrations
         self.task_manager.update_state(narrations=narrations)
@@ -1378,13 +1404,13 @@ class CreativeVideoPipeline(BasePipeline):
         """Use LLM to generate a single narration text for the entire video.
 
         Generates ONE continuous narration that covers all scenes, with length
-        matching the total video duration (num_scenes * video_duration).
+        matching the total video duration (sum of per-scene durations).
 
         Args:
             story: Full story text for context.
             scenes: List of scene visual prompts from write_script.
         """
-        total_duration = float(self._state.video_duration) * len(self._state.scenes)
+        total_duration = sum(float(s.duration) for s in self._state.scenes)
         single_narration = self._state.narrations[0] if self._state.narrations else ""
 
         if single_narration and len(single_narration) > 5:
@@ -1462,7 +1488,7 @@ class CreativeVideoPipeline(BasePipeline):
 
         audio_enabled = self._state.audio_config.enabled
         narration_text = self._state.narrations[0] if self._state.narrations else ""
-        total_duration = float(self._state.video_duration) * len(self._state.scenes)
+        total_duration = sum(float(s.duration) for s in self._state.scenes)
 
         logger.info(
             f"[Pipeline] Step audio: RUNNING "
@@ -1567,7 +1593,11 @@ class CreativeVideoPipeline(BasePipeline):
         else:
             scene_texts = [narration_text] if narration_text else [""]
 
-        scene_durations = [float(self._state.video_duration)] * max(num_scenes, 1)
+        scene_durations = (
+            [float(s.duration) for s in self._state.scenes]
+            if self._state.scenes
+            else [float(self._state.video_duration)]
+        )
 
         srt_path, styles_path = await self.generate_subtitles_common(
             segment_texts=scene_texts,

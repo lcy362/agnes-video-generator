@@ -130,6 +130,8 @@ class SceneTask(BaseModel):
     narration_audio: str = ""
     subtitle_srt: str = ""
     final_clip: str = ""
+    # v3.x 新增：每个场景独立时长
+    duration: int = 5
 
 
 # ═══════════════════════════════════════════════════
