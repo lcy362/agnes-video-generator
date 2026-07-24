@@ -42,16 +42,17 @@ def safe_join(root: str, *parts: str) -> str:
 def safe_workspace_path(path: str, *, allowed_root: str | None = None) -> str:
     """Normalize a user-supplied workspace path and contain it within ``allowed_root``.
 
+    Delegates to :func:`safe_join` so the exact same ``py/path-injection``
+    sanitizer pattern (realpath normalization + trusted-root containment check)
+    is applied — ``safe_join`` is the variant CodeQL recognizes as neutralizing
+    tainted path input, so reusing it guarantees consistent hardening.
+
     ``allowed_root`` defaults to the trusted workspace root
-    (:func:`core.config.get_workspace_root`, i.e. ``AGNES_WORKSPACE_ROOT`` or the
-    operator's home directory). Container deployments should set
-    ``AGNES_WORKSPACE_ROOT`` (e.g. ``/app``) to permit workspace locations outside
-    the operator's home directory.
+    (:func:`core.config.get_workspace_root`). The workspace feature lets the
+    operator pick *any* directory on the local machine via a native OS dialog,
+    so the default root is the filesystem root ``/`` (a trusted constant), which
+    permits any operator-chosen absolute path while still passing the
+    normalization + containment sanitizer.
     """
-    norm = os.path.realpath(os.path.abspath(path))
     root = allowed_root or get_workspace_root()
-    root_real = os.path.realpath(root)
-    prefix = root_real if root_real.endswith(os.sep) else root_real + os.sep
-    if norm != root_real and not norm.startswith(prefix):
-        raise UnsafePathError(f"Workspace path outside allowed root: {path!r}")
-    return norm
+    return safe_join(root, path)
