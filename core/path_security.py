@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import os
 
+from core.config import get_workspace_root
+
 __all__ = ["UnsafePathError", "safe_join", "safe_workspace_path"]
 
 
@@ -40,13 +42,14 @@ def safe_join(root: str, *parts: str) -> str:
 def safe_workspace_path(path: str, *, allowed_root: str | None = None) -> str:
     """Normalize a user-supplied workspace path and contain it within ``allowed_root``.
 
-    ``allowed_root`` defaults to the ``AGNES_WORKSPACE_ROOT`` environment variable,
-    falling back to the current user's home directory. Container deployments should
-    set ``AGNES_WORKSPACE_ROOT`` (e.g. ``/app``) to permit workspace locations outside
+    ``allowed_root`` defaults to the trusted workspace root
+    (:func:`core.config.get_workspace_root`, i.e. ``AGNES_WORKSPACE_ROOT`` or the
+    operator's home directory). Container deployments should set
+    ``AGNES_WORKSPACE_ROOT`` (e.g. ``/app``) to permit workspace locations outside
     the operator's home directory.
     """
     norm = os.path.realpath(os.path.abspath(path))
-    root = allowed_root or os.environ.get("AGNES_WORKSPACE_ROOT") or os.path.expanduser("~")
+    root = allowed_root or get_workspace_root()
     root_real = os.path.realpath(root)
     prefix = root_real if root_real.endswith(os.sep) else root_real + os.sep
     if norm != root_real and not norm.startswith(prefix):

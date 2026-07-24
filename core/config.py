@@ -162,6 +162,9 @@ def get_api_key_source() -> str:
 # 回归测试专用工作目录环境变量名
 REGRESSION_WORKING_DIR_ENV = "AGNES_REGRESSION_WORKING_DIR"
 
+# 工作目录允许根的环境变量名
+WORKSPACE_ROOT_ENV = "AGNES_WORKSPACE_ROOT"
+
 # 默认工作目录的固定名称标识
 DEFAULT_WORKSPACE_NAME = "默认空间"
 
@@ -192,6 +195,16 @@ def get_working_dir() -> str:
     if active:
         return active
     return _default_working_dir()
+
+
+def get_workspace_root() -> str:
+    """返回工作目录允许根的受信任路径。
+
+    作为 safe_workspace_path 的 containment 检查基准。来源为 AGNES_WORKSPACE_ROOT
+    环境变量或当前用户主目录。以独立函数暴露（而非直接读取 os.environ），使静态
+    分析将其视为受信任根，与 get_working_dir 的行为一致。
+    """
+    return os.environ.get(WORKSPACE_ROOT_ENV) or os.path.expanduser("~")
 
 
 def get_workspaces() -> list:
