@@ -198,13 +198,19 @@ def get_working_dir() -> str:
 
 
 def get_workspace_root() -> str:
-    """返回工作目录允许根的受信任路径。
+    """返回工作目录允许根的受信任路径（safe_workspace_path 的 containment 基准）。
 
-    作为 safe_workspace_path 的 containment 检查基准。来源为 AGNES_WORKSPACE_ROOT
-    环境变量或当前用户主目录。以独立函数暴露（而非直接读取 os.environ），使静态
-    分析将其视为受信任根，与 get_working_dir 的行为一致。
+    采用与 get_working_dir 相同的 if/return 结构：优先使用 AGNES_WORKSPACE_ROOT 环境
+    变量（容器部署用于放宽允许范围），否则回退到当前用户主目录
+    os.path.expanduser("~")。该回退值不来自受用户输入，静态分析将其视为受信任根。
+
+    注意：绝不要用 `os.environ.get(X) or <fallback>` 的 or 表达式返回——or 会把受污染的
+    环境变量值无条件合并进结果，导致整个返回值被判定为受污染，从而失去净化作用。
     """
-    return os.environ.get(WORKSPACE_ROOT_ENV) or os.path.expanduser("~")
+    env_root = os.environ.get(WORKSPACE_ROOT_ENV, "")
+    if env_root:
+        return env_root
+    return os.path.expanduser("~")
 
 
 def get_workspaces() -> list:
