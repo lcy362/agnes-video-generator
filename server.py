@@ -488,8 +488,15 @@ async def create_workspace(path: str = Form(...), name: str = Form("")):
             detail="工作目录路径不合法或超出允许范围（可由 AGNES_WORKSPACE_ROOT 环境变量放宽）",
         )
     entry = add_workspace(safe_path, name.strip())
-    os.makedirs(entry["path"], exist_ok=True)
-    os.makedirs(os.path.join(entry["path"], "uploads"), exist_ok=True)
+    # Path-injection hardening: re-validate the *resolved* path stays within the
+    # allowed workspace root before any disk write. The sink must use the
+    # containment-checked value, not the raw stored entry["path"].
+    ws_root = os.path.realpath(os.environ.get("AGNES_WORKSPACE_ROOT") or os.path.expanduser("~"))
+    entry_real = os.path.realpath(entry["path"])
+    if entry_real != ws_root and not entry_real.startswith(ws_root + os.sep):
+        raise HTTPException(status_code=422, detail="工作目录路径超出允许范围")
+    os.makedirs(entry_real, exist_ok=True)
+    os.makedirs(os.path.join(entry_real, "uploads"), exist_ok=True)
     return {"ok": True, "workspace": entry, "active_workspace": get_active_workspace()}
 
 
@@ -519,8 +526,14 @@ async def activate_workspace(path: str = Form(...)):
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    os.makedirs(active, exist_ok=True)
-    os.makedirs(os.path.join(active, "uploads"), exist_ok=True)
+    # Path-injection hardening: re-validate the *resolved* path stays within the
+    # allowed workspace root before any disk write (sink must use the checked value).
+    ws_root = os.path.realpath(os.environ.get("AGNES_WORKSPACE_ROOT") or os.path.expanduser("~"))
+    active_real = os.path.realpath(active)
+    if active_real != ws_root and not active_real.startswith(ws_root + os.sep):
+        raise HTTPException(status_code=422, detail="工作目录路径超出允许范围")
+    os.makedirs(active_real, exist_ok=True)
+    os.makedirs(os.path.join(active_real, "uploads"), exist_ok=True)
     return {"ok": True, "active_workspace": active}
 
 
