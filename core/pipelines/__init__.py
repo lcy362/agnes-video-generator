@@ -5,6 +5,7 @@ BasePipeline 抽象基类 + 四种流水线导出。
 
 import asyncio
 import concurrent.futures
+import functools
 import json
 import logging
 import os
@@ -842,10 +843,13 @@ class BasePipeline(ABC):
             if lang == "auto":
                 lang = detect_language(self._get_watermark_language_text())
             wm_output = video_path + ".wm_tmp.mp4"
-            # 2.3：编码走专用线程池（与轻量请求隔离，不占用默认 to_thread 池）
+            # 2.3：编码走专用线程池（与轻量请求隔离，不占用默认 to_thread 池）。
+            # run_in_executor 只接受位置参数，关键字参数经 functools.partial 绑定。
             loop = asyncio.get_running_loop()
             ok = await loop.run_in_executor(
-                _ENCODING_EXECUTOR, add_watermark, video_path, wm_output, language=lang
+                _ENCODING_EXECUTOR,
+                functools.partial(add_watermark, language=lang),
+                video_path, wm_output,
             )
             if ok:
                 os.replace(wm_output, video_path)

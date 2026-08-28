@@ -30,6 +30,7 @@ from web import app_state
 from web.app_state import init_runtime_state
 from web.routes import (
     config_routes,
+    health_routes,
     image_routes,
     task_creation_routes,
     task_routes,
@@ -51,6 +52,23 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # 初始化工作目录 / uploads / 错误收集根路径，并重置上次异常退出的遗留任务
     init_runtime_state()
+
+    # 3.2：可选文件日志（AGNES_LOG_FILE 设置后启用，10MB 轮转 × 5 份）
+    log_file = os.environ.get("AGNES_LOG_FILE", "").strip()
+    if log_file:
+        try:
+            from logging.handlers import RotatingFileHandler
+            fh = RotatingFileHandler(
+                log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8",
+            )
+            fh.setLevel(logging.INFO)
+            fh.setFormatter(logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+            ))
+            logging.getLogger().addHandler(fh)
+            logger.info(f"[Startup] File logging enabled → {log_file}")
+        except Exception as e:
+            logger.warning(f"[Startup] File logging setup failed: {e}")
 
     # v4.0: 预加载音色目录（edge_tts.list_voices）。
     # edge_tts.list_voices() 是网络调用，若网络慢/不可达会阻塞 lifespan 的 yield，
@@ -133,6 +151,7 @@ async def icon():
 # ═══════════════════════════════════════════════════
 
 app.include_router(utility_routes.router)
+app.include_router(health_routes.router)
 app.include_router(config_routes.router)
 app.include_router(workspace_routes.router)
 app.include_router(voice_routes.router)

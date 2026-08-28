@@ -74,14 +74,30 @@ SCENARIO_WEIGHTS = {
     "C1": 3, "C2": 3, "C3": 3,        # 创意 keyframes: Chat + N*Image + N*Video + 轮询
     "M1": 4, "M2": 4,                 # 稿件: 段落*Chat + 段落*Image + 轮询
     "A1": 2, "A2": 2,                 # 数字人: 1 i2v submit + 轻量轮询
+    "P1": 2,                          # 诗词: 场景*Chat + 场景*Video + 轮询
+    "I1": 1,                          # 简单图片: 1 t2i + 轮询
+    "C4": 3,                          # 创意+用户分镜图: 同 C 系列
 }
-MAX_CONCURRENT_WEIGHT = AGNES_RATE_LIMIT // 2
+# 3.7：并发权重上限尽量从服务端读取（/api/metrics 的 effective_rate），
+# 避免与 rate_limiter 的双份硬编码口径漂移；读取失败时回退本地默认值
+try:
+    import urllib.request as _ur
+    _metrics = json.loads(_ur.urlopen(
+        f"{os.environ.get('REGRESSION_SERVER_URL', 'http://localhost:8765')}"
+        "/api/metrics", timeout=3,
+    ).read().decode("utf-8"))
+    _effective_rate = float(_metrics.get("rate_limiter", {}).get("effective_rate_per_min", 0) or 0)
+    MAX_CONCURRENT_WEIGHT = int(_effective_rate) // 2 if _effective_rate > 0 else AGNES_RATE_LIMIT // 2
+except Exception:
+    MAX_CONCURRENT_WEIGHT = AGNES_RATE_LIMIT // 2
 
 # 单场景超时（秒）
 TIMEOUT_SIMPLE = 30 * 60
 TIMEOUT_CREATIVE = 120 * 60
 TIMEOUT_MANUSCRIPT = 60 * 60
 TIMEOUT_ANCHOR = 60 * 60
+TIMEOUT_POETRY = 60 * 60
+TIMEOUT_IMAGE = 15 * 60
 # 任务状态轮询间隔（区别于 pipeline 内部 30s 的 Agnes Video API 轮询）
 POLL_INTERVAL = 30
 HEALTH_CHECK_RETRIES = 12
@@ -233,6 +249,29 @@ SCENARIO_DEFS = [
          "audio_source": "model",
          "audio_enabled": False},
         TIMEOUT_ANCHOR, SCENARIO_WEIGHTS["A2"]),
+
+    # ── 诗词视频（3.7 补全六种任务类型）──
+    ScenarioConfig("P1", "诗词朗诵+字幕", "poetry",
+        "/api/tasks/poetry",
+        {"poem_text": "床前明月光，疑是地上霜。举头望明月，低头思故乡。",
+         "video_duration": 5, "audio_enabled": True,
+         "audio_voice": "zh-CN-XiaoxiaoNeural", "subtitle_enabled": True},
+        TIMEOUT_POETRY, SCENARIO_WEIGHTS["P1"]),
+
+    # ── 简单图片（3.7 补全六种任务类型）──
+    ScenarioConfig("I1", "文生图", "simple_image",
+        "/api/image/generate",
+        {"prompt": "一只可爱的橘猫坐在窗台上，阳光洒进来", "size": "768x1152"},
+        TIMEOUT_IMAGE, SCENARIO_WEIGHTS["I1"]),
+
+    # ── 创意视频：用户上传分镜图（3.7 C4）──
+    ScenarioConfig("C4", "用户上传分镜图+关键帧", "creative",
+        "/api/tasks/creative",
+        {"idea": "海边日出，波浪轻轻拍打沙滩",
+         "user_requirement": "2个场景，每个场景5秒",
+         "style": "电影质感", "chaining_mode": "keyframes",
+         "video_duration": 5, "audio_enabled": False},
+        TIMEOUT_CREATIVE, SCENARIO_WEIGHTS["C4"], requires_ref_image=True),
 ]
 
 SCENARIO_MAP = {s.id: s for s in SCENARIO_DEFS}

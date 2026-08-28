@@ -304,9 +304,19 @@ class VideoStepsMixin:
                     f"场景 {scene_idx+1}/{total}: 提交任务 (ti2vid)...",
                     _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * scene_idx / total,
                 )
+                # 优化路线图 3.6：双参考图——尾帧（时序连贯）+ 角色参考图
+                # （身份稳定），缓解链式生成的角色漂移累积。
+                # 首场景 current_image == reference_image 时避免重复提交同一张图。
+                ref_paths = [current_image]
+                if (
+                    reference_image
+                    and os.path.exists(reference_image)
+                    and current_image != reference_image
+                ):
+                    ref_paths = [current_image, reference_image]
                 video_id = await self.video_generator.submit_video(
                     prompt=scene_text,
-                    reference_image_paths=[current_image],
+                    reference_image_paths=ref_paths,
                     duration=self._scene_duration(scene_idx),
                     width=vw,
                     height=vh,
