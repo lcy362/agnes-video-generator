@@ -224,9 +224,10 @@ class ConcatMixin:
                 未指定的字段回退到 subtitle_style 的全局值。
         """
         from moviepy import TextClip as MpTextClip
-        from core.config import resolve_font_path, DEFAULT_ARABIC_FONT
+
         from core.audio.subtitle import SubtitleGenerator
         from core.audio.voices import _ARABIC_RE
+        from core.config import DEFAULT_ARABIC_FONT, resolve_font_path
 
         font_path = resolve_font_path(subtitle_style.font)
         # 项目内置字体均不含阿拉伯语字形；配置的字体若不支持阿拉伯文会渲染为方块（tofu）。
