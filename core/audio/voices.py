@@ -158,11 +158,17 @@ def get_voice_lang(voice_id: str):
 # ═══════════════════════════════════════════════════
 
 def is_voice_compatible(voice_id: str, target_lang: str) -> bool:
-    """语言级兼容性：voice 能否朗读 target_lang 语言的内容。"""
+    """语言级兼容性：voice 能否朗读 target_lang 语言的内容。
+
+    target_lang 不在 PROJECT_LANGUAGES 中（UI 22 种语言、音色目录 14 种，
+    tr/vi/th 等）时无法判定兼容性，保持旧行为不阻断，避免任务创建被 422 卡死。
+    """
     vlang = get_voice_lang(voice_id)
-    if vlang is None or target_lang not in PROJECT_LANGUAGES:
-        # 未知 voice 或未知目标语言：仅当完全相同时视为兼容
+    if vlang is None:
+        # 未知 voice：仅当完全相同时视为兼容
         return vlang == target_lang
+    if target_lang not in PROJECT_LANGUAGES:
+        return True  # 无法判定的目标语言不阻断
     supported = LANG_COMPAT.get(vlang, [vlang])
     return target_lang in supported
 
