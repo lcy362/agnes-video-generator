@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
-import { t } from '@/i18n'
+import { t, currentLang } from '@/i18n'
 import { appState } from '@/store'
 import { useGa } from '@/composables/useGa'
 import { useNavigation } from '@/composables/useNavigation'
@@ -129,7 +129,7 @@ async function submitCreative() {
   if (sc) {
     fd.append('audio_enabled', String(sc.audioEnabled))
     fd.append('audio_voice', voiceSelections.c)
-    fd.append('audio_lang', 'zh')
+    fd.append('audio_lang', currentLang.value)
     fd.append('audio_rate', sc.rate)
     fd.append('subtitle_enabled', String(sc.subtitleEnabled))
     fd.append('subtitle_style_mode', sc.styleMode)

@@ -352,6 +352,7 @@ async def create_creative_task(
 async def create_manuscript_task(
     manuscript_text: str = Form(...),
     creative_name: str = Form(""),
+    style: str = Form(""),
     video_width: int = Form(768),
     video_height: int = Form(1152),
     video_duration: int = Form(10),
@@ -411,6 +412,7 @@ async def create_manuscript_task(
         task_id=task_id,
         creative_name=name,
         manuscript_text=manuscript_text.strip(),
+        style=style.strip(),
         video_width=video_width,
         video_height=video_height,
         video_duration=video_duration,
