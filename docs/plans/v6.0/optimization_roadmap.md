@@ -48,7 +48,7 @@
 | 2.5 | 独立环节并行化（t2i 尾帧 / 稿件 prompt） | 🟢 | 长流水线总时长缩短 | 小~中 | ✅ |
 | 3.1 | 前端交互层统一（api 层/Toast/表单去重） | 🟢 | 错误处理集中治理，改一处生效全局 | 中 | ⬜ |
 | 3.2 | 可观测与运维（/api/health、文件日志、metrics） | 🟢 | 部署可探活、事后可查日志 | 小~中 | ✅ |
-| 3.3 | CI 补强（Python 3.10 矩阵 / lint / 前端单测） | 🟢 | 承诺的 3.10+ 兼容有背书 | 小~中 | ⬜ |
+| 3.3 | CI 补强（Python 3.10 矩阵 / lint / 前端单测） | 🟢 | 承诺的 3.10+ 兼容有背书 | 小~中 | ✅ |
 | 3.4 | 移动端/可访问性/杂项体验 | 🟢 | 窄屏可用、模态可达、表单不丢草稿 | 小~中 | ⬜ |
 | 3.5 | 配置收敛（typed Settings） | 🟢 | 12+ 环境变量统一口径，消除默认值冲突 | 中 | ⬜ |
 | 3.6 | chained 模式双参考图提交（调研存档 R1 拆出） | 🟢 | 链式模式角色身份漂移缓解 | 小 | ✅ |
@@ -450,6 +450,7 @@
 | 2026-08-28 | 2.1a 落地（拼接 ffmpeg 化第一步） | `core/compositor/concatenator/concat.py`（`_try_ffmpeg_copy_concat`：probe 分辨率/帧率一致 → concat demuxer + `-c copy`，失败自动回退 moviepy compose） | 新增 `tests/test_concat_ffmpeg_fastpath.py`（5 项）通过；`test_pipeline_contract`/`test_core` 无回归；2.1b（对齐/音量单链）/2.1c（字幕 ASS 灰度）待后续 |
 | 2026-08-28 | 2.1b 落地（无字幕路径单链一次编码） | `core/compositor/concatenator/audio_overlay.py`（`_ffmpeg_mux_aligned`：`tpad` 冻结补帧 + `apad=whole_dur` 静音 + `volume=1.5` 单条 filter 链 + `-t` 对齐，一次编码替代 Step3/4/5 三遍编码；无字幕时启用，失败回退 moviepy） | 新增 `tests/test_overlay_single_pass.py`（2 项）通过（断言 `_run_ffmpeg` 仅 1 次 + 音频长于视频尾帧补齐）；2.1c（字幕 ASS 灰度，覆盖有字幕场景）仍待后续 |
 | 2026-08-28 | 批次 3 部分（3.6/3.2/3.7） | 3.6 `core/pipelines/creative/steps_video.py`（chained 双参考图 `[尾帧, 角色参考图]`，首场景去重）；3.2 新建 `web/routes/health_routes.py`（`/api/health` + `/api/metrics`）+ `server.py`（路由注册 + `AGNES_LOG_FILE` RotatingFileHandler）+ `Dockerfile`（HEALTHCHECK）；3.7 `scripts/regression_runner.py`（场景 P1/I1/C4 + 权重/超时 + 并发上限从 `/api/metrics` 读取）+ `run_mock_regression.sh`（poetry 过滤器）+ `docs/dev/regression_test_plan.md`（矩阵 8→11 场景）；修复 2.3 引入的 `run_in_executor` 关键字参数 bug（`functools.partial`） | `test_health_metrics.py`（2 项）+ 端点冒烟（`/api/health`、`/api/metrics` 均 200）；`TestPoetryVideoPipeline` 9 项通过（暴露并修复水印 `run_in_executor` bug）；`py_compile` 全通过 |
+| 2026-08-28 | 3.3 落地（CI 补强） | `.github/workflows/test.yml`（test job Python 3.10/3.12 矩阵 + `ruff` step + `setup-node` + `npm test`（vitest）+ 前端 `vue-tsc`/build）；`requirements-dev.txt`（加 `ruff`）；`frontend/package.json`（加 `vitest` + `npm test` script）；新增 `frontend/src/utils/feedback.test.ts`（4 项，`isDeterministicError` 纯函数）；新建 `ruff.toml`（select E/F/I + line-length 120 + 豁免 E501/E402/F821 误报/I001 刻意顺序）；`ruff check --fix` 清理 161 处存量告警（删 8 处死变量、2 处未用 import、4 处 lambda→def、2 处变量重命名等） | `ruff check` 全通过（零告警）；后端 `test_core`/`test_pipeline_contract` 全通过；前端 `vitest` 4 项通过；修复 ruff isort 排序破坏 `core/pipelines/__init__.py` 刻意导入顺序导致的循环导入（恢复顺序 + 配置豁免 I001） |
 
 ---
 

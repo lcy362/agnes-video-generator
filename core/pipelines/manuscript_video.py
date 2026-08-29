@@ -17,15 +17,11 @@ from typing import Callable, List, Optional
 
 from core.api.agnes_video import AgnesVideoAPI, VideoTaskCancelled
 from core.compositor.concatenator import VideoConcatenator
+from core.pipelines import MultiScenePipeline
 from core.screenwriter import Screenwriter
-from core.pipelines import MultiScenePipeline, PipelineShutdown
 from models.task import (
-    ManuscriptVideoTask,
     ManuscriptParagraph,
     SceneTask,
-    StepStatus,
-    AudioConfig,
-    SubtitleConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -236,7 +232,6 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         优化路线图 2.5：LLM 调用相互独立，改为有限并发（3 并发）执行；
         进度语义简化为「开始 → 完成」（避免并发下中间进度乱序回退）。
         """
-        total = len(paragraphs)
         pending = [p for p in paragraphs if not p.scene_prompt]
         if pending:
             await self._emit(

@@ -97,7 +97,7 @@ def main() -> int:
         return 2
 
     en_missing = missing.get(HARD_LANG, [])
-    other_missing = {l: m for l, m in missing.items() if l != HARD_LANG}
+    other_missing = {lang: m for lang, m in missing.items() if lang != HARD_LANG}
 
     if args.json:
         print(json.dumps({

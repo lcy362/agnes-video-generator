@@ -3,7 +3,6 @@
 提供缩放、帧提取、静音音频生成、尾帧冻结等工具方法。
 """
 
-import asyncio
 import logging
 import os
 
@@ -58,7 +57,7 @@ class VideoProcessor:
         subprocess.run([
             "ffmpeg", "-y",
             "-f", "lavfi",
-            "-i", f"anullsrc=r=44100:cl=mono",
+            "-i", "anullsrc=r=44100:cl=mono",
             "-t", str(duration_sec),
             "-c:a", "libmp3lame", "-q:a", "4",
             output_path,
@@ -106,7 +105,7 @@ class VideoProcessor:
 
         # 方案 2（回退）：moviepy 拼接原视频 + 尾帧定格。
         # 使用 get_frame + ImageClip 构造定格（moviepy 2.x 无 to_ImageClip(duration=...) API）。
-        from moviepy import VideoFileClip, ImageClip, concatenate_videoclips
+        from moviepy import ImageClip, VideoFileClip, concatenate_videoclips
 
         clip = VideoFileClip(video_path)
         final = None

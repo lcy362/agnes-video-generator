@@ -4,11 +4,11 @@ import json
 import logging
 import os
 import re
-from typing import List, Optional
+from typing import Optional
 
 from core.compositor.concatenator import VideoConcatenator
 from core.screenwriter import clean_narration_text
-from models.task import SceneTask, StepStatus
+from models.task import StepStatus
 
 logger = logging.getLogger(__name__)
 

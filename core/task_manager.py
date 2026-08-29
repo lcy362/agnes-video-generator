@@ -13,9 +13,8 @@ from datetime import datetime
 from typing import Optional
 
 from core.config import get_working_dir
-from core.path_security import safe_join, UnsafePathError
+from core.path_security import UnsafePathError, safe_join
 from models.task import (
-    AnyTaskState,
     BaseTaskState,
     CreativeVideoTask,
     ManuscriptParagraph,

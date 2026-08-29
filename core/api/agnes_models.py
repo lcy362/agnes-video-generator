@@ -9,8 +9,8 @@ import logging
 import requests
 
 from core.config import (
-    DEFAULT_TEXT_MODEL,
     DEFAULT_IMAGE_MODEL,
+    DEFAULT_TEXT_MODEL,
     DEFAULT_VIDEO_MODEL,
     get_agnes_base_url,
 )

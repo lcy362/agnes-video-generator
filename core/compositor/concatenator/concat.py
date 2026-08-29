@@ -6,7 +6,6 @@ import logging
 import os
 import shutil
 import subprocess
-import re as _re
 from typing import List, Optional
 
 import srt as srt_lib
@@ -208,8 +207,9 @@ class ConcatMixin:
                 未指定的字段回退到 subtitle_style 的全局值。
         """
         from moviepy import TextClip as MpTextClip
-        from core.config import resolve_font_path
+
         from core.audio.subtitle import SubtitleGenerator
+        from core.config import resolve_font_path
 
         font_path = resolve_font_path(subtitle_style.font)
 

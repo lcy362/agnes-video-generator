@@ -568,15 +568,8 @@ DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"
 # 保留 AVAILABLE_VOICES 作为向后兼容的别名（返回扁平列表），新代码请使用 get_voice_catalog()。
 from core.audio.voices import (
     get_voice_catalog,
-    get_voice_by_id,
-    get_voice_lang,
-    is_voice_compatible,
-    is_voice_compatible_with_text,
-    load_voice_catalog,
-    VOICE_PREVIEW_TEXTS,
-    LANG_COMPAT,
-    PROJECT_LANGUAGES,
 )
+
 
 def AVAILABLE_VOICES() -> list:
     """向后兼容：返回扁平化的 [{id, label}, ...] 列表。

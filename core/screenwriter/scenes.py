@@ -105,7 +105,7 @@ Output in the SAME LANGUAGE as the input scene.
 <style>{style}</style>
 <max_shots>{max_shots}</max_shots>
 """
-        logger.info(f"[Screenwriter] Designing shots for scene...")
+        logger.info("[Screenwriter] Designing shots for scene...")
         result = self._chat_json(system_prompt, user_prompt)
         shots = result.get("shots", [])
         logger.info(f"[Screenwriter] Designed {len(shots)} shots")

@@ -2,7 +2,7 @@
 import html
 import logging
 import re
-from typing import List, Optional
+from typing import List
 
 from core.api.agnes_chat import strip_code_fence
 

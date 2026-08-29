@@ -222,7 +222,6 @@ class MultiScenePipeline(BasePipeline):
         子类（如链式/循环视频）可整体覆写本方法以保留其特有逻辑。
         """
         scenes = self._state.scenes
-        total = len(scenes)
 
         # Phase 1: 批量提交
         pending: list = []

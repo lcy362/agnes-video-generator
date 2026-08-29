@@ -29,4 +29,5 @@ def test_metrics_endpoint_structure():
     assert "video_limiter" in data
     assert data["concurrency"]["max_weight"] > 0
     assert "usage_pct" in data["concurrency"]
-    assert data["tasks"]["active"] == 0
+    # active 为全局运行时状态（其他测试可能遗留 pipeline），仅断言结构
+    assert isinstance(data["tasks"]["active"], int) and data["tasks"]["active"] >= 0

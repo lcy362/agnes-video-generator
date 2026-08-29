@@ -6,17 +6,16 @@ Screenwriter 类由四个职责 mixin（story/scenes/characters/style）+ 本模
 import json
 import logging
 import os
-import re
 import time as _time
 from typing import List, Optional
 
-from core.api.agnes_chat import AgnesChatAPI, strip_code_fence
+from core.api.agnes_chat import AgnesChatAPI
 
 from .characters import ScreenwriterCharactersMixin
 from .scenes import ScreenwriterScenesMixin
 from .story import (
     ScreenwriterStoryMixin,
-    _xml_escape,           # 兼容 re-export（develop_story 使用）
+    _xml_escape,  # 兼容 re-export（develop_story 使用）
     clean_narration_text,  # 兼容 re-export（外部 pipeline 导入）
 )
 from .style import ScreenwriterStyleMixin
@@ -77,11 +76,6 @@ class Screenwriter(
         if not image_paths:
             return ""
 
-        has_chinese = (
-            bool(re.search(r'[\u4e00-\u9fff]', language_hint))
-            if language_hint
-            else self.language == "zh"
-        )
 
         single_prompt = self._prompt(
             zh_text="""\

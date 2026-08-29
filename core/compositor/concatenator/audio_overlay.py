@@ -282,7 +282,6 @@ class AudioOverlayMixin:
             输出文件路径。
         """
         import math
-        import subprocess
 
         logger.info(
             f"[Compositor] composite_anchor_video: {clip_path} + {audio_path} "
@@ -328,16 +327,7 @@ class AudioOverlayMixin:
         except subprocess.CalledProcessError as e:
             logger.warning(f"[Compositor] Simple concat failed: {e.stderr[:200]}, trying xfade")
 
-            # Build complex filter for xfade cross-fade between each pair
-            fade_duration = 0.3
-            filter_parts = []
-            for i in range(n):
-                if i == 0:
-                    filter_parts.append(f"[0:{i}]")
-                else:
-                    filter_parts.append(f"[0:{i}]")
-                    filter_parts.append(f"xfade=transition=fade:duration={fade_duration}:offset={i * clip_duration - fade_duration * i}")
-            filter_str = "".join(filter_parts)
+            # xfade filter 构建已由上方 trim 循环拼接替代（死代码，3.3 清理）
 
             subprocess.run(
                 ["ffmpeg", "-y",

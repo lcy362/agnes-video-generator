@@ -20,6 +20,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from core.config import get_working_dir
+from core.path_security import safe_join
 from models.task import (
     AnchorVideoTask,
     BaseTaskState,
@@ -28,9 +30,6 @@ from models.task import (
     PoetryVideoTask,
     StepStatus,
 )
-
-from core.config import get_working_dir
-from core.path_security import safe_join
 
 logger = logging.getLogger(__name__)
 
@@ -510,16 +509,12 @@ def get_cascade_plan(artifact_id: str, state: BaseTaskState, task_dir: str) -> O
     # 5. 获取场景/段落数量
     if isinstance(state, CreativeVideoTask):
         scope_count = len(state.scenes)
-        list_field = "scenes"
     elif isinstance(state, ManuscriptVideoTask):
         scope_count = len(state.paragraphs)
-        list_field = "paragraphs"
     elif isinstance(state, AnchorVideoTask):
         scope_count = len(state.paragraphs) if state.paragraphs else 0
-        list_field = "paragraphs"
     else:
         scope_count = 0
-        list_field = ""
 
     # 6. 遍历级联产物定义, 生成删除计划
     for d in cascaded_defs:

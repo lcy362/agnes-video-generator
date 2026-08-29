@@ -10,7 +10,6 @@ import logging
 import mimetypes
 import os
 import re
-import time
 from typing import List
 
 import requests

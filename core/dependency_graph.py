@@ -280,7 +280,6 @@ class DependencyGraph:
 
         # 2. 解析 modified → 受影响产物 id 集合（含场景级传播）
         affected_ids: set[str] = set()
-        affected_types: set[str] = set()  # 参数级类型（非场景关联）
 
         for mid in modified_artifact_ids:
             base_type, field, index = self._parse_artifact_id(mid, state)

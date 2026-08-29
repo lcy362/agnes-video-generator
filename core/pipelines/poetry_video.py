@@ -24,7 +24,6 @@ from core.screenwriter import Screenwriter, clean_narration_text
 from models.task import (
     PoetryVideoTask,
     SceneTask,
-    StepStatus,
     SubtitleStyle,
 )
 
@@ -179,8 +178,8 @@ class PoetryVideoPipeline(MultiScenePipeline):
         # 解析用户分镜描述：每行支持「原诗句 | 画面描述」。
         # 过滤纯场景标签行（如「场景 1（00:00 - 00:10）」），避免干扰格式检测。
         user_lines = [
-            l.strip() for l in (self._state.user_scene_prompts or [])
-            if l.strip() and not _is_scene_label(l)
+            line.strip() for line in (self._state.user_scene_prompts or [])
+            if line.strip() and not _is_scene_label(line)
         ]
         user_scenes: List[tuple] = []
         for line in user_lines:

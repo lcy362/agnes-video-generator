@@ -20,7 +20,6 @@ from core.pipelines import (
 )
 from core.task_manager import TaskManager
 from models.task import BaseTaskState, StepStatus, TaskType
-
 from web import app_state
 
 logger = logging.getLogger(__name__)

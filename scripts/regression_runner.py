@@ -27,9 +27,9 @@ import json
 import logging
 import os
 import re
+import shutil
 import signal
 import subprocess
-import shutil
 import sys
 import time
 from contextlib import contextmanager
@@ -474,34 +474,35 @@ class ReportManager:
         ep = d["endpoints"]
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-        icon = lambda st: {"completed": "✅", "failed": "❌", "skipped": "⏭️",
-                           "running": "🔄", "pending": "⏳", "submitted": "⏳"}.get(st, "❓")
+        def icon(st):
+            return {"completed": "✅", "failed": "❌", "skipped": "⏭️",
+                    "running": "🔄", "pending": "⏳", "submitted": "⏳"}.get(st, "❓")
 
         lines = []
-        lines.append(f"# Agnes Video Generator v2.0 — 大版本回归测试报告")
-        lines.append(f"")
-        lines.append(f"| 元数据 | 值 |")
-        lines.append(f"|--------|-----|")
+        lines.append("# Agnes Video Generator v2.0 — 大版本回归测试报告")
+        lines.append("")
+        lines.append("| 元数据 | 值 |")
+        lines.append("|--------|-----|")
         lines.append(f"| 日期 | {now} |")
         lines.append(f"| 版本 | {d.get('git_commit', 'unknown')} |")
         lines.append(f"| 报告版本 | {d.get('version', '?')} |")
         lines.append(f"| 自动验证 | {s['passed_checks']}/{s['total_checks']} 通过 |")
-        lines.append(f"")
+        lines.append("")
         ep_pass = sum(1 for e in ep.values() if e["status"] == "passed")
         ep_all = len(ep)
-        lines.append(f"## 概览")
-        lines.append(f"")
-        lines.append(f"| 状态 | 数量 |")
-        lines.append(f"|------|------|")
+        lines.append("## 概览")
+        lines.append("")
+        lines.append("| 状态 | 数量 |")
+        lines.append("|------|------|")
         lines.append(f"| 总计 | {s['total']} |")
         lines.append(f"| ✅ 完成 | {s['completed']} |")
         lines.append(f"| ❌ 失败 | {s['failed']} |")
         lines.append(f"| ⏭️ 跳过 | {s['skipped']} |")
         lines.append(f"| 🔄 运行中 | {s['running']} |")
         lines.append(f"| ⏳ 待处理 | {s['pending']} |")
-        lines.append(f"")
+        lines.append("")
         lines.append(f"端点验证: {ep_pass}/{ep_all} ✅")
-        lines.append(f"")
+        lines.append("")
 
         for type_label, type_key, type_ids in [
             ("简单视频 (Simple)", "simple", ["S1"]),
@@ -509,10 +510,10 @@ class ReportManager:
             ("稿件视频 (Manuscript)", "manuscript", ["M1", "M2"]),
             ("数字人口播 (Anchor)", "anchor", ["A1", "A2"]),
         ]:
-            lines.append(f"---")
-            lines.append(f"")
+            lines.append("---")
+            lines.append("")
             lines.append(f"## {type_label}")
-            lines.append(f"")
+            lines.append("")
             for sid in type_ids:
                 sdata = sc.get(sid)
                 if not sdata:
@@ -536,9 +537,9 @@ class ReportManager:
                     lines.append(f"### {sid} {label} — {tag} {st}")
 
             # Table
-            lines.append(f"")
-            lines.append(f"| 检查项 | " + " | ".join(type_ids) + " |")
-            lines.append(f"|" + "|".join(["---" for _ in range(len(type_ids) + 1)]) + "|")
+            lines.append("")
+            lines.append("| 检查项 | " + " | ".join(type_ids) + " |")
+            lines.append("|" + "|".join(["---" for _ in range(len(type_ids) + 1)]) + "|")
 
             all_check_names = set()
             for sid in type_ids:
@@ -546,7 +547,8 @@ class ReportManager:
                 chk = (sdata.get("result") or {}).get("checks") or {} if sdata else {}
                 all_check_names.update(chk.keys())
 
-            sort_key = lambda n: (0 if n.startswith("F") else 1 if n.startswith("R") else 2, n)
+            def sort_key(n):
+                return (0 if n.startswith("F") else 1 if n.startswith("R") else 2, n)
             for cname in sorted(all_check_names, key=sort_key):
                 if cname.endswith(("_width", "_height", "_duration", "_count", "_entries", "F2_duration", "F6_asr_text", "F4_speech_duration")):
                     continue
@@ -568,38 +570,38 @@ class ReportManager:
                     else:
                         row.append(str(val) if val else "—")
                 lines.append("| " + " | ".join(row) + " |")
-            lines.append(f"")
+            lines.append("")
 
         # Endpoint results
-        lines.append(f"---")
-        lines.append(f"")
-        lines.append(f"## 端点验证 (E1-E10)")
-        lines.append(f"")
-        lines.append(f"| 端点 | 状态 | 详情 |")
-        lines.append(f"|------|------|------|")
+        lines.append("---")
+        lines.append("")
+        lines.append("## 端点验证 (E1-E10)")
+        lines.append("")
+        lines.append("| 端点 | 状态 | 详情 |")
+        lines.append("|------|------|------|")
         for eid in sorted(ep.keys()):
             e = ep[eid]
             tag = "✅" if e["status"] == "passed" else "❌"
             lines.append(f"| {eid} | {tag} | {e.get('detail', '')} |")
-        lines.append(f"")
+        lines.append("")
 
         # Manual verification section (only F5 subtitle visibility remains manual)
-        lines.append(f"---")
-        lines.append(f"")
-        lines.append(f"## 需手动验证")
-        lines.append(f"")
-        lines.append(f"以下检查因 IMAX 视觉限制无法由脚本验证，需人工确认：")
-        lines.append(f"")
-        lines.append(f"| 检查项 | 操作 | 预期 |")
-        lines.append(f"|--------|------|------|")
-        lines.append(f"| F5 字幕可见性 | 播放 final_video.mp4 观察画面 | 字幕内容、位置、样式与配置一致 |")
-        lines.append(f"")
-        lines.append(f"> 音频正确性 (F4) 和字幕文本匹配 (F6) 已由脚本通过 whisper ASR 自动验证。")
+        lines.append("---")
+        lines.append("")
+        lines.append("## 需手动验证")
+        lines.append("")
+        lines.append("以下检查因 IMAX 视觉限制无法由脚本验证，需人工确认：")
+        lines.append("")
+        lines.append("| 检查项 | 操作 | 预期 |")
+        lines.append("|--------|------|------|")
+        lines.append("| F5 字幕可见性 | 播放 final_video.mp4 观察画面 | 字幕内容、位置、样式与配置一致 |")
+        lines.append("")
+        lines.append("> 音频正确性 (F4) 和字幕文本匹配 (F6) 已由脚本通过 whisper ASR 自动验证。")
 
         # Error summary
-        lines.append(f"")
-        lines.append(f"## 错误汇总")
-        lines.append(f"")
+        lines.append("")
+        lines.append("## 错误汇总")
+        lines.append("")
         has_errors = False
         for sid, sdata in sorted(sc.items()):
             errs = sdata.get("errors") or []
@@ -607,8 +609,8 @@ class ReportManager:
                 has_errors = True
                 lines.append(f"- **{sid}** ({sdata.get('label', '')}): {errs[0]}")
         if not has_errors:
-            lines.append(f"无错误。")
-        lines.append(f"")
+            lines.append("无错误。")
+        lines.append("")
 
         content = "\n".join(lines)
         os.makedirs(os.path.dirname(report_md_path), exist_ok=True)
@@ -624,17 +626,17 @@ class ReportManager:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
         lines = []
-        lines.append(f"# Agnes Video Generator v2.0 — 回归测试问题清单")
-        lines.append(f"")
-        lines.append(f"| 元数据 | 值 |")
-        lines.append(f"|--------|-----|")
+        lines.append("# Agnes Video Generator v2.0 — 回归测试问题清单")
+        lines.append("")
+        lines.append("| 元数据 | 值 |")
+        lines.append("|--------|-----|")
         lines.append(f"| 日期 | {now} |")
         lines.append(f"| 版本 | {d.get('git_commit', 'unknown')} |")
-        lines.append(f"")
+        lines.append("")
 
         # ── 场景问题 ──
-        lines.append(f"## 一、场景执行问题")
-        lines.append(f"")
+        lines.append("## 一、场景执行问题")
+        lines.append("")
         has_scenario_issues = False
 
         for sid, sdata in sorted(sc.items()):
@@ -652,17 +654,17 @@ class ReportManager:
                 label = sdata.get("label", sid)
                 duration = (sdata.get("result") or {}).get("duration_s", "?")
                 lines.append(f"### {sid} {label}")
-                lines.append(f"")
+                lines.append("")
                 lines.append(f"- **状态**: {st}")
                 lines.append(f"- **耗时**: {duration}s")
 
                 if errs:
-                    lines.append(f"- **错误信息**:")
+                    lines.append("- **错误信息**:")
                     for e in errs:
                         lines.append(f"  - `{e}`")
 
                 if failed_checks:
-                    lines.append(f"- **失败检查项**:")
+                    lines.append("- **失败检查项**:")
                     for fc in failed_checks:
                         val = chk.get(fc)
                         lines.append(f"  - `{fc}`: {val}")
@@ -673,15 +675,15 @@ class ReportManager:
                     lines.append(f"- **task_id**: `{task_id}`")
                 if dir_name:
                     lines.append(f"- **目录**: `{dir_name}`")
-                lines.append(f"")
+                lines.append("")
 
         if not has_scenario_issues:
-            lines.append(f"无场景执行问题。")
-            lines.append(f"")
+            lines.append("无场景执行问题。")
+            lines.append("")
 
         # ── 端点问题 ──
-        lines.append(f"## 二、端点验证问题")
-        lines.append(f"")
+        lines.append("## 二、端点验证问题")
+        lines.append("")
         has_ep_issues = False
         for eid in sorted(ep.keys()):
             e = ep[eid]
@@ -689,22 +691,22 @@ class ReportManager:
                 has_ep_issues = True
                 lines.append(f"- **{eid}**: {e.get('detail', 'unknown')}")
         if not has_ep_issues:
-            lines.append(f"无端点问题。")
-        lines.append(f"")
+            lines.append("无端点问题。")
+        lines.append("")
 
         # ── 需手动验证 ──
-        lines.append(f"## 三、需手动验证项")
-        lines.append(f"")
-        lines.append(f"| 检查项 | 场景 | 操作 |")
-        lines.append(f"|--------|------|------|")
+        lines.append("## 三、需手动验证项")
+        lines.append("")
+        lines.append("| 检查项 | 场景 | 操作 |")
+        lines.append("|--------|------|------|")
         for sid, sdata in sorted(sc.items()):
             if sdata.get("status") == "completed":
                 lines.append(f"| F5 字幕可见性 | {sid} | 播放 final_video.mp4 确认字幕显示 |")
-        lines.append(f"")
+        lines.append("")
 
         # ── 汇总 ──
-        lines.append(f"## 四、问题汇总")
-        lines.append(f"")
+        lines.append("## 四、问题汇总")
+        lines.append("")
         total_issues = sum(
             1 for sdata in sc.values()
             if sdata.get("status") == "failed" or sdata.get("errors")
@@ -713,7 +715,7 @@ class ReportManager:
         lines.append(f"- 场景问题数: {total_issues}")
         lines.append(f"- 端点问题数: {ep_issues}")
         lines.append(f"- 总问题数: {total_issues + ep_issues}")
-        lines.append(f"")
+        lines.append("")
 
         content = "\n".join(lines)
         os.makedirs(os.path.dirname(issues_md_path), exist_ok=True)
@@ -1608,7 +1610,6 @@ async def run_scenario(scenario: ScenarioConfig,
             ok_count = sum(1 for v in checks.values() if v is True)
             na_count = sum(
                 1 for v in checks.values() if v == "N/A" or v == "skip")
-            skip_count = sum(1 for v in checks.values() if v == "skip")
             total_real = sum(
                 1 for v in checks.values()
                 if v not in ("N/A", "skip") or v is True or v is False)
@@ -1811,9 +1812,9 @@ async def main(resume: bool = False, auto_start: bool = False,
     logger.info(f"  并行度上限: {MAX_CONCURRENT_WEIGHT} 权重并发")
     logger.info(f"  服务端限速: {AGNES_RATE_LIMIT} 次/分钟 (令牌桶, 含轮询)")
     logger.info(f"  轮询间隔: {POLL_INTERVAL}s")
-    resume and logger.info(f"  模式: 续传 (跳过已完成 + 不可恢复失败，重试可恢复失败)")
-    quick and logger.info(f"  模式: 快速验证 (跳过运行)")
-    cleanup and logger.info(f"  模式: 清理回归产物")
+    resume and logger.info("  模式: 续传 (跳过已完成 + 不可恢复失败，重试可恢复失败)")
+    quick and logger.info("  模式: 快速验证 (跳过运行)")
+    cleanup and logger.info("  模式: 清理回归产物")
     logger.info("=" * 56)
 
     # ── 清理模式 ──
@@ -1897,7 +1898,6 @@ async def main(resume: bool = False, auto_start: bool = False,
     skipped = [sc for sc in SCENARIO_DEFS if not report.should_run(sc.id, resume=resume)]
 
     if skipped:
-        skip_ids = ', '.join(s.id for s in skipped)
         skip_reasons = []
         for s in skipped:
             st = report.data["scenarios"][s.id]["status"]
@@ -1918,7 +1918,7 @@ async def main(resume: bool = False, auto_start: bool = False,
         sema = WeightedSemaphore(MAX_CONCURRENT_WEIGHT)
         tasks = [run_scenario(sc, sema, report, manifest) for sc in pending]
         await asyncio.gather(*tasks)
-        logger.info(f"全部场景执行完毕")
+        logger.info("全部场景执行完毕")
 
     await verify_endpoints(report)
     report._save()

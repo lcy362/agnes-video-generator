@@ -327,7 +327,6 @@ class SubtitleSrtMixin:
         while len(groups) >= 2:
             last_dur = groups[-1][1] - groups[-1][0]
             last_chars = len(groups[-1][2])
-            prev_dur = groups[-2][1] - groups[-2][0]
             prev_chars = len(groups[-2][2])
             merged_dur = groups[-1][1] - groups[-2][0]
             merged_chars = prev_chars + last_chars
@@ -531,7 +530,8 @@ class SubtitleSrtMixin:
         """
         if not segment_texts:
             return None
-        norm_len = lambda x: len(_re.sub(r"\s+|[^\w\u4e00-\u9fff]", "", x))
+        def norm_len(x):
+            return len(_re.sub(r"\s+|[^\w\u4e00-\u9fff]", "", x))
         ranges = []
         cum = 0
         for t in segment_texts:
@@ -606,7 +606,8 @@ class SubtitleSrtMixin:
         scene_char_ranges = SubtitleGenerator._scene_char_ranges(segment_texts)
         if scene_char_ranges is not None:
             # 策略 A：文本锚定。累计归一化字符位置，定位每个 cue 所属场景。
-            norm_len = lambda x: len(_re.sub(r"\s+|[^\w\u4e00-\u9fff]", "", x))
+            def norm_len(x):
+                return len(_re.sub(r"\s+|[^\w\u4e00-\u9fff]", "", x))
             cue_char_pos = []
             run = 0
             for _, _, t in items:

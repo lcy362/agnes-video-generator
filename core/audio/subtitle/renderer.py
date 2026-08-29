@@ -5,7 +5,7 @@ import logging
 import os
 import re as _re
 
-from moviepy import VideoFileClip, CompositeVideoClip
+from moviepy import CompositeVideoClip, VideoFileClip
 from moviepy.video.tools.subtitles import SubtitlesClip
 
 from models.task import SubtitleStyle

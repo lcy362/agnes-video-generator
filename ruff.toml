@@ -1,0 +1,21 @@
+# ruff 配置（3.3 CI 补强）
+# 规则面从最小集合起步：E（error 类）+ F（pyflakes）+ I（isort 导入排序）。
+# 目标：现有代码零告警过 CI；后续可按需放宽 select 并逐步修复更多规则。
+
+line-length = 120
+target-version = "py310"
+
+[lint]
+select = ["E", "F", "I"]
+# E501 行长：line-length 120 下仍有少量超长行，从 CI 门槛移除（交由格式化工具）
+ignore = ["E501"]
+# E402 模块级导入位置：项目大量使用函数内延迟导入规避循环依赖（有意模式）
+extend-ignore = ["E402"]
+
+[lint.per-file-ignores]
+# F821 误报：SubtitleGenerator / VideoConcatenator 的类内自引用（运行时正常）
+"core/audio/subtitle/*.py" = ["F821"]
+"core/compositor/concatenator/*.py" = ["F821"]
+# I001：导出区 import 顺序为刻意设计（multi_scene 先于 anchor，避免循环导入），
+# 不参与 isort 排序
+"core/pipelines/__init__.py" = ["I001"]

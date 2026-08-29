@@ -35,7 +35,6 @@ from models.task import (
     TaskType,
     VideoMode,
 )
-
 from web import app_state, deps, helpers
 
 logger = logging.getLogger(__name__)

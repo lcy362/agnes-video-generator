@@ -1,4 +1,5 @@
 import logging
+
 import requests
 from tenacity import retry, stop_after_attempt, wait_fixed
 
@@ -32,7 +33,8 @@ def download_image(url: str, save_path: str, max_size: int = _MAX_IMAGE_SIZE) ->
 
 
 def image_path_to_b64(image_path: str) -> str:
-    import base64, mimetypes
+    import base64
+    import mimetypes
     with open(image_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode("utf-8")
     mime = mimetypes.guess_type(image_path)[0] or "image/png"

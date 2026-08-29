@@ -27,8 +27,7 @@ _ENCODING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
 from core.compositor.watermark import add_watermark, detect_language
 from core.config import get_watermark_config
 from core.task_manager import TaskManager
-from models.task import AudioConfig, BaseTaskState, StepStatus, SubtitleConfig, SubtitleStyle
-
+from models.task import AudioConfig, BaseTaskState, StepStatus, SubtitleConfig
 
 # ── 优化路线图 1.2：词级 cues 持久化（续传免重采 TTS） ───────────────
 # 生成音频时把 edge_tts SubMaker.cues（词级时间戳）序列化落盘到
@@ -875,6 +874,8 @@ class BasePipeline(ABC):
 
 
 # 导出
+# 注意：导入顺序是刻意设计（multi_scene 必须先于 anchor 导入，避免循环导入）。
+# ruff isort（I001）排序会破坏该顺序，故本文件在 ruff.toml 中豁免 I001。
 from core.pipelines.multi_scene import MultiScenePipeline
 from core.pipelines.simple_video import SimpleVideoPipeline
 from core.pipelines.creative_video import CreativeVideoPipeline

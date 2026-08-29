@@ -5,7 +5,6 @@ import base64
 import logging
 import mimetypes
 import os
-import time
 from typing import List, Optional
 
 import requests
@@ -184,7 +183,7 @@ class AgnesImageAPI:
                             "image", "generate_single_image",
                             prompt=prompt,
                             error_type="RateLimit429",
-                            error_message=f"HTTP 429: rate limited",
+                            error_message="HTTP 429: rate limited",
                             status_code=429,
                             response_body=resp.text,
                             retry_count=attempt + 1,
@@ -197,7 +196,7 @@ class AgnesImageAPI:
                         "image", "generate_single_image",
                         prompt=prompt,
                         error_type="RateLimit429",
-                        error_message=f"HTTP 429: retries exhausted",
+                        error_message="HTTP 429: retries exhausted",
                         status_code=429,
                         response_body=resp.text,
                         retry_count=max_retries,

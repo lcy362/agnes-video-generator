@@ -44,11 +44,11 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    # 如需验证多版本兼容性，把 python-version 改为矩阵即可，例如：
-    # strategy:
-    #   fail-fast: false
-    #   matrix:
-    #     python-version: ["3.11", "3.12"]
+    # 3.3：Python 3.10 / 3.12 矩阵（README / start.sh 承诺 3.10+）
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,7 +56,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: |
             requirements.txt
@@ -71,6 +71,26 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check core/ web/ utils/ models/ scripts/ --output-format=github
+
+      - name: Setup Node (frontend unit tests)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install --no-audit --no-fund
+
+      - name: Run frontend unit tests (vitest)
+        working-directory: frontend
+        run: npm test
+
+      - name: Type-check + build frontend
+        working-directory: frontend
+        run: npm run build
 
       - name: Run tests with coverage
         # --cov-fail-under=55：覆盖率跌破当前基线（58%）即判红，防静默退化。

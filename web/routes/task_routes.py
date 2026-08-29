@@ -6,9 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
-
-from fastapi import Form
+from fastapi import APIRouter, Form, HTTPException
 
 from core.config import API_KEY_MISSING_MSG, get_api_key
 from core.pipelines import ALL_CHECKPOINTS, compute_current_checkpoint
@@ -23,7 +21,6 @@ from models.task import (
     StepStatus,
     TaskType,
 )
-
 from web import app_state, deps, helpers
 
 logger = logging.getLogger(__name__)

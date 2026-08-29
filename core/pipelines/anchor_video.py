@@ -11,23 +11,19 @@ v4.0 重构：继承 MultiScenePipeline，复用模板方法 run() 与步骤编�
 
 import asyncio
 import logging
-import math
 import os
 import re
-from typing import Callable, List, Optional
+from typing import Callable, Optional
 
 from core.api.agnes_image import AgnesImageAPI
 from core.api.agnes_video import AgnesVideoAPI, VideoTaskCancelled
 from core.compositor.concatenator import VideoConcatenator
-from core.pipelines import MultiScenePipeline, PipelineShutdown
+from core.pipelines import MultiScenePipeline
 from core.screenwriter import Screenwriter
 from models.task import (
     AnchorVideoTask,
-    ManuscriptParagraph,
     SceneTask,
     StepStatus,
-    AudioConfig,
-    SubtitleConfig,
 )
 
 logger = logging.getLogger(__name__)

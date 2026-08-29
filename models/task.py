@@ -12,10 +12,9 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
-
 
 # ═══════════════════════════════════════════════════
 # 枚举
