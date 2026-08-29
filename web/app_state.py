@@ -64,6 +64,19 @@ class WeightedSemaphore:
             self.current -= weight
             self._cond.notify_all()
 
+    async def update_max_weight(self, new_max: int):
+        """优化路线图 3.5：动态调整并发上限（随 Key 数/配额缩放）。
+
+        - 不低于当前已占用权重（避免已获取的槽位失效）
+        - 上调时唤醒排队等待者（新任务可继续获取）
+        - 下调不回收已占槽位（等其自然释放）
+        """
+        if new_max <= 0:
+            return
+        async with self._lock:
+            self.max_weight = max(new_max, self.current)
+            self._cond.notify_all()
+
     @property
     def utilization(self) -> float:
         return self.current / self.max_weight if self.max_weight else 0
@@ -89,8 +102,34 @@ def get_rate_limit() -> int:
     return _AGNES_RATE_LIMIT
 
 
+def _effective_concurrency_limit() -> int:
+    """并发权重上限 = 有效配额 // 2（对齐 rate_limiter._effective_rate()）。
+
+    优化路线图 3.5：此前固定为 ``env 值 // 2``，不随 Key 数缩放——多 Key 部署
+    下并发上限过严（8 Key 时配额 128 却仍按 10），而低 ``AGNES_RATE_LIMIT``
+    配置（如 6）下稿件(权重 4) 反被硬拒绝。动态化后 0.4 的硬拒绝场景消失。
+    """
+    try:
+        from core.api.rate_limiter import get_rate_limiter
+        rate = get_rate_limiter().stats.get("effective_rate_per_min", 0) or 0
+        if rate > 0:
+            return max(1, int(rate) // 2)
+    except Exception:
+        pass
+    return _AGNES_RATE_LIMIT // 2
+
+
 def get_semaphore() -> WeightedSemaphore:
-    """全局加权信号量。"""
+    """全局加权信号量（3.5：max_weight 随 Key 数/配额动态缩放）。"""
+    target = _effective_concurrency_limit()
+    if target > 0 and target != _pipeline_semaphore.max_weight:
+        try:
+            asyncio.get_running_loop().create_task(
+                _pipeline_semaphore.update_max_weight(target)
+            )
+        except RuntimeError:
+            # 无运行中事件循环（如回归脚本同步上下文）：直接跳过动态更新
+            pass
     return _pipeline_semaphore
 
 

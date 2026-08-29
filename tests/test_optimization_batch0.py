@@ -77,6 +77,41 @@ async def test_semaphore_queued_cancellation_does_not_release():
     assert sem.current == 2
 
 
+# ── 3.5 并发上限动态缩放 ────────────────────────────────────────────
+
+
+async def test_semaphore_update_max_weight_wakes_waiters():
+    """上限上调后唤醒排队等待者（多 Key 配额提升立即生效）。"""
+    from web.app_state import WeightedSemaphore
+
+    sem = WeightedSemaphore(3)
+    await sem.acquire(3)  # 占满
+    waiter = asyncio.create_task(sem.acquire(2))  # 排队
+    await asyncio.sleep(0.01)
+    assert not waiter.done()
+
+    await sem.update_max_weight(5)  # 3.5：配额提升
+    await asyncio.wait_for(waiter, 1)  # 被唤醒并成功获取
+    assert sem.current == 5
+
+
+async def test_semaphore_update_max_weight_not_below_current():
+    """下调不回收已占用权重（不低于 current）。"""
+    from web.app_state import WeightedSemaphore
+
+    sem = WeightedSemaphore(5)
+    await sem.acquire(4)
+    await sem.update_max_weight(2)
+    assert sem.max_weight == 4
+
+
+def test_effective_concurrency_limit_positive():
+    """有效并发上限为正数（随配额动态计算）。"""
+    from web import app_state
+
+    assert app_state._effective_concurrency_limit() > 0
+
+
 # ── 0.5 WatermarkLayout ─────────────────────────────────────────────
 
 
