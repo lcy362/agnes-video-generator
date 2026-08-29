@@ -251,7 +251,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                     prompt = await asyncio.to_thread(
                         self.screenwriter.generate_scene_prompt_for_paragraph,
                         para.text,
-                        "",
+                        self._state.style,
                     )
                     para.scene_prompt = prompt.strip()
 

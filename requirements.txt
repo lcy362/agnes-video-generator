@@ -12,6 +12,11 @@ python-multipart>=0.0.6,<1.0.0
 edge_tts>=6.1.0,<8.0.0          # Azure Edge TTS，免费无需 API Key
 srt>=3.5.0,<4.0.0               # SRT 字幕解析/生成工具
 
+# 阿拉伯语字幕支持：Pillow/moviepy 的 TextClip 不做双向文本重排/字母连写，
+# 需在渲染前手动 reshape + bidi 重排（否则字母不连写、显示顺序反向）。
+arabic-reshaper>=3.0.0,<4.0.0
+python-bidi>=0.4.2,<1.0.0
+
 # v5.0 优化（可选依赖：缺失时自动降级，行为与旧版一致）
 json-repair>=0.25.0,<1.0.0      # LLM JSON 输出容错（optimization_roadmap §4）
 python-dotenv>=1.0.0,<2.0.0     # .env 支持（optimization_roadmap §1.8，.env.example 模板）

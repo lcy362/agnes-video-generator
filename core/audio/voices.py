@@ -37,6 +37,7 @@ PROJECT_LANGUAGES = {
     "it": {"label": "Italiano", "script": "latin"},
     "id": {"label": "Bahasa Indonesia", "script": "latin"},
     "ms": {"label": "Bahasa Melayu", "script": "latin"},
+    "ar": {"label": "العربية", "script": "arabic"},
 }
 
 # 拉丁体系包含的全部项目语言（彼此完全互通）
@@ -60,6 +61,14 @@ VOICE_PREVIEW_TEXTS = {
     "it": "Ciao, sono {name}, questo è un esempio vocale.",
     "id": "Halo, saya {name}, ini adalah sampel suara.",
     "ms": "Helo, saya {name}, ini adalah sampel suara.",
+    "ar": "مرحبًا، أنا {name}، هذا نموذج صوتي تجريبي.",
+}
+
+# 阿拉伯语按地区方言的试听文案覆盖（locale 如 "ar-SY"）。
+# 阿拉伯语音色的地域口音差异很大，标准阿拉伯语（فصحى）试听无法体现方言特色，
+# 因此对已适配的地区使用地道方言问候语；未覆盖的地区回退到 VOICE_PREVIEW_TEXTS["ar"]。
+VOICE_PREVIEW_TEXTS_BY_LOCALE = {
+    "ar-SY": "أهلين، أنا {name}، هاد مثال عن صوتي.",
 }
 
 # ═══════════════════════════════════════════════════
@@ -84,6 +93,7 @@ LANG_COMPAT = {
     "it": list(_LATIN_COMPAT),
     "id": list(_LATIN_COMPAT),
     "ms": list(_LATIN_COMPAT),
+    "ar": ["ar"],
 }
 
 
@@ -98,17 +108,21 @@ _SCRIPT_COMPAT_VOICES = {
     "ko": {"ko"},                       # 谚文 → 仅韩语音色
     "latin": set(_LATIN_LANGS) | {"zh", "ja", "ko"},  # 拉丁字母 → 全部拉丁 + CJK(均可读英文)
     "ru": {"ru"},                       # 西里尔 → 仅俄文
+    "arabic": {"ar"},                   # 阿拉伯字母 → 仅阿拉伯语音色
 }
+
+# 阿拉伯字母及常见附加区块（含波斯语/乌尔都语共用字符、阿拉伯语标点、表现形式）
+_ARABIC_RE = re.compile(r"[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]")
 
 
 def detect_text_script(text: str) -> str:
     """粗略判断文本的 dominant 文字体系。
 
-    Returns: 'zh' | 'ja' | 'ko' | 'latin' | 'ru' | 'unknown'
+    Returns: 'zh' | 'ja' | 'ko' | 'latin' | 'ru' | 'arabic' | 'unknown'
     """
     if not text or not text.strip():
         return "unknown"
-    # 优先级：谚文 > 假名 > 汉字 > 西里尔 > 拉丁
+    # 优先级：谚文 > 假名 > 汉字 > 西里尔 > 阿拉伯文 > 拉丁
     if re.search(r"[가-힣]", text):
         return "ko"
     if re.search(r"[぀-ヿ]", text):
@@ -117,6 +131,8 @@ def detect_text_script(text: str) -> str:
         return "zh"
     if re.search(r"[Ѐ-ӿ]", text):
         return "ru"
+    if _ARABIC_RE.search(text):
+        return "arabic"
     if re.search(r"[A-Za-z]", text):
         return "latin"
     return "unknown"
@@ -142,11 +158,17 @@ def get_voice_lang(voice_id: str):
 # ═══════════════════════════════════════════════════
 
 def is_voice_compatible(voice_id: str, target_lang: str) -> bool:
-    """语言级兼容性：voice 能否朗读 target_lang 语言的内容。"""
+    """语言级兼容性：voice 能否朗读 target_lang 语言的内容。
+
+    target_lang 不在 PROJECT_LANGUAGES 中（UI 22 种语言、音色目录 14 种，
+    tr/vi/th 等）时无法判定兼容性，保持旧行为不阻断，避免任务创建被 422 卡死。
+    """
     vlang = get_voice_lang(voice_id)
-    if vlang is None or target_lang not in PROJECT_LANGUAGES:
-        # 未知 voice 或未知目标语言：仅当完全相同时视为兼容
+    if vlang is None:
+        # 未知 voice：仅当完全相同时视为兼容
         return vlang == target_lang
+    if target_lang not in PROJECT_LANGUAGES:
+        return True  # 无法判定的目标语言不阻断
     supported = LANG_COMPAT.get(vlang, [vlang])
     return target_lang in supported
 
@@ -197,6 +219,33 @@ def _build_fallback_catalog() -> dict:
 
 
 # ═══════════════════════════════════════════════════
+# 阿拉伯语音色姓名本地化
+# ═══════════════════════════════════════════════════
+# edge-tts 不提供阿拉伯语音色的本地文字姓名（仅拉丁转写，如 "Hamed"）。
+# 试听文案若直接把拉丁姓名嵌入阿拉伯语句子朗读，阿语音色会按外语拼读，
+# 发音明显错误。此处手工维护全部 32 个阿拉伯语音色的正确阿拉伯语姓名，
+# 用于试听文案与搜索，而非拉丁转写。
+ARABIC_VOICE_NAMES = {
+    "Fatima": "فاطمة", "Hamdan": "حمدان",
+    "Ali": "علي", "Laila": "ليلى",
+    "Amina": "أمينة", "Ismael": "إسماعيل",
+    "Salma": "سلمى", "Shakir": "شاكر",
+    "Bassel": "باسل", "Rana": "رنا",
+    "Sana": "سناء", "Taim": "تيم",
+    "Fahed": "فهد", "Noura": "نورة",
+    "Layla": "ليلى", "Rami": "رامي",
+    "Iman": "إيمان", "Omar": "عمر",
+    "Jamal": "جمال", "Mouna": "منى",
+    "Abdullah": "عبدالله", "Aysha": "عائشة",
+    "Amal": "أمل", "Moaz": "معاذ",
+    "Hamed": "حامد", "Zariyah": "زارية",
+    "Amany": "أماني", "Laith": "ليث",
+    "Hedi": "هادي", "Reem": "ريم",
+    "Maryam": "مريم", "Saleh": "صالح",
+}
+
+
+# ═══════════════════════════════════════════════════
 # 目录构建
 # ═══════════════════════════════════════════════════
 
@@ -231,12 +280,19 @@ def _voice_to_dict(v: dict) -> dict | None:
     categories = list(tag.get("ContentCategories", []) or [])
     style_tags = personalities + categories
 
-    preview = VOICE_PREVIEW_TEXTS.get(lang_part, VOICE_PREVIEW_TEXTS["zh"]).format(name=name)
+    # 阿拉伯语音色：试听文案用真实阿拉伯语姓名朗读，而非拉丁转写
+    local_name = ARABIC_VOICE_NAMES.get(name, name) if lang_part == "ar" else name
+
+    preview_template = (
+        VOICE_PREVIEW_TEXTS_BY_LOCALE.get(locale)
+        or VOICE_PREVIEW_TEXTS.get(lang_part, VOICE_PREVIEW_TEXTS["zh"])
+    )
+    preview = preview_template.format(name=local_name)
 
     return {
         "id": short,
         "name": name,
-        "local_name": name,
+        "local_name": local_name,
         "region": region_label,
         "region_code": locale,
         "gender": gender,

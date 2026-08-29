@@ -38,6 +38,10 @@ def font_dir() -> str:
 # 默认中文字体文件名（需位于 resource/fonts/ 下）
 DEFAULT_CHINESE_FONT = "STHeitiMedium.ttc"
 
+# 默认阿拉伯语字体文件名（需位于 resource/fonts/ 下）。
+# 项目内置字体均不含阿拉伯语字形，阿拉伯文字幕若使用默认/中文字体会渲染为方块（tofu）。
+DEFAULT_ARABIC_FONT = "NotoNaskhArabicUI.ttf"
+
 # 不支持 CJK 字符的常见字体名（用于向后兼容旧任务）
 # 这些字体在 moviepy/pillow TextClip 中无法正确渲染中文，
 # 检测到后自动回退到 DEFAULT_CHINESE_FONT。

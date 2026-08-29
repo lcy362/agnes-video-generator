@@ -186,6 +186,23 @@ class ConcatMixin:
         )
 
     @staticmethod
+    def _shape_bidi_text(text: str) -> str:
+        """阿拉伯文字母连写 + 双向重排（Pillow/moviepy 不做复杂文本排版，需手动处理）。
+
+        非阿拉伯文文本原样返回；多行文本逐行处理，保留行序。
+        """
+        from core.audio.voices import _ARABIC_RE
+
+        if not _ARABIC_RE.search(text):
+            return text
+
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+
+        lines = text.split("\n")
+        return "\n".join(get_display(arabic_reshaper.reshape(line)) for line in lines)
+
+    @staticmethod
     def _parse_srt_to_clips(
         srt_path: str,
         subtitle_style: SubtitleStyle,
@@ -207,11 +224,14 @@ class ConcatMixin:
                 未指定的字段回退到 subtitle_style 的全局值。
         """
         from moviepy import TextClip as MpTextClip
-
+        from core.config import resolve_font_path, DEFAULT_ARABIC_FONT
         from core.audio.subtitle import SubtitleGenerator
-        from core.config import resolve_font_path
+        from core.audio.voices import _ARABIC_RE
 
         font_path = resolve_font_path(subtitle_style.font)
+        # 项目内置字体均不含阿拉伯语字形；配置的字体若不支持阿拉伯文会渲染为方块（tofu）。
+        # 逐条按文本内容检测并强制回退到内置阿拉伯语字体，而非依赖用户手填正确字体名。
+        arabic_font_path = resolve_font_path(DEFAULT_ARABIC_FONT)
 
         # 兼容旧格式 bg_color 字符串
         bg = subtitle_style.bg_color
@@ -269,10 +289,12 @@ class ConcatMixin:
 
                 # 长文本自动拆为多行，避免单行溢出屏幕
                 wrapped = SubtitleGenerator._split_long_text(txt, cjk_max_chars)
+                wrapped = VideoConcatenator._shape_bidi_text(wrapped)
+                entry_font = arabic_font_path if _ARABIC_RE.search(txt) else font_path
 
                 clip = MpTextClip(
                     text=wrapped,
-                    font=font_path,
+                    font=entry_font,
                     font_size=fs,
                     color=color,
                     stroke_color=subtitle_style.stroke_color,

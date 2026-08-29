@@ -317,6 +317,7 @@ class ManuscriptVideoTask(BaseTaskState):
     task_type: Literal[TaskType.MANUSCRIPT] = TaskType.MANUSCRIPT
 
     manuscript_text: str = ""
+    style: str = ""  # 可选画面风格描述，传给场景 prompt 生成（默认空，保持旧行为）
     paragraphs: List[ManuscriptParagraph] = Field(default_factory=list)
     # v4.0 重构：通用场景列表（由 _build_scenes 填充，供模板与下游步骤引用）
     scenes: List[SceneTask] = Field(default_factory=list)
