@@ -145,12 +145,13 @@ def main() -> int:
     # the curl invocation stays well within ARG_MAX and avoids quoting issues.
     payload = json.dumps({"description": desc, "full_description": readme})
     tmp_payload = "/tmp/dockerhub_overview_payload.json"
+    tmp_resp = "/tmp/dockerhub_overview_response.txt"
     with open(tmp_payload, "w", encoding="utf-8") as f:
         f.write(payload)
     try:
         res = subprocess.run(
             [
-                "curl", "-sS", "-m", "60", "-o", "/dev/null", "-w", "%{http_code}",
+                "curl", "-sS", "-m", "60", "-o", tmp_resp, "-w", "%{http_code}",
                 "-X", "PATCH",
                 "-H", "Content-Type: application/json",
                 "-H", f"User-Agent: {UA}",
@@ -166,9 +167,20 @@ def main() -> int:
         print("curl not found on this runner; cannot update Docker Hub overview")
         return 1
     os.remove(tmp_payload)
-    if res.returncode != 0 or res.stdout.strip() != "200":
-        print(f"PATCH failed: exit={res.returncode} http={res.stdout.strip()} {res.stderr.strip()[:300]}")
+    http_code = res.stdout.strip()
+    if res.returncode != 0 or http_code != "200":
+        print(f"PATCH failed: exit={res.returncode} http={http_code} {res.stderr.strip()[:300]}")
+        try:
+            with open(tmp_resp, encoding="utf-8", errors="replace") as f:
+                body = f.read()
+        except OSError:
+            body = ""
+        print("=== response body (first 800 chars) ===")
+        print(body[:800])
+        print("=== end response body ===")
+        os.remove(tmp_resp)
         return 1
+    os.remove(tmp_resp)
     print(f"PATCH {repo_path} -> HTTP 200")
     print(f"description: {len(desc)} chars | full_description: {len(readme)} chars")
     return 0

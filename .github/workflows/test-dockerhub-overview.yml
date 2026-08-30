@@ -1,0 +1,23 @@
+name: Test Docker Hub Overview
+
+# 仅测试 update_dockerhub_overview.py 脚本（Debug/诊断用），不构建任何镜像。
+# 用法：gh workflow run test-dockerhub-overview.yml
+on:
+  workflow_dispatch:
+
+jobs:
+  test-overview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run update_dockerhub_overview.py
+        env:
+          DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          IMAGE_NAME: free-short-video
+          RELEASE_VERSION: v6.3.0
+        run: |
+          python3 .github/scripts/update_dockerhub_overview.py
+          echo "SCRIPT_EXIT=$?"
