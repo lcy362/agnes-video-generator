@@ -61,7 +61,7 @@
 
 ## 🌐 多语言 Web UI
 
-一键启动后在浏览器中完成所有操作。界面支持 **13 种语言**：中文、English、Deutsch、Français、Nederlands、Español、Português、Italiano、Русский、日本語、한국어、Bahasa Melayu、Bahasa Indonesia。
+一键启动后在浏览器中完成所有操作。界面支持 **22 种语言**：中文、English、Deutsch、Français、Nederlands、Español、Português、Italiano、Русский、日本語、한국어、Bahasa Melayu、Bahasa Indonesia、العربية、Türkçe、Tiếng Việt、ไทย、Tagalog、हिन्दी、فارسی、বাংলা、اردو。音色目录与字幕字体同样覆盖这 22 种语言（含阿拉伯/波斯/乌尔都 RTL 连字排版与泰/印地/孟加拉字体回退）。
 
 ## 🎬 三种 AI 视频串联模式
 

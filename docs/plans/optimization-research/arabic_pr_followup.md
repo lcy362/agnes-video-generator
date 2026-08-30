@@ -3,6 +3,7 @@
 > **来源**：GitHub PR #32「Arabic Language Added」（Khaled97Sho，2026-08-29 合并入 master `db33d23`；随附兼容性修复 `e8c31fa`）。
 > **性质**：A 节为合并评审时发现并接受的遗留瑕疵；B 节为以 PR #32 实施模式为模板、补齐其余 UI 语言缺口的待办。
 > **注意**：PR #32 改动目前仅在 master；v6.0-dev 需合并 master 后才会包含阿语链路，本文引用的代码位置以 master 为准。
+> **状态（2026-08-30）**：✅ **A 节与 B 节均已实施完成**。A 节修复 `_ARABIC_RE` 排除 U+FEFF；B 节补齐 tr/vi/th/tl/hi/fa/bn/ur 共 8 种语言后端链路（音色分组/试听/脚本检测/字幕字体/RTL）。详见各节「实施记录」。
 
 ***
 
@@ -24,9 +25,10 @@
 
 * 代价：极低。实际触发概率接近零（SRT 文本源自 TTS 输出，正常不含 BOM；且 `_shape_bidi_text` 对非阿文原样返回，误判后果仅为字体替换，视觉差异极小）。
 
-### 未实施原因
+### 实施记录（2026-08-30）
 
-* 合并评审时判定为可接受瑕疵，不阻断合并；留待下次触碰 `voices.py` 时顺手修复。
+* `core/audio/voices.py`：`_ARABIC_RE` 末区间由 `ﹰ-﻿`（U+FE70–U+FEFF）收紧为 `ﹰ-ﻼ`（U+FE70–U+FEFC），显式排除 U+FEFF（BOM）。同时新增 `_THAI_RE` / `_DEVANAGARI_RE` / `_BENGALI_RE` 三个脚本正则（配合 B 节）。
+* 验证：`detect_text_script("\ufeffHello") == "latin"`、`detect_text_script("\ufeff") != "arabic"`，单测覆盖（`tests/test_voice_multilang.py::test_bom_not_detected_as_arabic`）。
 
 ***
 
@@ -56,9 +58,22 @@
 
 * 代价：中低。数据条目级增量（正则 / 映射 / 文案），主要成本是内置字体二进制与逐语言回归验证；无架构改动。
 
-### 未实施原因
+### 实施记录（2026-08-30）
 
-* 未排期。PR #32 刚合并，先观察阿语链路在真实任务中的稳定性（重点：reshape+bidi 字幕渲染、阿语字体回退），再决定是否按此模板批量补齐。
+逐语言对照 PR #32 五件套完成：
 
-* 触发条件：出现 tr/vi/th/hi/fa/bn/ur 用户的明确反馈，或规划下一个小/中版本时纳入实施批次。
+1. **`PROJECT_LANGUAGES` / `LANG_COMPAT` / `VOICE_PREVIEW_TEXTS`**（`core/audio/voices.py`）：
+   - 新增 8 种语言条目（tr/vi/tl=拉丁，th=thai，hi=devanagari，bn=bengali，fa/ur=arabic），共 22 种；
+   - `LANG_COMPAT`：tr/vi/tl 并入拉丁互通集合；th/hi/bn/fa/ur 仅自身；
+   - `VOICE_PREVIEW_TEXTS`：8 种语言各配本地试听句。
+2. **脚本检测正则**（`core/audio/voices.py`）：新增 `_THAI_RE`（U+0E00–0E7F）/ `_DEVANAGARI_RE`（U+0900–097F）/ `_BENGALI_RE`（U+0980–09FF），`detect_text_script` 增加对应分支；`_SCRIPT_COMPAT_VOICES` 增加 thai→{th}、devanagari→{hi}、bengali→{bn}，并将 arabic 集合扩为 {ar, fa, ur}。
+3. **音色姓名本地化映射**（`core/audio/voices.py`）：`ARABIC_VOICE_NAMES` 重构为按语言分组的 `_VOICE_NATIVE_NAMES`，新增 fa（2）/ur（4）/th（2）/hi（2）/bn（4）共 14 个本地姓名；保留 `ARABIC_VOICE_NAMES` 兼容别名。
+4. **字幕字体**（`core/config.py` + `core/compositor/concatenator/{concat,audio_overlay}.py`）：
+   - `config.py` 新增 `DEFAULT_THAI_FONT` / `DEFAULT_DEVANAGARI_FONT` / `DEFAULT_BENGALI_FONT`，并从 Google Fonts 下载 `NotoSansThai-Regular.ttf`（38KB）/ `NotoSansDevanagari-Regular.ttf`（244KB）/ `NotoSansBengali-Regular.ttf`（143KB）至 `resource/fonts/`；
+   - fa/ur 复用 `NotoNaskhArabicUI.ttf`（已验证覆盖波斯语 پ چ ژ گ 与乌尔都语特殊字符）；
+   - moviepy 字幕路径（`concat.py`）与 ASS 路径（`audio_overlay.py`）均改为逐条按脚本回退字体（`\fn` 覆盖）。
+5. **RTL**：fa/ur 直接复用 `_shape_bidi_text` 的 reshape+bidi 管线，无新增代码。
+6. **voice id 归一**：`get_voice_lang` 新增 `fil`→`tl` 映射（edge-tts Tagalog 音色前缀为 `fil-PH` 而非 `tl-PH`）。
+
+**自验**：`tests/test_voice_multilang.py` 新增 32 项单测全通过（脚本检测 / voice 归一 / 兼容矩阵 / 本地姓名 / 目录分组 / ASS 字体回退）；全量后端单测（不含 mock_regression）459 项通过；mock_regression 28 项通过；`ruff` 零告警；`i18n_check` 通过。
 

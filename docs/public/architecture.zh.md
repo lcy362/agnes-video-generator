@@ -9,7 +9,7 @@ agnes-video-generator/
 ├── docker-run.sh                     # 一行 Docker 启动脚本（封装挂载参数）
 ├── server.py                         # FastAPI 主服务 (REST + WebSocket)
 ├── static/
-│   └── index.html                    # 前端 SPA — 五种任务 Tab，13 种语言 (Tailwind CSS)
+│   └── index.html                    # 前端 SPA — 五种任务 Tab，22 种语言 (Tailwind CSS)
 ├── core/
 │   ├── config.py                     # API Key、字体解析、默认配置
 │   ├── screenwriter.py               # 编剧 Agent (LLM 驱动的故事/脚本/旁白生成)

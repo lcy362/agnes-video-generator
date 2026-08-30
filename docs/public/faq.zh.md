@@ -22,7 +22,7 @@
 
 ### Web UI 支持哪些语言？
 
-界面支持 13 种语言：中文、English、Deutsch、Français、Nederlands、Español、Português、Italiano、Русский、日本語、한국어、Bahasa Melayu、Bahasa Indonesia。字幕以源文本语言生成，内置 CJK 字体支持。
+界面支持 22 种语言：中文、English、Deutsch、Français、Nederlands、Español、Português、Italiano、Русский、日本語、한국어、Bahasa Melayu、Bahasa Indonesia、العربية、Türkçe、Tiếng Việt、ไทย、Tagalog、हिन्दी、فارسی、বাংলা、اردو。字幕以源文本语言生成，内置 CJK / 阿拉伯 / 泰 / 印地（天城文）/ 孟加拉字体支持。
 
 ### 可以用 Docker 部署吗？
 

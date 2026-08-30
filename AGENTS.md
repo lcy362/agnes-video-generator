@@ -98,7 +98,7 @@ curl -X POST http://localhost:8765/api/tasks/manuscript -H "Content-Type: applic
 | 图片模型 | `agnes-image-2.1-flash`（t2i / i2i 共用；i2i 默认同 t2i，可用 `AGNES_IMAGE_I2I_MODEL` 回退 2.0） |
 | 视频模型 | `agnes-video-v2.0` — 免费 |
 | 水印 | moviepy TextClip 生成 PNG + ffmpeg overlay 叠加（避免整片重编码 OOM） |
-| 音色 | edge_tts 动态音色目录，按 13 种项目语言分组 + 跨脚本兼容性校验 |
+| 音色 | edge_tts 动态音色目录，按 22 种项目语言分组（与前端 UI 语言对齐）+ 跨脚本兼容性校验 |
 | 日志 | `logging.getLogger(__name__)` |
 
 ---
@@ -141,7 +141,7 @@ agnes-video-generator/
 │   ├── audio/
 │   │   ├── tts.py                    # EdgeTTSEngine（旁白+词级时间戳）+ SilentTTSEngine
 │   │   ├── subtitle/                  # 字幕包（generator: SRT 生成 + renderer: moviepy 叠加）
-│   │   └── voices.py                 # 音色目录（13 语言分组）+ 跨脚本兼容性校验矩阵
+│   │   └── voices.py                 # 音色目录（22 语言分组）+ 跨脚本兼容性校验矩阵
 │   ├── compositor/
 │   │   ├── concatenator/              # 拼接包（concat: 视频拼接 + audio_overlay: 音频叠加）
 │   │   ├── processor.py              # 视频缩放/帧提取/定格延长/静音音频生成

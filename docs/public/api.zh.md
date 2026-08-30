@@ -24,7 +24,7 @@
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/voices` | 列出可用 TTS 音色（按 13 语言分组） |
+| GET | `/api/voices` | 列出可用 TTS 音色（按 22 语言分组） |
 | GET | `/api/voices/preview` | 音色试听（生成/缓存样本） |
 | GET | `/api/voices/compat` | 音色与语言兼容性校验 |
 

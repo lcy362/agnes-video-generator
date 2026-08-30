@@ -436,7 +436,20 @@ class AudioOverlayMixin:
         """
         try:
             from core.audio.subtitle import SubtitleGenerator
-            from core.config import font_dir, resolve_font_path
+            from core.audio.voices import (
+                _ARABIC_RE,
+                _BENGALI_RE,
+                _DEVANAGARI_RE,
+                _THAI_RE,
+            )
+            from core.config import (
+                DEFAULT_ARABIC_FONT,
+                DEFAULT_BENGALI_FONT,
+                DEFAULT_DEVANAGARI_FONT,
+                DEFAULT_THAI_FONT,
+                font_dir,
+                resolve_font_path,
+            )
 
             with open(srt_path, "r", encoding="utf-8") as f:
                 subs = list(srt_lib.parse(f))
@@ -446,6 +459,14 @@ class AudioOverlayMixin:
             font_path = resolve_font_path(subtitle_style.font)
             fonts_dir = font_dir()
             fontname = _ass_fontname(font_path)
+            # 逐条按文本脚本回退字体（阿/泰/印地/孟加拉 → 内置对应字体），
+            # 与 moviepy 字幕路径（concat.py）保持一致，避免方块（tofu）。
+            script_font_map = {
+                _ARABIC_RE: resolve_font_path(DEFAULT_ARABIC_FONT),
+                _THAI_RE: resolve_font_path(DEFAULT_THAI_FONT),
+                _DEVANAGARI_RE: resolve_font_path(DEFAULT_DEVANAGARI_FONT),
+                _BENGALI_RE: resolve_font_path(DEFAULT_BENGALI_FONT),
+            }
 
             # 主色 / 描边 / 背景
             primary = AudioOverlayMixin._ass_color(
@@ -511,6 +532,14 @@ class AudioOverlayMixin:
 
                 # override tags：仅在与全局不同时输出
                 overrides = []
+                # 文本脚本 → 强制回退内置字体（与 moviepy 路径一致）
+                entry_fontname = fontname
+                for script_re, script_font in script_font_map.items():
+                    if script_re.search(txt):
+                        entry_fontname = _ass_fontname(script_font)
+                        break
+                if entry_fontname != fontname:
+                    overrides.append(f"\\fn{entry_fontname}")
                 if entry_fs != fs:
                     overrides.append(f"\\fs{entry_fs}")
                 c_rgb = AudioOverlayMixin._parse_ass_color(entry_color)

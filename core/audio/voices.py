@@ -1,6 +1,6 @@
 """core.audio.voices — 音色目录与兼容性
 
-基于 edge_tts.list_voices() 动态加载全部可用音色，按项目 13 种 i18n 语言分组，
+基于 edge_tts.list_voices() 动态加载全部可用音色，按项目 22 种 i18n 语言分组，
 并内置跨语言兼容性矩阵与「文本脚本 → 兼容性」检测，供后端 /api/voices* 接口与
 任务创建时的 voice/text 校验复用。
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════
 
 # code -> (展示名, 文字体系)
-# 文字体系: cjk / latin / cyrillic
+# 文字体系: cjk / latin / cyrillic / arabic / thai / devanagari / bengali
 PROJECT_LANGUAGES = {
     "zh": {"label": "中文", "script": "cjk"},
     "en": {"label": "English", "script": "latin"},
@@ -38,6 +38,14 @@ PROJECT_LANGUAGES = {
     "id": {"label": "Bahasa Indonesia", "script": "latin"},
     "ms": {"label": "Bahasa Melayu", "script": "latin"},
     "ar": {"label": "العربية", "script": "arabic"},
+    "tr": {"label": "Türkçe", "script": "latin"},
+    "vi": {"label": "Tiếng Việt", "script": "latin"},
+    "th": {"label": "ไทย", "script": "thai"},
+    "tl": {"label": "Tagalog", "script": "latin"},
+    "hi": {"label": "हिन्दी", "script": "devanagari"},
+    "fa": {"label": "فارسی", "script": "arabic"},
+    "bn": {"label": "বাংলা", "script": "bengali"},
+    "ur": {"label": "اردو", "script": "arabic"},
 }
 
 # 拉丁体系包含的全部项目语言（彼此完全互通）
@@ -62,6 +70,14 @@ VOICE_PREVIEW_TEXTS = {
     "id": "Halo, saya {name}, ini adalah sampel suara.",
     "ms": "Helo, saya {name}, ini adalah sampel suara.",
     "ar": "مرحبًا، أنا {name}، هذا نموذج صوتي تجريبي.",
+    "tr": "Merhaba, ben {name}, bu bir ses önizlemesi.",
+    "vi": "Xin chào, tôi là {name}, đây là mẫu giọng nói.",
+    "th": "สวัสดีครับ ฉันชื่อ{name} นี่คือตัวอย่างเสียง",
+    "tl": "Kumusta, ako si {name}, ito ay sample ng boses.",
+    "hi": "नमस्ते, मैं {name} हूँ, यह आवाज़ का नमूना है।",
+    "fa": "سلام، من {name} هستم، این یک نمونه صدا است.",
+    "bn": "নমস্কার, আমি {name}, এটি একটি কণ্ঠস্বরের নমুনা।",
+    "ur": "السلام علیکم، میں {name} ہوں، یہ آواز کا نمونہ ہے۔",
 }
 
 # 阿拉伯语按地区方言的试听文案覆盖（locale 如 "ar-SY"）。
@@ -94,6 +110,14 @@ LANG_COMPAT = {
     "id": list(_LATIN_COMPAT),
     "ms": list(_LATIN_COMPAT),
     "ar": ["ar"],
+    "tr": list(_LATIN_COMPAT),
+    "vi": list(_LATIN_COMPAT),
+    "th": ["th"],
+    "tl": list(_LATIN_COMPAT),
+    "hi": ["hi"],
+    "fa": ["fa"],
+    "bn": ["bn"],
+    "ur": ["ur"],
 }
 
 
@@ -108,11 +132,23 @@ _SCRIPT_COMPAT_VOICES = {
     "ko": {"ko"},                       # 谚文 → 仅韩语音色
     "latin": set(_LATIN_LANGS) | {"zh", "ja", "ko"},  # 拉丁字母 → 全部拉丁 + CJK(均可读英文)
     "ru": {"ru"},                       # 西里尔 → 仅俄文
-    "arabic": {"ar"},                   # 阿拉伯字母 → 仅阿拉伯语音色
+    "arabic": {"ar", "fa", "ur"},        # 阿拉伯字母 → 阿/波/乌音色（fa/ur 共用阿拉伯字母）
+    "thai": {"th"},                     # 泰文 → 仅泰语音色
+    "devanagari": {"hi"},               # 天城文 → 仅印地语音色
+    "bengali": {"bn"},                  # 孟加拉文 → 仅孟加拉语音色
 }
 
-# 阿拉伯字母及常见附加区块（含波斯语/乌尔都语共用字符、阿拉伯语标点、表现形式）
-_ARABIC_RE = re.compile(r"[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]")
+# 阿拉伯字母及常见附加区块（含波斯语/乌尔都语共用字符、阿拉伯语标点、表现形式）。
+# 最后区间 U+FE70–U+FEFC 显式排除了 U+FEFF（BOM 零宽不换行空格，非阿拉伯字符），
+# 避免含 BOM 文本被误判为阿拉伯文导致字幕误切阿语字体。
+_ARABIC_RE = re.compile(r"[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-ﻼ]")
+
+# 泰文字母（U+0E00–U+0E7F）
+_THAI_RE = re.compile(r"[ก-๟]")
+# 天城文（印地语，U+0900–U+097F）
+_DEVANAGARI_RE = re.compile(r"[ऀ-ॿ]")
+# 孟加拉文（U+0980–U+09FF）
+_BENGALI_RE = re.compile(r"[ঀ-৿]")
 
 
 def detect_text_script(text: str) -> str:
@@ -122,7 +158,7 @@ def detect_text_script(text: str) -> str:
     """
     if not text or not text.strip():
         return "unknown"
-    # 优先级：谚文 > 假名 > 汉字 > 西里尔 > 阿拉伯文 > 拉丁
+    # 优先级：谚文 > 假名 > 汉字 > 西里尔 > 孟加拉文 > 天城文 > 泰文 > 阿拉伯文 > 拉丁
     if re.search(r"[가-힣]", text):
         return "ko"
     if re.search(r"[぀-ヿ]", text):
@@ -131,11 +167,28 @@ def detect_text_script(text: str) -> str:
         return "zh"
     if re.search(r"[Ѐ-ӿ]", text):
         return "ru"
+    if _BENGALI_RE.search(text):
+        return "bengali"
+    if _DEVANAGARI_RE.search(text):
+        return "devanagari"
+    if _THAI_RE.search(text):
+        return "thai"
     if _ARABIC_RE.search(text):
         return "arabic"
     if re.search(r"[A-Za-z]", text):
         return "latin"
     return "unknown"
+
+
+# edge-tts voice id 前缀 → 项目语言 code 映射。
+# 例外：Tagalog 音色在 edge-tts 中用 ISO 639-3 代码 `fil`（如 fil-PH-AngeloNeural），
+# 而项目/前端 UI 用 ISO 639-1 `tl`，故需显式归一。
+_VOICE_PREFIX_TO_LANG = {"fil": "tl"}
+
+
+def _voice_prefix_to_lang(prefix: str) -> str | None:
+    """将 voice id 前缀（小写）归一为项目语言 code，无法识别返回 None。"""
+    return _VOICE_PREFIX_TO_LANG.get(prefix, prefix if prefix in PROJECT_LANGUAGES else None)
 
 
 # ═══════════════════════════════════════════════════
@@ -150,7 +203,7 @@ def get_voice_lang(voice_id: str):
     if not voice_id:
         return None
     lang_part = voice_id.split("-")[0].lower()
-    return lang_part if lang_part in PROJECT_LANGUAGES else None
+    return _voice_prefix_to_lang(lang_part)
 
 
 # ═══════════════════════════════════════════════════
@@ -160,8 +213,8 @@ def get_voice_lang(voice_id: str):
 def is_voice_compatible(voice_id: str, target_lang: str) -> bool:
     """语言级兼容性：voice 能否朗读 target_lang 语言的内容。
 
-    target_lang 不在 PROJECT_LANGUAGES 中（UI 22 种语言、音色目录 14 种，
-    tr/vi/th 等）时无法判定兼容性，保持旧行为不阻断，避免任务创建被 422 卡死。
+    target_lang 不在 PROJECT_LANGUAGES 中（不在项目 22 种语言集合内的语言）时
+    无法判定兼容性，保持旧行为不阻断，避免任务创建被 422 卡死。
     """
     vlang = get_voice_lang(voice_id)
     if vlang is None:
@@ -219,30 +272,53 @@ def _build_fallback_catalog() -> dict:
 
 
 # ═══════════════════════════════════════════════════
-# 阿拉伯语音色姓名本地化
+# 非拉丁语音色姓名本地化
 # ═══════════════════════════════════════════════════
-# edge-tts 不提供阿拉伯语音色的本地文字姓名（仅拉丁转写，如 "Hamed"）。
-# 试听文案若直接把拉丁姓名嵌入阿拉伯语句子朗读，阿语音色会按外语拼读，
-# 发音明显错误。此处手工维护全部 32 个阿拉伯语音色的正确阿拉伯语姓名，
-# 用于试听文案与搜索，而非拉丁转写。
-ARABIC_VOICE_NAMES = {
-    "Fatima": "فاطمة", "Hamdan": "حمدان",
-    "Ali": "علي", "Laila": "ليلى",
-    "Amina": "أمينة", "Ismael": "إسماعيل",
-    "Salma": "سلمى", "Shakir": "شاكر",
-    "Bassel": "باسل", "Rana": "رنا",
-    "Sana": "سناء", "Taim": "تيم",
-    "Fahed": "فهد", "Noura": "نورة",
-    "Layla": "ليلى", "Rami": "رامي",
-    "Iman": "إيمان", "Omar": "عمر",
-    "Jamal": "جمال", "Mouna": "منى",
-    "Abdullah": "عبدالله", "Aysha": "عائشة",
-    "Amal": "أمل", "Moaz": "معاذ",
-    "Hamed": "حامد", "Zariyah": "زارية",
-    "Amany": "أماني", "Laith": "ليث",
-    "Hedi": "هادي", "Reem": "ريم",
-    "Maryam": "مريم", "Saleh": "صالح",
+# edge-tts 不提供阿/波/乌/泰/印地/孟加拉语音色的本地文字姓名（仅拉丁转写，
+# 如 "Hamed" / "Niwat" / "Swara"）。试听文案若把拉丁姓名直接嵌入本地语句子
+# 朗读，对应音色会按外语拼读，发音明显错误。此处手工维护这些语言全部音色的
+# 正确本地姓名，用于试听文案与搜索，而非拉丁转写。
+# 拉丁体系语言（含 tr/vi/tl）的拉丁转写即本地写法，无需映射。
+_VOICE_NATIVE_NAMES = {
+    "ar": {
+        "Fatima": "فاطمة", "Hamdan": "حمدان",
+        "Ali": "علي", "Laila": "ليلى",
+        "Amina": "أمينة", "Ismael": "إسماعيل",
+        "Salma": "سلمى", "Shakir": "شاكر",
+        "Bassel": "باسل", "Rana": "رنا",
+        "Sana": "سناء", "Taim": "تيم",
+        "Fahed": "فهد", "Noura": "نورة",
+        "Layla": "ليلى", "Rami": "رامي",
+        "Iman": "إيمان", "Omar": "عمر",
+        "Jamal": "جمال", "Mouna": "منى",
+        "Abdullah": "عبدالله", "Aysha": "عائشة",
+        "Amal": "أمل", "Moaz": "معاذ",
+        "Hamed": "حامد", "Zariyah": "زارية",
+        "Amany": "أماني", "Laith": "ليث",
+        "Hedi": "هادي", "Reem": "ريم",
+        "Maryam": "مريم", "Saleh": "صالح",
+    },
+    "fa": {
+        "Dilara": "دلارا", "Farid": "فرید",
+    },
+    "ur": {
+        "Gul": "گل", "Salman": "سلمان",
+        "Asad": "اسد", "Uzma": "عظمیٰ",
+    },
+    "th": {
+        "Niwat": "นิวัฒน์", "Premwadee": "เปรมวดี",
+    },
+    "hi": {
+        "Madhur": "मधुर", "Swara": "स्वरा",
+    },
+    "bn": {
+        "Nabanita": "নবনীতা", "Pradeep": "প্রদীপ",
+        "Bashkar": "ভাস্কর", "Tanishaa": "তনিষা",
+    },
 }
+
+# 兼容别名：保留旧常量（内部已合并进 _VOICE_NATIVE_NAMES["ar"]）
+ARABIC_VOICE_NAMES = _VOICE_NATIVE_NAMES["ar"]
 
 
 # ═══════════════════════════════════════════════════
@@ -266,9 +342,9 @@ def _voice_to_dict(v: dict) -> dict | None:
     short = v.get("ShortName", "")
     if not short:
         return None
-    lang_part = short.split("-")[0].lower()
-    if lang_part not in PROJECT_LANGUAGES:
-        return None  # 跳过非项目语言（如 ar/fa/hi 等）
+    lang_part = _voice_prefix_to_lang(short.split("-")[0].lower())
+    if lang_part is None:
+        return None  # 跳过非项目语言（如 sr/pl/uk 等）
 
     locale = v.get("Locale", "")
     gender = "female" if str(v.get("Gender", "")).lower() == "female" else "male"
@@ -280,8 +356,9 @@ def _voice_to_dict(v: dict) -> dict | None:
     categories = list(tag.get("ContentCategories", []) or [])
     style_tags = personalities + categories
 
-    # 阿拉伯语音色：试听文案用真实阿拉伯语姓名朗读，而非拉丁转写
-    local_name = ARABIC_VOICE_NAMES.get(name, name) if lang_part == "ar" else name
+    # 非拉丁语言（阿/波/乌/泰/印地/孟加拉）音色：试听文案用真实本地姓名朗读，
+    # 而非拉丁转写，避免外语拼读。edge-tts 不提供本地姓名，故手工维护映射。
+    local_name = _VOICE_NATIVE_NAMES.get(lang_part, {}).get(name, name)
 
     preview_template = (
         VOICE_PREVIEW_TEXTS_BY_LOCALE.get(locale)
@@ -344,8 +421,11 @@ async def load_voice_catalog(force: bool = False) -> dict:
             "voices": voices,
         })
 
-    # 保持设计文档约定的高频语言顺序
-    _order = ["zh", "en", "ja", "ko", "ru", "es", "fr", "de", "nl", "pt", "it", "id", "ms"]
+    # 保持设计文档约定的高频语言顺序，新补齐语言排在既有语言之后
+    _order = [
+        "zh", "en", "ja", "ko", "ru", "es", "fr", "de", "nl", "pt", "it", "id", "ms",
+        "ar", "tr", "vi", "th", "tl", "hi", "fa", "bn", "ur",
+    ]
     languages.sort(key=lambda g: _order.index(g["code"]) if g["code"] in _order else 99)
 
     _VOICE_CATALOG = {

@@ -226,13 +226,30 @@ class ConcatMixin:
         from moviepy import TextClip as MpTextClip
 
         from core.audio.subtitle import SubtitleGenerator
-        from core.audio.voices import _ARABIC_RE
-        from core.config import DEFAULT_ARABIC_FONT, resolve_font_path
+        from core.audio.voices import (
+            _ARABIC_RE,
+            _BENGALI_RE,
+            _DEVANAGARI_RE,
+            _THAI_RE,
+        )
+        from core.config import (
+            DEFAULT_ARABIC_FONT,
+            DEFAULT_BENGALI_FONT,
+            DEFAULT_DEVANAGARI_FONT,
+            DEFAULT_THAI_FONT,
+            resolve_font_path,
+        )
 
         font_path = resolve_font_path(subtitle_style.font)
-        # 项目内置字体均不含阿拉伯语字形；配置的字体若不支持阿拉伯文会渲染为方块（tofu）。
-        # 逐条按文本内容检测并强制回退到内置阿拉伯语字体，而非依赖用户手填正确字体名。
-        arabic_font_path = resolve_font_path(DEFAULT_ARABIC_FONT)
+        # 项目内置字体均不含阿/波/乌/泰/印地/孟加拉字形；配置的字体若不含对应字形
+        # 会渲染为方块（tofu）。逐条按文本内容检测并强制回退到内置对应文字体系字体，
+        # 而非依赖用户手填正确字体名。
+        script_font_map = {
+            _ARABIC_RE: resolve_font_path(DEFAULT_ARABIC_FONT),
+            _THAI_RE: resolve_font_path(DEFAULT_THAI_FONT),
+            _DEVANAGARI_RE: resolve_font_path(DEFAULT_DEVANAGARI_FONT),
+            _BENGALI_RE: resolve_font_path(DEFAULT_BENGALI_FONT),
+        }
 
         # 兼容旧格式 bg_color 字符串
         bg = subtitle_style.bg_color
@@ -291,7 +308,12 @@ class ConcatMixin:
                 # 长文本自动拆为多行，避免单行溢出屏幕
                 wrapped = SubtitleGenerator._split_long_text(txt, cjk_max_chars)
                 wrapped = VideoConcatenator._shape_bidi_text(wrapped)
-                entry_font = arabic_font_path if _ARABIC_RE.search(txt) else font_path
+                # 按文本脚本匹配字体：命中阿/泰/印地/孟加拉任一脚本则回退对应内置字体
+                entry_font = font_path
+                for script_re, script_font in script_font_map.items():
+                    if script_re.search(txt):
+                        entry_font = script_font
+                        break
 
                 clip = MpTextClip(
                     text=wrapped,
