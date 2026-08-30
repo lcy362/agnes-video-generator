@@ -545,6 +545,7 @@
   "fbRepEnv": "Environment",
   "fbRepUnknown": "unknown",
   "fbRepErrorTitle": "### Error Message",
+  "fbRepTraceback": "#### Volledige traceback",
   "fbRepReproSteps": "### Reproduction Steps",
   "fbRepReproHint": "<!-- Please fill in: operations and related config -->",
   "fbRepExpected": "### Expected Behavior",
