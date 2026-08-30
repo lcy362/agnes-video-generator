@@ -18,7 +18,7 @@ services:
   agnes:
     # GHCR 与 Docker Hub 二选一：
     #   image: ghcr.io/lcy362/agnes-video-generator/free-short-video:6.2.0
-    image: ghcr.io/lcy362/agnes-video-generator/free-short-video:6.2.0
+    image: ghcr.io/lcy362/agnes-video-generator/free-short-video:6.3.0
     container_name: agnes-video
     ports:
       - "8765:8765"

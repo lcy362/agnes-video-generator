@@ -64,7 +64,7 @@ msg "   $(link 'https://video.lichuanyang.top' '🌐 官网：https://video.lich
 echo "================================================"
 echo ""
 
-IMAGE="${AGNES_IMAGE:-ghcr.io/lcy362/agnes-video-generator/free-short-video:6.2.1}"
+IMAGE="${AGNES_IMAGE:-ghcr.io/lcy362/agnes-video-generator/free-short-video:6.3.0}"
 NAME="agnes-video"
 PORT="${AGNES_PORT:-8765}"
 DATA_DIR="$(pwd)/agnes_data"
