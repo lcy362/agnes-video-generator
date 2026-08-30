@@ -109,11 +109,15 @@ def main() -> int:
             "\n\n---\nFull README: https://github.com/lcy362/agnes-video-generator"
 
     # 1) Log in to obtain a JWT (the Hub API accepts a PAT as the password).
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "free-short-video-release-bot/1.0 (https://github.com/lcy362/agnes-video-generator)",
+    }
     try:
         req = urllib.request.Request(
             f"{DOCKERHUB_API}/users/login",
             data=json.dumps({"username": user, "password": token}).encode(),
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=30) as r:
@@ -130,7 +134,7 @@ def main() -> int:
         req = urllib.request.Request(
             f"{DOCKERHUB_API}/repositories/{repo_path}/",
             data=json.dumps({"description": desc, "full_description": readme}).encode(),
-            headers={"Content-Type": "application/json", "Authorization": f"JWT {jwt}"},
+            headers={**headers, "Authorization": f"JWT {jwt}"},
             method="PATCH",
         )
         with urllib.request.urlopen(req, timeout=30) as r:
