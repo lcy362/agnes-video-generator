@@ -15,6 +15,7 @@
 import asyncio
 import logging
 import os
+import traceback
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Callable, List, Optional
@@ -153,8 +154,12 @@ class MultiScenePipeline(BasePipeline):
             await self._emit("error", "failed", "任务已被中断，可从任务列表续传", _PROGRESS_FAILED)
             raise
         except Exception as e:
+            # 持久化完整 traceback，供诊断端点/前端反馈报告暴露（定位环境级异常如 [WinError 2]）
             self._state.status = StepStatus.FAILED
-            self.task_manager.update_state(status=StepStatus.FAILED)
+            self.task_manager.update_state(
+                status=StepStatus.FAILED,
+                error_traceback=traceback.format_exc(),
+            )
             await self._emit("error", "failed", str(e), _PROGRESS_FAILED)
             raise
 

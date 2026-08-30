@@ -540,6 +540,7 @@
   "fbRepEnv": "环境",
   "fbRepUnknown": "未知",
   "fbRepErrorTitle": "### 错误信息",
+  "fbRepTraceback": "#### 完整 Traceback",
   "fbRepReproSteps": "### 复现步骤",
   "fbRepReproHint": "<!-- 请补充：操作过程与相关配置 -->",
   "fbRepExpected": "### 期望行为",

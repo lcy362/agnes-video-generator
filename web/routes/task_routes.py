@@ -111,6 +111,8 @@ async def get_task(task_id: str):
 
 # ── v6.1 二期：任务诊断端点 ──
 _ERROR_LOG_MAX_MESSAGE = 800  # 错误消息截断长度（诊断报告用，不含 prompt 全文与 response_body）
+# v6.2.2：完整 traceback 截断长度（相对长，供定位环境级异常如 [WinError 2]）
+_ERROR_TRACEBACK_MAX = 6000
 
 # 需要从 error log 暴露给前端的字段（敏感字段：prompt / system_prompt / response_body / extra 一律不返回）
 _DIAG_LOG_FIELDS = (
@@ -181,6 +183,7 @@ async def get_task_diagnostics(task_id: str):
         "status": state.status,
         "current_step": state.current_step,
         "current_message": (state.current_message or "")[:_ERROR_LOG_MAX_MESSAGE],
+        "error_traceback": (state.error_traceback or "")[:_ERROR_TRACEBACK_MAX],
         "created_at": state.created_at or "",
         "updated_at": state.updated_at or "",
     }
