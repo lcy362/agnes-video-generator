@@ -3,12 +3,14 @@ import { appState } from '@/store'
 import * as api from '@/api'
 import { t } from '@/i18n'
 import { useToast } from './useToast'
+import { useConfirm } from './useConfirm'
 import { useGa } from './useGa'
 import { useArtifacts } from './useArtifacts'
 import { useNavigation } from './useNavigation'
 import type { TaskListItem, TaskState } from '@/types'
 
 const { showToast } = useToast()
+const { confirmAsync } = useConfirm()
 const { trackEvent } = useGa()
 const { loadArtifacts } = useArtifacts()
 const { goProgress } = useNavigation()
@@ -72,7 +74,7 @@ async function viewTask(taskId: string) {
     goProgress(taskId, 'list')
     return state
   } catch (e: any) {
-    alert(t('failLoad') + ': ' + e.message)
+    showToast(t('failLoad') + ': ' + e.message, 4500)
     return null
   }
 }
@@ -95,35 +97,35 @@ async function resumeTask(taskId: string) {
     appState.currentTaskType = taskType
     appState.currentDirName = d.dir_name || taskId
     goProgress(taskId, 'list')
-    showToast(t('resumed'), 5000)
+    showToast(t('resumed'), 5000, 'success')
   } catch (e: any) {
-    alert(t('failResume') + ': ' + e.message)
+    showToast(t('failResume') + ': ' + e.message, 4500)
   }
 }
 
 async function stopTaskById(taskId: string) {
-  if (!confirm(t('stopConfirmById'))) return
+  if (!(await confirmAsync(t('stopConfirmById')))) return
   try {
     const d = await api.stopTask(taskId)
     if (!d.ok) throw new Error(d.detail || t('failStop'))
     trackEvent('task_stopped', { task_type: appState.currentTaskType || '', source: 'list' })
-    showToast(t('stoppedById'), 3000)
+    showToast(t('stoppedById'), 3000, 'success')
     loadTaskList()
   } catch (e: any) {
-    alert(t('failStop') + ': ' + e.message)
+    showToast(t('failStop') + ': ' + e.message, 4500)
   }
 }
 
 async function deleteTaskById(taskId: string) {
-  if (!confirm(t('deleteTaskConfirm'))) return
+  if (!(await confirmAsync(t('deleteTaskConfirm')))) return
   try {
     const d = await api.deleteTask(taskId)
     if (!d.ok) throw new Error(d.detail || t('failDelete'))
     trackEvent('task_deleted', { task_type: appState.currentTaskType || '', source: 'list' })
-    showToast(t('deletedTask'), 3000)
+    showToast(t('deletedTask'), 3000, 'success')
     loadTaskList()
   } catch (e: any) {
-    alert(t('failDelete') + ': ' + e.message)
+    showToast(t('failDelete') + ': ' + e.message, 4500)
   }
 }
 
@@ -132,7 +134,7 @@ async function switchMode(taskId: string, mode: 'auto' | 'manual') {
   try {
     const d = await api.switchTaskMode(taskId, mode)
     if (!d.ok) throw new Error(d.detail || t('failSwitchMode'))
-    showToast(t('modeSwitched'), 3000)
+    showToast(t('modeSwitched'), 3000, 'success')
     loadTaskList()
     // 若正展示该任务进度，刷新
     if (appState.currentTaskId === taskId) {
@@ -140,7 +142,7 @@ async function switchMode(taskId: string, mode: 'auto' | 'manual') {
     }
     return d
   } catch (e: any) {
-    alert(t('failSwitchMode') + ': ' + e.message)
+    showToast(t('failSwitchMode') + ': ' + e.message, 4500)
     return null
   }
 }

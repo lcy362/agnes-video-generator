@@ -135,6 +135,7 @@
   "currentSelection": "Current",
   "confirmSelection": "Confirm",
   "cancel": "Cancel",
+  "confirm": "Confirm",
   "previewPlay": "Preview",
   "previewStop": "Stop",
   "previewFailed": "Preview failed, voice may not support this language",
@@ -552,5 +553,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "Privacy",
+  "gaOptOutLabel": "Opt out of anonymous analytics",
+  "gaOptOutHint": "Disables all analytics scripts; your content is never uploaded."
 }

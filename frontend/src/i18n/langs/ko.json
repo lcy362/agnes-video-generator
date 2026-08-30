@@ -430,6 +430,7 @@
   "artifactDeleteFailed": "삭제 실패",
   "artifactDeleted": "산출물이 삭제되었습니다",
   "cancel": "취소",
+  "confirm": "확인",
   "clickToPreview": "클릭하여 미리보기",
   "confirmSelection": "선택 확인",
   "copyPromptWithPoem": "시 입력 후 프롬프트 복사",
@@ -557,5 +558,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "개인정보",
+  "gaOptOutLabel": "익명 통계 비활성화",
+  "gaOptOutHint": "분석 스크립트를 중지합니다. 콘텐츠는 업로드되지 않습니다."
 }

@@ -67,7 +67,8 @@ class AgnesImageAPI:
         self.api_key = api_key
         self.model = model
         # i2i 默认与 t2i 同模型（官方 2.1 同时支持 t2i/i2i）；环境变量可回退到 2.0。
-        env_i2i = os.environ.get("AGNES_IMAGE_I2I_MODEL")
+        from core.config import get_settings
+        env_i2i = get_settings().agnes_image_i2i_model
         self.i2i_model = i2i_model or env_i2i or model
         # 基础 headers（不含 Authorization）：每次请求前经 _auth_headers() 注入当前 Key
         self._base_headers = {

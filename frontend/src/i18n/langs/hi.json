@@ -133,6 +133,7 @@
   "currentSelection": "वर्तमान",
   "confirmSelection": "पुष्टि करें",
   "cancel": "रद्द करें",
+  "confirm": "पुष्टि करें",
   "previewPlay": "सुनें",
   "previewStop": "रोकें",
   "previewFailed": "सुनना विफल, आवाज़ शायद यह भाषा नहीं समझती",
@@ -556,5 +557,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "गोपनीयता",
+  "gaOptOutLabel": "अनाम आँकड़े बंद करें",
+  "gaOptOutHint": "सभी विश्लेषण स्क्रिप्ट बंद हो जाती हैं।"
 }

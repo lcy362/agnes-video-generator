@@ -430,6 +430,7 @@
   "artifactDeleteFailed": "Verwijderen mislukt",
   "artifactDeleted": "Resultaat verwijderd",
   "cancel": "Annuleren",
+  "confirm": "Bevestigen",
   "clickToPreview": "Klik om te bekijken",
   "confirmSelection": "Selectie bevestigen",
   "copyPromptWithPoem": "Gedicht invullen en prompt kopiëren",
@@ -557,5 +558,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "Privacy",
+  "gaOptOutLabel": "Anonieme statistieken uitschakelen",
+  "gaOptOutHint": "Schakelt alle analysescripts uit."
 }

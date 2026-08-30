@@ -133,6 +133,7 @@
   "currentSelection": "বর্তমান",
   "confirmSelection": "নিশ্চিত",
   "cancel": "বাতিল",
+  "confirm": "Confirm",
   "previewPlay": "শুনুন",
   "previewStop": "থামুন",
   "previewFailed": "শোনা ব্যর্থ, কণ্ঠটি এই ভাষা নাও সমর্থন করতে পারে",
@@ -556,5 +557,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "Privacy",
+  "gaOptOutLabel": "Opt out of anonymous analytics",
+  "gaOptOutHint": "Disables all analytics scripts; your content is never uploaded."
 }

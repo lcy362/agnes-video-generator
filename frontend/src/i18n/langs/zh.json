@@ -147,6 +147,7 @@
   "currentSelection": "当前选择",
   "confirmSelection": "确认选择",
   "cancel": "取消",
+  "confirm": "确认",
   "previewPlay": "试听",
   "previewStop": "停止",
   "previewFailed": "试听失败，该音色可能不支持此语言",
@@ -552,5 +553,8 @@
   "fbRepErrApi": "接口",
   "fbRepErrType": "错误类型",
   "fbRepErrStatusCode": "状态码",
-  "fbRepErrInfo": "错误信息"
+  "fbRepErrInfo": "错误信息",
+  "privacyTitle": "隐私设置",
+  "gaOptOutLabel": "关闭匿名使用统计",
+  "gaOptOutHint": "开启后不再加载任何分析脚本，您的创作内容始终不会被上传。"
 }

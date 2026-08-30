@@ -133,6 +133,7 @@
   "currentSelection": "ปัจจุบัน",
   "confirmSelection": "ยืนยัน",
   "cancel": "ยกเลิก",
+  "confirm": "ยืนยัน",
   "previewPlay": "ฟังตัวอย่าง",
   "previewStop": "หยุด",
   "previewFailed": "ฟังตัวอย่างล้มเหลว เสียงนี้อาจไม่รองรับภาษานี้",
@@ -556,5 +557,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "ความเป็นส่วนตัว",
+  "gaOptOutLabel": "ปิดสถิติแบบไม่ระบุตัวตน",
+  "gaOptOutHint": "ปิดสคริปต์วิเคราะห์ทั้งหมด"
 }

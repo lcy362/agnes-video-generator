@@ -28,7 +28,6 @@
 
 import asyncio
 import logging
-import os
 import threading
 import time
 from typing import Optional
@@ -56,7 +55,10 @@ def _key_count() -> int:
 
 def _effective_rate() -> float:
     """共享桶有效速率 = 单 Key 配额 × Key 数 × 安全系数。"""
-    limit = int(os.environ.get("AGNES_RATE_LIMIT", str(_KEY_BASE_RATE * _key_count())))
+    from core.config import get_settings
+    limit = get_settings().agnes_rate_limit
+    if limit is None or limit <= 0:
+        limit = _KEY_BASE_RATE * _key_count()
     return limit * _SAFETY_FACTOR
 
 
@@ -66,18 +68,29 @@ def _video_submit_rate() -> float:
     注：若服务端对视频提交是全局限 1/min（而非 per-Key），
     设置 AGNES_VIDEO_RATE_LIMIT=1 即可，无需改代码。
     """
-    limit = int(os.environ.get("AGNES_VIDEO_RATE_LIMIT", str(_VIDEO_SUBMIT_RATE * _key_count())))
+    from core.config import get_settings
+    limit = get_settings().agnes_video_rate_limit
+    if limit is None or limit <= 0:
+        limit = _VIDEO_SUBMIT_RATE * _key_count()
     return limit * _VIDEO_SAFETY_FACTOR
 
 
 def _max_burst() -> int:
     """共享桶容量随 Key 数上调：4 × Key 数，否则高并发被突发容量卡住。"""
-    return int(os.environ.get("AGNES_RATE_BURST", str(4 * _key_count())))
+    from core.config import get_settings
+    burst = get_settings().agnes_rate_burst
+    if burst is None or burst <= 0:
+        burst = 4 * _key_count()
+    return burst
 
 
 def _video_max_burst() -> int:
     """视频提交桶容量 = 1 × Key 数：允许每 Key 立即提交一次，随后受 1/min 限制。"""
-    return int(os.environ.get("AGNES_VIDEO_RATE_BURST", str(_key_count())))
+    from core.config import get_settings
+    burst = get_settings().agnes_video_rate_burst
+    if burst is None or burst <= 0:
+        burst = _key_count()
+    return burst
 
 
 class AgnesRateLimiter:

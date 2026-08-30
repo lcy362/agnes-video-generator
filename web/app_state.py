@@ -13,17 +13,24 @@ import tempfile
 from typing import Dict, Set
 
 from core.api.error_collector import set_workspace_root
-from core.config import get_working_dir
+from core.config import get_settings, get_working_dir
 from models.task import TaskType
 
 logger = logging.getLogger(__name__)
+
+
+def _settings_rate_limit() -> int:
+    """AGNES_RATE_LIMIT（3.5 RuntimeSettings 收敛），未配置时默认 20。"""
+    v = get_settings().agnes_rate_limit
+    return v if v and v > 0 else 20
 
 # ═══════════════════════════════════════════════════
 # 并发控制（复用回归流程的加权信号量逻辑）
 # ═══════════════════════════════════════════════════
 
 # Agnes API 每分钟调用上限（与 rate_limiter.py / regression_runner.py 一致）
-_AGNES_RATE_LIMIT = int(os.environ.get("AGNES_RATE_LIMIT", "20"))
+# 3.5：经 RuntimeSettings 收敛读取，未显式配置时由 rate_limiter 按 Key 数动态计算
+_AGNES_RATE_LIMIT = _settings_rate_limit()
 
 # 各任务类型权重 = 该类型预估的每分钟 Agnes API 调用数
 # 留 50% 余量 => 总权重上限 = _AGNES_RATE_LIMIT / 2

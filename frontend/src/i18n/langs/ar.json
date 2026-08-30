@@ -133,6 +133,7 @@
   "currentSelection": "الحالي",
   "confirmSelection": "تأكيد",
   "cancel": "إلغاء",
+  "confirm": "تأكيد",
   "previewPlay": "معاينة",
   "previewStop": "إيقاف",
   "previewFailed": "فشلت المعاينة، قد لا يدعم هذا الصوت هذه اللغة",
@@ -556,5 +557,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "الخصوصية",
+  "gaOptOutLabel": "إيقاف الإحصائيات المجهولة",
+  "gaOptOutHint": "يوقف جميع نصوص التحليلات."
 }

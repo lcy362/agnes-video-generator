@@ -133,6 +133,7 @@
   "currentSelection": "Kasalukuyan",
   "confirmSelection": "Kumpirmahin",
   "cancel": "Kanselahin",
+  "confirm": "Confirm",
   "previewPlay": "Pakinggan",
   "previewStop": "Itigil",
   "previewFailed": "Bigo ang pagdinig, maaaring hindi suportado ng boses ang wikang ito",
@@ -556,5 +557,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "Privacy",
+  "gaOptOutLabel": "Opt out of anonymous analytics",
+  "gaOptOutHint": "Disables all analytics scripts; your content is never uploaded."
 }

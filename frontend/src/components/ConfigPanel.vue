@@ -6,8 +6,16 @@ import { useConfig } from '@/composables/useConfig'
 import { useVoice } from '@/composables/useVoice'
 import { useGa } from '@/composables/useGa'
 import { useVideoModelCaps } from '@/composables/useVideoModelCaps'
+import { useToast } from '@/composables/useToast'
 
-const { trackEvent } = useGa()
+const { trackEvent, isGaOptedOut, setGaOptOut } = useGa()
+const { showToast } = useToast()
+
+// 3.4：匿名统计隐私开关（localStorage 'ga_opt_out'）
+const gaOptOut = ref(isGaOptedOut())
+function toggleGaOptOut() {
+  setGaOptOut(gaOptOut.value)
+}
 const {
   apiKeyStatus,
   keyCount,
@@ -93,7 +101,7 @@ function modelDisplayLabel(m: string): string {
 async function onSaveApiKey() {
   const key = apiKeyInput.value.trim()
   if (!key) {
-    alert(t('enterApiKey'))
+    showToast(t('enterApiKey'), 3500)
     return
   }
   // 多 Key 输入框：按换行/逗号拆分保存（单个 Key 同样适用）
@@ -473,5 +481,17 @@ initCollapse()
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- 隐私设置（3.4：GA4 配置开关） -->
+  <div class="glass-card rounded-2xl mb-6 p-6">
+    <h2 class="text-lg font-semibold text-accent mb-3">{{ t('privacyTitle') }}</h2>
+    <label class="flex items-start gap-3 cursor-pointer select-none">
+      <input v-model="gaOptOut" type="checkbox" class="mt-1 accent-red-500" @change="toggleGaOptOut" />
+      <span>
+        <span class="text-sm text-ink font-medium block">{{ t('gaOptOutLabel') }}</span>
+        <span class="text-xs text-muted block mt-0.5">{{ t('gaOptOutHint') }}</span>
+      </span>
+    </label>
   </div>
 </template>

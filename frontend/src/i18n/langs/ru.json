@@ -430,6 +430,7 @@
   "artifactDeleteFailed": "Ошибка удаления",
   "artifactDeleted": "Результат удалён",
   "cancel": "Отмена",
+  "confirm": "Подтвердить",
   "clickToPreview": "Нажмите для предпросмотра",
   "confirmSelection": "Подтвердить выбор",
   "copyPromptWithPoem": "Вставить стих и скопировать промпт",
@@ -557,5 +558,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "Конфиденциальность",
+  "gaOptOutLabel": "Отключить анонимную аналитику",
+  "gaOptOutHint": "Отключает все скрипты аналитики."
 }

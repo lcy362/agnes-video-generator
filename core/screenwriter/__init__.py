@@ -22,11 +22,12 @@ from .style import ScreenwriterStyleMixin
 
 logger = logging.getLogger(__name__)
 
-# 提示词语言配置：通过环境变量 PROMPT_LANGUAGE 切换
+# 提示词语言配置：通过环境变量 PROMPT_LANGUAGE 切换（3.5 经 RuntimeSettings 收敛）
 #   "zh" — 所有 meta-prompt 使用中文（默认）
 #   "en" — 所有 meta-prompt 使用英文
 # 示例：export PROMPT_LANGUAGE=en
-PROMPT_LANGUAGE = os.environ.get("PROMPT_LANGUAGE", "zh")
+from core.config import get_settings as _get_settings  # noqa: I001 就地导入避免循环依赖
+PROMPT_LANGUAGE = _get_settings().prompt_language
 
 # 图片描述重试间隔基数（秒）：delay = 基数 * (attempt + 1)
 _DESCRIBE_RETRY_BASE_DELAY_SECONDS = 15

@@ -106,9 +106,8 @@ def _key_id(key: str) -> str:
     使用 blake2b 的 keyed mode（等效 HMAC 强度、不可反向爆破），避免对敏感
     Key 使用可直接哈希爆破的算法。ID 每次 GET 动态生成，算法更换无兼容性影响。
     """
-    secret = os.environ.get("AGNES_CONFIG_ID_HMAC_KEY", "agnes-config-keys-id-v1").encode(
-        "utf-8"
-    )
+    from core.config import get_settings
+    secret = get_settings().agnes_config_id_hmac_key.encode("utf-8")
     # 注意：data 参数（第一个位置参数）必须传入 Key 明文本身。此前误写成仅传
     # key=secret 而漏掉 data，导致 blake2b 对空串做哈希——所有 Key 生成相同 id，
     # 多 Key 场景下按 id 删除会永远命中第一个（见优化路线图 0.7）。

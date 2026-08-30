@@ -41,16 +41,16 @@
 | 1.6 | 测试补齐（API 重试/并发/续传） | 🔴 | 批次 0 类 bug 从此有回归护栏 | 中 | ✅ |
 | 1.7 | 前端轮询体验（退避/后台暂停/断连提示/竞态） | 🟡 | 服务异常时用户看得到原因；轮询不堆积 | 小~中 | ✅ |
 | 1.8 | i18n 拆分懒加载 + 检查脚本硬化 + 接 CI | 🔴 | 首屏 bundle 大幅瘦身，翻译缺失 CI 拦截 | 大 | ✅ |
-| 2.1 | 成片合成链 ffmpeg 化（消除 3~4 遍重编码） | 🟡 | 合成阶段 3~10 倍提速 | 大 | 🟡 部分（2.1a/2.1b ✅） |
-| 2.2 | poetry 逐场景双份编码合并 | 🟡 | 诗词视频编码开销减半以上 | 中 | ⬜ |
+| 2.1 | 成片合成链 ffmpeg 化（消除 3~4 遍重编码） | 🟡 | 合成阶段 3~10 倍提速 | 大 | ✅（2.1a/2.1b/2.1c） |
+| 2.2 | poetry 逐场景双份编码合并 | 🟡 | 诗词视频编码开销减半以上 | 中 | ✅ |
 | 2.3 | 限速器异步化 + 编码专用线程池 | 🟡 | 停止即时响应限速等待；线程池不再饥饿 | 中 | ✅ |
 | 2.4 | 进度状态写盘节流 | 🟢 | 事件循环周期性卡顿消除 | 小~中 | ✅ |
 | 2.5 | 独立环节并行化（t2i 尾帧 / 稿件 prompt） | 🟢 | 长流水线总时长缩短 | 小~中 | ✅ |
-| 3.1 | 前端交互层统一（api 层/Toast/表单去重） | 🟢 | 错误处理集中治理，改一处生效全局 | 中 | 🟡 部分（request 统一 r.ok ✅） |
+| 3.1 | 前端交互层统一（api 层/Toast/表单去重） | 🟢 | 错误处理集中治理，改一处生效全局 | 中 | ✅ |
 | 3.2 | 可观测与运维（/api/health、文件日志、metrics） | 🟢 | 部署可探活、事后可查日志 | 小~中 | ✅ |
 | 3.3 | CI 补强（Python 3.10 矩阵 / lint / 前端单测） | 🟢 | 承诺的 3.10+ 兼容有背书 | 小~中 | ✅ |
-| 3.4 | 移动端/可访问性/杂项体验 | 🟢 | 窄屏可用、模态可达、表单不丢草稿 | 小~中 | ⬜ |
-| 3.5 | 配置收敛（typed Settings） | 🟢 | 12+ 环境变量统一口径，消除默认值冲突 | 中 | 🟡 部分（并发上限动态缩放 ✅） |
+| 3.4 | 移动端/可访问性/杂项体验 | 🟢 | 窄屏可用、模态可达、表单不丢草稿 | 小~中 | ✅ |
+| 3.5 | 配置收敛（typed Settings） | 🟢 | 12+ 环境变量统一口径，消除默认值冲突 | 中 | ✅ |
 | 3.6 | chained 模式双参考图提交（调研存档 R1 拆出） | 🟢 | 链式模式角色身份漂移缓解 | 小 | ✅ |
 | 3.7 | 回归矩阵补全（poetry/simple_image/C4） | 🟡 | 六种任务类型全部有真实回归覆盖 | 小~中 | ✅ |
 
@@ -269,7 +269,7 @@
 
 ## 批次 2 — 性能
 
-### 2.1 成片合成链 ffmpeg 化 🟡（收益最大）
+### 2.1 成片合成链 ffmpeg 化 🟡（收益最大）✅（2.1a/2.1b/2.1c 全部落地）
 
 **现状问题**：`concat_videos_with_audio_overlay`（`core/compositor/concatenator/audio_overlay.py`）链路为：moviepy compose 全量重编码拼接 → ffmpeg tpad 再全片重编码对齐 → moviepy 第三次全片重编码写音频+字幕 →（开水印再第四次）。3 分钟成片消耗 3~4 倍片长的 CPU 编码时间。
 
@@ -282,7 +282,7 @@
 
 **验收**：合成阶段耗时下降 ≥3 倍；输出与旧路径做音画字幕对照回归（含逐条样式场景）；旧路径开关可回退。
 
-### 2.2 poetry 逐场景双份编码合并 🟡
+### 2.2 poetry 逐场景双份编码合并 🟡 ✅
 
 **现状问题**：`poetry_video.py:444-507` 每场景单独走一遍 2.1 的三遍编码链路，最后 `concat_videos` 再全量重编码——5 场景约 20 次片段级编码开销。
 
@@ -322,7 +322,7 @@
 
 ## 批次 3 — 体验与长期健康度
 
-### 3.1 前端交互层统一 🟢
+### 3.1 前端交互层统一 🟢 ✅
 
 **现状问题**：`frontend/src/api/index.ts` 的 `request()` 不检查 `r.ok`，5xx/HTML 错误页抛出误导性解析错误；8 个文件绕过 api 层裸 `fetch`；原生 `alert()/confirm()` 散布 35+ 处；5 个任务表单重复同一套提交流程（`parseResolution()` 定义了三次）。
 
@@ -350,7 +350,7 @@
 
 **验收**：3.10 下全量单测通过；lint 接入 CI 且现有代码清零告警。
 
-### 3.4 移动端 / 可访问性 / 杂项体验 🟢
+### 3.4 移动端 / 可访问性 / 杂项体验 🟢 ✅
 
 - 窄屏适配：任务类型按钮条（`CreatePanel.vue:140-150`）改 grid/横向滚动；任务卡片操作按钮行加 `flex-wrap`。
 - 可访问性：抽通用 Modal（focus trap + ESC + 焦点还原）；补 `prefers-reduced-motion`。
@@ -364,7 +364,7 @@
 
 **验收**：375px 宽视口无溢出不可点元素；模态可键盘完整操作。
 
-### 3.5 配置收敛 🟢
+### 3.5 配置收敛 🟢 ✅
 
 **现状问题**：约 12 个环境变量散落各处；`web/app_state.py:26` 的 `AGNES_RATE_LIMIT` 默认固定 20，而 `core/api/rate_limiter.py` 默认 20×Key 数，多 Key 部署时口径冲突（并发权重上限不随 Key 扩展，注释"与 rate_limiter.py 一致"已失真）。
 
@@ -452,7 +452,12 @@
 | 2026-08-28 | 批次 3 部分（3.6/3.2/3.7） | 3.6 `core/pipelines/creative/steps_video.py`（chained 双参考图 `[尾帧, 角色参考图]`，首场景去重）；3.2 新建 `web/routes/health_routes.py`（`/api/health` + `/api/metrics`）+ `server.py`（路由注册 + `AGNES_LOG_FILE` RotatingFileHandler）+ `Dockerfile`（HEALTHCHECK）；3.7 `scripts/regression_runner.py`（场景 P1/I1/C4 + 权重/超时 + 并发上限从 `/api/metrics` 读取）+ `run_mock_regression.sh`（poetry 过滤器）+ `docs/dev/regression_test_plan.md`（矩阵 8→11 场景）；修复 2.3 引入的 `run_in_executor` 关键字参数 bug（`functools.partial`） | `test_health_metrics.py`（2 项）+ 端点冒烟（`/api/health`、`/api/metrics` 均 200）；`TestPoetryVideoPipeline` 9 项通过（暴露并修复水印 `run_in_executor` bug）；`py_compile` 全通过 |
 | 2026-08-28 | 3.3 落地（CI 补强） | `.github/workflows/test.yml`（test job Python 3.10/3.12 矩阵 + `ruff` step + `setup-node` + `npm test`（vitest）+ 前端 `vue-tsc`/build）；`requirements-dev.txt`（加 `ruff`）；`frontend/package.json`（加 `vitest` + `npm test` script）；新增 `frontend/src/utils/feedback.test.ts`（4 项，`isDeterministicError` 纯函数）；新建 `ruff.toml`（select E/F/I + line-length 120 + 豁免 E501/E402/F821 误报/I001 刻意顺序）；`ruff check --fix` 清理 161 处存量告警（删 8 处死变量、2 处未用 import、4 处 lambda→def、2 处变量重命名等） | `ruff check` 全通过（零告警）；后端 `test_core`/`test_pipeline_contract` 全通过；前端 `vitest` 4 项通过；修复 ruff isort 排序破坏 `core/pipelines/__init__.py` 刻意导入顺序导致的循环导入（恢复顺序 + 配置豁免 I001） |
 | 2026-08-28 | 批次 3 部分（3.5/3.1 核心） | 3.5 `web/app_state.py`（`WeightedSemaphore.update_max_weight` 动态调整 + `get_semaphore()` 按 `rate_limiter.effective_rate_per_min` 动态缩放并发上限，0.4 硬拒绝场景消除）；3.1 `frontend/src/api/index.ts`（`request()` 统一检查 `r.ok`，非 2xx 抛带后端 `detail` 的可读错误） | 新增 3 项信号量动态缩放测试通过；`test_health_metrics`/`test_pipeline_contract` 通过；`vitest` 4 项 + `vite build` 通过；3.1 的 useConfirm/useTaskSubmit 收敛与 3.5 的 pydantic-settings 完整版标注为后续增强 |
+| 2026-08-30 | 2.1c 落地（字幕 ASS 灰度） | `core/compositor/concatenator/audio_overlay.py`（`_srt_to_ass` SRT+样式→ASS 句级样式转换：字体/字号/主色/描边/半透明底/位置→alignment+margins、逐条样式按 index 覆盖、`_ffmpeg_mux_aligned` 追加 `subtitles` 滤镜 + `fontsdir`）；`core/config.py`（`AGNES_SUBTITLE_ASS` 开关，默认开启，失败自动回退 moviepy） | 新增 `tests/test_subtitle_ass.py`（10 项）通过；`test_overlay_single_pass`/`test_concat_ffmpeg_fastpath` 无回归；修复无字幕分支 filter 链 `[v0][v]` 双标签语法错误 |
+| 2026-08-30 | 2.2 落地（poetry 多场景单链一次合成） | `core/compositor/concatenator/audio_overlay.py`（`concat_scenes_single_pass`：场景视频 `-c copy` 拼接 + `_merge_scene_audios` adelay/amix/apad 合并 + `_merge_scene_srts` 偏移合并 → 最终一次编码；失败回退逐场景）；`core/pipelines/poetry_video.py`（`_composite_final` 重构：全量缺失时优先单链、续传快速路径复用已合成场景） | 新增 `tests/test_scenes_single_pass.py`（6 项）通过；`TestPoetryVideoPipeline` 12 项 mock 回归通过 |
+| 2026-08-30 | 3.1 落地（前端交互层统一收尾） | `frontend/src/composables/useTaskSubmit.ts`（提交统一执行器 + `collectAudioSubtitleFields`）；`useConfirm.ts` + `ConfirmModal.vue`（确认弹窗）；`useToast.ts`/`Toast.vue`（type: error/success/info）；5 个表单 + `useTasks`/`useConfig`/`useArtifacts`/`useVoice`/`ConfigPanel`/`TaskListPanel`/`CheckpointDetail` 替换全部 44 处原生 `alert()/confirm()`；i18n 22 语言新增 `confirm` key | `vue-tsc --noEmit` + `vite build` 通过；`i18n_check` 通过；残留原生弹窗搜索为 0 |
+| 2026-08-30 | 3.4 落地（移动端/可访问性/杂项） | `useGa.ts`（`localStorage 'ga_opt_out'` 开关 + `SENSITIVE_KEYS` 上报脱敏 + 长文本截断）；`useModalA11y.ts`（focus trap + ESC + 焦点还原，接入 ConfirmModal/VoicePickerModal）；`useVoice.ts`（blob URL revoke）；`useTheme.ts`（matchMedia 监听器清理）；`useDraft.ts`（表单草稿，接入 SimpleForm/CreativeForm）；`style.css`（`prefers-reduced-motion` + `:focus-visible`）；`App.vue`（窄屏字号/导航换行）；`ConfigPanel.vue`（隐私开关）+ i18n 22 语言 | `vue-tsc --noEmit` + `vite build` 通过；`i18n_check` 通过 |
+| 2026-08-30 | 3.5 落地（pydantic-settings 完整版） | `core/config.py`（`RuntimeSettings(BaseSettings)`：host/port/限速×4/i2i 模型/prompt_language/字幕 ASS/轮询超时/log_file/sweep/hmac_key/regression 工作目录，env_file=.env，无缓存每次动态读取保证测试可覆盖）；`requirements.txt`（+`pydantic-settings`）；收敛调用点：`rate_limiter.py`×4、`app_state.py`、`agnes_image.py`、`agnes_video.py`（轮询超时参数化）、`screenwriter`、`server.py`（host/port/log/sweep）、`config_routes.py`、`config.py`；`audio_overlay.py` 经 `subtitle_ass_enabled()` 联动 | 新增 6 项 `test_config_settings.py` 用例通过；`test_core`/`test_rate_limiter_async`/`test_subtitle_ass`/`test_scenes_single_pass` 全通过；无 pydantic-settings 时降级读 os.environ 兜底 |
 
 ---
 
-*文档版本：v1.2（2026-08-29 批次 0/1 全部完成、批次 2/3 部分完成）| 创建日期：2026-08-26 | 目标版本：v6 版本线内全部完成 | 状态：**29 项中 24 项已完成**（批次 0 全 9、批次 1 全 8、批次 2 完成 2.3/2.4/2.5 及 2.1a/2.1b、批次 3 完成 3.2/3.3/3.6/3.7 及 3.1/3.5 核心）；剩余：2.1c（字幕 ASS 灰度）、2.2（poetry 编码合并）、3.4（移动端/可访问性），及 3.1（useConfirm/useTaskSubmit 收敛）、3.5（pydantic-settings 完整版）增强项*
+*文档版本：v1.3（2026-08-30）| 创建日期：2026-08-26 | 目标版本：v6 版本线内全部完成 | 状态：**29 项全部完成**（批次 0 全 9、批次 1 全 8、批次 2 全 6（2.1a/2.1b/2.1c/2.2/2.3/2.4/2.5）、批次 3 全 7）*

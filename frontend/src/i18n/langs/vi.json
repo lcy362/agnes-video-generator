@@ -133,6 +133,7 @@
   "currentSelection": "Hiện tại",
   "confirmSelection": "Xác nhận",
   "cancel": "Hủy",
+  "confirm": "Xác nhận",
   "previewPlay": "Nghe thử",
   "previewStop": "Dừng",
   "previewFailed": "Nghe thử thất bại, giọng này có thể không hỗ trợ ngôn ngữ này",
@@ -556,5 +557,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "Quyền riêng tư",
+  "gaOptOutLabel": "Tắt thống kê ẩn danh",
+  "gaOptOutHint": "Tắt mọi tập lệnh phân tích."
 }

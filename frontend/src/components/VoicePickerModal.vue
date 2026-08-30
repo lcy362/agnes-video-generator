@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { t } from '@/i18n'
 import { useVoice } from '@/composables/useVoice'
+import { useModalA11y } from '@/composables/useModalA11y'
 import { appState } from '@/store'
 
 const {
@@ -19,6 +20,9 @@ const {
   confirmVoiceSelection,
 } = useVoice()
 
+// 3.4：ESC + focus trap + 焦点还原
+const { containerRef } = useModalA11y(pickerVisible, closeVoicePicker)
+
 const selectedVoiceName = computed(() => {
   const v = appState.voiceIndex[selectedId.value as string]
   return v ? `${v.name}（${v.region}）` : (selectedId.value || '—')
@@ -26,7 +30,7 @@ const selectedVoiceName = computed(() => {
 </script>
 
 <template>
-  <div v-if="pickerVisible" class="vp-overlay" @click.self="closeVoicePicker">
+  <div v-if="pickerVisible" ref="containerRef" class="vp-overlay" @click.self="closeVoicePicker">
     <div class="vp-modal" role="dialog" aria-modal="true">
       <div class="vp-header">
         <h3>{{ t('selectVoice') }}</h3>

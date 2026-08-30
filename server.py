@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from core.audio.voices import load_voice_catalog
-from web import app_state
+from web import app_state  # noqa: F401 兼容 re-export：旧代码 from server import app_state
 from web.app_state import init_runtime_state
 from web.routes import (
     config_routes,
@@ -54,7 +54,8 @@ async def lifespan(app: FastAPI):
     init_runtime_state()
 
     # 3.2：可选文件日志（AGNES_LOG_FILE 设置后启用，10MB 轮转 × 5 份）
-    log_file = os.environ.get("AGNES_LOG_FILE", "").strip()
+    from core.config import get_settings as _settings
+    log_file = _settings().agnes_log_file.strip()
     if log_file:
         try:
             from logging.handlers import RotatingFileHandler
@@ -92,11 +93,11 @@ async def lifespan(app: FastAPI):
         logger.warning(f"[Startup] Voice catalog load failed ({e}); will use fallback")
 
     # v5.0 (5.1): 可选启动时僵尸任务清理（AGNES_SWEEP_AGE_DAYS 设置后启用，失败不阻断）
-    sweep_days = os.environ.get("AGNES_SWEEP_AGE_DAYS", "").strip()
-    if sweep_days.isdigit():
+    sweep_days = _settings().agnes_sweep_age_days
+    if sweep_days and sweep_days > 0:
         try:
             from core.artifacts import sweep_stale_tasks
-            result = sweep_stale_tasks(age_days=int(sweep_days))
+            result = sweep_stale_tasks(age_days=sweep_days)
             logger.info(f"[Startup] Stale task sweep: "
                         f"swept={result['swept']}, protected={len(result['protected'])}")
         except Exception as e:
@@ -165,14 +166,14 @@ app.include_router(task_creation_routes.router)
 # 兼容 re-export（旧代码 / tests/test_core.py 从 server 导入）
 # ═══════════════════════════════════════════════════
 
-from web.helpers import (  # noqa: E402
+from web.helpers import (  # noqa: E402,F401,I001 兼容 re-export，勿删
     _build_position,
     _has_explicit_duration,
     _parse_bg_color,
     _parse_duration,
     get_upload_dir,
 )
-from web.app_state import (  # noqa: E402
+from web.app_state import (  # noqa: E402,F401,I001 兼容 re-export，勿删
     MAX_CONCURRENT_WEIGHT,
     TASK_TYPE_WEIGHTS,
     WeightedSemaphore,
@@ -183,7 +184,7 @@ from web.app_state import (  # noqa: E402
     background_tasks,
     shutdown_event,
 )
-from web.deps import (  # noqa: E402
+from web.deps import (  # noqa: E402,F401,I001 兼容 re-export，勿删
     _create_pipeline_for_type,
     _run_pipeline,
     _run_pipeline_with_concurrency,
@@ -198,9 +199,10 @@ if __name__ == "__main__":
     import uvicorn
 
     # 允许通过环境变量覆盖监听地址/端口（npm 启动器 free-short-video 会注入）
-    # 默认值保持向后兼容：0.0.0.0:8765
-    _HOST = os.environ.get("HOST", "0.0.0.0")
-    _PORT = int(os.environ.get("PORT", "8765"))
+    # 默认值保持向后兼容：0.0.0.0:8765（3.5 经 RuntimeSettings 收敛）
+    from core.config import get_settings as _settings
+    _HOST = _settings().host
+    _PORT = _settings().port
     config = uvicorn.Config(app, host=_HOST, port=_PORT, log_level="info")
     server = uvicorn.Server(config)
 

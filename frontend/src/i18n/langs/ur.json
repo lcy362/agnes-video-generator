@@ -133,6 +133,7 @@
   "currentSelection": "موجودہ",
   "confirmSelection": "تصدیق",
   "cancel": "منسوخ",
+  "confirm": "Confirm",
   "previewPlay": "سن کر دیکھیں",
   "previewStop": "روکیں",
   "previewFailed": "سننا ناکام، ہو سکتا ہے یہ آواز اس زبان کو نہ سمجھے",
@@ -556,5 +557,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "Privacy",
+  "gaOptOutLabel": "Opt out of anonymous analytics",
+  "gaOptOutHint": "Disables all analytics scripts; your content is never uploaded."
 }

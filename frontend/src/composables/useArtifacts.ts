@@ -2,7 +2,12 @@ import { ref } from 'vue'
 import { appState } from '@/store'
 import * as api from '@/api'
 import { t } from '@/i18n'
+import { useToast } from './useToast'
+import { useConfirm } from './useConfirm'
 import type { Artifact } from '@/types'
+
+const { showToast } = useToast()
+const { confirmAsync } = useConfirm()
 
 const artifactsAreaVisible = ref(false)
 const artifactGroups = ref<{ stepKey: string; items: Artifact[] }[]>([])
@@ -128,14 +133,14 @@ async function confirmDeleteArtifact(art: Artifact) {
     preview = await api.getArtifactCascadePreview(taskId, art.artifact_id)
     if (!preview.ok) throw new Error(preview.detail)
   } catch (e: any) {
-    alert(t('artifactDeleteFailed') + ': ' + e.message)
+    showToast(t('artifactDeleteFailed') + ': ' + e.message, 4500)
     return
   }
   const fileList = (preview.files_to_delete || []).map((f: string) => '  • ' + f).join('\n')
   const stepList = (preview.steps_to_reset || []).map((s: string) => '  • ' + s).join('\n')
   const msg =
     t('deleteArtifactConfirm') + '\n\n' + t('willDelete') + ':\n' + fileList + '\n\n' + t('willResetSteps') + ':\n' + stepList
-  if (!confirm(msg)) return
+  if (!(await confirmAsync(msg))) return
   await deleteArtifact(taskId, art.artifact_id)
 }
 
@@ -153,7 +158,7 @@ async function deleteArtifact(taskId: string, artifactId: string) {
       /* ignore */
     }
   } catch (e: any) {
-    alert(t('artifactDeleteFailed') + ': ' + e.message)
+    showToast(t('artifactDeleteFailed') + ': ' + e.message, 4500)
   }
 }
 

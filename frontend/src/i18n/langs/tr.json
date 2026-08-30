@@ -133,6 +133,7 @@
   "currentSelection": "Geçerli",
   "confirmSelection": "Onayla",
   "cancel": "İptal",
+  "confirm": "Onayla",
   "previewPlay": "Önizle",
   "previewStop": "Durdur",
   "previewFailed": "Önizleme başarısız, ses bu dili desteklemeyebilir",
@@ -556,5 +557,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "Gizlilik",
+  "gaOptOutLabel": "Anonim istatistikleri kapat",
+  "gaOptOutHint": "Tüm analiz betiklerini devre dışı bırakır."
 }

@@ -716,7 +716,13 @@ class AgnesVideoAPI:
         return video_id
 
     async def wait_for_video(self, video_id: str, progress_callback=None) -> VideoOutput:
-        final = await self._poll_task(video_id, progress_callback=progress_callback)
+        # 1.2：轮询总超时可经 AGNES_VIDEO_POLL_TIMEOUT 配置（3.5 RuntimeSettings 收敛）
+        from core.config import get_settings
+        poll_timeout = get_settings().agnes_video_poll_timeout
+        final = await self._poll_task(
+            video_id, progress_callback=progress_callback,
+            max_poll_duration=poll_timeout,
+        )
 
         video_url = (
             final.get("remixed_from_video_id")

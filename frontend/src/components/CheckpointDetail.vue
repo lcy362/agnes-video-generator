@@ -76,7 +76,7 @@ async function runAiModify() {
     impactData.value = imp
     aiResult.value = { target: target.artifact_id, preview: null }
   } catch (e: any) {
-    alert(e.message || t('aiModifyFailed'))
+    showToast(e.message || t('aiModifyFailed'), 4500)
   } finally {
     aiLoading.value = false
   }
@@ -100,7 +100,7 @@ async function doApprove(modifiedIds: string[], paramUpdates: Record<string, any
     if (!d.ok) throw new Error(d.detail || t('failContinue'))
     await continueAfterConfirm()
   } catch (e: any) {
-    alert(e.message || t('failContinue'))
+    showToast(e.message || t('failContinue'), 4500)
   } finally {
     confirming.value = false
   }
@@ -146,7 +146,7 @@ async function regen() {
     if (!d.ok) throw new Error(d.detail || t('failRegen'))
     await continueAfterConfirm()
   } catch (e: any) {
-    alert(e.message || t('failRegen'))
+    showToast(e.message || t('failRegen'), 4500)
   } finally {
     confirming.value = false
   }
@@ -172,7 +172,7 @@ const editableTextArts = computed(() =>
 async function openEditModal() {
   const arts = editableTextArts.value
   if (!arts.length) {
-    alert(t('noEditableText'))
+    showToast(t('noEditableText'), 3500)
     return
   }
   editModalOpen.value = true
@@ -191,7 +191,7 @@ async function openEditModal() {
     }
     editArts.value = arts
   } catch (e: any) {
-    alert(e.message || t('loadFailed'))
+    showToast(e.message || t('loadFailed'), 4500)
   } finally {
     editLoading.value = false
   }

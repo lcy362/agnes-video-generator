@@ -3,17 +3,22 @@ import { ref, reactive, computed, watch } from 'vue'
 import { t } from '@/i18n'
 import { appState } from '@/store'
 import { useGa } from '@/composables/useGa'
-import { useNavigation } from '@/composables/useNavigation'
-import { useToast } from '@/composables/useToast'
 import { useVideoModelCaps, MODE_V25_TO_API } from '@/composables/useVideoModelCaps'
 import { useConfig } from '@/composables/useConfig'
-import * as api from '@/api'
+import { useTaskSubmit } from '@/composables/useTaskSubmit'
+import { useDraft } from '@/composables/useDraft'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 
 const { trackEvent } = useGa()
-const { goProgress } = useNavigation()
-const { showToast } = useToast()
 const { saveModels } = useConfig()
+
+// 3.1：视频/图片两个提交独立守卫
+const videoSubmit = useTaskSubmit()
+const imageSubmit = useTaskSubmit()
+
+// 3.4：表单草稿（切走/刷新不丢失，提交成功清除）
+const videoDraft = useDraft('simple-video')
+const imageDraft = useDraft('simple-image')
 
 // v6.2：视频模型能力（动态选项 + 差异说明）
 const vmCaps = useVideoModelCaps()
@@ -51,9 +56,36 @@ const image = reactive({
 })
 
 const advancedCollapsed = reactive({ video: true, image: true })
-const submitting = ref(false)
-// 优化路线图 0.9：图片生成独立守卫（此前仅视频提交有守卫，图片连点会并发重复提交）
-const imageSubmitting = ref(false)
+
+// 3.4：恢复草稿（仅 JSON 安全字段）
+;(() => {
+  const vd = videoDraft.load()
+  if (vd) {
+    if (typeof vd.prompt === 'string') video.prompt = vd.prompt
+    if (typeof vd.mode === 'string') video.mode = vd.mode
+    if (typeof vd.duration === 'string') video.duration = vd.duration
+    if (typeof vd.resolution === 'string') video.resolution = vd.resolution
+    if (typeof vd.ratio === 'string') video.ratio = vd.ratio
+    if (typeof vd.size === 'string') video.size = vd.size
+    if (typeof vd.seed === 'string') video.seed = vd.seed
+    if (typeof vd.negative === 'string') video.negative = vd.negative
+    if (typeof vd.system === 'string') video.system = vd.system
+  }
+  const id = imageDraft.load()
+  if (id) {
+    if (typeof id.prompt === 'string') image.prompt = id.prompt
+    if (typeof id.size === 'string') image.size = id.size
+    if (typeof id.negative === 'string') image.negative = id.negative
+    if (typeof id.system === 'string') image.system = id.system
+  }
+})()
+videoDraft.autoSave(video, (v) => ({
+  prompt: v.prompt, mode: v.mode, duration: v.duration, resolution: v.resolution,
+  ratio: v.ratio, size: v.size, seed: v.seed, negative: v.negative, system: v.system,
+}))
+imageDraft.autoSave(image, (v) => ({
+  prompt: v.prompt, size: v.size, negative: v.negative, system: v.system,
+}))
 
 // ── 按所选视频模型动态派生选项 ──
 const currentVideoModel = computed(() => appState.models.video || '')
@@ -133,86 +165,68 @@ async function onVideoModelChange(e: Event) {
 }
 
 async function submitSimple() {
-  const prompt = video.prompt.trim()
-  if (!prompt) {
-    alert(t('enterPrompt'))
-    return
-  }
-  submitting.value = true
-  const form = new FormData()
-  form.append('prompt', prompt)
-  // 2.5 系列模式映射：text→t2v / reference→i2v / keyframe→keyframes
-  form.append('mode', isV25.value ? MODE_V25_TO_API[video.mode] || 't2v' : video.mode)
-  form.append('duration', video.duration)
-  if (isV25.value) {
-    // 2.5 系列：比例 → 720P 基准像素 + 清晰度档位
-    const [w, h] = vmCaps.ratioToWH(video.ratio, currentVideoModel.value)
-    form.append('video_width', String(w))
-    form.append('video_height', String(h))
-    form.append('video_size', video.size)
-  } else {
-    const res = parseResolution(video.resolution)
-    form.append('video_width', String(res.width))
-    form.append('video_height', String(res.height))
-  }
-  if (video.seed) form.append('seed', video.seed)
-  // 2.5 系列不支持负面提示词，不提交
-  if (!isV25.value && video.negative) form.append('negative_prompt', video.negative)
-  if (video.system.trim()) form.append('system_prompt', video.system.trim())
-  if (video.refImage) form.append('reference_image', video.refImage)
-  if (video.endImage) form.append('end_frame_image', video.endImage)
-
-  try {
-    const d = await api.submitSimple(form)
-    if (!d.ok) throw new Error(d.detail || t('failCreate'))
-    trackEvent('create_task', {
-      task_type: 'simple',
+  await videoSubmit.runSubmit({
+    taskType: 'simple',
+    buildForm: () => {
+      const prompt = video.prompt.trim()
+      if (!prompt) throw new Error(t('enterPrompt'))
+      const form = new FormData()
+      form.append('prompt', prompt)
+      // 2.5 系列模式映射：text→t2v / reference→i2v / keyframe→keyframes
+      form.append('mode', isV25.value ? MODE_V25_TO_API[video.mode] || 't2v' : video.mode)
+      form.append('duration', video.duration)
+      if (isV25.value) {
+        // 2.5 系列：比例 → 720P 基准像素 + 清晰度档位
+        const [w, h] = vmCaps.ratioToWH(video.ratio, currentVideoModel.value)
+        form.append('video_width', String(w))
+        form.append('video_height', String(h))
+        form.append('video_size', video.size)
+      } else {
+        const res = parseResolution(video.resolution)
+        form.append('video_width', String(res.width))
+        form.append('video_height', String(res.height))
+      }
+      if (video.seed) form.append('seed', video.seed)
+      // 2.5 系列不支持负面提示词，不提交
+      if (!isV25.value && video.negative) form.append('negative_prompt', video.negative)
+      if (video.system.trim()) form.append('system_prompt', video.system.trim())
+      if (video.refImage) form.append('reference_image', video.refImage)
+      if (video.endImage) form.append('end_frame_image', video.endImage)
+      return form
+    },
+    extraEvent: {
       mode: video.mode,
       duration: video.duration,
       resolution: isV25.value ? video.ratio + '/' + video.size : video.resolution,
       video_model: currentVideoModel.value,
-    })
-    appState.currentTaskType = 'simple'
-    appState.currentDirName = d.dir_name
-    goProgress(d.task_id, 'create')
-    showToast(t('submitted'), 5000)
-  } catch (e: any) {
-    trackEvent('create_task_failed', { task_type: 'simple', error: (e.message || '').slice(0, 120) })
-    alert(t('failCreate') + ': ' + e.message)
-  } finally {
-    submitting.value = false
-  }
+    },
+    onSuccess: () => videoDraft.clear(),
+  })
 }
 
 async function submitImage() {
-  const prompt = image.prompt.trim()
-  if (!prompt) {
-    alert(t('enterImagePrompt'))
-    return
-  }
-  // 0.9：防重复提交（与 submitSimple 对齐）
-  if (imageSubmitting.value) return
-  imageSubmitting.value = true
-  const form = new FormData()
-  form.append('prompt', prompt)
-  form.append('size', image.size)
-  if (image.negative) form.append('negative_prompt', image.negative)
-  if (image.system.trim()) form.append('system_prompt', image.system.trim())
-  if (image.refImage) form.append('reference_image', image.refImage)
-
-  try {
-    const d = await api.submitImage(form)
-    if (!d.ok) throw new Error(d.detail || t('failCreate'))
-    trackEvent('create_task', { task_type: 'image', size: image.size })
-    image.imageResultSrc = '/api/image/' + d.task_id
-    image.imageResultVisible = true
-    showToast(t('imgComplete'), 5000)
-  } catch (e: any) {
-    trackEvent('create_task_failed', { task_type: 'image', error: (e.message || '').slice(0, 120) })
-    alert(t('failCreate') + ': ' + e.message)
-  } finally {
-    imageSubmitting.value = false
-  }
+  await imageSubmit.runSubmit({
+    taskType: 'simple_image',
+    eventTaskType: 'image',
+    buildForm: () => {
+      const prompt = image.prompt.trim()
+      if (!prompt) throw new Error(t('enterImagePrompt'))
+      const form = new FormData()
+      form.append('prompt', prompt)
+      form.append('size', image.size)
+      if (image.negative) form.append('negative_prompt', image.negative)
+      if (image.system.trim()) form.append('system_prompt', image.system.trim())
+      if (image.refImage) form.append('reference_image', image.refImage)
+      return form
+    },
+    extraEvent: { size: image.size },
+    successMessage: t('imgComplete'),
+    onSubmit: (d) => {
+      image.imageResultSrc = '/api/image/' + d.task_id
+      image.imageResultVisible = true
+    },
+    onSuccess: () => imageDraft.clear(),
+  })
 }
 </script>
 
@@ -363,10 +377,10 @@ async function submitImage() {
 
       <button
         class="w-full py-3.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn"
-        :disabled="submitting"
+        :disabled="videoSubmit.submitting.value"
         @click="submitSimple"
       >
-        {{ submitting ? t('submitting') : t('startGenerate') }}
+        {{ videoSubmit.submitting.value ? t('submitting') : t('startGenerate') }}
       </button>
     </div>
 
@@ -425,10 +439,10 @@ async function submitImage() {
 
       <button
         class="w-full py-3.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn"
-        :disabled="imageSubmitting"
+        :disabled="imageSubmit.submitting.value"
         @click="submitImage"
       >
-        {{ imageSubmitting ? t('submitting') : t('imgGenerate') }}
+        {{ imageSubmit.submitting.value ? t('submitting') : t('imgGenerate') }}
       </button>
 
       <div v-if="image.imageResultVisible" class="mt-4 p-4 glass-card rounded-lg">

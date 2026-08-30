@@ -2,12 +2,15 @@
 
 AudioOverlayMixin：concat_videos_with_audio_overlay / composite_anchor_video；
 跨组方法（_parse_srt_to_clips 等）经 MRO 由 ConcatMixin 解析。"""
+import datetime
+import itertools
 import json
 import logging
 import os
 import subprocess
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
+import srt as srt_lib
 from moviepy import AudioFileClip, CompositeVideoClip, VideoFileClip
 
 from models.task import SubtitleStyle
@@ -15,6 +18,32 @@ from models.task import SubtitleStyle
 from .concat import _AUDIO_BITRATE, _AUDIO_CODEC, _AUDIO_FPS, _VIDEO_FPS
 
 logger = logging.getLogger(__name__)
+
+# ── 2.1c：ASS 字幕渲染辅助 ──
+# moviepy TextClip 支持的命名颜色 → RGB（ASS 需要 BGR 十六进制）
+_ASS_COLOR_NAMES = {
+    "white": (255, 255, 255), "black": (0, 0, 0), "yellow": (255, 255, 0),
+    "red": (255, 0, 0), "blue": (0, 0, 255), "green": (0, 128, 0),
+    "cyan": (0, 255, 255), "magenta": (255, 0, 255), "orange": (255, 165, 0),
+    "pink": (255, 192, 203), "purple": (128, 0, 128), "gray": (128, 128, 128),
+    "grey": (128, 128, 128), "brown": (165, 42, 42), "navy": (0, 0, 128),
+    "teal": (0, 128, 128), "silver": (192, 192, 192), "gold": (255, 215, 0),
+    "lime": (0, 255, 0), "aqua": (0, 255, 255),
+}
+
+
+def _ass_fontname(font: str) -> str:
+    """ASS Fontname：字体文件取文件名 stem；系统字体名原样返回。"""
+    f = os.path.basename(str(font))
+    if "." in f:
+        return os.path.splitext(f)[0]
+    return f
+
+
+def _subtitle_ass_enabled() -> bool:
+    """2.1c：字幕 ASS 单链开关（灰度）。关闭后回退 moviepy 字幕路径。"""
+    from core.config import subtitle_ass_enabled as _enabled
+    return _enabled()
 
 
 class AudioOverlayMixin:
@@ -65,20 +94,37 @@ class AudioOverlayMixin:
             f"audio={audio_dur:.2f}s, final={final_dur:.2f}s"
         )
 
-        # ── 2.1b：无字幕时视频+音频在一条 ffmpeg filter 链一次编码完成 ──
-        # （替代 Step 3 tpad + Step 4 apad/volume + Step 5 moviepy 三遍编码）
-        if not (srt_path and os.path.exists(srt_path) and subtitle_style):
+        # ── 2.1b/2.1c：视频+音频（+字幕）在一条 ffmpeg filter 链一次编码完成 ──
+        # 无字幕走 2.1b；有字幕时优先走 2.1c（SRT→ASS + subtitles 滤镜，句级样式），
+        # 失败自动回退 moviepy（Step 3/4/5）——词级动效与逐条样式完整保真仍在 moviepy 路径。
+        has_sub = bool(srt_path and os.path.exists(srt_path) and subtitle_style)
+        if not has_sub or _subtitle_ass_enabled():
             try:
+                ass_path = None
+                fonts_dir = None
+                if has_sub:
+                    video_w, video_h = AudioOverlayMixin._get_video_size(silent_path)
+                    ass_path, fonts_dir = AudioOverlayMixin._srt_to_ass(
+                        srt_path, subtitle_style, video_w, video_h, subtitle_styles_path,
+                    )
+                    if not ass_path:
+                        raise RuntimeError("SRT→ASS conversion returned None")
                 result = AudioOverlayMixin._ffmpeg_mux_aligned(
                     silent_path, audio_path, output_path, final_dur,
+                    subtitle_ass_path=ass_path, fonts_dir=fonts_dir,
                 )
                 # fast path 自行清理拼接中间产物（原 finally 不经过此分支）
                 if os.path.exists(silent_path):
                     os.remove(silent_path)
+                if ass_path and os.path.exists(ass_path):
+                    try:
+                        os.remove(ass_path)
+                    except OSError:
+                        pass
                 return result
             except Exception as e:
                 logger.warning(
-                    f"[Compositor] ffmpeg single-pass mux failed, "
+                    f"[Compositor] ffmpeg single-pass mux (subtitle ass) failed, "
                     f"fallback moviepy chain: {e}"
                 )
 
@@ -221,24 +267,34 @@ class AudioOverlayMixin:
     @staticmethod
     def _ffmpeg_mux_aligned(
         silent_path: str, audio_path: str, output_path: str, final_dur: float,
+        subtitle_ass_path: Optional[str] = None, fonts_dir: Optional[str] = None,
     ) -> str:
-        """2.1b：视频+音频在一条 ffmpeg filter 链中完成对齐与合成（一次编码）。
+        """2.1b/2.1c：视频+音频（+字幕）在一条 ffmpeg filter 链中完成对齐与合成（一次编码）。
 
         - 视频不足 ``final_dur`` → ``tpad stop_mode=clone`` 冻结尾帧补齐
         - 音频不足 ``final_dur`` → ``apad=whole_dur`` 补静音 + ``volume=1.5``
           补偿 edge_tts 默认低音量（与既有语义一致）
+        - 传入 ``subtitle_ass_path`` 时追加 ``subtitles`` 滤镜烧录 ASS 字幕（2.1c）
         - ``-t final_dur`` 强制截断对齐
 
         Returns:
             输出文件路径。失败抛 RuntimeError（调用方回退 moviepy）。
         """
+        if subtitle_ass_path:
+            esc_path = AudioOverlayMixin._escape_filter_path(subtitle_ass_path)
+            esc_dir = AudioOverlayMixin._escape_filter_path(fonts_dir or "")
+            v_chain = (
+                f"[0:v]tpad=stop_mode=clone:stop_duration={final_dur:.2f}[v0];"
+                f"[v0]subtitles={esc_path}:fontsdir='{esc_dir}'[v]"
+            )
+        else:
+            v_chain = f"[0:v]tpad=stop_mode=clone:stop_duration={final_dur:.2f}[v]"
         cmd = [
             "ffmpeg", "-y",
             "-i", silent_path,
             "-i", audio_path,
             "-filter_complex",
-            f"[0:v]tpad=stop_mode=clone:stop_duration={final_dur:.2f}[v];"
-            f"[1:a]apad=whole_dur={final_dur:.2f},volume=1.5[a]",
+            f"{v_chain};[1:a]apad=whole_dur={final_dur:.2f},volume=1.5[a]",
             "-map", "[v]", "-map", "[a]",
             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "fast",
             "-c:a", _AUDIO_CODEC, "-b:a", _AUDIO_BITRATE,
@@ -246,9 +302,444 @@ class AudioOverlayMixin:
             output_path,
         ]
         VideoConcatenator._run_ffmpeg(
-            cmd, desc=f"mux video+audio (single-pass, {final_dur:.1f}s)",
+            cmd, desc=f"mux video+audio+subtitle (single-pass, {final_dur:.1f}s)",
         )
         return output_path
+
+    # ─────────────────────────────────────────────────────────────
+    # 2.1c：SRT → ASS 转换辅助
+    # ─────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _get_video_size(video_path: str) -> Tuple[int, int]:
+        """ffprobe 获取视频宽高，失败回退 (768, 1152)。"""
+        try:
+            r = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-show_entries", "stream=width,height",
+                 "-of", "csv=s=x:p=0", video_path],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=15,
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                w, h = r.stdout.strip().split("x")
+                return int(w), int(h)
+        except Exception as e:
+            logger.warning(f"[Compositor] probe video size failed: {e}")
+        return 768, 1152
+
+    @staticmethod
+    def _escape_filter_path(p: str) -> str:
+        """转义 ffmpeg filter 参数内的路径（\\ : ' 特殊字符）。"""
+        return p.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+
+    @staticmethod
+    def _parse_ass_color(c) -> Optional[Tuple[int, int, int]]:
+        """颜色（名称/#RRGGBB/rgb tuple）→ RGB 三元组；无法解析返回 None。"""
+        if isinstance(c, (tuple, list)) and len(c) >= 3:
+            return tuple(int(x) for x in c[:3])
+        if isinstance(c, str):
+            s = c.strip()
+            if s.startswith("#") and len(s) == 7:
+                try:
+                    return (int(s[1:3], 16), int(s[3:5], 16), int(s[5:7], 16))
+                except ValueError:
+                    return None
+            if s.lower() in _ASS_COLOR_NAMES:
+                return _ASS_COLOR_NAMES[s.lower()]
+        return None
+
+    @staticmethod
+    def _ass_color(rgb: Tuple[int, int, int]) -> str:
+        """RGB → ASS 颜色 &H00BBGGRR&。"""
+        r, g, b = rgb
+        return f"&H00{b:02X}{g:02X}{r:02X}&"
+
+    @staticmethod
+    def _parse_ass_bg(c) -> Optional[Tuple[Tuple[int, int, int], int]]:
+        """bg_color → ((r,g,b), alpha 0-255)；兼容 tuple/旧式 "black@0.5" 字符串。"""
+        if isinstance(c, (tuple, list)):
+            rgb = AudioOverlayMixin._parse_ass_color(c)
+            alpha = int(c[3]) if len(c) >= 4 else 0
+            return (rgb, alpha) if rgb else None
+        if isinstance(c, str):
+            s = c.strip()
+            if "@" in s:
+                name, _, a = s.partition("@")
+                rgb = AudioOverlayMixin._parse_ass_color(name)
+                if rgb:
+                    try:
+                        return (rgb, int(float(a.strip()) * 255))
+                    except ValueError:
+                        return None
+            rgb = AudioOverlayMixin._parse_ass_color(s)
+            return (rgb, 0) if rgb else None
+        return None
+
+    @staticmethod
+    def _pos_to_ass_margins(
+        pos: Tuple, video_width: int, video_height: int,
+    ) -> Tuple[int, int, int, int]:
+        """moviepy 位置 (h, v) → ASS (alignment, margin_l, margin_r, margin_v)。
+
+        h/v 可为 "left/center/right"、"top/center/bottom" 或像素（离顶部距离）。
+        """
+        h_part, v_part = pos
+        # 水平锚点
+        if isinstance(h_part, (int, float)):
+            ml = max(0, min(int(h_part), max(0, video_width - 40)))
+            mr = 0
+            h_anchor = "left"
+        else:
+            ml = mr = 0
+            h_anchor = str(h_part).strip().lower()
+            if h_anchor not in ("left", "right"):
+                h_anchor = "center"
+        # 垂直锚点
+        if isinstance(v_part, (int, float)):
+            mv = max(0, min(int(video_height - v_part), video_height))
+            v_anchor = "bottom"
+        else:
+            mv = 0
+            v_anchor = str(v_part).strip().lower()
+            if v_anchor not in ("top", "center"):
+                v_anchor = "bottom"
+        # ASS alignment（1-9）：7 8 9 / 4 5 6 / 1 2 3（顶/中/底）
+        col = {"left": 1, "center": 2, "right": 3}[h_anchor]
+        row = {"top": 0, "center": 1, "bottom": 2}[v_anchor]
+        alignment = col + (2 - row) * 3
+        return alignment, ml, mr, mv
+
+    @staticmethod
+    def _ass_escape_text(txt: str) -> str:
+        """转义 ASS Dialogue 文本（反斜杠 / 花括号 / 换行转义为 \\\\N）。"""
+        txt = txt.replace("\\", "\\\\")
+        txt = txt.replace("{", "\\{").replace("}", "\\}")
+        txt = txt.replace("\n", "\\N")
+        return txt
+
+    @staticmethod
+    def _srt_to_ass(
+        srt_path: str,
+        subtitle_style: SubtitleStyle,
+        video_width: int,
+        video_height: int,
+        subtitle_styles_path: Optional[str] = None,
+    ) -> Optional[Tuple[str, str]]:
+        """2.1c：SRT + 样式 → ASS 文件（句级样式灰度）。
+
+        保留字体/字号/主色/描边/位置/半透明底，放弃 moviepy 词级逐字动效
+        （词级动效仍走 moviepy 兜底路径）。逐条样式（subtitle_styles_path）按
+        index 覆盖字号/主色/位置。
+
+        Returns:
+            (ass_path, fonts_dir)；失败返回 None（调用方回退 moviepy）。
+        """
+        try:
+            from core.audio.subtitle import SubtitleGenerator
+            from core.config import font_dir, resolve_font_path
+
+            with open(srt_path, "r", encoding="utf-8") as f:
+                subs = list(srt_lib.parse(f))
+            if not subs:
+                return None
+
+            font_path = resolve_font_path(subtitle_style.font)
+            fonts_dir = font_dir()
+            fontname = _ass_fontname(font_path)
+
+            # 主色 / 描边 / 背景
+            primary = AudioOverlayMixin._ass_color(
+                AudioOverlayMixin._parse_ass_color(subtitle_style.color) or (255, 255, 255)
+            )
+            stroke = AudioOverlayMixin._ass_color(
+                AudioOverlayMixin._parse_ass_color(subtitle_style.stroke_color) or (0, 0, 0)
+            )
+            bg = AudioOverlayMixin._parse_ass_bg(subtitle_style.bg_color)
+            if bg is not None:
+                (br, bg_, bb), balpha = bg
+                back = f"&H{balpha:02X}{bb:02X}{bg_:02X}{br:02X}&"
+                border_style = 3  # opaque box（半透明底）
+                outline = 0
+            else:
+                back = "&H00000000&"
+                border_style = 1  # outline + shadow
+                outline = max(1, int(subtitle_style.stroke_width or 2))
+
+            # 全局位置 → 默认样式 alignment/margins
+            pos_resolved = VideoConcatenator._resolve_subtitle_position(
+                subtitle_style.position, video_height=video_height, video_width=video_width,
+            )
+            g_al, g_ml, g_mr, g_mv = AudioOverlayMixin._pos_to_ass_margins(
+                pos_resolved, video_width, video_height,
+            )
+
+            fs = max(8, int(subtitle_style.fontsize or 48))
+
+            # 逐条样式查找表（index → 覆盖字段）
+            style_map: dict[int, dict] = {}
+            if subtitle_styles_path and os.path.exists(subtitle_styles_path):
+                with open(subtitle_styles_path, "r", encoding="utf-8") as f:
+                    for s in json.load(f):
+                        idx = s.get("index", 0)
+                        if idx > 0:
+                            style_map[idx] = s
+
+            lines = []
+            for sub in subs:
+                txt = (sub.content or "").strip()
+                if not txt:
+                    continue
+                entry = style_map.get(sub.index, {})
+                entry_fs = max(8, int(entry.get("fontsize", fs)))
+                entry_color = entry.get("color", subtitle_style.color)
+                entry_pos = entry.get("position", subtitle_style.position)
+
+                # 长文本多行换行（与 moviepy 路径同一算法）
+                available_w = max(80, video_width - 40)
+                cjk_max = max(8, available_w // entry_fs)
+                wrapped = SubtitleGenerator._split_long_text(
+                    txt, cjk_max, video_width=video_width, fontsize=entry_fs,
+                )
+
+                # 条目位置 → 独立 margins（该条覆盖全局）
+                e_pos = VideoConcatenator._resolve_subtitle_position(
+                    entry_pos, video_height=video_height, video_width=video_width,
+                )
+                e_al, e_ml, e_mr, e_mv = AudioOverlayMixin._pos_to_ass_margins(
+                    e_pos, video_width, video_height,
+                )
+
+                # override tags：仅在与全局不同时输出
+                overrides = []
+                if entry_fs != fs:
+                    overrides.append(f"\\fs{entry_fs}")
+                c_rgb = AudioOverlayMixin._parse_ass_color(entry_color)
+                if c_rgb and AudioOverlayMixin._ass_color(c_rgb) != primary:
+                    overrides.append(f"\\c{AudioOverlayMixin._ass_color(c_rgb)}")
+
+                # 位置：条目与全局一致 → Dialogue margins 全零（继承 Style）；
+                # 不一致 → 显式 \an + 非零 margins 覆盖（避免 \pos 文本宽度估算误差）
+                if (e_al, e_ml, e_mr, e_mv) == (g_al, g_ml, g_mr, g_mv):
+                    line_ml = line_mr = line_mv = 0
+                else:
+                    overrides.append(f"\\an{e_al}")
+                    line_ml, line_mr, line_mv = e_ml, e_mr, e_mv
+
+                start_s = sub.start.total_seconds()
+                end_s = sub.end.total_seconds()
+                start = AudioOverlayMixin._ass_time(start_s)
+                end = AudioOverlayMixin._ass_time(end_s)
+                text = AudioOverlayMixin._ass_escape_text(wrapped)
+                tag_str = "".join(overrides)
+                if tag_str:
+                    text = "{" + tag_str + "}" + text
+
+                lines.append(
+                    f"Dialogue: 0,{start},{end},Default,,{line_ml},{line_mr},{line_mv},,{text}"
+                )
+
+            ass_path = srt_path + ".ass"
+            header = (
+                "[Script Info]\n"
+                "ScriptType: v4.00+\n"
+                f"PlayResX: {video_width}\n"
+                f"PlayResY: {video_height}\n"
+                "WrapStyle: 2\n"
+                "\n"
+                "[V4+ Styles]\n"
+                "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+                "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+                "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+                "Alignment, MarginL, MarginR, MarginV, Encoding\n"
+                f"Style: Default,{fontname},{fs},{primary},&H000000FF&,{stroke},"
+                f"{back},0,0,0,0,100,100,0,0,{border_style},{outline},0,"
+                f"{g_al},{g_ml},{g_mr},{g_mv},1\n"
+                "\n"
+                "[Events]\n"
+                "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
+                "Effect, Text\n"
+            )
+            with open(ass_path, "w", encoding="utf-8") as f:
+                f.write(header + "\n".join(lines) + "\n")
+            logger.info(
+                f"[Compositor] SRT→ASS done: {len(lines)} entries → {ass_path}"
+            )
+            return ass_path, fonts_dir
+        except Exception as e:
+            logger.warning(f"[Compositor] SRT→ASS conversion failed: {e}")
+            return None
+
+    @staticmethod
+    def _ass_time(seconds: float) -> str:
+        """秒 → ASS 时间 H:MM:SS.cc。"""
+        h = int(seconds // 3600)
+        m = int((seconds % 3600) // 60)
+        s = int(seconds % 60)
+        cs = int((seconds % 1) * 100)
+        return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+    # ─────────────────────────────────────────────────────────────
+    # 2.2：poetry 多场景一次合成（视频 -c copy 拼接 + 音频合并 + 总字幕）
+    # ─────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def concat_scenes_single_pass(
+        video_paths: List[str],
+        audio_paths: List[str],
+        srt_paths: List[Optional[str]],
+        output_path: str,
+        subtitle_style: Optional[SubtitleStyle],
+        subtitle_styles_path: Optional[str] = None,
+    ) -> Optional[str]:
+        """2.2：多场景「视频拼接 + 音频合并 + 字幕」一次编码合成。
+
+        - 场景视频 ``concat_videos``（2.1a ``-c copy`` fast path）→ 0 次视频重编码
+        - 各场景音频按视频实际时间轴 ``adelay+amix+apad`` 合并 → 单音频（一次音频编码）
+        - 各场景 SRT 偏移合并为总 SRT
+        - 最终 ``concat_videos_with_audio_overlay`` 一次编码（无字幕走 2.1b /
+          有字幕走 2.1c ASS 单链）
+
+        任何一步失败返回 None（调用方回退逐场景合成），不抛异常。
+
+        Args:
+            video_paths: 各场景视频路径（有序）。
+            audio_paths: 各场景音频路径（有序，需与视频一一对应）。
+            srt_paths: 各场景 SRT 路径（可为 None/空串，有序）。
+            output_path: 最终输出。
+            subtitle_style: 全局字幕样式（None 表示无字幕）。
+            subtitle_styles_path: 逐条样式 JSON（透传 2.1c）。
+
+        Returns:
+            输出路径；失败返回 None。
+        """
+        try:
+            n = len(video_paths)
+            if n < 1 or len(audio_paths) != n or len(srt_paths) != n:
+                return None
+            for vp, ap in zip(video_paths, audio_paths):
+                if not vp or not ap or not os.path.exists(vp) or not os.path.exists(ap):
+                    return None
+
+            base = output_path.replace(".mp4", "")
+            # 1) 场景视频 -c copy 拼接（2.1a fast path，失败自动回退 moviepy compose）
+            total_silent = base + "_total_silent.mp4"
+            VideoConcatenator.concat_videos(video_paths, total_silent)
+            # 偏移按视频实际时长累积（模型产出与规划时长可能有偏差）
+            real_durs = [VideoConcatenator._get_duration(v) for v in video_paths]
+            offsets = list(itertools.accumulate(real_durs, initial=0.0))[:-1]
+            total_dur = sum(real_durs)
+
+            # 2) 音频合并（adelay+amix+apad，一次音频编码）
+            total_audio = base + "_total_audio.mp3"
+            if not AudioOverlayMixin._merge_scene_audios(
+                audio_paths, offsets, total_audio, total_dur,
+            ):
+                return None
+
+            # 3) 总 SRT（偏移合并）
+            total_srt = None
+            has_srt = subtitle_style is not None and any(
+                s and os.path.exists(s) for s in srt_paths
+            )
+            if has_srt:
+                total_srt = base + "_total.srt"
+                if not AudioOverlayMixin._merge_scene_srts(srt_paths, offsets, total_srt):
+                    total_srt = None
+
+            # 4) 一次合成（无字幕 2.1b / 有字幕 2.1c ASS 单链）
+            AudioOverlayMixin.concat_videos_with_audio_overlay(
+                [total_silent], total_audio, total_srt, output_path,
+                subtitle_style, subtitle_styles_path,
+            )
+            for tmp in (total_silent, total_audio, total_srt):
+                if tmp and os.path.exists(tmp):
+                    try:
+                        os.remove(tmp)
+                    except OSError:
+                        pass
+            logger.info(
+                f"[Compositor] concat_scenes_single_pass done: "
+                f"{n} scenes → {output_path}"
+            )
+            return output_path
+        except Exception as e:
+            logger.warning(f"[Compositor] single-pass scenes composite failed: {e}")
+            return None
+
+    @staticmethod
+    def _merge_scene_audios(
+        audio_paths: List[str], offsets: List[float], output_path: str, total_dur: float,
+    ) -> bool:
+        """各场景音频按偏移 adelay+amix+apad 合并为单音频（含场景间静音）。
+
+        Returns:
+            True=成功；False=失败（调用方回退）。
+        """
+        try:
+            n = len(audio_paths)
+            cmd = ["ffmpeg", "-y"]
+            for ap in audio_paths:
+                cmd += ["-i", ap]
+            filters = []
+            mixins = []
+            for i, (ap, off) in enumerate(zip(audio_paths, offsets)):
+                off_ms = max(0, int(round(off * 1000)))
+                filters.append(
+                    f"[{i}:a]aresample=44100,adelay={off_ms}:all=1[a{i}]"
+                )
+                mixins.append(f"[a{i}]")
+            filters.append(
+                "".join(mixins)
+                + f"amix=inputs={n}:normalize=0:dropout_transition=0,"
+                + f"apad=whole_dur={total_dur:.2f}[a]"
+            )
+            cmd += [
+                "-filter_complex", ";".join(filters),
+                "-map", "[a]",
+                "-c:a", "libmp3lame", "-q:a", "2",
+                "-t", f"{total_dur:.2f}",
+                output_path,
+            ]
+            VideoConcatenator._run_ffmpeg(
+                cmd, desc=f"merge {n} scene audios (adelay+amix, {total_dur:.1f}s)",
+            )
+            return os.path.exists(output_path) and os.path.getsize(output_path) > 0
+        except Exception as e:
+            logger.warning(f"[Compositor] merge scene audios failed: {e}")
+            return False
+
+    @staticmethod
+    def _merge_scene_srts(
+        srt_paths: List[Optional[str]], offsets: List[float], output_path: str,
+    ) -> bool:
+        """各场景 SRT 按偏移合并为总 SRT（重新编号）。
+
+        Returns:
+            True=成功；False=失败。
+        """
+        try:
+            out_subs = []
+            idx = 1
+            for sp, off in zip(srt_paths, offsets):
+                if not sp or not os.path.exists(sp):
+                    continue
+                with open(sp, "r", encoding="utf-8") as f:
+                    for sub in srt_lib.parse(f):
+                        out_subs.append(srt_lib.Subtitle(
+                            index=idx,
+                            start=sub.start + datetime.timedelta(seconds=off),
+                            end=sub.end + datetime.timedelta(seconds=off),
+                            content=sub.content,
+                        ))
+                        idx += 1
+            if not out_subs:
+                return False
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(srt_lib.compose(out_subs))
+            return True
+        except Exception as e:
+            logger.warning(f"[Compositor] merge scene srts failed: {e}")
+            return False
 
     @staticmethod
     def composite_anchor_video(

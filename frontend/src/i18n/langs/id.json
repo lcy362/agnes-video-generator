@@ -428,6 +428,7 @@
   "artifactDeleteFailed": "Penghapusan gagal",
   "artifactDeleted": "Hasil dihapus",
   "cancel": "Batal",
+  "confirm": "Konfirmasi",
   "clickToPreview": "Klik untuk pratinjau",
   "confirmSelection": "Konfirmasi Pilihan",
   "copyPromptWithPoem": "Isi puisi dan salin prompt",
@@ -557,5 +558,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "Privasi",
+  "gaOptOutLabel": "Nonaktifkan statistik anonim",
+  "gaOptOutHint": "Menonaktifkan semua skrip analitik."
 }

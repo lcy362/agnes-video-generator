@@ -430,6 +430,7 @@
   "artifactDeleteFailed": "Eliminazione fallita",
   "artifactDeleted": "Risultato eliminato",
   "cancel": "Annulla",
+  "confirm": "Conferma",
   "clickToPreview": "Clicca per anteprima",
   "confirmSelection": "Conferma selezione",
   "copyPromptWithPoem": "Inserisci la poesia e copia il prompt",
@@ -557,5 +558,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "Privacy",
+  "gaOptOutLabel": "Disattiva statistiche anonime",
+  "gaOptOutHint": "Disattiva tutti gli script di analisi."
 }

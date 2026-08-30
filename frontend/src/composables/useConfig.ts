@@ -3,9 +3,11 @@ import { appState } from '@/store'
 import * as api from '@/api'
 import { t } from '@/i18n'
 import { useToast } from './useToast'
+import { useConfirm } from './useConfirm'
 import { useGa } from './useGa'
 
 const { showToast } = useToast()
+const { confirmAsync } = useConfirm()
 const { trackEvent } = useGa()
 
 // ── API Key ──
@@ -46,7 +48,7 @@ async function loadKeyInfo() {
 }
 
 async function removeKey(id: string) {
-  if (!confirm(t('removeKeyConfirm'))) return false
+  if (!(await confirmAsync(t('removeKeyConfirm')))) return false
   const r = await api.removeConfigKey(id)
   if (r.ok) {
     trackEvent('config_action', { action: 'remove_api_key' })
@@ -65,7 +67,7 @@ async function removeKey(id: string) {
     }
     return true
   }
-  alert(r.detail || t('failRemoveKey'))
+  showToast(r.detail || t('failRemoveKey'), 4500)
   return false
 }
 
@@ -95,17 +97,17 @@ async function saveMultiKeys(keysText: string) {
 
 async function clearApiKey() {
   if (apiKeyStatus.value === 'env') {
-    alert(t('clearEnvHint'))
+    showToast(t('clearEnvHint'), 3500)
     return
   }
-  if (!confirm(t('clearConfirm'))) return
+  if (!(await confirmAsync(t('clearConfirm')))) return
   const r = await api.clearApiKey()
   if (r.ok) {
     trackEvent('config_action', { action: 'clear_api_key' })
     apiKeyStatus.value = 'none'
   } else {
     const d = await r.json().catch(() => ({}))
-    alert(d.detail || 'Failed to clear')
+    showToast(d.detail || 'Failed to clear', 4500)
   }
 }
 
@@ -254,18 +256,18 @@ async function activateWorkspace(path: string) {
     await renderWorkspaces()
   } else {
     const d = await r.json().catch(() => ({}))
-    alert(d.detail || 'Failed')
+    showToast(d.detail || t('failSwitchMode'), 4500)
   }
 }
 
 async function removeWorkspaceEntry(path: string) {
-  if (!confirm(t('workspaceRemoveConfirm'))) return
+  if (!(await confirmAsync(t('workspaceRemoveConfirm')))) return
   const r = await api.removeWorkspace(path)
   if (r.ok) {
     await renderWorkspaces()
   } else {
     const d = await r.json().catch(() => ({}))
-    alert(d.detail || 'Failed')
+    showToast(d.detail || t('failSwitchMode'), 4500)
   }
 }
 
@@ -274,7 +276,7 @@ async function browseDirectory(): Promise<string | null> {
     const d = await api.pickDirectory()
     if (d.ok && d.path) return d.path
   } catch (e) {
-    alert('Network error')
+    showToast(t('networkError'), 3500)
   }
   return null
 }
@@ -286,7 +288,7 @@ async function addWorkspace(path: string, name: string) {
     await renderWorkspaces()
   } else {
     const d = await r.json().catch(() => ({}))
-    alert(d.detail || 'Failed')
+    showToast(d.detail || t('failSwitchMode'), 4500)
   }
 }
 

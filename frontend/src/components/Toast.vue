@@ -1,8 +1,24 @@
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue'
+import type { ToastType } from '@/composables/useToast'
+
+const props = defineProps<{
   visible: boolean
   message: string
+  type?: ToastType
 }>()
+
+const styleClass = computed(() => {
+  switch (props.type) {
+    case 'success':
+      return 'bg-emerald-600 text-white'
+    case 'info':
+      return 'bg-sky-600 text-white'
+    case 'error':
+    default:
+      return 'bg-red-600 text-white'
+  }
+})
 </script>
 
 <template>
@@ -16,7 +32,10 @@ defineProps<{
   >
     <div
       v-if="visible"
-      class="fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl text-sm font-medium border border-rule z-50 bg-yellow-600 text-ink"
+      class="fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl text-sm font-medium border border-rule z-50 shadow-lg"
+      :class="styleClass"
+      role="alert"
+      aria-live="polite"
     >
       {{ message }}
     </div>

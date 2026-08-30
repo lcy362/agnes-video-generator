@@ -61,13 +61,25 @@ function cycleTheme() {
   themeApply(next)
 }
 
-// system 模式下跟随系统切换
+// 3.4：system 模式下跟随系统切换（保存 mql 引用以便卸载时清理）
+let themeMql: MediaQueryList | null = null
+let themeMqlHandler: (() => void) | null = null
+
 function initThemeListener() {
-  if (window.matchMedia) {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-      if (storedMode.value === 'system') themeApply('system')
-    })
+  if (!window.matchMedia || themeMqlHandler) return
+  themeMql = window.matchMedia('(prefers-color-scheme: dark)')
+  themeMqlHandler = () => {
+    if (storedMode.value === 'system') themeApply('system')
   }
+  themeMql.addEventListener('change', themeMqlHandler)
+}
+
+function disposeThemeListener() {
+  if (themeMql && themeMqlHandler) {
+    themeMql.removeEventListener('change', themeMqlHandler)
+  }
+  themeMql = null
+  themeMqlHandler = null
 }
 
 export function useTheme() {
@@ -80,5 +92,6 @@ export function useTheme() {
     themeApply,
     cycleTheme,
     initThemeListener,
+    disposeThemeListener,
   }
 }

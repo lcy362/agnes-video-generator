@@ -133,6 +133,7 @@
   "currentSelection": "فعلی",
   "confirmSelection": "تأیید",
   "cancel": "لغو",
+  "confirm": "Confirm",
   "previewPlay": "پیش‌نمایش",
   "previewStop": "توقف",
   "previewFailed": "پیش‌نمایش ناموفق، شاید این صدا این زبان را پشتیبانی نکند",
@@ -556,5 +557,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "Privacy",
+  "gaOptOutLabel": "Opt out of anonymous analytics",
+  "gaOptOutHint": "Disables all analytics scripts; your content is never uploaded."
 }

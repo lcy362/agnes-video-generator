@@ -2,18 +2,13 @@
 import { ref, reactive, computed } from 'vue'
 import { t } from '@/i18n'
 import { appState } from '@/store'
-import { useGa } from '@/composables/useGa'
-import { useNavigation } from '@/composables/useNavigation'
-import { useToast } from '@/composables/useToast'
 import { useVoice } from '@/composables/useVoice'
-import * as api from '@/api'
+import { useTaskSubmit, collectAudioSubtitleFields } from '@/composables/useTaskSubmit'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
 
-const { trackEvent } = useGa()
-const { goProgress } = useNavigation()
-const { showToast } = useToast()
 const { voiceSelections } = useVoice()
+const { submitting, runSubmit } = useTaskSubmit()
 
 const subtitleRef = ref<InstanceType<typeof SubtitleConfig>>()
 
@@ -27,7 +22,6 @@ const form = reactive({
 })
 
 const charCount = computed(() => form.script.length)
-const submitting = ref(false)
 
 function parseResolution(val: string) {
   const [w, h] = val.split('x').map(Number)
@@ -41,64 +35,41 @@ function onRefImageChange(e: Event) {
 }
 
 async function submitAnchor() {
-  const script = form.script.trim()
-  if (!script) {
-    alert(t('enterText'))
-    return
-  }
-  submitting.value = true
-  const fd = new FormData()
-  fd.append('script_text', script)
-  const prompt = form.prompt.trim()
-  if (prompt) fd.append('anchor_prompt', prompt)
-  const res = parseResolution(form.resolution)
-  fd.append('video_width', String(res.width))
-  fd.append('video_height', String(res.height))
-  if (form.refImage) fd.append('anchor_reference_image', form.refImage)
-  fd.append('audio_source', form.audioSource)
+  let ev: Record<string, any> = {}
+  await runSubmit({
+    taskType: 'anchor',
+    buildForm: () => {
+      const script = form.script.trim()
+      if (!script) throw new Error(t('enterText'))
+      const fd = new FormData()
+      fd.append('script_text', script)
+      const prompt = form.prompt.trim()
+      if (prompt) fd.append('anchor_prompt', prompt)
+      const res = parseResolution(form.resolution)
+      fd.append('video_width', String(res.width))
+      fd.append('video_height', String(res.height))
+      if (form.refImage) fd.append('anchor_reference_image', form.refImage)
+      fd.append('audio_source', form.audioSource)
 
-  const sc = subtitleRef.value
-  if (sc) {
-    fd.append('audio_enabled', String(form.audioSource === 'model' ? false : sc.audioEnabled))
-    fd.append('audio_voice', voiceSelections.a)
-    fd.append('audio_lang', 'zh')
-    fd.append('audio_rate', sc.rate)
-    fd.append('subtitle_enabled', String(sc.subtitleEnabled))
-    fd.append('subtitle_style_mode', sc.styleMode)
-    fd.append('subtitle_style_hints', sc.style.hints)
-    fd.append('subtitle_font', sc.style.font)
-    fd.append('subtitle_color', sc.style.color)
-    fd.append('subtitle_fontsize', String(sc.style.fontsize))
-    fd.append('subtitle_position', sc.style.position)
-    fd.append('subtitle_stroke_color', sc.style.stroke_color)
-    fd.append('subtitle_stroke_width', String(sc.style.stroke_width))
-    fd.append('subtitle_bg_color', sc.style.bg_color)
-  }
+      const sc = subtitleRef.value
+      collectAudioSubtitleFields(fd, sc, voiceSelections, 'a')
+      // 特例：model 自带口型音频 → 强制关闭 TTS 旁白
+      if (form.audioSource === 'model') fd.set('audio_enabled', 'false')
 
-  // v6.0 手动模式：执行模式 + 暂停点
-  fd.append('execution_mode', appState.execMode)
-  fd.append('pause_points', JSON.stringify(appState.execMode === 'manual' ? appState.pausePoints : []))
+      // v6.0 手动模式：执行模式 + 暂停点
+      fd.append('execution_mode', appState.execMode)
+      fd.append('pause_points', JSON.stringify(appState.execMode === 'manual' ? appState.pausePoints : []))
 
-  try {
-    const d = await api.submitAnchor(fd)
-    if (!d.ok) throw new Error(d.detail || t('failCreate'))
-    trackEvent('create_task', {
-      task_type: 'anchor',
-      resolution: form.resolution,
-      audio_source: form.audioSource,
-      audio: form.audioSource === 'model' ? 'off' : sc?.audioEnabled ? 'on' : 'off',
-      subtitle: sc?.subtitleEnabled ? 'on' : 'off',
-    })
-    appState.currentTaskType = 'anchor'
-    appState.currentDirName = d.dir_name
-    goProgress(d.task_id, 'create')
-    showToast(t('submitted'), 5000)
-  } catch (e: any) {
-    trackEvent('create_task_failed', { task_type: 'anchor', error: (e.message || '').slice(0, 120) })
-    alert(t('failCreate') + ': ' + e.message)
-  } finally {
-    submitting.value = false
-  }
+      ev = {
+        resolution: form.resolution,
+        audio_source: form.audioSource,
+        audio: form.audioSource === 'model' ? 'off' : sc?.audioEnabled ? 'on' : 'off',
+        subtitle: sc?.subtitleEnabled ? 'on' : 'off',
+      }
+      return fd
+    },
+    extraEvent: ev,
+  })
 }
 </script>
 

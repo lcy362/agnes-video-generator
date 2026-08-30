@@ -2,13 +2,15 @@
 import { computed } from 'vue'
 import { t } from '@/i18n'
 import { useTasks } from '@/composables/useTasks'
+import { useConfirm } from '@/composables/useConfirm'
 import type { TaskListItem } from '@/types'
 
 const { tasks, loading, loadTaskList, viewTask, viewRunningTask, resumeTask, stopTaskById, deleteTaskById, switchMode } = useTasks()
+const { confirmAsync } = useConfirm()
 
 async function toggleMode(task: TaskListItem) {
   const target = task.current_mode === 'manual' ? 'auto' : 'manual'
-  if (!confirm(target === 'auto' ? t('switchToAutoConfirm') : t('switchToManualConfirm'))) return
+  if (!(await confirmAsync(target === 'auto' ? t('switchToAutoConfirm') : t('switchToManualConfirm')))) return
   const d = await switchMode(task.task_id, target as 'auto' | 'manual')
   if (d && task.awaiting_user && target === 'auto') {
     // 手动→自动：切换即继续（后端已 resume），刷新列表

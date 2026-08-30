@@ -53,6 +53,15 @@ _NON_CJK_FONTS = frozenset({
 })
 
 
+def subtitle_ass_enabled() -> bool:
+    """2.1c：字幕是否走 ffmpeg ASS 单链合成（灰度开关）。
+
+    ``AGNES_SUBTITLE_ASS`` 环境变量控制，默认开启；设为 ``0``/``false``/``off``
+    关闭并回退 moviepy 字幕路径。ASS 路径任何失败也会自动回退 moviepy。
+    """
+    return get_settings().agnes_subtitle_ass
+
+
 def resolve_font_path(font: str) -> str:
     """将字体名称解析为 moviepy TextClip 可用的路径。
 
@@ -143,6 +152,97 @@ def load_settings() -> AppSettings:
             raw = json.load(f)
         return AppSettings(**raw)
     return AppSettings()
+
+
+# ═══════════════════════════════════════════════════
+# 运行时环境变量收敛（optimization_roadmap 3.5）
+# 所有 AGNES_* / HOST / PORT / PROMPT_LANGUAGE 的唯一出处
+# ═══════════════════════════════════════════════════
+
+try:
+    from pydantic_settings import BaseSettings, SettingsConfigDict
+
+    class RuntimeSettings(BaseSettings):
+        """运行配置：环境变量的类型化统一入口（3.5 pydantic-settings）。
+
+        字段名 = 环境变量名（大小写不敏感）；``env_file=".env"`` 自动读取
+        项目根 .env（未配置 python-dotenv 时由 pydantic-settings 自身实现）。
+        新增环境变量时只需在此声明字段 + 默认值，调用方经 ``get_settings()``
+        读取，保证「环境变量清单唯一出处」。
+        """
+
+        model_config = SettingsConfigDict(
+            case_sensitive=False,
+            extra="ignore",
+            env_file=os.path.join(_PROJECT_ROOT, ".env"),
+            env_file_encoding="utf-8",
+        )
+
+        # ── 服务地址 ──
+        host: str = "0.0.0.0"
+        port: int = 8765
+
+        # ── 限速（None = 由 rate_limiter 按 Key 数动态计算）──
+        agnes_rate_limit: int | None = None
+        agnes_video_rate_limit: int | None = None
+        agnes_rate_burst: int | None = None
+        agnes_video_rate_burst: int | None = None
+
+        # ── 模型 / 提示词 ──
+        agnes_image_i2i_model: str | None = None
+        prompt_language: str = "zh"
+
+        # ── 合成 / 字幕 ──
+        agnes_subtitle_ass: bool = True          # 2.1c 字幕 ASS 单链灰度开关
+        agnes_video_poll_timeout: int = 1800     # 1.2 视频轮询总超时
+
+        # ── 运维 ──
+        agnes_log_file: str = ""
+        agnes_sweep_age_days: int | None = None
+        agnes_config_id_hmac_key: str = "agnes-config-keys-id-v1"
+
+        # ── 回归测试专用 ──
+        agnes_regression_working_dir: str = ""
+
+    def get_settings() -> RuntimeSettings:
+        """返回运行配置（每次读取环境变量，保证测试/运行时动态修改生效）。"""
+        return RuntimeSettings()
+
+    _HAS_PYDANTIC_SETTINGS = True
+
+except ImportError:  # pragma: no cover - pydantic-settings 为必备依赖，仅兜底
+    _HAS_PYDANTIC_SETTINGS = False
+
+    class RuntimeSettings:  # type: ignore[no-redef]
+        """pydantic-settings 缺失时的降级视图（读 os.environ）。"""
+
+        def __init__(self):
+            self.host = os.environ.get("HOST", "0.0.0.0")
+            self.port = int(os.environ.get("PORT", "8765"))
+            self.agnes_rate_limit = _env_int("AGNES_RATE_LIMIT")
+            self.agnes_video_rate_limit = _env_int("AGNES_VIDEO_RATE_LIMIT")
+            self.agnes_rate_burst = _env_int("AGNES_RATE_BURST")
+            self.agnes_video_rate_burst = _env_int("AGNES_VIDEO_RATE_BURST")
+            self.agnes_image_i2i_model = os.environ.get("AGNES_IMAGE_I2I_MODEL") or None
+            self.prompt_language = os.environ.get("PROMPT_LANGUAGE", "zh")
+            self.agnes_subtitle_ass = os.environ.get("AGNES_SUBTITLE_ASS", "1").strip().lower() not in (
+                "0", "false", "off",
+            )
+            self.agnes_video_poll_timeout = int(os.environ.get("AGNES_VIDEO_POLL_TIMEOUT", "1800"))
+            self.agnes_log_file = os.environ.get("AGNES_LOG_FILE", "")
+            self.agnes_sweep_age_days = _env_int("AGNES_SWEEP_AGE_DAYS")
+            self.agnes_config_id_hmac_key = os.environ.get(
+                "AGNES_CONFIG_ID_HMAC_KEY", "agnes-config-keys-id-v1",
+            )
+            self.agnes_regression_working_dir = os.environ.get("AGNES_REGRESSION_WORKING_DIR", "")
+
+    def get_settings() -> RuntimeSettings:
+        return RuntimeSettings()
+
+
+def _env_int(name: str):
+    v = os.environ.get(name, "").strip()
+    return int(v) if v else None
 
 
 # ═══════════════════════════════════════════════════
@@ -454,7 +554,7 @@ def get_working_dir() -> str:
     2. 配置文件中的 active_workspace
     3. 默认 .working_dir
     """
-    env_dir = os.environ.get(REGRESSION_WORKING_DIR_ENV, "")
+    env_dir = get_settings().agnes_regression_working_dir
     if env_dir:
         return env_dir
     active = load_settings().active_workspace

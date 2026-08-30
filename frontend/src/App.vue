@@ -15,10 +15,11 @@ import TaskListPanel from '@/components/TaskListPanel.vue'
 import ProgressPage from '@/components/ProgressPage.vue'
 import VoicePickerModal from '@/components/VoicePickerModal.vue'
 import Toast from '@/components/Toast.vue'
+import ConfirmModal from '@/components/ConfirmModal.vue'
 
 const { switchLang } = useI18n()
 const { themeIcon, themeLabel, cycleTheme } = useTheme()
-const { visible: toastVisible, message: toastMessage } = useToast()
+const { visible: toastVisible, message: toastMessage, type: toastType } = useToast()
 const { loadModels, renderWorkspaces } = useConfig()
 const { initVoiceSelector } = useVoice()
 const { loadTaskList, startTaskListTimer, stopTaskListTimer } = useTasks()
@@ -143,12 +144,12 @@ async function autoReconnectRunningTask() {
             <option v-for="l in LANGS" :key="l.code" :value="l.code">{{ l.label }}</option>
           </select>
         </div>
-        <h1 class="text-4xl font-bold text-ink" style="position: relative; z-index: 0">Agnes Video Generator</h1>
-        <p class="text-muted mt-2 text-sm tracking-wide">{{ t('subtitle') }}</p>
+        <h1 class="text-2xl sm:text-4xl font-bold text-ink px-2" style="position: relative; z-index: 0">Agnes Video Generator</h1>
+        <p class="text-muted mt-2 text-sm tracking-wide px-2">{{ t('subtitle') }}</p>
       </div>
 
-      <!-- Resource links -->
-      <nav class="flex justify-center items-center gap-4 mb-8 text-xs tracking-wide">
+      <!-- Resource links（窄屏可换行） -->
+      <nav class="flex justify-center items-center gap-x-4 gap-y-1.5 flex-wrap mb-8 text-xs tracking-wide">
         <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="flex items-center gap-1 text-accent hover:text-ink transition-colors">🎬 Demo</a>
         <span class="text-ink/5 select-none">·</span>
         <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="flex items-center gap-1 text-muted hover:text-ink-2 transition-colors">🏠 Home</a>
@@ -227,6 +228,7 @@ async function autoReconnectRunningTask() {
   <!-- Voice Picker Modal -->
   <VoicePickerModal />
 
-  <!-- Toast -->
-  <Toast :visible="toastVisible" :message="toastMessage" />
+  <!-- Toast / Confirm -->
+  <Toast :visible="toastVisible" :message="toastMessage" :type="toastType" />
+  <ConfirmModal />
 </template>

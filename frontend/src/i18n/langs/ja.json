@@ -430,6 +430,7 @@
   "artifactDeleteFailed": "削除に失敗",
   "artifactDeleted": "成果物を削除しました",
   "cancel": "キャンセル",
+  "confirm": "確認",
   "clickToPreview": "クリックしてプレビュー",
   "confirmSelection": "選択を確定",
   "copyPromptWithPoem": "詩を入力してプロンプトをコピー",
@@ -557,5 +558,8 @@
   "fbRepErrApi": "API",
   "fbRepErrType": "Error Type",
   "fbRepErrStatusCode": "Status Code",
-  "fbRepErrInfo": "Error Message"
+  "fbRepErrInfo": "Error Message",
+  "privacyTitle": "プライバシー",
+  "gaOptOutLabel": "匿名統計を無効化",
+  "gaOptOutHint": "分析スクリプトを停止します。作成内容はアップロードされません。"
 }
