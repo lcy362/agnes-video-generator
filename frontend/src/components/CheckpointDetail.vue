@@ -20,7 +20,7 @@ const activeCard = ref<'ai' | 'self' | 'agent' | 'edit'>('ai')
 // 官网"其他免费 AI 工具"页面（官网提供 zh / en 多语言路径，其余语言回退 en）
 const moreToolsHref = computed(() => {
   const l = lang.value === 'zh' ? 'zh' : 'en'
-  return `https://video.lichuanyang.top/${l}/learn/tools`
+  return `https://video.lichuanyang.top/${l}/guides/free-ai-tools`
 })
 const aiRequest = ref('')
 const aiLoading = ref(false)
