@@ -135,6 +135,18 @@ Not scheduled yet; recorded here so the intent is explicit. A "simple mode" tab 
 | M3 | API contract docs + (if the author opts in) Community-tools link | M2 |
 | M4 | (optional) Simple mode in main UI | M1; own PRD |
 
+## 10. Backlog (low-priority follow-ups, handle opportunistically)
+
+- **Frontend/backend language-set alignment check.** The frontend `LANGS` array
+  (`frontend/src/i18n/index.ts`, 22 languages) and the backend voice catalog
+  `PROJECT_LANGUAGES` (`core/audio/voices.py`, 22 languages) currently stay in
+  sync only by hand — no automated check guarantees they match. Add a guard
+  (either inside `scripts/i18n_check.py` or a small new script) that fails the
+  CI `i18n-check` job when a language is added to one side without the other.
+  Spotted 2026-08-30 while implementing the Arabic PR #32 follow-up
+  (`docs/plans/optimization-research/arabic_pr_followup.md`); both sets were
+  verified equal at that point.
+
 ---
 
 *Document version: v0.1 (draft) — 2026-08-30*
