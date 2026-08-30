@@ -61,6 +61,19 @@ All items below are taken from PR #33 with minimal adaptation; credit to @Khaled
 | 1.5 | Manuscript reference images | `models/task.py`, `web/routes/task_creation_routes.py`, `core/pipelines/manuscript_video.py` | `reference_images` + `reference_images_map` (paragraph-index JSON) on `POST /api/tasks/manuscript`, wired to per-paragraph i2v submission. |
 | 1.6 | `split_manuscript_text()` extraction | `core/pipelines/manuscript_video.py` | Single implementation shared by the real pipeline and the preview endpoint. |
 
+**Attribution (must-do, do not forget at implementation time)**
+
+PR #33 is a single squashed commit mixing the UI and backend changes, so the original commit cannot be cherry-picked. Attribution is carried via the standard `Co-authored-by` trailer on every absorption commit instead:
+
+```
+Co-authored-by: Khaled97Sho <Khaled97Sho@users.noreply.github.com>
+```
+
+- The noreply address guarantees the commit links to the author's GitHub account (avatar + contributions graph credit).
+- Commit body also states the source: "Ported from PR #33 by @Khaled97Sho, adapted to the existing architecture."
+- Release notes for the version that lands these changes mention the source PR and author.
+- Rewritten parts (e.g., configurable CORS) still carry the trailer as design-origin credit — that is the intended convention here.
+
 **Acceptance criteria**
 
 - `py_compile` clean on all touched files; `pytest tests/ -q` green.
