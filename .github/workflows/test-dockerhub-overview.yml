@@ -12,7 +12,77 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run update_dockerhub_overview.py
+      - name: Diagnostic - curl variants
+        env:
+          DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -x
+          REPO="$DH_USER/free-short-video"
+          # login 获取 JWT（已知 login 可通过）
+          JWT=$(curl -sS -m 30 -X POST -H "Content-Type: application/json" \
+            --data "{\"username\":\"$DH_USER\",\"password\":\"$DH_TOKEN\"}" \
+            https://hub.docker.com/v2/users/login | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+          echo "JWT length: ${#JWT}"
+
+          # Test 1: GET 读操作是否被拦
+          echo "=== Test 1: GET repositories (read) ==="
+          curl -sS -m 30 -o /tmp/t1.txt -w "HTTP %{http_code}\n" \
+            -H "Authorization: JWT $JWT" \
+            "https://hub.docker.com/v2/repositories/$REPO/"
+          head -c 200 /tmp/t1.txt; echo
+
+          # Test 2: PATCH 小 payload（排除 payload 大小触发）
+          echo "=== Test 2: PATCH small payload ==="
+          curl -sS -m 30 -o /tmp/t2.txt -w "HTTP %{http_code}\n" -X PATCH \
+            -H "Content-Type: application/json" \
+            -H "Authorization: JWT $JWT" \
+            --data '{"description":"free-short-video — Self-hosted AI video generator with subtitles"}' \
+            "https://hub.docker.com/v2/repositories/$REPO/"
+          head -c 300 /tmp/t2.txt; echo
+
+          # Test 3: PATCH + Accept 头（部分 WAF 校验 Accept）
+          echo "=== Test 3: PATCH with Accept header ==="
+          curl -sS -m 30 -o /tmp/t3.txt -w "HTTP %{http_code}\n" -X PATCH \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -H "Authorization: JWT $JWT" \
+            --data '{"description":"free-short-video — Self-hosted AI video generator with subtitles"}' \
+            "https://hub.docker.com/v2/repositories/$REPO/"
+          head -c 300 /tmp/t3.txt; echo
+
+      - name: Diagnostic - curl_cffi (Chrome TLS impersonation)
+        env:
+          DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          pip install --quiet curl-cffi
+          python3 - <<'EOF'
+          from curl_cffi import requests as crequests
+          import os
+          user = os.environ["DH_USER"]
+          token = os.environ["DH_TOKEN"]
+          # Test 4: 模拟 Chrome TLS 指纹 login + PATCH
+          r = crequests.post(
+              "https://hub.docker.com/v2/users/login",
+              json={"username": user, "password": token},
+              impersonate="chrome",
+              timeout=30,
+          )
+          jwt = r.json().get("token", "")
+          print("curl_cffi login:", r.status_code, "| jwt len:", len(jwt))
+          r2 = crequests.patch(
+              f"https://hub.docker.com/v2/repositories/{user}/free-short-video/",
+              json={"description": "free-short-video — Self-hosted AI video generator with subtitles"},
+              headers={"Authorization": f"JWT {jwt}"},
+              impersonate="chrome",
+              timeout=30,
+          )
+          print("curl_cffi PATCH:", r2.status_code)
+          print(r2.text[:300])
+          EOF
+
+      - name: Run original script (full update)
         env:
           DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
