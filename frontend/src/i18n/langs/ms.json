@@ -562,5 +562,14 @@
   "fbRepErrInfo": "Error Message",
   "privacyTitle": "Privasi",
   "gaOptOutLabel": "Matikan statistik tanpa nama",
-  "gaOptOutHint": "Melumpuhkan semua skrip analisis."
+  "gaOptOutHint": "Apabila diaktifkan, tiada skrip analitik (Google Analytics 4) dimuatkan dan tiada data dilaporkan.",
+  "gaReportTitle": "Apabila analitik diaktifkan, perkara berikut dilaporkan secara tanpa nama",
+  "gaReportItem1": "Peristiwa tugasan: cipta, siap, gagal, henti, padam",
+  "gaReportItem2": "Jenis tugasan dan mod penjanaan (cth. Video mudah/t2v, Video kreatif)",
+  "gaReportItem3": "Tindakan UI dan konfigurasi: tukar jenis tugasan, pilih model, simpan/kosongkan kunci API, domain, togol tanda air (hanya tindakan direkod, bukan kunci itu sendiri)",
+  "gaReportItem4": "Ringkasan ralat frontend: mesej ralat (dipotong kepada 500 aksara)",
+  "gaNeverUploadTitle": "Perkara berikut tidak pernah dimuat naik tanpa mengira status togol",
+  "gaNeverUploadText": "Kandungan kreatif seperti prompt, manuskrip dan teks puisi; kunci API; imej rujukan. Semua medan kandungan digantikan dengan penanda <redacted> sebelum dilaporkan, teks panjang dipotong secara automatik dan tiada apa-apa masuk ke sistem analitik.",
+  "gaStatOn": "Statistik aktif",
+  "gaStatOff": "Statistik dilumpuhkan"
 }

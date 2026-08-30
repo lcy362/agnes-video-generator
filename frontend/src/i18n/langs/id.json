@@ -562,5 +562,14 @@
   "fbRepErrInfo": "Error Message",
   "privacyTitle": "Privasi",
   "gaOptOutLabel": "Nonaktifkan statistik anonim",
-  "gaOptOutHint": "Menonaktifkan semua skrip analitik."
+  "gaOptOutHint": "Saat diaktifkan, tidak ada skrip analitik (Google Analytics 4) yang dimuat dan tidak ada data yang dilaporkan.",
+  "gaReportTitle": "Saat analitik aktif, hal berikut dilaporkan secara anonim",
+  "gaReportItem1": "Peristiwa tugas: buat, selesai, gagal, hentikan, hapus",
+  "gaReportItem2": "Jenis tugas dan mode pembuatan (mis. Video sederhana/t2v, Video kreatif)",
+  "gaReportItem3": "Tindakan UI dan konfigurasi: ganti jenis tugas, pilih model, simpan/hapus kunci API, domain, alih tanda air (hanya tindakan yang dicatat, bukan kuncinya)",
+  "gaReportItem4": "Ringkasan kesalahan frontend: pesan kesalahan (dipotong hingga 500 karakter)",
+  "gaNeverUploadTitle": "Hal berikut tidak pernah diunggah terlepas dari status sakelar",
+  "gaNeverUploadText": "Konten kreatif seperti prompt, naskah, dan teks puisi; kunci API; gambar referensi. Semua bidang konten diganti dengan penanda <redacted> sebelum dilaporkan, teks panjang dipotong otomatis, dan tidak ada yang masuk ke sistem analitik.",
+  "gaStatOn": "Statistik aktif",
+  "gaStatOff": "Statistik nonaktif"
 }

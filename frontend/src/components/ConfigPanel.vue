@@ -62,17 +62,18 @@ function vmRatioListText(item: { model: string; caps: Record<string, any> }): st
   return ratios.map((r: string) => vmCaps.ratioWHText(r, item.model)).join(' / ')
 }
 
-// 折叠状态（4 个配置面板）
+// 折叠状态（5 个配置面板）
 const collapsed = reactive<Record<string, boolean>>({
   apikey: false,
   model: false,
   domain: false,
   workspace: false,
+  privacy: true,
 })
 
 function initCollapse() {
   const prefs = getCollapsePrefs()
-  const keys = ['apikey', 'model', 'domain', 'workspace']
+  const keys = ['apikey', 'model', 'domain', 'workspace', 'privacy']
   keys.forEach((k) => {
     const manual = prefs[k + '_manual']
     if (manual !== undefined) {
@@ -484,14 +485,57 @@ initCollapse()
   </div>
 
   <!-- 隐私设置（3.4：GA4 配置开关） -->
-  <div class="glass-card rounded-2xl mb-6 p-6">
-    <h2 class="text-lg font-semibold text-accent mb-3">{{ t('privacyTitle') }}</h2>
-    <label class="flex items-start gap-3 cursor-pointer select-none">
-      <input v-model="gaOptOut" type="checkbox" class="mt-1 accent-red-500" @change="toggleGaOptOut" />
-      <span>
-        <span class="text-sm text-ink font-medium block">{{ t('gaOptOutLabel') }}</span>
-        <span class="text-xs text-muted block mt-0.5">{{ t('gaOptOutHint') }}</span>
-      </span>
-    </label>
+  <div class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
+    <div
+      v-if="collapsed.privacy"
+      class="flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-paper-3 transition"
+      role="button"
+      tabindex="0"
+      :aria-expanded="!collapsed.privacy"
+      @click="toggleConfigPanel('privacy')"
+    >
+      <div class="flex items-center gap-3">
+        <span class="text-sm">🔒</span>
+        <span class="text-sm text-muted">
+          <span class="text-ink-2 font-medium">{{ t('privacyTitle') }}</span>
+          <span class="text-muted mx-2">·</span>
+          <span :class="gaOptOut ? 'text-green-400' : 'text-muted'">
+            {{ gaOptOut ? t('gaStatOff') : t('gaStatOn') }}
+          </span>
+        </span>
+      </div>
+      <span class="text-muted text-xs">▶</span>
+    </div>
+    <div v-else class="p-6 pt-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-accent">{{ t('privacyTitle') }}</h2>
+        <div class="flex items-center gap-2">
+          <span class="text-xs px-2 py-1 rounded-full" :class="gaOptOut ? 'bg-green-900 text-green-300' : 'bg-paper-2 text-muted'">
+            {{ gaOptOut ? t('gaStatOff') : t('gaStatOn') }}
+          </span>
+          <button class="text-xs text-muted hover:text-ink-2 transition px-2 py-1 rounded" @click="toggleConfigPanel('privacy')">▲</button>
+        </div>
+      </div>
+      <label class="flex items-start gap-3 cursor-pointer select-none">
+        <input v-model="gaOptOut" type="checkbox" class="mt-1 accent-red-500" @change="toggleGaOptOut" />
+        <span>
+          <span class="text-sm text-ink font-medium block">{{ t('gaOptOutLabel') }}</span>
+          <span class="text-xs text-muted block mt-0.5">{{ t('gaOptOutHint') }}</span>
+        </span>
+      </label>
+
+      <!-- 上报信息透明化说明（3.4：采集范围 + 隐私承诺） -->
+      <div class="mt-4 rounded-lg bg-paper-3/60 p-4 text-xs leading-relaxed">
+        <p class="font-medium text-ink-2 mb-2">{{ t('gaReportTitle') }}</p>
+        <ul class="list-disc pl-4 space-y-1 text-muted">
+          <li>{{ t('gaReportItem1') }}</li>
+          <li>{{ t('gaReportItem2') }}</li>
+          <li>{{ t('gaReportItem3') }}</li>
+          <li>{{ t('gaReportItem4') }}</li>
+        </ul>
+        <p class="mt-3 pt-3 border-t border-rule/40 font-medium text-ink-2">{{ t('gaNeverUploadTitle') }}</p>
+        <p class="text-muted">{{ t('gaNeverUploadText') }}</p>
+      </div>
+    </div>
   </div>
 </template>

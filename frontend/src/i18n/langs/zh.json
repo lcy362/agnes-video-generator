@@ -557,5 +557,14 @@
   "fbRepErrInfo": "错误信息",
   "privacyTitle": "隐私设置",
   "gaOptOutLabel": "关闭匿名使用统计",
-  "gaOptOutHint": "开启后不再加载任何分析脚本，您的创作内容始终不会被上传。"
+  "gaOptOutHint": "开启后不再加载任何分析脚本（Google Analytics 4），也不会上报任何数据。",
+  "gaReportTitle": "开启统计时会匿名上报以下信息",
+  "gaReportItem1": "任务操作事件：创建、完成、失败、停止、删除任务",
+  "gaReportItem2": "任务类型与生成模式（如 简单视频/t2v、创意长视频 等）",
+  "gaReportItem3": "界面与配置操作：切换任务类型、选择模型、保存/清除 API Key、域名、水印开关（仅记录动作，不含 Key 本身）",
+  "gaReportItem4": "前端错误摘要：错误消息（截断至 500 字符）",
+  "gaNeverUploadTitle": "无论开关状态，以下内容都绝不会被上传",
+  "gaNeverUploadText": "提示词、稿件、诗词原文等创作内容；API Key；参考图片。所有内容类字段在上报前均被替换为 <redacted> 脱敏标记，长文本自动截断，不进入分析系统。",
+  "gaStatOn": "统计已开启",
+  "gaStatOff": "统计已关闭"
 }

@@ -562,5 +562,14 @@
   "fbRepErrInfo": "Error Message",
   "privacyTitle": "Privacy",
   "gaOptOutLabel": "Anonieme statistieken uitschakelen",
-  "gaOptOutHint": "Schakelt alle analysescripts uit."
+  "gaOptOutHint": "Wanneer ingeschakeld, worden er geen analysescripts (Google Analytics 4) geladen en wordt er geen gegevens gerapporteerd.",
+  "gaReportTitle": "Wanneer analyses zijn ingeschakeld, wordt het volgende anoniem gerapporteerd",
+  "gaReportItem1": "Taakgebeurtenissen: maken, voltooien, mislukken, stoppen, verwijderen",
+  "gaReportItem2": "Taaktype en generatiemodus (bijv. Eenvoudige video/t2v, Creatieve video)",
+  "gaReportItem3": "UI- en configuratieacties: taaktype wijzigen, modellen selecteren, API-sleutels opslaan/verwijderen, domein, watermerk schakelen (alleen de actie wordt geregistreerd, nooit de sleutel)",
+  "gaReportItem4": "Frontend-foutoverzicht: foutmelding (afgekapt tot 500 tekens)",
+  "gaNeverUploadTitle": "Het volgende wordt nooit geüpload, ongeacht de status van de schakelaar",
+  "gaNeverUploadText": "Creatieve inhoud zoals prompts, manuscripten en gedichtteksten; API-sleutels; referentieafbeeldingen. Alle inhoudsvelden worden vóór het rapporteren vervangen door een <redacted>-markering, lange teksten worden automatisch afgekapt en er komt niets in het analysesysteem.",
+  "gaStatOn": "Statistieken aan",
+  "gaStatOff": "Statistieken uit"
 }

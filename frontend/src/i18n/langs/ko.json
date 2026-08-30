@@ -562,5 +562,14 @@
   "fbRepErrInfo": "Error Message",
   "privacyTitle": "개인정보",
   "gaOptOutLabel": "익명 통계 비활성화",
-  "gaOptOutHint": "분석 스크립트를 중지합니다. 콘텐츠는 업로드되지 않습니다."
+  "gaOptOutHint": "활성화하면 분석 스크립트(Google Analytics 4)가 로드되지 않으며 데이터도 전송되지 않습니다.",
+  "gaReportTitle": "통계가 켜져 있으면 다음 정보가 익명으로 보고됩니다",
+  "gaReportItem1": "작업 이벤트: 생성, 완료, 실패, 중지, 삭제",
+  "gaReportItem2": "작업 유형 및 생성 모드(예: 단순 동영상/t2v, 창의적 장편 동영상)",
+  "gaReportItem3": "UI 및 구성 작업: 작업 유형 전환, 모델 선택, API 키 저장/삭제, 도메인, 워터마크 토글(작업만 기록되며 키 자체는 포함되지 않음)",
+  "gaReportItem4": "프런트엔드 오류 요약: 오류 메시지(500자로 제한)",
+  "gaNeverUploadTitle": "토글 상태와 관계없이 다음은 절대 업로드되지 않습니다",
+  "gaNeverUploadText": "프롬프트, 원고, 시 원문 등의 창작 콘텐츠, API 키, 참조 이미지. 모든 콘텐츠 필드는 보고 전에 <redacted> 표시로 대체되며 긴 텍스트는 자동으로 잘리고 분석 시스템에 들어가지 않습니다.",
+  "gaStatOn": "통계 켜짐",
+  "gaStatOff": "통계 꺼짐"
 }

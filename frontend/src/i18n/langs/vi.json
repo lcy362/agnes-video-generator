@@ -561,5 +561,14 @@
   "fbRepErrInfo": "Error Message",
   "privacyTitle": "Quyền riêng tư",
   "gaOptOutLabel": "Tắt thống kê ẩn danh",
-  "gaOptOutHint": "Tắt mọi tập lệnh phân tích."
+  "gaOptOutHint": "Khi bật, không tải bất kỳ tập lệnh phân tích nào (Google Analytics 4) và không gửi dữ liệu nào.",
+  "gaReportTitle": "Khi phân tích được bật, các thông tin sau được báo cáo ẩn danh",
+  "gaReportItem1": "Sự kiện tác vụ: tạo, hoàn thành, thất bại, dừng, xóa",
+  "gaReportItem2": "Loại tác vụ và chế độ tạo (ví dụ: Video đơn giản/t2v, Video sáng tạo)",
+  "gaReportItem3": "Hành động giao diện và cấu hình: chuyển loại tác vụ, chọn mô hình, lưu/xóa khóa API, tên miền, chuyển hình mờ (chỉ ghi nhận hành động, không bao gồm khóa)",
+  "gaReportItem4": "Tóm tắt lỗi frontend: thông báo lỗi (cắt còn 500 ký tự)",
+  "gaNeverUploadTitle": "Những nội dung sau không bao giờ được tải lên bất kể trạng thái công tắc",
+  "gaNeverUploadText": "Nội dung sáng tạo như prompt, bản thảo và văn bản thơ; khóa API; hình ảnh tham chiếu. Tất cả các trường nội dung được thay thế bằng dấu <redacted> trước khi báo cáo, văn bản dài được cắt ngắn tự động và không có gì đi vào hệ thống phân tích.",
+  "gaStatOn": "Thống kê bật",
+  "gaStatOff": "Thống kê tắt"
 }

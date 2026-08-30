@@ -562,5 +562,14 @@
   "fbRepErrInfo": "Error Message",
   "privacyTitle": "Privacidad",
   "gaOptOutLabel": "Desactivar estadísticas anónimas",
-  "gaOptOutHint": "Desactiva todos los scripts de análisis."
+  "gaOptOutHint": "Al activarlo, no se cargan scripts de análisis (Google Analytics 4) ni se envían datos.",
+  "gaReportTitle": "Cuando la analítica está activada, se informa de forma anónima lo siguiente",
+  "gaReportItem1": "Eventos de tarea: crear, completar, fallar, detener, eliminar",
+  "gaReportItem2": "Tipo de tarea y modo de generación (p. ej., Vídeo simple/t2v, Vídeo creativo)",
+  "gaReportItem3": "Acciones de interfaz y configuración: cambiar tipo de tarea, seleccionar modelos, guardar/borrar claves API, dominio, alternar marca de agua (solo se registra la acción, nunca la clave)",
+  "gaReportItem4": "Resumen de errores del frontend: mensaje de error (truncado a 500 caracteres)",
+  "gaNeverUploadTitle": "Lo siguiente nunca se sube, independientemente del estado del interruptor",
+  "gaNeverUploadText": "Contenido creativo como prompts, manuscritos y poemas; claves API; imágenes de referencia. Todos los campos de contenido se sustituyen por una marca <redacted> antes del informe, los textos largos se truncan y nada entra en el sistema de analítica.",
+  "gaStatOn": "Estadísticas activadas",
+  "gaStatOff": "Estadísticas desactivadas"
 }

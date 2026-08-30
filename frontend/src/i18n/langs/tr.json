@@ -561,5 +561,14 @@
   "fbRepErrInfo": "Error Message",
   "privacyTitle": "Gizlilik",
   "gaOptOutLabel": "Anonim istatistikleri kapat",
-  "gaOptOutHint": "Tüm analiz betiklerini devre dışı bırakır."
+  "gaOptOutHint": "Etkinleştirildiğinde, hiçbir analiz betiği (Google Analytics 4) yüklenmez ve hiçbir veri raporlanmaz.",
+  "gaReportTitle": "Analiz etkinken aşağıdakiler anonim olarak raporlanır",
+  "gaReportItem1": "Görev olayları: oluştur, tamamla, başarısız, durdur, sil",
+  "gaReportItem2": "Görev türü ve üretim modu (örn. Basit video/t2v, Yaratıcı video)",
+  "gaReportItem3": "UI ve yapılandırma işlemleri: görev türünü değiştir, modelleri seç, API anahtarlarını kaydet/temizle, alan adı, filigranı değiştir (yalnızca işlem kaydedilir, anahtar asla)",
+  "gaReportItem4": "Frontend hata özeti: hata mesajı (500 karaktere kısaltıldı)",
+  "gaNeverUploadTitle": "Aşağıdakiler, anahtarın durumundan bağımsız olarak asla yüklenmez",
+  "gaNeverUploadText": "Prompt, el yazması ve şiir metinleri gibi yaratıcı içerikler; API anahtarları; referans görselleri. Raporlamadan önce tüm içerik alanları <redacted> işaretiyle değiştirilir, uzun metinler otomatik olarak kısaltılır ve analiz sistemine hiçbir şey girmez.",
+  "gaStatOn": "İstatistikler açık",
+  "gaStatOff": "İstatistikler kapalı"
 }

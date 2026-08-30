@@ -557,5 +557,14 @@
   "fbRepErrInfo": "Error Message",
   "privacyTitle": "Privacy",
   "gaOptOutLabel": "Opt out of anonymous analytics",
-  "gaOptOutHint": "Disables all analytics scripts; your content is never uploaded."
+  "gaOptOutHint": "When enabled, no analytics scripts (Google Analytics 4) are loaded and no data is reported.",
+  "gaReportTitle": "When analytics is on, the following is reported anonymously",
+  "gaReportItem1": "Task events: create, complete, fail, stop, delete",
+  "gaReportItem2": "Task type and generation mode (e.g. Simple/t2v, Creative)",
+  "gaReportItem3": "UI and config actions: switch task type, select models, save/clear API keys, domain, watermark toggle (action only, never the key itself)",
+  "gaReportItem4": "Frontend error summary: error message (truncated to 500 characters)",
+  "gaNeverUploadTitle": "The following is never uploaded, regardless of the toggle",
+  "gaNeverUploadText": "Creative content such as prompts, manuscripts, and poem texts; API keys; reference images. All content fields are replaced with a <redacted> marker before reporting, long texts are truncated, and nothing enters the analytics system.",
+  "gaStatOn": "Analytics on",
+  "gaStatOff": "Analytics off"
 }

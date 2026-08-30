@@ -561,5 +561,14 @@
   "fbRepErrInfo": "Error Message",
   "privacyTitle": "Privacy",
   "gaOptOutLabel": "Opt out of anonymous analytics",
-  "gaOptOutHint": "Disables all analytics scripts; your content is never uploaded."
+  "gaOptOutHint": "Kapag naka-enable, walang analytics script (Google Analytics 4) na nilo-load at walang data na naiuulat.",
+  "gaReportTitle": "Kapag naka-on ang analytics, ang sumusunod ay iniuulat nang hindi nagpapakilala",
+  "gaReportItem1": "Mga event ng gawain: gumawa, kumpletuhin, mabigo, ihinto, tanggalin",
+  "gaReportItem2": "Uri ng gawain at mode ng pagbuo (hal. Simpleng video/t2v, Malikhain na video)",
+  "gaReportItem3": "Mga aksyon sa UI at configuration: palitan ang uri ng gawain, pumili ng mga modelo, i-save/i-clear ang mga API key, domain, i-toggle ang watermark (ang aksyon lang ang naitatala, hindi ang key mismo)",
+  "gaReportItem4": "Buod ng error sa frontend: mensahe ng error (pinaikli sa 500 character)",
+  "gaNeverUploadTitle": "Ang sumusunod ay hindi kailanman ina-upload, anuman ang estado ng toggle",
+  "gaNeverUploadText": "Malikhain na nilalaman tulad ng mga prompt, manuskrito, at teksto ng tula; mga API key; mga reference na larawan. Ang lahat ng field ng nilalaman ay pinapalitan ng <redacted> marker bago iulat, ang mahahabang teksto ay awtomatikong pinaikli, at walang pumapasok sa analytics system.",
+  "gaStatOn": "Naka-on ang stats",
+  "gaStatOff": "Naka-off ang stats"
 }
