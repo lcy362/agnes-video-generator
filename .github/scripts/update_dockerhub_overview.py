@@ -14,10 +14,10 @@ import os
 import re
 import sys
 import json
-import urllib.request
-import urllib.error
+import subprocess
 
 DOCKERHUB_API = "https://hub.docker.com/v2"
+UA = "free-short-video-release-bot/1.0 (https://github.com/lcy362/agnes-video-generator)"
 
 
 def _load_whats_new(version: str) -> str:
@@ -109,41 +109,68 @@ def main() -> int:
             "\n\n---\nFull README: https://github.com/lcy362/agnes-video-generator"
 
     # 1) Log in to obtain a JWT (the Hub API accepts a PAT as the password).
-    headers = {
-        "Content-Type": "application/json",
-        "User-Agent": "free-short-video-release-bot/1.0 (https://github.com/lcy362/agnes-video-generator)",
-    }
+    # We use curl instead of urllib: Docker Hub's WAF (Akamai) has been returning
+    # HTML 403 pages for urllib's default TLS fingerprint/User-Agent, while the
+    # docker CLI (and curl) pass. A PAT works as the login password.
     try:
-        req = urllib.request.Request(
-            f"{DOCKERHUB_API}/users/login",
-            data=json.dumps({"username": user, "password": token}).encode(),
-            headers=headers,
-            method="POST",
+        res = subprocess.run(
+            [
+                "curl", "-sS", "-m", "30", "-X", "POST",
+                "-H", "Content-Type: application/json",
+                "-H", f"User-Agent: {UA}",
+                "--data", json.dumps({"username": user, "password": token}),
+                f"{DOCKERHUB_API}/users/login",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
         )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            jwt = json.load(r).get("token", "")
-    except Exception as e:  # noqa: BLE001
-        print("Docker Hub login failed:", e)
+    except FileNotFoundError:
+        print("curl not found on this runner; cannot update Docker Hub overview")
+        return 1
+    if res.returncode != 0:
+        print("Docker Hub login failed (curl):", res.stderr.strip()[:300])
+        return 1
+    try:
+        jwt = json.loads(res.stdout).get("token", "")
+    except json.JSONDecodeError:
+        print("Docker Hub login: unexpected response:", res.stdout[:300])
         return 1
     if not jwt:
         print("No JWT returned from Docker Hub")
         return 1
 
     # 2) Patch the repository description + full description.
+    # full_description can reach ~24k chars; write the payload to a temp file so
+    # the curl invocation stays well within ARG_MAX and avoids quoting issues.
+    payload = json.dumps({"description": desc, "full_description": readme})
+    tmp_payload = "/tmp/dockerhub_overview_payload.json"
+    with open(tmp_payload, "w", encoding="utf-8") as f:
+        f.write(payload)
     try:
-        req = urllib.request.Request(
-            f"{DOCKERHUB_API}/repositories/{repo_path}/",
-            data=json.dumps({"description": desc, "full_description": readme}).encode(),
-            headers={**headers, "Authorization": f"JWT {jwt}"},
-            method="PATCH",
+        res = subprocess.run(
+            [
+                "curl", "-sS", "-m", "60", "-o", "/dev/null", "-w", "%{http_code}",
+                "-X", "PATCH",
+                "-H", "Content-Type: application/json",
+                "-H", f"User-Agent: {UA}",
+                "-H", f"Authorization: JWT {jwt}",
+                "--data", f"@{tmp_payload}",
+                f"{DOCKERHUB_API}/repositories/{repo_path}/",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
         )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            print(f"PATCH {repo_path} -> HTTP {r.status}")
-        print(f"description: {len(desc)} chars | full_description: {len(readme)} chars")
-    except urllib.error.HTTPError as e:
-        print("PATCH failed:", e.code, e.read().decode()[:300])
+    except FileNotFoundError:
+        print("curl not found on this runner; cannot update Docker Hub overview")
         return 1
-
+    os.remove(tmp_payload)
+    if res.returncode != 0 or res.stdout.strip() != "200":
+        print(f"PATCH failed: exit={res.returncode} http={res.stdout.strip()} {res.stderr.strip()[:300]}")
+        return 1
+    print(f"PATCH {repo_path} -> HTTP 200")
+    print(f"description: {len(desc)} chars | full_description: {len(readme)} chars")
     return 0
 
 
