@@ -335,7 +335,7 @@ class ScriptStepsMixin:
             prompt=char_prompt,
             size=f"{self._state.video_width}x{self._state.video_height}",
         )
-        img_output.save(ref_img_path)
+        await img_output.save(ref_img_path)
 
         self._state.step_character_ref = StepStatus.COMPLETED
         self._state.character_ref_prompt = char_prompt

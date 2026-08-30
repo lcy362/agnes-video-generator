@@ -16,6 +16,7 @@
 import itertools
 import logging
 import threading
+from typing import Optional
 
 from core.config import get_api_keys
 
@@ -29,15 +30,30 @@ class KeyRing:
         self._keys = list(keys)
         self._count = itertools.count()
         self._lock = threading.Lock()
+        # rotate() 钉住的下一个 Key 索引：rotate 后紧接的 next() 必须返回该 Key
+        # （此前 rotate 与 next 共享递增计数，rotate 消费一个序号后 next 取模
+        #  又回到原 Key，导致 429 换 Key 重试实际仍用旧 Key）
+        self._force_next: Optional[int] = None
 
     def next(self) -> str:
         """轮转取下一个 Key（普通请求调用，均匀分摊）。"""
-        return self._keys[next(self._count) % len(self._keys)]
+        with self._lock:
+            if self._force_next is not None:
+                idx = self._force_next
+                self._force_next = None
+                return self._keys[idx]
+            return self._keys[next(self._count) % len(self._keys)]
 
     def rotate(self) -> str:
-        """强制切换到下一个 Key（429 换 Key 重试调用）。"""
+        """强制切换到下一个 Key（429 换 Key 重试调用）。
+
+        递增计数返回下一个 Key，并记录为 ``_force_next``，确保紧随其后的
+        ``next()``（即重试请求的 ``_auth_headers()``）真的使用新 Key，
+        之后恢复正常 round-robin。
+        """
         with self._lock:
             idx = next(self._count) % len(self._keys)
+            self._force_next = idx
             return self._keys[idx]
 
     @property

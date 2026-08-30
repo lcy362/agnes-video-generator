@@ -98,7 +98,7 @@ curl -X POST http://localhost:8765/api/tasks/manuscript -H "Content-Type: applic
 | 图片模型 | `agnes-image-2.1-flash`（t2i / i2i 共用；i2i 默认同 t2i，可用 `AGNES_IMAGE_I2I_MODEL` 回退 2.0） |
 | 视频模型 | `agnes-video-v2.0` — 免费 |
 | 水印 | moviepy TextClip 生成 PNG + ffmpeg overlay 叠加（避免整片重编码 OOM） |
-| 音色 | edge_tts 动态音色目录，按 13 种项目语言分组 + 跨脚本兼容性校验 |
+| 音色 | edge_tts 动态音色目录，按 22 种项目语言分组（与前端 UI 语言对齐）+ 跨脚本兼容性校验 |
 | 日志 | `logging.getLogger(__name__)` |
 
 ---
@@ -141,7 +141,7 @@ agnes-video-generator/
 │   ├── audio/
 │   │   ├── tts.py                    # EdgeTTSEngine（旁白+词级时间戳）+ SilentTTSEngine
 │   │   ├── subtitle/                  # 字幕包（generator: SRT 生成 + renderer: moviepy 叠加）
-│   │   └── voices.py                 # 音色目录（13 语言分组）+ 跨脚本兼容性校验矩阵
+│   │   └── voices.py                 # 音色目录（22 语言分组）+ 跨脚本兼容性校验矩阵
 │   ├── compositor/
 │   │   ├── concatenator/              # 拼接包（concat: 视频拼接 + audio_overlay: 音频叠加）
 │   │   ├── processor.py              # 视频缩放/帧提取/定格延长/静音音频生成
@@ -448,7 +448,7 @@ python scripts/scene_runner.py --endpoints         # 端点验证
 
 > **所有面向用户的文案必须由多语言配置管理，禁止硬编码中文**（含模板文本、`alert()`、`showToast()`、按钮、placeholder、title 等）。
 
-1. **文案入配置**：新文案一律添加到 `frontend/src/i18n/translations.ts` 的 **`zh` 与 `en` 两个区块**（缺一不可）。其余 20 种语言允许暂时缺失（前端 `t()` 自动回退 `zh`），但会在完整性检查中列出提醒。
+1. **文案入配置**：新文案一律添加到 `frontend/src/i18n/langs/zh.json` 与 `langs/en.json`（缺一不可）。其余 20 种语言允许暂时缺失（前端 `t()` 自动回退 `zh`），但会在完整性检查中列出提醒。语言包为懒加载（zh/en 首屏预载，其余按需 `import()` 分包），切换语言走 `useI18n().switchLang`。
 2. **多语言完整性与「手动/自动切换」「在线编辑」等 v6.1 功能**：zh 与 en 的 key 集合必须 100% 对齐；en 缺失视为缺陷。
 3. **完整性检查**：`python scripts/i18n_check.py` —— 检查全部 22 种语言相对 zh 的 key 缺失。退出码 `0` 完整 / `1` 有缺失（打印缺失清单）/ `2` 文件解析失败。
 4. **回归前置门槛**：`regression_runner.py` 启动时自动执行多语言检查，**有缺失直接终止回归**（返回码 2），补齐后重试。用户说「执行大版本回归」时若被该检查阻断，必须先补齐缺失翻译。

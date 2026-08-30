@@ -13,7 +13,6 @@ import platform
 import re
 import subprocess
 import tempfile
-from typing import Optional
 
 import edge_tts
 from fastapi import HTTPException

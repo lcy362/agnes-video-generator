@@ -169,6 +169,7 @@ run_tests() {
     creative) pytest_args+=(-k "TestCreativeVideoPipeline") ;;
     manuscript) pytest_args+=(-k "TestManuscriptVideoPipeline") ;;
     anchor)   pytest_args+=(-k "TestAnchorVideoPipeline") ;;
+    poetry)   pytest_args+=(-k "TestPoetryVideoPipeline") ;;
     resume)   pytest_args+=(-k "TestPipelineResume") ;;
     *)        log_warn "未知过滤: $filter，执行全部";;
   esac
@@ -273,7 +274,7 @@ main() {
     clean-all)
       clean_all
       ;;
-    all|simple|creative|manuscript|anchor|resume)
+    all|simple|creative|manuscript|anchor|poetry|resume)
       generate_assets
       check_env
       run_tests "$cmd"

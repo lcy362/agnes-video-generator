@@ -4,11 +4,11 @@ import json
 import logging
 import os
 import re
-from typing import List, Optional
+from typing import Optional
 
 from core.compositor.concatenator import VideoConcatenator
 from core.screenwriter import clean_narration_text
-from models.task import SceneTask, StepStatus
+from models.task import StepStatus
 
 logger = logging.getLogger(__name__)
 
@@ -265,6 +265,7 @@ class AudioStepsMixin:
             return await self._recover_sub_maker(
                 narration_text,
                 self._state.audio_config, self._state.subtitle_config,
+                combined_audio,
             )
 
         audio_enabled = self._state.audio_config.enabled

@@ -37,13 +37,56 @@ DURATION_PRESETS = {
 _UPLOAD_RETRY_BASE_DELAY_SECONDS = 30
 
 
+def _adaptive_poll_interval(interval: int, poll_count: int) -> int:
+    """优化路线图 1.3：自适应轮询间隔。
+
+    此前固定 ``interval``（默认 60s），每个视频平均多等 ~30s 检测延迟。
+    现改为 20s 起步，每 5 次轮询 +5s，上限为调用方 ``interval``；
+    调用方传小间隔（<20，如测试）时保持原样。
+    """
+    if interval < 20:
+        return interval
+    return min(interval, 20 + (poll_count // 5) * 5)
+
+
+class VideoTaskCancelled(RuntimeError):
+    """用户停止任务导致的取消（优化路线图 0.2）。
+
+    继承 RuntimeError 以保持向后兼容，但语义上区别于可重试的临时错误
+    （超时 / 网络 / 5xx）：停止必须立即穿透上层重试循环，否则用户点停止后
+    仍要经历 20s/40s 退避才真正停下。
+    """
+
+
+def is_remote_video_failure(exc: BaseException) -> bool:
+    """判断是否为「服务端已确认失败」——只有这种情况才可安全丢弃 video_id。
+
+    仅当服务端明确返回 ``status=failed``（异常信息含 "Video generation failed:"）
+    时为 True。超时、用户取消、网络中断时服务端任务**可能仍在运行**，必须返回
+    False 以保留 video_id 供续传，避免重复提交浪费视频配额（1 次/分钟/Key）。
+
+    优化路线图 0.2：此前流水线在任何异常下都删除 task.json，导致超时/取消后
+    续传只能重新提交。
+    """
+    return "Video generation failed:" in str(exc)
+
+
 class VideoOutput:
     def __init__(self, fmt: str, ext: str, data: str):
         self.fmt = fmt
         self.ext = ext
         self.data = data
 
-    def save(self, path: str) -> None:
+    async def save(self, path: str) -> None:
+        """保存视频到 path（异步）。
+
+        优化路线图 0.3：URL 下载为同步 requests 流式读取，耗时 5~30s+，
+        此前在协程中直接调用会阻塞事件循环；整体下沉到线程池执行。
+        """
+        await asyncio.to_thread(self._save_sync, path)
+
+    def _save_sync(self, path: str) -> None:
+        """同步保存实现（供线程池调用；同步上下文可直接使用）。"""
         if self.fmt == "url":
             download_video(self.data, path)
         else:
@@ -158,7 +201,7 @@ class AgnesVideoAPI:
                     },
                 }
                 logger.info(f"[AgnesVideo] Uploading image to hosted URL (attempt {attempt + 1}/{retries})...")
-                await asyncio.to_thread(get_rate_limiter().acquire)
+                await get_rate_limiter().acquire_async(self.shutdown_event)
                 resp = await asyncio.to_thread(
                     requests.post,
                     f"{get_agnes_base_url()}/images/generations",
@@ -250,7 +293,7 @@ class AgnesVideoAPI:
         while True:
             # M2: 每次轮询前检查停止信号
             if self.shutdown_event and self.shutdown_event.is_set():
-                raise RuntimeError("Video generation cancelled by user")
+                raise VideoTaskCancelled("Video generation cancelled by user")
 
             elapsed = asyncio.get_event_loop().time() - start_time
             if elapsed > max_poll_duration:
@@ -270,8 +313,8 @@ class AgnesVideoAPI:
             try:
                 if poll_count % 10 == 0:
                     logger.info(f"[AgnesVideo] Polling video {video_id[:16]}... (poll #{poll_count + 1}, elapsed {elapsed:.0f}s)")
-                # 全局限速：每次轮询都消耗一个令牌
-                await asyncio.to_thread(get_rate_limiter().acquire)
+                # 全局限速：每次轮询都消耗一个令牌（2.3 异步原生，停止可打断）
+                await get_rate_limiter().acquire_async(self.shutdown_event)
                 # M2: 用 wait_for 包裹以支持取消；429 换 Key 立即重试（轮询也轮转 Key 分摊配额）
                 poll_attempts = 0
                 while True:
@@ -344,7 +387,8 @@ class AgnesVideoAPI:
                     )
                     raise RuntimeError(error_msg)
 
-            await asyncio.sleep(interval)
+            # 优化路线图 1.3：自适应轮询间隔（20s 起步，每 5 次 +5s，上限 interval）
+            await asyncio.sleep(_adaptive_poll_interval(interval, poll_count))
 
     async def _submit_with_retry(self, payload: dict, mode_desc: str) -> str:
         frame_reductions_left = 2  # allow up to 2 frame-count reductions on 400
@@ -354,11 +398,12 @@ class AgnesVideoAPI:
         max_rotations = len(ring) * self.max_retries
         while attempt < self.max_retries:
             if self.shutdown_event and self.shutdown_event.is_set():
-                raise RuntimeError("Video generation cancelled by user")
+                raise VideoTaskCancelled("Video generation cancelled by user")
             try:
                 logger.info(f"[AgnesVideo] Submitting {mode_desc} (attempt {attempt + 1}/{self.max_retries})...")
-                # 视频提交独立限速桶（服务端 1/min 硬限制，不与 chat/image 共享配额）
-                await asyncio.to_thread(get_video_submit_limiter().acquire)
+                # 视频提交独立限速桶（服务端 1/min 硬限制，不与 chat/image 共享配额；
+                # 2.3 异步原生，停止可打断）
+                await get_video_submit_limiter().acquire_async(self.shutdown_event)
                 # M2: 缩短读超时从 180s 到 60s，使 stop() 更快生效
                 resp = await asyncio.wait_for(
                     asyncio.to_thread(
@@ -671,7 +716,13 @@ class AgnesVideoAPI:
         return video_id
 
     async def wait_for_video(self, video_id: str, progress_callback=None) -> VideoOutput:
-        final = await self._poll_task(video_id, progress_callback=progress_callback)
+        # 1.2：轮询总超时可经 AGNES_VIDEO_POLL_TIMEOUT 配置（3.5 RuntimeSettings 收敛）
+        from core.config import get_settings
+        poll_timeout = get_settings().agnes_video_poll_timeout
+        final = await self._poll_task(
+            video_id, progress_callback=progress_callback,
+            max_poll_duration=poll_timeout,
+        )
 
         video_url = (
             final.get("remixed_from_video_id")

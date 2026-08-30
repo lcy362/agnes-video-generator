@@ -9,12 +9,27 @@ import os
 import re
 import subprocess
 import tempfile
+from typing import NamedTuple, Optional
 
 from core.config import resolve_font_path
 
 logger = logging.getLogger(__name__)
 
 _CJK_RE = re.compile(r'[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]')
+
+
+class WatermarkLayout(NamedTuple):
+    """水印在视频中的叠加位置与尺寸。
+
+    由 ``_render_watermark_png`` 直接返回给调用方（优化路线图 0.5）：
+    此前通过函数对象属性（``setattr/getattr``）传递，两个任务并发叠加水印
+    时会互相覆盖坐标，导致水印位置错乱。
+    """
+
+    pos_x: int
+    pos_y: int
+    box_w: int
+    box_h: int
 
 WATERMARK_TEXTS = {
     "zh": {
@@ -67,14 +82,18 @@ def _render_watermark_png(
     video_height: int,
     language: str = "en",
     font_path: str = None,
-) -> bool:
-    """用 moviepy TextClip 渲染水印为 PNG 图片（仅一帧，内存极低）。"""
+) -> Optional[WatermarkLayout]:
+    """用 moviepy TextClip 渲染水印为 PNG 图片（仅一帧，内存极低）。
+
+    Returns:
+        成功返回水印在视频中的布局（坐标 + 尺寸）；失败（字体缺失 / 渲染异常）返回 None。
+    """
     from moviepy import TextClip
 
     if font_path is None:
         font_path = resolve_font_path("STHeitiMedium.ttc")
     if not os.path.exists(font_path):
-        return False
+        return None
 
     font_size = _compute_font_size(video_height)
     url_font_size = max(10, round(font_size * 0.85))
@@ -116,15 +135,11 @@ def _render_watermark_png(
 
         composite.save_frame(output_png, t=0)
 
-        # 返回相对于视频的位置信息
-        setattr(_render_watermark_png, '_wm_pos_x', pos_x)
-        setattr(_render_watermark_png, '_wm_pos_y', pos_y)
-        setattr(_render_watermark_png, '_wm_box_w', box_w)
-        setattr(_render_watermark_png, '_wm_box_h', box_h)
-        return True
+        # 位置信息经返回值传递（此前写在函数对象属性上，并发下会互相覆盖）
+        return WatermarkLayout(pos_x=pos_x, pos_y=pos_y, box_w=box_w, box_h=box_h)
     except Exception as e:
         logger.error(f"[Watermark] Render PNG failed: {e}")
-        return False
+        return None
 
 
 def add_watermark(
@@ -168,21 +183,21 @@ def add_watermark(
     wm_png_fd, wm_png_path = tempfile.mkstemp(suffix=".png", prefix="watermark_")
     os.close(wm_png_fd)
     try:
-        if not _render_watermark_png(wm_png_path, video_width, video_height, language, font_path):
+        layout = _render_watermark_png(
+            wm_png_path, video_width, video_height, language, font_path
+        )
+        if layout is None:
             logger.error("[Watermark] Failed to render watermark PNG, copying original")
             import shutil
             shutil.copy2(input_path, output_path)
             return False
-
-        pos_x = getattr(_render_watermark_png, '_wm_pos_x', 0)
-        pos_y = getattr(_render_watermark_png, '_wm_pos_y', 0)
 
         # ffmpeg overlay: 将水印 PNG 叠加到视频上，无损流式拷贝
         cmd = [
             "ffmpeg", "-y",
             "-i", input_path,
             "-i", wm_png_path,
-            "-filter_complex", f"[0:v][1:v]overlay={pos_x}:{pos_y}[v]",
+            "-filter_complex", f"[0:v][1:v]overlay={layout.pos_x}:{layout.pos_y}[v]",
             "-map", "[v]",
             "-map", "0:a?",  # 保留原音频
             "-c:v", "libx264", "-crf", "18", "-preset", "fast",

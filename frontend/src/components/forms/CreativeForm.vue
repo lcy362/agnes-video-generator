@@ -2,18 +2,14 @@
 import { ref, reactive, computed } from 'vue'
 import { t, currentLang } from '@/i18n'
 import { appState } from '@/store'
-import { useGa } from '@/composables/useGa'
-import { useNavigation } from '@/composables/useNavigation'
-import { useToast } from '@/composables/useToast'
 import { useVoice } from '@/composables/useVoice'
-import * as api from '@/api'
+import { useTaskSubmit, collectAudioSubtitleFields } from '@/composables/useTaskSubmit'
+import { useDraft } from '@/composables/useDraft'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
 
-const { trackEvent } = useGa()
-const { goProgress } = useNavigation()
-const { showToast } = useToast()
 const { voiceSelections } = useVoice()
+const { submitting, runSubmit } = useTaskSubmit()
 
 const subtitleRef = ref<InstanceType<typeof SubtitleConfig>>()
 
@@ -37,12 +33,33 @@ const form = reactive({
   sceneRefs: [] as File[],
 })
 
-const submitting = ref(false)
-
 function parseResolution(val: string) {
   const [w, h] = val.split('x').map(Number)
   return { width: w, height: h }
 }
+
+// 3.4：创意表单草稿（JSON 安全字段，File 不保存）
+const draft = useDraft('creative')
+;(() => {
+  const d = draft.load()
+  if (!d) return
+  if (typeof d.name === 'string') form.name = d.name
+  if (typeof d.idea === 'string') form.idea = d.idea
+  if (d.durationSource === 'manual' || d.durationSource === 'prompt') form.durationSource = d.durationSource
+  if (typeof d.sceneCount === 'number') form.sceneCount = d.sceneCount
+  if (typeof d.uniform === 'boolean') form.uniform = d.uniform
+  if (typeof d.uniformDuration === 'number') form.uniformDuration = d.uniformDuration
+  if (Array.isArray(d.independentDurations)) form.independentDurations = d.independentDurations
+  if (typeof d.style === 'string') form.style = d.style
+  if (typeof d.chaining === 'string') form.chaining = d.chaining
+  if (typeof d.resolution === 'string') form.resolution = d.resolution
+})()
+draft.autoSave(form, (v) => ({
+  name: v.name, idea: v.idea, durationSource: v.durationSource, sceneCount: v.sceneCount,
+  uniform: v.uniform, uniformDuration: v.uniformDuration,
+  independentDurations: v.independentDurations, style: v.style, chaining: v.chaining,
+  resolution: v.resolution,
+}))
 
 function onRefImageChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0] || null
@@ -77,98 +94,74 @@ function onSceneRefChange(e: Event, idx: number) {
 }
 
 async function submitCreative() {
-  const idea = form.idea.trim()
-  if (!idea) {
-    alert(t('enterIdea'))
-    return
-  }
-  submitting.value = true
-  const fd = new FormData()
-  fd.append('idea', idea)
-  fd.append('creative_name', form.name.trim())
-  fd.append('style', form.style)
-  fd.append('chaining_mode', form.chaining)
+  let ev: Record<string, any> = {}
+  await runSubmit({
+    taskType: 'creative',
+    buildForm: () => {
+      const idea = form.idea.trim()
+      if (!idea) throw new Error(t('enterIdea'))
+      const fd = new FormData()
+      fd.append('idea', idea)
+      fd.append('creative_name', form.name.trim())
+      fd.append('style', form.style)
+      fd.append('chaining_mode', form.chaining)
 
-  fd.append('duration_source', form.durationSource)
-  if (form.durationSource === 'manual') {
-    fd.append('scene_count', String(form.sceneCount))
-    fd.append('uniform_duration', String(form.uniform))
-    if (form.uniform) {
-      fd.append('scene_durations_json', JSON.stringify(Array(form.sceneCount).fill(form.uniformDuration)))
-    } else {
-      const vals = form.independentDurations.slice(0, form.sceneCount)
-      fd.append('scene_durations_json', JSON.stringify(vals))
-    }
-  } else {
-    fd.append('scene_count', '0')
-    fd.append('uniform_duration', 'true')
-    fd.append('scene_durations_json', JSON.stringify([]))
-  }
+      fd.append('duration_source', form.durationSource)
+      if (form.durationSource === 'manual') {
+        fd.append('scene_count', String(form.sceneCount))
+        fd.append('uniform_duration', String(form.uniform))
+        if (form.uniform) {
+          fd.append('scene_durations_json', JSON.stringify(Array(form.sceneCount).fill(form.uniformDuration)))
+        } else {
+          const vals = form.independentDurations.slice(0, form.sceneCount)
+          fd.append('scene_durations_json', JSON.stringify(vals))
+        }
+      } else {
+        fd.append('scene_count', '0')
+        fd.append('uniform_duration', 'true')
+        fd.append('scene_durations_json', JSON.stringify([]))
+      }
 
-  const res = parseResolution(form.resolution)
-  fd.append('video_width', String(res.width))
-  fd.append('video_height', String(res.height))
-  fd.append('use_custom_end_frames', String(form.useEndFrames))
-  fd.append('generate_end_frames_from_ref', String(form.genEndFromRef))
+      const res = parseResolution(form.resolution)
+      fd.append('video_width', String(res.width))
+      fd.append('video_height', String(res.height))
+      fd.append('use_custom_end_frames', String(form.useEndFrames))
+      fd.append('generate_end_frames_from_ref', String(form.genEndFromRef))
 
-  if (form.refImage) fd.append('reference_image', form.refImage)
-  if (form.useEndFrames) {
-    form.endFrames.forEach((f) => {
-      if (f && f.size > 0) fd.append('end_frame_images', f)
-    })
-  }
-  // v5.0 优化 5：用户上传分镜场景图（多文件，后端按上传顺序对应场景 index）
-  if (form.sceneRefs.length > 0) {
-    form.sceneRefs.forEach((f) => {
-      if (f && f.size > 0) fd.append('scene_reference_images', f)
-    })
-  }
+      if (form.refImage) fd.append('reference_image', form.refImage)
+      if (form.useEndFrames) {
+        form.endFrames.forEach((f) => {
+          if (f && f.size > 0) fd.append('end_frame_images', f)
+        })
+      }
+      // v5.0 优化 5：用户上传分镜场景图（多文件，后端按上传顺序对应场景 index）
+      if (form.sceneRefs.length > 0) {
+        form.sceneRefs.forEach((f) => {
+          if (f && f.size > 0) fd.append('scene_reference_images', f)
+        })
+      }
 
-  // Audio & Subtitle
-  const sc = subtitleRef.value
-  if (sc) {
-    fd.append('audio_enabled', String(sc.audioEnabled))
-    fd.append('audio_voice', voiceSelections.c)
-    fd.append('audio_lang', currentLang.value)
-    fd.append('audio_rate', sc.rate)
-    fd.append('subtitle_enabled', String(sc.subtitleEnabled))
-    fd.append('subtitle_style_mode', sc.styleMode)
-    fd.append('subtitle_style_hints', sc.style.hints)
-    fd.append('subtitle_font', sc.style.font)
-    fd.append('subtitle_color', sc.style.color)
-    fd.append('subtitle_fontsize', String(sc.style.fontsize))
-    fd.append('subtitle_position', sc.style.position)
-    fd.append('subtitle_stroke_color', sc.style.stroke_color)
-    fd.append('subtitle_stroke_width', String(sc.style.stroke_width))
-    fd.append('subtitle_bg_color', sc.style.bg_color)
-  }
+      // Audio & Subtitle
+      const sc = subtitleRef.value
+      collectAudioSubtitleFields(fd, sc, voiceSelections, 'c', currentLang.value)
 
-  // v6.0 手动模式：执行模式 + 暂停点
-  fd.append('execution_mode', appState.execMode)
-  fd.append('pause_points', JSON.stringify(appState.execMode === 'manual' ? appState.pausePoints : []))
+      // v6.0 手动模式：执行模式 + 暂停点
+      fd.append('execution_mode', appState.execMode)
+      fd.append('pause_points', JSON.stringify(appState.execMode === 'manual' ? appState.pausePoints : []))
 
-  try {
-    const d = await api.submitCreative(fd)
-    if (!d.ok) throw new Error(d.detail || t('failCreate'))
-    trackEvent('create_task', {
-      task_type: 'creative',
-      style: form.style,
-      chaining_mode: form.chaining,
-      duration_source: form.durationSource,
-      resolution: form.resolution,
-      audio: sc?.audioEnabled ? 'on' : 'off',
-      subtitle: sc?.subtitleEnabled ? 'on' : 'off',
-    })
-    appState.currentTaskType = 'creative'
-    appState.currentDirName = d.dir_name
-    goProgress(d.task_id, 'create')
-    showToast(t('submitted'), 5000)
-  } catch (e: any) {
-    trackEvent('create_task_failed', { task_type: 'creative', error: (e.message || '').slice(0, 120) })
-    alert(t('failCreate') + ': ' + e.message)
-  } finally {
-    submitting.value = false
-  }
+      ev = {
+        style: form.style,
+        chaining_mode: form.chaining,
+        duration_source: form.durationSource,
+        resolution: form.resolution,
+        audio: sc?.audioEnabled ? 'on' : 'off',
+        subtitle: sc?.subtitleEnabled ? 'on' : 'off',
+      }
+      return fd
+    },
+    extraEvent: ev,
+    onSuccess: () => draft.clear(),
+  })
 }
 </script>
 

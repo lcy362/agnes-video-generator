@@ -171,3 +171,65 @@ def test_set_then_read_roundtrip(conf_file, monkeypatch):
     assert config.load_settings().agnes_domain == "cn"
     config.delete_api_key()
     assert config.load_settings().api_key == ""
+
+
+# ═══════════════════════════════════════════════════
+# 3.5 RuntimeSettings（pydantic-settings 环境变量收敛）
+# ═══════════════════════════════════════════════════
+
+def test_runtime_settings_defaults(monkeypatch):
+    """默认值：host/port/subtitle_ass/轮询超时等。"""
+    from core.config import get_settings
+    # 清掉可能存在的环境变量干扰
+    for k in ("HOST", "PORT", "AGNES_SUBTITLE_ASS", "AGNES_VIDEO_POLL_TIMEOUT"):
+        monkeypatch.delenv(k, raising=False)
+    s = get_settings()
+    assert s.host == "0.0.0.0"
+    assert s.port == 8765
+    assert s.agnes_subtitle_ass is True
+    assert s.agnes_video_poll_timeout == 1800
+    assert s.agnes_rate_limit is None
+
+
+def test_runtime_settings_env_override(monkeypatch):
+    """环境变量覆盖默认值（大小写不敏感 + 类型转换）。"""
+    from core.config import get_settings
+    monkeypatch.setenv("HOST", "127.0.0.1")
+    monkeypatch.setenv("PORT", "9000")
+    monkeypatch.setenv("AGNES_SUBTITLE_ASS", "0")
+    monkeypatch.setenv("AGNES_VIDEO_POLL_TIMEOUT", "3000")
+    monkeypatch.setenv("AGNES_RATE_LIMIT", "6")
+    s = get_settings()
+    assert s.host == "127.0.0.1"
+    assert s.port == 9000
+    assert s.agnes_subtitle_ass is False
+    assert s.agnes_video_poll_timeout == 3000
+    assert s.agnes_rate_limit == 6
+
+
+def test_runtime_settings_extra_ignored(monkeypatch):
+    """未声明环境变量（如 AGNES_API_KEY_2）不报错。"""
+    from core.config import get_settings
+    monkeypatch.setenv("AGNES_API_KEY_2", "sk-xxx")
+    monkeypatch.setenv("UNRELATED_VAR", "1")
+    s = get_settings()
+    assert s.agnes_rate_limit is None
+
+
+def test_subtitle_ass_enabled_uses_settings(monkeypatch):
+    """subtitle_ass_enabled 与 RuntimeSettings 联动。"""
+    from core.config import subtitle_ass_enabled
+    monkeypatch.setenv("AGNES_SUBTITLE_ASS", "1")
+    assert subtitle_ass_enabled() is True
+    monkeypatch.setenv("AGNES_SUBTITLE_ASS", "0")
+    assert subtitle_ass_enabled() is False
+
+
+def test_rate_limiter_reads_settings(monkeypatch):
+    """rate_limiter 从 RuntimeSettings 读取 AGNES_RATE_LIMIT（3.5 收敛）。"""
+    monkeypatch.setenv("AGNES_RATE_LIMIT", "30")
+    from core.api.rate_limiter import _effective_rate
+    assert _effective_rate() == 30 * 0.8
+    monkeypatch.setenv("AGNES_RATE_LIMIT", "0")
+    # 0/未配置 → 回退动态计算（>0）
+    assert _effective_rate() > 0

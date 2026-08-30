@@ -13,9 +13,8 @@ from datetime import datetime
 from typing import Optional
 
 from core.config import get_working_dir
-from core.path_security import safe_join, UnsafePathError
+from core.path_security import UnsafePathError, safe_join
 from models.task import (
-    AnyTaskState,
     BaseTaskState,
     CreativeVideoTask,
     ManuscriptParagraph,
@@ -144,7 +143,9 @@ class TaskManager:
             tmp_fd, tmp_path = tempfile.mkstemp(dir=task_dir, suffix=".tmp")
             try:
                 with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
-                    json.dump(self._state.model_dump(), f, ensure_ascii=False, indent=2)
+                    # 2.4：去掉 indent=2（体积减半、写盘更快）；可读性由
+                    # 诊断端点 / 前端展示补偿，原始 JSON 不追求人工可读
+                    json.dump(self._state.model_dump(), f, ensure_ascii=False)
                 os.replace(tmp_path, self._task_file)
             except Exception:
                 if os.path.exists(tmp_path):

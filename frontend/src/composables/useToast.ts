@@ -1,11 +1,15 @@
 import { ref } from 'vue'
 
+export type ToastType = 'error' | 'success' | 'info'
+
 const visible = ref(false)
 const message = ref('')
+const type = ref<ToastType>('error')
 let timer: ReturnType<typeof setTimeout> | null = null
 
-function showToast(msg: string, duration = 2500) {
+function showToast(msg: string, duration = 2500, t: ToastType = 'error') {
   message.value = msg
+  type.value = t
   visible.value = true
   if (timer) clearTimeout(timer)
   timer = setTimeout(() => {
@@ -14,5 +18,5 @@ function showToast(msg: string, duration = 2500) {
 }
 
 export function useToast() {
-  return { visible, message, showToast }
+  return { visible, message, type, showToast }
 }

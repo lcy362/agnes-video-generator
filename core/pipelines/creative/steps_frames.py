@@ -271,7 +271,7 @@ class FramesStepsMixin:
                             reference_image_paths=ref_images,
                             size=f"{vw}x{vh}",
                         )
-                        img_output.save(end_frame_path)
+                        await img_output.save(end_frame_path)
                         pregenerated[scene_idx] = end_frame_path
                         cached[str(scene_idx)] = end_frame_path
                         break
@@ -301,7 +301,7 @@ class FramesStepsMixin:
                     prompt=end_frame_prompt,
                     size=f"{vw}x{vh}",
                 )
-                img_output.save(end_frame_path)
+                await img_output.save(end_frame_path)
                 pregenerated[scene_idx] = end_frame_path
                 cached[str(scene_idx)] = end_frame_path
 

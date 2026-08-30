@@ -71,6 +71,25 @@ def _get_log_dir() -> Path:
     return log_dir
 
 
+# 优化路线图 1.5b：error_logs 按数量轮转，超过上限后删除最旧文件，
+# 防止长期运行的工作区无限膨胀（诊断端点 _iter_error_logs 全量读取也受影响）。
+_MAX_ERROR_LOGS = 500
+
+
+def _rotate_error_logs(log_dir: Path) -> None:
+    """超过 _MAX_ERROR_LOGS 个文件时，按 mtime 删除最旧的超量文件。"""
+    try:
+        files = [p for p in log_dir.glob("*.json") if p.is_file()]
+        if len(files) <= _MAX_ERROR_LOGS:
+            return
+        files.sort(key=lambda p: p.stat().st_mtime)  # 最旧在前
+        for p in files[: len(files) - _MAX_ERROR_LOGS]:
+            p.unlink(missing_ok=True)
+            logger.info(f"[ErrorCollector] Rotated old error log → {p.name}")
+    except OSError:
+        pass
+
+
 def set_error_task_id(task_id: str) -> None:
     """设置当前上下文的 task_id（v6.1 二期，诊断关联用）。
 
@@ -178,6 +197,9 @@ def collect_error(
 
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(error_data, f, ensure_ascii=False, indent=2)
+
+        # 优化路线图 1.5b：按数量轮转，防止 error_logs 无限膨胀
+        _rotate_error_logs(log_dir)
 
         logger.info(f"[ErrorCollector] Error saved → {filepath}")
         return str(filepath)

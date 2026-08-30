@@ -6,9 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
-
-from fastapi import Form
+from fastapi import APIRouter, Form, HTTPException
 
 from core.config import API_KEY_MISSING_MSG, get_api_key
 from core.pipelines import ALL_CHECKPOINTS, compute_current_checkpoint
@@ -23,7 +21,6 @@ from models.task import (
     StepStatus,
     TaskType,
 )
-
 from web import app_state, deps, helpers
 
 logger = logging.getLogger(__name__)
@@ -32,9 +29,27 @@ router = APIRouter(tags=["tasks"])
 
 
 @router.get("/api/tasks")
-async def list_tasks():
+async def list_tasks(limit: int = 0, offset: int = 0, status: str = ""):
+    """任务列表（优化路线图 1.4：状态过滤 + 分页）。
+
+    Args:
+        limit: 每页条数；0 表示不分页（返回全部）
+        offset: 跳过前 N 条
+        status: 逗号分隔的状态过滤（如 ``running,queued,pending``）；空为不过滤
+    """
     tm = TaskManager("_")
     tasks = tm.list_tasks()
+    # 1.4：状态过滤 + 分页在轻量字段阶段完成，避免为被过滤/截断的任务
+    # 做完整状态加载（此前列表对每个任务都做一次 Pydantic 完整校验）
+    if status:
+        statuses = {s.strip() for s in status.split(",") if s.strip()}
+        tasks = [t for t in tasks if t.get("status") in statuses]
+    total = len(tasks)
+    if offset:
+        tasks = tasks[offset:]
+    if limit > 0:
+        tasks = tasks[:limit]
+
     for t in tasks:
         task_tm = TaskManager(t["task_id"], dir_name=t.get("dir_name"))
         state = task_tm.load()
@@ -75,7 +90,8 @@ async def list_tasks():
                 and state.status == StepStatus.PENDING
                 and t["current_checkpoint"]
             )
-    return {"tasks": tasks}
+    # 1.4：total 为过滤后的总数（分页前），供前端做分页控件
+    return {"tasks": tasks, "total": total}
 
 
 @router.get("/api/tasks/{task_id}")
@@ -95,6 +111,8 @@ async def get_task(task_id: str):
 
 # ── v6.1 二期：任务诊断端点 ──
 _ERROR_LOG_MAX_MESSAGE = 800  # 错误消息截断长度（诊断报告用，不含 prompt 全文与 response_body）
+# v6.2.2：完整 traceback 截断长度（相对长，供定位环境级异常如 [WinError 2]）
+_ERROR_TRACEBACK_MAX = 6000
 
 # 需要从 error log 暴露给前端的字段（敏感字段：prompt / system_prompt / response_body / extra 一律不返回）
 _DIAG_LOG_FIELDS = (
@@ -165,6 +183,7 @@ async def get_task_diagnostics(task_id: str):
         "status": state.status,
         "current_step": state.current_step,
         "current_message": (state.current_message or "")[:_ERROR_LOG_MAX_MESSAGE],
+        "error_traceback": (state.error_traceback or "")[:_ERROR_TRACEBACK_MAX],
         "created_at": state.created_at or "",
         "updated_at": state.updated_at or "",
     }
@@ -365,20 +384,30 @@ async def switch_task_mode(task_id: str, mode: str = Form(...)):
 
 
 @router.post("/api/tasks/sweep")
-async def sweep_stale_tasks_endpoint(age_days: int = 7):
-    """手动触发僵尸任务清理（v5.0 Batch 5 / 5.1）。
+async def sweep_stale_tasks_endpoint(age_days: int = 7, protect: str = ""):
+    """手动触发僵尸任务清理（v5.0 Batch 5 / 5.1，1.5 参数化）。
 
-    清理工作区中状态文件超龄且非活跃的任务目录；运行中/排队中/断点续传
-    （PENDING）任务默认保护不清理。活跃 pipeline 中的任务一律跳过。
+    清理工作区中状态文件超龄且非活跃的任务目录；活跃 pipeline 中的任务一律跳过。
 
     Args:
         age_days: 任务状态文件超龄阈值（天），默认 7
+        protect: 额外保护的状态集合（逗号分隔，如 ``running,queued,pending``；
+                 为空时使用默认保护集 ``{running, queued, pending}``；
+                 传 ``none`` 表示仅保护活跃 pipeline，允许清理所有超龄静态任务）
     """
-    from core.artifacts import sweep_stale_tasks
+    from core.artifacts import _DEFAULT_PROTECT_STATUSES, sweep_stale_tasks
 
     # 活跃 pipeline 保护：即使状态文件超龄也不允许清理
     active_ids = set(app_state.active_pipelines.keys()) | set(app_state._queued_tasks)
-    result = sweep_stale_tasks(age_days=age_days)
+    protect_set = set(_DEFAULT_PROTECT_STATUSES)
+    if protect.strip():
+        if protect.strip().lower() == "none":
+            protect_set = set()
+        else:
+            protect_set = {
+                StepStatus(s.strip()) for s in protect.split(",") if s.strip()
+            }
+    result = sweep_stale_tasks(age_days=age_days, protect_statuses=protect_set)
     result["swept"] = [d for d in result["swept"] if d not in active_ids]
     result["protected"] = result["protected"] + sorted(active_ids)
     logger.info(f"[Cleanup] Sweep finished: swept={result['swept']}, "

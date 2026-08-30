@@ -24,7 +24,6 @@ from core.screenwriter import Screenwriter, clean_narration_text
 from models.task import (
     PoetryVideoTask,
     SceneTask,
-    StepStatus,
     SubtitleStyle,
 )
 
@@ -179,8 +178,8 @@ class PoetryVideoPipeline(MultiScenePipeline):
         # 解析用户分镜描述：每行支持「原诗句 | 画面描述」。
         # 过滤纯场景标签行（如「场景 1（00:00 - 00:10）」），避免干扰格式检测。
         user_lines = [
-            l.strip() for l in (self._state.user_scene_prompts or [])
-            if l.strip() and not _is_scene_label(l)
+            line.strip() for line in (self._state.user_scene_prompts or [])
+            if line.strip() and not _is_scene_label(line)
         ]
         user_scenes: List[tuple] = []
         for line in user_lines:
@@ -295,6 +294,7 @@ class PoetryVideoPipeline(MultiScenePipeline):
                 # 续传：音频已存在则仅重采该场景 cues，避免字幕退回纯文本估算
                 self._scene_sub_makers[idx] = await self._recover_sub_maker(
                     text, self._state.audio_config, self._state.subtitle_config,
+                    audio_path,
                 )
                 continue
 
@@ -444,12 +444,19 @@ class PoetryVideoPipeline(MultiScenePipeline):
     async def _composite_final(self) -> str:
         """逐场景合成 video+audio+subtitle → final_clip，再拼接为成片。
 
-        合成器自动将每场景音频补静音至视频时长，即"每句间隔拉长"的实现。
+        2.2：所有场景 final_clip 均缺失（首次合成）时，优先走
+        ``concat_scenes_single_pass``——场景视频 ``-c copy`` 拼接 + 音频
+        adelay/amix 合并 + 总字幕偏移合并，最终一次编码（依赖 2.1a/2.1c）。
+        失败自动回退逐场景合成（保留续传复用已合成场景产物）。
         """
         scenes = self._state.scenes
         has_subtitle = self._state.subtitle_config.enabled
+        output_path = os.path.join(self.working_dir, "final_video.mp4")
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            return output_path
 
-        final_clips = []
+        # ── 收集场景素材 ──
+        video_paths, audio_paths, srt_paths, clip_outs = [], [], [], []
         for idx, scene in enumerate(scenes):
             scene_dir = os.path.join(self.working_dir, f"scene_{idx}")
             video_path = scene.video_file
@@ -457,27 +464,68 @@ class PoetryVideoPipeline(MultiScenePipeline):
                 raise RuntimeError(f"[Poetry] scene {idx} video missing")
 
             audio_path = scene.narration_audio or ""
-            srt_path = scene.subtitle_srt or ""
-            clip_out = os.path.join(scene_dir, "final_clip.mp4")
-
-            if os.path.exists(clip_out) and os.path.getsize(clip_out) > 0:
-                if self._has_audio_stream(clip_out):
-                    final_clips.append(clip_out)
-                    continue
-                logger.warning(f"[Poetry] scene {idx} clip has no audio, redoing compositing")
-
-            # 兜底：音频缺失则生成静音占位，保证合成不中断
             audio_exists = os.path.exists(audio_path) and os.path.getsize(audio_path) > 0
             if not audio_exists:
+                # 兜底：音频缺失则生成静音占位，保证合成不中断
                 audio_path = os.path.join(scene_dir, "narration.mp3")
                 await SilentTTSEngine().generate(
                     text=" ", output_path=audio_path,
                     duration_sec=max(int(scene.duration), 2),
                 )
                 scene.narration_audio = audio_path
-                audio_exists = True
 
+            srt_path = scene.subtitle_srt or ""
             srt_exists = os.path.exists(srt_path) and os.path.getsize(srt_path) > 0
+            video_paths.append(video_path)
+            audio_paths.append(audio_path)
+            srt_paths.append(srt_path if (has_subtitle and srt_exists) else None)
+            clip_outs.append(os.path.join(scene_dir, "final_clip.mp4"))
+
+        # ── 快速路径：所有 final_clip 已存在且有音频（续传）→ 直接拼接 ──
+        if all(
+            os.path.exists(c) and os.path.getsize(c) > 0 and self._has_audio_stream(c)
+            for c in clip_outs
+        ):
+            if len(clip_outs) == 1:
+                shutil.copy2(clip_outs[0], output_path)
+            else:
+                await asyncio.to_thread(
+                    VideoConcatenator.concat_videos, clip_outs, output_path,
+                )
+            return output_path
+
+        # ── 2.2 单链一次合成（仅首次全量合成时，避免续传重复编码）──
+        if len(video_paths) > 1 and not any(
+            os.path.exists(c) and os.path.getsize(c) > 0 for c in clip_outs
+        ):
+            await self._emit(
+                "concatenate", "running",
+                f"合并合成 {len(scenes)} 个场景（单链）...", _PROGRESS_COMPOSITE_SCENE,
+            )
+            result = await asyncio.to_thread(
+                VideoConcatenator.concat_scenes_single_pass,
+                video_paths, audio_paths, srt_paths, output_path,
+                POETRY_SUBTITLE_STYLE if has_subtitle else None,
+                None,
+            )
+            if result:
+                return result
+            logger.warning("[Poetry] single-pass composite failed, fallback per-scene")
+
+        # ── 逐场景合成（兜底）──
+        final_clips = []
+        for idx, scene in enumerate(scenes):
+            scene_dir = os.path.join(self.working_dir, f"scene_{idx}")
+            video_path = scene.video_file
+            audio_path = audio_paths[idx]
+            srt_path = srt_paths[idx]
+            clip_out = clip_outs[idx]
+
+            if os.path.exists(clip_out) and os.path.getsize(clip_out) > 0:
+                if self._has_audio_stream(clip_out):
+                    final_clips.append(clip_out)
+                    continue
+                logger.warning(f"[Poetry] scene {idx} clip has no audio, redoing compositing")
 
             await self._emit(
                 "concatenate", "running",
@@ -487,16 +535,12 @@ class PoetryVideoPipeline(MultiScenePipeline):
                 VideoConcatenator.concat_videos_with_audio_overlay,
                 [video_path],
                 audio_path,
-                srt_path if (has_subtitle and srt_exists) else None,
+                srt_path,
                 clip_out,
                 POETRY_SUBTITLE_STYLE,
                 None,
             )
             final_clips.append(clip_out)
-
-        output_path = os.path.join(self.working_dir, "final_video.mp4")
-        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-            return output_path
 
         if len(final_clips) == 1:
             shutil.copy2(final_clips[0], output_path)

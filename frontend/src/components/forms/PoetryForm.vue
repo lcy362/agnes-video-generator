@@ -2,19 +2,15 @@
 import { ref, reactive, computed } from 'vue'
 import { t, currentLang } from '@/i18n'
 import { appState } from '@/store'
-import { useGa } from '@/composables/useGa'
-import { useNavigation } from '@/composables/useNavigation'
-import { useToast } from '@/composables/useToast'
 import { useVoice } from '@/composables/useVoice'
+import { useTaskSubmit } from '@/composables/useTaskSubmit'
 import { copyText } from '@/utils/clipboard'
 import * as api from '@/api'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
 
-const { trackEvent } = useGa()
-const { goProgress } = useNavigation()
-const { showToast } = useToast()
 const { voiceSelections } = useVoice()
+const { submitting, runSubmit } = useTaskSubmit()
 
 const subtitleRef = ref<InstanceType<typeof SubtitleConfig>>()
 
@@ -30,7 +26,6 @@ const form = reactive({
   resolution: '768x1152',
 })
 
-const submitting = ref(false)
 const promptPanelVisible = ref(false)
 const promptSystem = ref('')
 const promptUser = ref('')
@@ -89,67 +84,57 @@ async function copyPoetryPromptWithPoem() {
 }
 
 async function submitPoetry() {
-  const poem = form.poem.trim()
-  if (!poem) {
-    alert(t('enterPoem'))
-    return
-  }
-  submitting.value = true
-  const sceneLines = form.scenePrompts.split('\n').map((s) => s.trim()).filter(Boolean)
+  let ev: Record<string, any> = {}
+  await runSubmit({
+    taskType: 'poetry',
+    buildForm: () => {
+      const poem = form.poem.trim()
+      if (!poem) throw new Error(t('enterPoem'))
+      const sceneLines = form.scenePrompts.split('\n').map((s) => s.trim()).filter(Boolean)
 
-  const fd = new FormData()
-  fd.append('poem_text', poem)
-  fd.append('creative_name', form.name.trim())
-  fd.append('user_scene_prompts_json', JSON.stringify(sceneLines))
-  fd.append('style', form.style)
-  const res = parseResolution(form.resolution)
-  fd.append('video_width', String(res.width))
-  fd.append('video_height', String(res.height))
-  fd.append('video_duration', '30')
+      const fd = new FormData()
+      fd.append('poem_text', poem)
+      fd.append('creative_name', form.name.trim())
+      fd.append('user_scene_prompts_json', JSON.stringify(sceneLines))
+      fd.append('style', form.style)
+      const res = parseResolution(form.resolution)
+      fd.append('video_width', String(res.width))
+      fd.append('video_height', String(res.height))
+      fd.append('video_duration', '30')
 
-  fd.append('duration_source', 'manual')
-  fd.append('scene_count', String(form.sceneCount))
-  fd.append('uniform_duration', String(form.uniform))
-  if (form.uniform) {
-    fd.append('scene_durations_json', JSON.stringify(Array(form.sceneCount).fill(form.uniformDuration)))
-  } else {
-    fd.append('scene_durations_json', JSON.stringify(form.independentDurations.slice(0, form.sceneCount)))
-  }
+      fd.append('duration_source', 'manual')
+      fd.append('scene_count', String(form.sceneCount))
+      fd.append('uniform_duration', String(form.uniform))
+      if (form.uniform) {
+        fd.append('scene_durations_json', JSON.stringify(Array(form.sceneCount).fill(form.uniformDuration)))
+      } else {
+        fd.append('scene_durations_json', JSON.stringify(form.independentDurations.slice(0, form.sceneCount)))
+      }
 
-  const sc = subtitleRef.value
-  if (sc) {
-    fd.append('audio_enabled', String(sc.audioEnabled))
-    fd.append('audio_voice', voiceSelections.p)
-    fd.append('audio_lang', currentLang.value)
-    fd.append('audio_rate', sc.rate)
-    fd.append('subtitle_enabled', String(sc.subtitleEnabled))
-  }
+      const sc = subtitleRef.value
+      if (sc) {
+        fd.append('audio_enabled', String(sc.audioEnabled))
+        fd.append('audio_voice', voiceSelections.p)
+        fd.append('audio_lang', currentLang.value)
+        fd.append('audio_rate', sc.rate)
+        fd.append('subtitle_enabled', String(sc.subtitleEnabled))
+      }
 
-  // v6.0 手动模式：执行模式 + 暂停点
-  fd.append('execution_mode', appState.execMode)
-  fd.append('pause_points', JSON.stringify(appState.execMode === 'manual' ? appState.pausePoints : []))
+      // v6.0 手动模式：执行模式 + 暂停点
+      fd.append('execution_mode', appState.execMode)
+      fd.append('pause_points', JSON.stringify(appState.execMode === 'manual' ? appState.pausePoints : []))
 
-  try {
-    const d = await api.submitPoetry(fd)
-    if (!d.ok) throw new Error(d.detail || t('failCreate'))
-    trackEvent('create_task', {
-      task_type: 'poetry',
-      style: form.style,
-      scene_count: form.sceneCount,
-      resolution: form.resolution,
-      audio: sc?.audioEnabled ? 'on' : 'off',
-      subtitle: sc?.subtitleEnabled ? 'on' : 'off',
-    })
-    appState.currentTaskType = 'poetry'
-    appState.currentDirName = d.dir_name
-    goProgress(d.task_id, 'create')
-    showToast(t('submitted'), 5000)
-  } catch (e: any) {
-    trackEvent('create_task_failed', { task_type: 'poetry', error: (e.message || '').slice(0, 120) })
-    alert(t('failCreate') + ': ' + e.message)
-  } finally {
-    submitting.value = false
-  }
+      ev = {
+        style: form.style,
+        scene_count: form.sceneCount,
+        resolution: form.resolution,
+        audio: sc?.audioEnabled ? 'on' : 'off',
+        subtitle: sc?.subtitleEnabled ? 'on' : 'off',
+      }
+      return fd
+    },
+    extraEvent: ev,
+  })
 }
 </script>
 

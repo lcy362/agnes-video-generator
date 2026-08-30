@@ -13,7 +13,6 @@ from core.config import (
     set_active_workspace,
 )
 from core.path_security import UnsafePathError, safe_workspace_path
-
 from web import helpers
 
 router = APIRouter(tags=["workspaces"])

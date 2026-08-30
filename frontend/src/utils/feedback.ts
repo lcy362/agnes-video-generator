@@ -18,6 +18,9 @@ export const RETRY_THRESHOLD = 2
 /** 错误消息进入报告的最大字符数 */
 const ERROR_MESSAGE_MAX = 2000
 
+/** v6.2.2：完整 traceback 进入报告的最大字符数（诊断端点已截断 6000，此处再兜底） */
+export const TRACEBACK_MAX = 8000
+
 /**
  * Issue 预填 body 的原始字符数上限（PRD FR6.2：预填截断上限 4000 字符）。
  * 由于 body 会作为 URL query 传递，编码后可能翻倍以上（中文约 3×），

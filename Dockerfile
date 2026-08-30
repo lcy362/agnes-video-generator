@@ -44,6 +44,10 @@ COPY . .
 
 EXPOSE 8765
 
+# 3.2：容器健康检查（python urllib 探活 /api/health，避免依赖 apt curl）
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8765/api/health', timeout=3).status==200 else 1)"
+
 # 声明持久化卷：即使不加 -v 直接 docker run，以下两个目录也会落到 Docker 管理的卷里，
 # 同一容器 stop/start 时数据保留；可用 `docker cp 容器名:/app/.working_dir ./out` 导出。
 # 若要数据直接落盘到本机并随时导出，推荐用 docker-compose.yml 或 docker-run.sh（bind mount）。

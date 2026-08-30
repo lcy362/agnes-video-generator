@@ -20,7 +20,6 @@ from core.pipelines import (
 )
 from core.task_manager import TaskManager
 from models.task import BaseTaskState, StepStatus, TaskType
-
 from web import app_state
 
 logger = logging.getLogger(__name__)
@@ -178,9 +177,30 @@ async def run_pipeline_with_concurrency(
         current_message="任务排队中...", current_progress=0.0,
     )
 
+    # 优化路线图 0.4：权重超过并发上限时直接落盘 FAILED 并给出可读原因。
+    # 此前该场景由 semaphore.acquire 抛 ValueError，异常被后台任务静默吞掉，
+    # 任务永远卡在 QUEUED 且无任何提示。
+    if weight > semaphore.max_weight:
+        reason = (
+            f"任务权重 {weight} 超过并发上限 {semaphore.max_weight}"
+            f"（AGNES_RATE_LIMIT={app_state.get_rate_limit()}，"
+            f"请调高该值或配置多个 API Key）"
+        )
+        logger.error(f"[Concurrency] Task {task_id} rejected: {reason}")
+        app_state._queued_tasks.pop(task_id, None)
+        task_manager.update_state(
+            status=StepStatus.FAILED,
+            current_step="init",
+            current_status="failed",
+            current_message=reason,
+        )
+        return
+
+    acquired = False
     try:
         # 等待并发槽位
         await semaphore.acquire(weight)
+        acquired = True
         # 已获取槽位，从排队列表移除
         app_state._queued_tasks.pop(task_id, None)
 
@@ -200,16 +220,30 @@ async def run_pipeline_with_concurrency(
         # 任务被取消（如 stop 操作）
         app_state._queued_tasks.pop(task_id, None)
         logger.info(f"[Concurrency] Task {task_id} cancelled while queued")
+    except Exception as e:
+        # 0.4：获取槽位阶段的异常不再静默吞掉，落盘为 FAILED 供用户查看
+        logger.error(
+            f"[Concurrency] Task {task_id} failed before run: {e}", exc_info=True
+        )
+        app_state._queued_tasks.pop(task_id, None)
+        task_manager.update_state(
+            status=StepStatus.FAILED,
+            current_step="init",
+            current_status="failed",
+            current_message=f"任务启动失败：{e}",
+        )
     finally:
-        # 释放信号量
-        try:
-            await semaphore.release(weight)
-            logger.info(
-                f"[Concurrency] Task {task_id} released slot (weight={weight}, "
-                f"current={semaphore.current}/{semaphore.max_weight})"
-            )
-        except Exception:
-            pass
+        # 0.4：仅当确实获取到槽位时才释放。此前 finally 无条件释放，若 acquire
+        # 失败或排队中被取消，会让 semaphore.current 变负、并发控制永久失效。
+        if acquired:
+            try:
+                await semaphore.release(weight)
+                logger.info(
+                    f"[Concurrency] Task {task_id} released slot (weight={weight}, "
+                    f"current={semaphore.current}/{semaphore.max_weight})"
+                )
+            except Exception:
+                pass
         app_state._queued_tasks.pop(task_id, None)
 
 

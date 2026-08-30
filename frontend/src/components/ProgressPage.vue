@@ -23,6 +23,7 @@ const {
   failedMessage,
   awaitingCheckpoint,
   retryCount,
+  connectionLost,
   retryFailedTask,
   mountProgressPage,
   unmountProgressPage,
@@ -245,6 +246,11 @@ onUnmounted(() => {
           </div>
           <!-- 进度消息（HTML 渲染，来自后端安全文案） -->
           <div v-else class="mt-4 text-sm text-muted" v-html="progressMessage"></div>
+
+          <!-- 1.7：连接异常横幅（连续轮询失败 N 次后展示） -->
+          <div v-if="connectionLost" class="mt-3 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-400">
+            {{ t('connLost') }}
+          </div>
         </div>
 
         <!-- 任务信息（用户输入提示词 + 各项配置，v6.1） -->
@@ -333,7 +339,7 @@ onUnmounted(() => {
             <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('apiCall') }}</a>
             <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('apiDocs') }}</a>
             <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('appScenarios') }}</a>
-            <a href="https://video.lichuanyang.top/learn/tools" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('agentMoreTools') }}</a>
+            <a href="https://video.lichuanyang.top/zh/guides/free-ai-tools" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('agentMoreTools') }}</a>
             <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">📖 GitHub</a>
           </div>
         </div>

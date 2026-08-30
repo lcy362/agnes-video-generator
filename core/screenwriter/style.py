@@ -200,7 +200,6 @@ Styling rules:
 
     def _validate_styles(self, styles: list, expected_count: int) -> list[dict]:
         """验证并修复 LLM 输出的样式列表。"""
-        import re as _re
 
         # 循环位置池，确保即使是缺失项也能分布在不同区域
         _position_pool = [

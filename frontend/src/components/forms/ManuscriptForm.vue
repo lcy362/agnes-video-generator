@@ -2,18 +2,13 @@
 import { ref, reactive, computed } from 'vue'
 import { t } from '@/i18n'
 import { appState } from '@/store'
-import { useGa } from '@/composables/useGa'
-import { useNavigation } from '@/composables/useNavigation'
-import { useToast } from '@/composables/useToast'
 import { useVoice } from '@/composables/useVoice'
-import * as api from '@/api'
+import { useTaskSubmit, collectAudioSubtitleFields } from '@/composables/useTaskSubmit'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
 
-const { trackEvent } = useGa()
-const { goProgress } = useNavigation()
-const { showToast } = useToast()
 const { voiceSelections } = useVoice()
+const { submitting, runSubmit } = useTaskSubmit()
 
 const subtitleRef = ref<InstanceType<typeof SubtitleConfig>>()
 
@@ -24,7 +19,6 @@ const form = reactive({
 })
 
 const charCount = computed(() => form.text.length)
-const submitting = ref(false)
 
 function parseResolution(val: string) {
   const [w, h] = val.split('x').map(Number)
@@ -32,61 +26,36 @@ function parseResolution(val: string) {
 }
 
 async function submitManuscript() {
-  const text = form.text.trim()
-  if (!text) {
-    alert(t('enterText'))
-    return
-  }
-  submitting.value = true
-  const fd = new FormData()
-  fd.append('manuscript_text', text)
-  fd.append('creative_name', form.name.trim())
-  const res = parseResolution(form.resolution)
-  fd.append('video_width', String(res.width))
-  fd.append('video_height', String(res.height))
+  let ev: Record<string, any> = {}
+  await runSubmit({
+    taskType: 'manuscript',
+    buildForm: () => {
+      const text = form.text.trim()
+      if (!text) throw new Error(t('enterText'))
+      const fd = new FormData()
+      fd.append('manuscript_text', text)
+      fd.append('creative_name', form.name.trim())
+      const res = parseResolution(form.resolution)
+      fd.append('video_width', String(res.width))
+      fd.append('video_height', String(res.height))
 
-  const sc = subtitleRef.value
-  if (sc) {
-    fd.append('audio_enabled', String(sc.audioEnabled))
-    fd.append('audio_voice', voiceSelections.m)
-    fd.append('audio_lang', 'zh')
-    fd.append('audio_rate', sc.rate)
-    fd.append('subtitle_enabled', String(sc.subtitleEnabled))
-    fd.append('subtitle_style_mode', sc.styleMode)
-    fd.append('subtitle_style_hints', sc.style.hints)
-    fd.append('subtitle_font', sc.style.font)
-    fd.append('subtitle_color', sc.style.color)
-    fd.append('subtitle_fontsize', String(sc.style.fontsize))
-    fd.append('subtitle_position', sc.style.position)
-    fd.append('subtitle_stroke_color', sc.style.stroke_color)
-    fd.append('subtitle_stroke_width', String(sc.style.stroke_width))
-    fd.append('subtitle_bg_color', sc.style.bg_color)
-  }
+      const sc = subtitleRef.value
+      collectAudioSubtitleFields(fd, sc, voiceSelections, 'm')
 
-  // v6.0 手动模式：执行模式 + 暂停点
-  fd.append('execution_mode', appState.execMode)
-  fd.append('pause_points', JSON.stringify(appState.execMode === 'manual' ? appState.pausePoints : []))
+      // v6.0 手动模式：执行模式 + 暂停点
+      fd.append('execution_mode', appState.execMode)
+      fd.append('pause_points', JSON.stringify(appState.execMode === 'manual' ? appState.pausePoints : []))
 
-  try {
-    const d = await api.submitManuscript(fd)
-    if (!d.ok) throw new Error(d.detail || t('failCreate'))
-    trackEvent('create_task', {
-      task_type: 'manuscript',
-      resolution: form.resolution,
-      text_len: text.length,
-      audio: sc?.audioEnabled ? 'on' : 'off',
-      subtitle: sc?.subtitleEnabled ? 'on' : 'off',
-    })
-    appState.currentTaskType = 'manuscript'
-    appState.currentDirName = d.dir_name
-    goProgress(d.task_id, 'create')
-    showToast(t('submitted'), 5000)
-  } catch (e: any) {
-    trackEvent('create_task_failed', { task_type: 'manuscript', error: (e.message || '').slice(0, 120) })
-    alert(t('failCreate') + ': ' + e.message)
-  } finally {
-    submitting.value = false
-  }
+      ev = {
+        resolution: form.resolution,
+        text_len: text.length,
+        audio: sc?.audioEnabled ? 'on' : 'off',
+        subtitle: sc?.subtitleEnabled ? 'on' : 'off',
+      }
+      return fd
+    },
+    extraEvent: ev,
+  })
 }
 </script>
 

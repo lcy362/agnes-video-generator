@@ -12,7 +12,6 @@ from core.audio.voices import (
     get_voice_lang,
     is_voice_compatible,
 )
-
 from web import helpers
 
 logger = logging.getLogger(__name__)

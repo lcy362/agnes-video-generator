@@ -15,17 +15,13 @@ import os
 import re
 from typing import Callable, List, Optional
 
-from core.api.agnes_video import AgnesVideoAPI
+from core.api.agnes_video import AgnesVideoAPI, VideoTaskCancelled
 from core.compositor.concatenator import VideoConcatenator
+from core.pipelines import MultiScenePipeline
 from core.screenwriter import Screenwriter
-from core.pipelines import MultiScenePipeline, PipelineShutdown
 from models.task import (
-    ManuscriptVideoTask,
     ManuscriptParagraph,
     SceneTask,
-    StepStatus,
-    AudioConfig,
-    SubtitleConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -231,41 +227,47 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
     async def _generate_scene_prompts(
         self, paragraphs: List[ManuscriptParagraph],
     ) -> None:
-        """为每个段落生成视频场景描述 prompt（语言跟随输入段落）。"""
-        total = len(paragraphs)
-        for i, para in enumerate(paragraphs):
-            self._check_shutdown()
+        """为每个段落生成视频场景描述 prompt（语言跟随输入段落）。
 
-            if para.scene_prompt:
-                logger.info(
-                    "[Manuscript] scene_prompt: paragraph %d already has prompt, skipping",
-                    para.index,
-                )
-                continue
-
-            logger.info(
-                "[Manuscript] scene_prompt: generating for paragraph %d/%d...",
-                i + 1, total,
-            )
+        优化路线图 2.5：LLM 调用相互独立，改为有限并发（3 并发）执行；
+        进度语义简化为「开始 → 完成」（避免并发下中间进度乱序回退）。
+        """
+        pending = [p for p in paragraphs if not p.scene_prompt]
+        if pending:
             await self._emit(
                 "scene_prompts", "running",
-                f"生成场景描述 {i + 1}/{total}",
-                _PROGRESS_SCENE_PROMPTS_START + _PROGRESS_SCENE_PROMPTS_SPAN * (i / max(total, 1)),
+                f"生成 {len(pending)} 个场景描述...",
+                _PROGRESS_SCENE_PROMPTS_START,
             )
+            sem = asyncio.Semaphore(3)
 
-            prompt = await asyncio.to_thread(
-                self.screenwriter.generate_scene_prompt_for_paragraph,
-                para.text,
-                self._state.style,
+            async def _gen_one(para: ManuscriptParagraph) -> None:
+                async with sem:
+                    self._check_shutdown()
+                    logger.info(
+                        "[Manuscript] scene_prompt: generating for paragraph %d...",
+                        para.index,
+                    )
+                    prompt = await asyncio.to_thread(
+                        self.screenwriter.generate_scene_prompt_for_paragraph,
+                        para.text,
+                        self._state.style,
+                    )
+                    para.scene_prompt = prompt.strip()
+
+            await asyncio.gather(*[_gen_one(p) for p in pending])
+            await self._emit(
+                "scene_prompts", "completed",
+                f"场景描述生成完成 ({len(pending)} 段)",
+                _PROGRESS_SCENE_PROMPTS_START + _PROGRESS_SCENE_PROMPTS_SPAN,
             )
-            para.scene_prompt = prompt.strip()
+            for p in pending:
+                logger.info(
+                    "[Manuscript] scene_prompt %d: %s...",
+                    p.index, p.scene_prompt[:80],
+                )
 
-            self.task_manager.update_state(paragraphs=paragraphs)
-            logger.info(
-                "[Manuscript] scene_prompt %d: %s...",
-                para.index, para.scene_prompt[:80],
-            )
-
+        self.task_manager.update_state(paragraphs=paragraphs)
         self.save_prompts({
             "scene_prompts": [
                 {"index": p.index, "text": p.text, "scene_prompt": p.scene_prompt}
@@ -364,8 +366,11 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             for retry in range(_WAIT_RETRIES):
                 try:
                     video_output = await self.video_api.wait_for_video(video_id)
-                    video_output.save(video_path)
+                    await video_output.save(video_path)
                     break
+                except VideoTaskCancelled:
+                    # 优化路线图 0.2：用户停止不是临时错误，不重试、直接穿透
+                    raise
                 except Exception as e:
                     if retry < _WAIT_RETRIES - 1:
                         delay = _WAIT_RETRY_INTERVAL_BASE_SECONDS * (retry + 1)
@@ -404,6 +409,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             # 续传：音频已存在则仅重采 cues，避免字幕退回 legacy 启发式
             return await self._recover_sub_maker(
                 full_text, self._state.audio_config, self._state.subtitle_config,
+                audio_path,
             )
 
         await self._emit(

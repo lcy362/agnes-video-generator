@@ -15,10 +15,12 @@
 import asyncio
 import logging
 import os
+import traceback
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
+from core.api.agnes_video import VideoTaskCancelled, is_remote_video_failure
 from core.pipelines import BasePipeline, CheckpointPause, PipelineShutdown
 from models.task import SceneTask, StepStatus
 
@@ -127,8 +129,8 @@ class MultiScenePipeline(BasePipeline):
                 _PROGRESS.subtitle_end, _PROGRESS.composite_end, "合成视频", "合成完成",
             )
 
-            # 后处理：水印（继承自 BasePipeline）
-            final_video = self._apply_watermark(final_video)
+            # 后处理：水印（继承自 BasePipeline；异步，避免阻塞事件循环）
+            final_video = await self._apply_watermark(final_video)
 
             # 完成
             self._state.status = StepStatus.COMPLETED
@@ -152,8 +154,12 @@ class MultiScenePipeline(BasePipeline):
             await self._emit("error", "failed", "任务已被中断，可从任务列表续传", _PROGRESS_FAILED)
             raise
         except Exception as e:
+            # 持久化完整 traceback，供诊断端点/前端反馈报告暴露（定位环境级异常如 [WinError 2]）
             self._state.status = StepStatus.FAILED
-            self.task_manager.update_state(status=StepStatus.FAILED)
+            self.task_manager.update_state(
+                status=StepStatus.FAILED,
+                error_traceback=traceback.format_exc(),
+            )
             await self._emit("error", "failed", str(e), _PROGRESS_FAILED)
             raise
 
@@ -221,7 +227,6 @@ class MultiScenePipeline(BasePipeline):
         子类（如链式/循环视频）可整体覆写本方法以保留其特有逻辑。
         """
         scenes = self._state.scenes
-        total = len(scenes)
 
         # Phase 1: 批量提交
         pending: list = []
@@ -258,27 +263,61 @@ class MultiScenePipeline(BasePipeline):
 
         self.task_manager.update_state(scenes=[s.model_dump() for s in scenes])
 
-        # Phase 2: 逐个等待
-        for j, (scene_idx, video_id, video_path) in enumerate(pending):
-            self._check_shutdown()
+        # Phase 2: 并发等待全部视频（优化路线图 1.3）
+        # 此前逐场景串行 wait_for_video，N 场景等待时长线性叠加；改为并行轮询
+        # （视频 API 本身异步），整体耗时 ≈ 最慢场景，随后逐个落盘并上报进度。
+        if pending:
             await self._emit(
                 "video_gen", "running",
-                f"等待视频 {j + 1}/{len(pending)}...",
-                0.40 + 0.35 * j / max(len(pending), 1),
+                f"等待 {len(pending)} 个视频生成...",
+                0.40,
             )
-            video_output = await self._wait_for_video_with_retry(video_id, scene_idx)
-            video_output.save(video_path)
+
+        async def _wait_one(idx: int, vid: str):
+            out = await self._wait_for_video_with_retry(vid, idx)
+            return idx, out
+
+        done = await asyncio.gather(
+            *[_wait_one(i, vid) for i, vid, _ in pending],
+            return_exceptions=True,
+        )
+        # 任一场景失败 / 停止：立即穿透（保持 0.2 的停止即时性与异常语义）
+        for item in done:
+            if isinstance(item, BaseException):
+                raise item
+        results = dict(done)
+
+        # 逐个落盘 + 上报进度（保存为磁盘 IO，串行避免并发写）
+        for j, (scene_idx, video_id, video_path) in enumerate(pending):
+            self._check_shutdown()
+            video_output = results[scene_idx]
+            await video_output.save(video_path)
             self._state.scenes[scene_idx].video_file = video_path
             self.task_manager.update_state(scenes=[s.model_dump() for s in self._state.scenes])
+            await self._emit(
+                "video_gen", "running",
+                f"保存视频 {j + 1}/{len(pending)}...",
+                0.40 + 0.35 * (j + 1) / max(len(pending), 1),
+            )
 
     async def _wait_for_video_with_retry(
         self, video_id: str, scene_idx: int, max_retries: int = 3
     ):
-        """带重试的视频等待。"""
+        """带重试的视频等待。
+
+        优化路线图 0.2：
+        1. 用户停止（``VideoTaskCancelled``）不再被当作可重试的临时错误，直接
+           穿透——此前停止会走 20s/40s 退避重试，导致「点停止后最长 ~120s 才停」。
+        2. ``task.json`` 仅在**确认服务端失败**时删除；超时、用户取消、网络中断
+           一律保留，否则续传只能重新提交，浪费 1 次/分钟/Key 的视频配额。
+        """
         scene_dir = os.path.join(self.working_dir, f"scene_{scene_idx}")
         for retry in range(max_retries):
             try:
                 return await self.video_api.wait_for_video(video_id)
+            except VideoTaskCancelled:
+                # 用户停止：不重试、不删 task.json，立即穿透
+                raise
             except Exception as e:
                 if retry < max_retries - 1:
                     delay = _RETRY_INTERVAL_BASE_SECONDS * (retry + 1)
@@ -287,9 +326,10 @@ class MultiScenePipeline(BasePipeline):
                     )
                     await asyncio.sleep(delay)
                 else:
-                    tf = os.path.join(scene_dir, "task.json")
-                    if os.path.exists(tf):
-                        os.remove(tf)
+                    if is_remote_video_failure(e):
+                        tf = os.path.join(scene_dir, "task.json")
+                        if os.path.exists(tf):
+                            os.remove(tf)
                     raise
 
     async def _generate_audio(self) -> Optional[object]:
@@ -306,6 +346,7 @@ class MultiScenePipeline(BasePipeline):
                 text,
                 self._state.audio_config,
                 self._state.subtitle_config,
+                audio_path,
             )
 
         text = self._get_narration_text()

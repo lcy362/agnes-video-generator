@@ -5,7 +5,6 @@ import base64
 import logging
 import mimetypes
 import os
-import time
 from typing import List, Optional
 
 import requests
@@ -29,7 +28,16 @@ class ImageOutput:
         self.ext = ext
         self.data = data
 
-    def save(self, path: str) -> None:
+    async def save(self, path: str) -> None:
+        """保存图片到 path（异步）。
+
+        优化路线图 0.3：URL 下载为同步 requests 流式读取，协程中直接调用会
+        阻塞事件循环；整体下沉到线程池执行。
+        """
+        await asyncio.to_thread(self._save_sync, path)
+
+    def _save_sync(self, path: str) -> None:
+        """同步保存实现（供线程池调用；同步上下文可直接使用）。"""
         if self.fmt == "url":
             download_image(self.data, path)
         else:
@@ -59,7 +67,8 @@ class AgnesImageAPI:
         self.api_key = api_key
         self.model = model
         # i2i 默认与 t2i 同模型（官方 2.1 同时支持 t2i/i2i）；环境变量可回退到 2.0。
-        env_i2i = os.environ.get("AGNES_IMAGE_I2I_MODEL")
+        from core.config import get_settings
+        env_i2i = get_settings().agnes_image_i2i_model
         self.i2i_model = i2i_model or env_i2i or model
         # 基础 headers（不含 Authorization）：每次请求前经 _auth_headers() 注入当前 Key
         self._base_headers = {
@@ -143,8 +152,8 @@ class AgnesImageAPI:
         max_rotations = len(ring) * max_retries
         while attempt < max_retries:
             try:
-                # 全局限速：在发起 HTTP 请求前获取令牌
-                await asyncio.to_thread(get_rate_limiter().acquire)
+                # 全局限速：在发起 HTTP 请求前获取令牌（2.3 异步原生）
+                await get_rate_limiter().acquire_async()
                 # 动态超时：第一次 120s，后续逐步增加（图像生成较慢，放宽读超时）
                 read_timeout = _READ_TIMEOUT_BASE_SECONDS * (attempt + 1)
                 resp = await asyncio.to_thread(
@@ -175,7 +184,7 @@ class AgnesImageAPI:
                             "image", "generate_single_image",
                             prompt=prompt,
                             error_type="RateLimit429",
-                            error_message=f"HTTP 429: rate limited",
+                            error_message="HTTP 429: rate limited",
                             status_code=429,
                             response_body=resp.text,
                             retry_count=attempt + 1,
@@ -188,7 +197,7 @@ class AgnesImageAPI:
                         "image", "generate_single_image",
                         prompt=prompt,
                         error_type="RateLimit429",
-                        error_message=f"HTTP 429: retries exhausted",
+                        error_message="HTTP 429: retries exhausted",
                         status_code=429,
                         response_body=resp.text,
                         retry_count=max_retries,

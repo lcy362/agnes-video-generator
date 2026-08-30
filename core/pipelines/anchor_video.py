@@ -11,23 +11,19 @@ v4.0 重构：继承 MultiScenePipeline，复用模板方法 run() 与步骤编�
 
 import asyncio
 import logging
-import math
 import os
 import re
-from typing import Callable, List, Optional
+from typing import Callable, Optional
 
 from core.api.agnes_image import AgnesImageAPI
-from core.api.agnes_video import AgnesVideoAPI
+from core.api.agnes_video import AgnesVideoAPI, VideoTaskCancelled
 from core.compositor.concatenator import VideoConcatenator
-from core.pipelines import MultiScenePipeline, PipelineShutdown
+from core.pipelines import MultiScenePipeline
 from core.screenwriter import Screenwriter
 from models.task import (
     AnchorVideoTask,
-    ManuscriptParagraph,
     SceneTask,
     StepStatus,
-    AudioConfig,
-    SubtitleConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -145,7 +141,7 @@ class AnchorPipeline(MultiScenePipeline):
                     prompt=prompt,
                     size=size,
                 )
-            img_output.save(output_path)
+            await img_output.save(output_path)
         except Exception as e:
             logger.error(f"[Anchor] Anchor image generation failed: {e}")
             raise RuntimeError(f"主播形象生成失败: {e}")
@@ -245,8 +241,11 @@ class AnchorPipeline(MultiScenePipeline):
         for attempt in range(3):
             try:
                 video_output = await self.video_generator.wait_for_video(video_id)
-                video_output.save(clip_path)
+                await video_output.save(clip_path)
                 break
+            except VideoTaskCancelled:
+                # 优化路线图 0.2：用户停止不是临时错误，不重试、直接穿透
+                raise
             except Exception as e:
                 if attempt < 2:
                     logger.warning(
@@ -298,6 +297,7 @@ class AnchorPipeline(MultiScenePipeline):
             # 续传：音频已存在则仅重采 cues，避免字幕退回 legacy 启发式
             return await self._recover_sub_maker(
                 full_text, self._state.audio_config, self._state.subtitle_config,
+                audio_path,
             )
 
         audio_config = self._state.audio_config

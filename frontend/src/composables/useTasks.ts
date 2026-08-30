@@ -3,12 +3,14 @@ import { appState } from '@/store'
 import * as api from '@/api'
 import { t } from '@/i18n'
 import { useToast } from './useToast'
+import { useConfirm } from './useConfirm'
 import { useGa } from './useGa'
 import { useArtifacts } from './useArtifacts'
 import { useNavigation } from './useNavigation'
 import type { TaskListItem, TaskState } from '@/types'
 
 const { showToast } = useToast()
+const { confirmAsync } = useConfirm()
 const { trackEvent } = useGa()
 const { loadArtifacts } = useArtifacts()
 const { goProgress } = useNavigation()
@@ -16,25 +18,50 @@ const { goProgress } = useNavigation()
 const tasks = ref<TaskListItem[]>([])
 const loading = ref(false)
 let taskListTimer: ReturnType<typeof setInterval> | null = null
+// 1.7：in-flight 守卫，避免慢请求下 5s 轮询请求堆积
+let listInFlight = false
 
 async function loadTaskList() {
+  // 1.7：in-flight 守卫 + loading 状态正确赋值（此前只在 catch 置 false，
+  // 正常路径从不置 true，loading 从未真正生效）
+  if (listInFlight) return
+  listInFlight = true
+  loading.value = true
   try {
     const d = await api.getTasks()
     tasks.value = d.tasks || []
   } catch (e) {
+    // 保留旧列表，不覆盖为失败态（轮询失败静默，下次重试）
+  } finally {
     loading.value = false
+    listInFlight = false
   }
 }
 
 function startTaskListTimer() {
   if (taskListTimer) return
   taskListTimer = setInterval(loadTaskList, 5000)
+  // 1.7：后台标签页暂停轮询，恢复可见时立即补一次
+  document.addEventListener('visibilitychange', handleTaskListVisibility)
 }
 
 function stopTaskListTimer() {
   if (taskListTimer) {
     clearInterval(taskListTimer)
     taskListTimer = null
+  }
+  document.removeEventListener('visibilitychange', handleTaskListVisibility)
+}
+
+function handleTaskListVisibility() {
+  if (document.hidden) {
+    if (taskListTimer) {
+      clearInterval(taskListTimer)
+      taskListTimer = null
+    }
+  } else {
+    loadTaskList()
+    startTaskListTimer()
   }
 }
 
@@ -47,7 +74,7 @@ async function viewTask(taskId: string) {
     goProgress(taskId, 'list')
     return state
   } catch (e: any) {
-    alert(t('failLoad') + ': ' + e.message)
+    showToast(t('failLoad') + ': ' + e.message, 4500)
     return null
   }
 }
@@ -70,35 +97,35 @@ async function resumeTask(taskId: string) {
     appState.currentTaskType = taskType
     appState.currentDirName = d.dir_name || taskId
     goProgress(taskId, 'list')
-    showToast(t('resumed'), 5000)
+    showToast(t('resumed'), 5000, 'success')
   } catch (e: any) {
-    alert(t('failResume') + ': ' + e.message)
+    showToast(t('failResume') + ': ' + e.message, 4500)
   }
 }
 
 async function stopTaskById(taskId: string) {
-  if (!confirm(t('stopConfirmById'))) return
+  if (!(await confirmAsync(t('stopConfirmById')))) return
   try {
     const d = await api.stopTask(taskId)
     if (!d.ok) throw new Error(d.detail || t('failStop'))
     trackEvent('task_stopped', { task_type: appState.currentTaskType || '', source: 'list' })
-    showToast(t('stoppedById'), 3000)
+    showToast(t('stoppedById'), 3000, 'success')
     loadTaskList()
   } catch (e: any) {
-    alert(t('failStop') + ': ' + e.message)
+    showToast(t('failStop') + ': ' + e.message, 4500)
   }
 }
 
 async function deleteTaskById(taskId: string) {
-  if (!confirm(t('deleteTaskConfirm'))) return
+  if (!(await confirmAsync(t('deleteTaskConfirm')))) return
   try {
     const d = await api.deleteTask(taskId)
     if (!d.ok) throw new Error(d.detail || t('failDelete'))
     trackEvent('task_deleted', { task_type: appState.currentTaskType || '', source: 'list' })
-    showToast(t('deletedTask'), 3000)
+    showToast(t('deletedTask'), 3000, 'success')
     loadTaskList()
   } catch (e: any) {
-    alert(t('failDelete') + ': ' + e.message)
+    showToast(t('failDelete') + ': ' + e.message, 4500)
   }
 }
 
@@ -107,7 +134,7 @@ async function switchMode(taskId: string, mode: 'auto' | 'manual') {
   try {
     const d = await api.switchTaskMode(taskId, mode)
     if (!d.ok) throw new Error(d.detail || t('failSwitchMode'))
-    showToast(t('modeSwitched'), 3000)
+    showToast(t('modeSwitched'), 3000, 'success')
     loadTaskList()
     // 若正展示该任务进度，刷新
     if (appState.currentTaskId === taskId) {
@@ -115,7 +142,7 @@ async function switchMode(taskId: string, mode: 'auto' | 'manual') {
     }
     return d
   } catch (e: any) {
-    alert(t('failSwitchMode') + ': ' + e.message)
+    showToast(t('failSwitchMode') + ': ' + e.message, 4500)
     return null
   }
 }

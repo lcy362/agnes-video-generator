@@ -28,9 +28,9 @@
 
 import asyncio
 import logging
-import os
 import threading
 import time
+from typing import Optional
 
 from core.api.key_manager import get_key_ring
 
@@ -55,7 +55,10 @@ def _key_count() -> int:
 
 def _effective_rate() -> float:
     """共享桶有效速率 = 单 Key 配额 × Key 数 × 安全系数。"""
-    limit = int(os.environ.get("AGNES_RATE_LIMIT", str(_KEY_BASE_RATE * _key_count())))
+    from core.config import get_settings
+    limit = get_settings().agnes_rate_limit
+    if limit is None or limit <= 0:
+        limit = _KEY_BASE_RATE * _key_count()
     return limit * _SAFETY_FACTOR
 
 
@@ -65,18 +68,29 @@ def _video_submit_rate() -> float:
     注：若服务端对视频提交是全局限 1/min（而非 per-Key），
     设置 AGNES_VIDEO_RATE_LIMIT=1 即可，无需改代码。
     """
-    limit = int(os.environ.get("AGNES_VIDEO_RATE_LIMIT", str(_VIDEO_SUBMIT_RATE * _key_count())))
+    from core.config import get_settings
+    limit = get_settings().agnes_video_rate_limit
+    if limit is None or limit <= 0:
+        limit = _VIDEO_SUBMIT_RATE * _key_count()
     return limit * _VIDEO_SAFETY_FACTOR
 
 
 def _max_burst() -> int:
     """共享桶容量随 Key 数上调：4 × Key 数，否则高并发被突发容量卡住。"""
-    return int(os.environ.get("AGNES_RATE_BURST", str(4 * _key_count())))
+    from core.config import get_settings
+    burst = get_settings().agnes_rate_burst
+    if burst is None or burst <= 0:
+        burst = 4 * _key_count()
+    return burst
 
 
 def _video_max_burst() -> int:
     """视频提交桶容量 = 1 × Key 数：允许每 Key 立即提交一次，随后受 1/min 限制。"""
-    return int(os.environ.get("AGNES_VIDEO_RATE_BURST", str(_key_count())))
+    from core.config import get_settings
+    burst = get_settings().agnes_video_rate_burst
+    if burst is None or burst <= 0:
+        burst = _key_count()
+    return burst
 
 
 class AgnesRateLimiter:
@@ -111,12 +125,15 @@ class AgnesRateLimiter:
         self._total_waits = 0
         self._total_wait_seconds = 0.0
 
-    def acquire(self) -> None:
-        """阻塞式获取一个令牌。
+    def _try_acquire(self) -> Optional[float]:
+        """尝试获取令牌（线程安全）。返回 None=成功；否则返回需等待秒数。
 
-        如果桶中有令牌，立即消耗并返回。
-        否则计算等待时间并 ``time.sleep()`` 直到令牌可用。
+        优化路线图 2.3：等待计算与阻塞解耦，供同步 ``acquire`` 与异步
+        ``acquire_async`` 共用；速率 ≤ 0（如 ``AGNES_RATE_LIMIT=0``）时直接
+        放行，避免此前 ``wait_time = 1/0`` 除零崩溃。
         """
+        if self.refill_rate <= 0:
+            return None
         with self._lock:
             now = time.monotonic()
             elapsed = now - self.last_refill
@@ -128,15 +145,16 @@ class AgnesRateLimiter:
 
             if self.tokens >= 1.0:
                 self.tokens -= 1.0
-                return
+                return None
 
             # 需要等待的时间
             wait_time = (1.0 - self.tokens) / self.refill_rate
             self.tokens = 0.0
             # 更新 refill 时间基准，防止 sleep 期间令牌被其他线程"偷走"
             self.last_refill = now + wait_time
+            return wait_time
 
-        # sleep 在锁外执行，避免阻塞其他线程的 refill 计算
+    def _record_wait(self, wait_time: float) -> None:
         if wait_time > 0.05:
             self._total_waits += 1
             self._total_wait_seconds += wait_time
@@ -145,11 +163,40 @@ class AgnesRateLimiter:
                 f"(累计等待 {self._total_waits} 次, "
                 f"{self._total_wait_seconds:.0f}s)"
             )
+
+    def acquire(self) -> None:
+        """阻塞式获取一个令牌（同步场景 / 脚本 / 测试用）。
+
+        如果桶中有令牌，立即消耗并返回；否则 ``time.sleep()`` 直到令牌可用。
+        """
+        while True:
+            wait_time = self._try_acquire()
+            if wait_time is None:
+                return
+            self._record_wait(wait_time)
             time.sleep(wait_time)
 
-    async def acquire_async(self) -> None:
-        """异步获取令牌（内部使用 ``asyncio.to_thread``）。"""
-        await asyncio.to_thread(self.acquire)
+    async def acquire_async(self, stop_event: asyncio.Event | None = None) -> None:
+        """异步原生获取令牌（优化路线图 2.3）。
+
+        等待在事件循环中执行（不再占线程池）；可被任务取消打断，或经
+        ``stop_event`` 提前放行（停止后调用方不会再发请求，无需令牌）。
+        """
+        while True:
+            wait_time = self._try_acquire()
+            if wait_time is None:
+                return
+            self._record_wait(wait_time)
+            remaining = wait_time
+            while remaining > 0:
+                if stop_event is not None and stop_event.is_set():
+                    return
+                await asyncio.sleep(min(0.1, remaining))
+                remaining -= 0.1
+            # 预支语义（与同步 acquire 一致）：等待完成即视为已获取令牌。
+            # 注意不能再调用 _try_acquire()——last_refill 已被推进到
+            # now+wait_time，再次计算会因 elapsed≈0 而永远不足。
+            return
 
     @property
     def stats(self) -> dict:

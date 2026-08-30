@@ -64,7 +64,7 @@ msg "   $(link 'https://video.lichuanyang.top' '🌐 官网：https://video.lich
 echo "================================================"
 echo ""
 
-IMAGE="${AGNES_IMAGE:-ghcr.io/lcy362/agnes-video-generator/free-short-video:4.7.2}"
+IMAGE="${AGNES_IMAGE:-ghcr.io/lcy362/agnes-video-generator/free-short-video:6.3.0}"
 NAME="agnes-video"
 PORT="${AGNES_PORT:-8765}"
 DATA_DIR="$(pwd)/agnes_data"
@@ -76,7 +76,9 @@ if docker ps -a --format '{{.Names}}' | grep -qx "$NAME"; then
   docker rm -f "$NAME" >/dev/null
 fi
 
-docker run -d --name "$NAME" -p "$PORT:$PORT" \
+# 端口映射：容器内固定监听 8765（未向容器注入 PORT），宿主侧用 $PORT。
+# 此前写成 -p "$PORT:$PORT"，AGNES_PORT=9000 时会映射成 9000:9000 导致无法访问。
+docker run -d --name "$NAME" -p "$PORT:8765" \
   -e AGNES_API_KEY="${AGNES_API_KEY:-}" \
   -v "$DATA_DIR/working:/app/.working_dir" \
   -v "$DATA_DIR/config:/app/.agnes_config" \

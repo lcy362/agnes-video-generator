@@ -22,6 +22,7 @@ import {
   buildDiagnosticReport,
   buildIssueTitle,
   buildIssueUrl,
+  TRACEBACK_MAX,
   FAQ_URL,
 } from '@/utils/feedback'
 
@@ -103,6 +104,16 @@ async function buildReport(): Promise<string> {
   let merged = base
   try {
     const d = await api.getTaskDiagnostics(props.taskId)
+    // v6.2.2：合并完整 traceback（定位环境级异常如 [WinError 2]，诊断端点已截断）
+    const summary = d && d.summary
+    if (summary && summary.error_traceback) {
+      merged +=
+        '\n' +
+        t('fbRepTraceback') +
+        '\n```\n' +
+        String(summary.error_traceback).slice(0, TRACEBACK_MAX) +
+        '\n```\n'
+    }
     const logs = d && d.error_logs
     if (Array.isArray(logs) && logs.length) {
       const unk = t('fbRepUnknown')
@@ -118,7 +129,7 @@ async function buildReport(): Promise<string> {
           (errMsg ? `- ${t('fbRepErrInfo')}: ${errMsg}\n` : '')
         )
       })
-      merged = base + '\n' + lines.join('\n')
+      merged += '\n' + lines.join('\n')
     }
   } catch {
     /* 端点失败/404 → 静默降级为纯前端版报告 */

@@ -6,7 +6,7 @@ import logging
 import os
 import shutil
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from core.artifacts import (
@@ -21,8 +21,7 @@ from core.config import get_working_dir
 from core.dependency_graph import get_dependency_graph
 from core.path_security import UnsafePathError, safe_join
 from core.task_manager import TaskManager
-from models.task import StepStatus, TaskType
-
+from models.task import StepStatus
 from web import app_state, helpers
 
 logger = logging.getLogger(__name__)

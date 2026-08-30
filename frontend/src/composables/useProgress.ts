@@ -2,7 +2,7 @@ import { ref, computed } from 'vue'
 import { appState } from '@/store'
 import { getStepsForType, isStepDoneInState } from '@/steps'
 import * as api from '@/api'
-import { t } from '@/i18n'
+import { t, escapeHtml } from '@/i18n'
 import { useGa } from './useGa'
 import { useArtifacts } from './useArtifacts'
 import { useToast } from './useToast'
@@ -35,6 +35,12 @@ const retryCount = ref(0)
 const needsResume = ref(false)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
+
+// 1.7 前端轮询体验：in-flight 守卫 + 连续失败退避提示 + 后台标签页暂停
+let pollInFlight = false
+let consecutivePollFailures = 0
+const connectionLost = ref(false)
+const MAX_CONSECUTIVE_POLL_FAILURES = 3
 
 function resetSteps(taskType: string) {
   steps.value = getStepsForType(taskType)
@@ -90,8 +96,10 @@ async function showProgress(taskId: string, dirName?: string | null): Promise<Ta
     }
   }
 
-  const dirInfo = dirName ? `<br><span class="text-muted text-xs">${t('dir')}: <span class="font-mono">${dirName}</span></span>` : ''
-  progressMessage.value = `<span class="text-accent animate-pulse">${t('taskStarting')}</span><br><span class="text-muted">${t('task_')}: ${taskId}</span>${dirInfo}`
+  // 优化路线图 0.8：dirName / taskId 均来自后端（目录名可含用户输入），
+  // 而 progressMessage 最终由 v-html 渲染，必须先转义再拼接，否则构成 XSS
+  const dirInfo = dirName ? `<br><span class="text-muted text-xs">${t('dir')}: <span class="font-mono">${escapeHtml(dirName)}</span></span>` : ''
+  progressMessage.value = `<span class="text-accent animate-pulse">${t('taskStarting')}</span><br><span class="text-muted">${t('task_')}: ${escapeHtml(taskId)}</span>${dirInfo}`
 
   // 加载已有中间产物（任务运行中也可查看）
   appState.currentArtifactsTaskId = taskId
@@ -113,7 +121,7 @@ async function mountProgressPage(taskId: string, dirName?: string | null) {
     // 立即用后端实时进度消息（排队中/当前步骤），避免首次展示「任务启动中 + 0%」占位
     if (state.current_message) {
       setProgressMessageHtml(
-        `<span class="text-accent animate-pulse">${state.current_message}</span>`,
+        `<span class="text-accent animate-pulse">${escapeHtml(state.current_message)}</span>`,
       )
     }
     startPolling(taskId)
@@ -196,12 +204,18 @@ function unmountProgressPage() {
 
 async function pollTaskProgress(taskId: string) {
   if (!appState.isTaskRunning || !taskId) return
+  // 1.7：in-flight 守卫，避免慢请求下轮询请求堆积、响应乱序覆盖进度
+  if (pollInFlight) return
+  pollInFlight = true
   try {
     const state = await api.getTask(taskId)
+    consecutivePollFailures = 0
+    connectionLost.value = false
 
     progressPct.value = Math.round((state.current_progress || 0) * 100)
     if (state.current_message) {
-      progressMessage.value = state.current_message
+      // 0.8：后端消息最终由 v-html 渲染，必须转义
+      progressMessage.value = escapeHtml(state.current_message)
     }
 
     markCompletedStepsFromState(state)
@@ -255,7 +269,13 @@ async function pollTaskProgress(taskId: string) {
       awaitingCheckpoint.value = ''
     }
   } catch {
-    // 网络错误静默，下次轮询重试
+    // 1.7：连续失败 N 次 → 提示连接异常（此前无限静默轮询，用户看不到原因）
+    consecutivePollFailures += 1
+    if (consecutivePollFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
+      connectionLost.value = true
+    }
+  } finally {
+    pollInFlight = false
   }
 }
 
@@ -264,12 +284,29 @@ function startPolling(taskId: string) {
   // 立即执行首次轮询：恢复/继续后无需等一个完整轮询周期（30s）即可刷新状态
   void pollTaskProgress(taskId)
   pollTimer = setInterval(() => pollTaskProgress(taskId), POLL_INTERVAL)
+  // 1.7：后台标签页暂停轮询，恢复可见时立即补一次（省资源 + 状态不落后）
+  document.addEventListener('visibilitychange', handlePollVisibility)
 }
 
 function stopPolling() {
   if (pollTimer) {
     clearInterval(pollTimer)
     pollTimer = null
+  }
+  document.removeEventListener('visibilitychange', handlePollVisibility)
+  connectionLost.value = false
+}
+
+function handlePollVisibility() {
+  if (document.hidden) {
+    if (pollTimer) {
+      clearInterval(pollTimer)
+      pollTimer = null
+    }
+  } else if (appState.currentTaskId) {
+    // 恢复可见：立即补一次轮询并恢复定时器
+    void pollTaskProgress(appState.currentTaskId)
+    startPolling(appState.currentTaskId)
   }
 }
 
@@ -307,6 +344,7 @@ export function useProgress() {
     awaitingCheckpoint,
     needsResume,
     retryCount,
+    connectionLost,
     retryFailedTask,
     resumeTask,
     showProgress,

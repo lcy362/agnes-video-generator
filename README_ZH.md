@@ -8,6 +8,49 @@
 [![Docker Hub](https://img.shields.io/docker/pulls/lcy362/free-short-video?label=docker%20pulls)](https://hub.docker.com/r/lcy362/free-short-video)
 [![npm](https://img.shields.io/npm/v/free-short-video?label=npm)](https://www.npmjs.com/package/free-short-video)
 
+<p align="center">
+  <img src="images/home.png" alt="Agnes Video Generator — 免费 AI 视频生成工具" width="720">
+</p>
+
+<!--
+schema.org 结构化数据，供搜索引擎与 AI 引擎索引。GitHub 不会执行该脚本，但源码中的 JSON-LD 可被爬取 README 的引擎读取。
+-->
+<!--
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Agnes Video Generator",
+  "alternateName": "免费 AI 视频生成工具",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Linux, macOS, Windows",
+  "description": "一个完全免费、开源的 AI 视频生成工具。无需订阅、无需高端显卡、没有用量限制——输入一段文字创意，即可自动生成带旁白配音与字幕的多场景 AI 视频。支持文生视频、图生视频、关键帧动画、数字人口播与文章成片。",
+  "url": "https://github.com/lcy362/agnes-video-generator",
+  "downloadUrl": "https://github.com/lcy362/agnes-video-generator",
+  "softwareVersion": "1.0.0",
+  "license": "https://opensource.org/licenses/MIT",
+  "keywords": "免费AI视频生成器, AI视频生成工具, 文字转视频AI, 免费AI视频制作, 开源视频生成器, AI旁白配音, 自动字幕, 多场景视频, Runway开源替代, Pika开源替代",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "author": {
+    "@type": "Person",
+    "@id": "https://lichuanyang.top/#author",
+    "name": "SandGrid",
+    "alternateName": "lcy362",
+    "url": "https://lichuanyang.top/",
+    "sameAs": [
+      "https://github.com/lcy362",
+      "https://gitee.com/sandgrid/agnes-video-generator",
+      "https://video.lichuanyang.top/"
+    ]
+  }
+}
+</script>
+-->
+
 > **🌏 镜像说明 / Mirror Notice**
 > 本项目在国内 Gitee 设有镜像仓库（[gitee.com/sandgrid/agnes-video-generator](https://gitee.com/sandgrid/agnes-video-generator)），便于国内访问加速；**GitHub 为项目主仓库**，Issue / PR / Star 均在 GitHub 提交。
 > This project is also mirrored on Gitee for faster access in mainland China; the GitHub repository is the primary home for issues, PRs and stars.
@@ -93,6 +136,20 @@ Agnes Video Generator 完全免费且开源，**本项目绝不会提供付费�
 | **本地 GPU 需求** | ❌ 不需要（云端 API） | ❌ 不需要（云端） | ❌ 不需要（云端） | ❌ 不需要（云端） | ❌ 不需要（云端） |
 | **水印** | 无水印 | 内置水印 | 内置水印 | C2PA 元数据 | 内置水印 |
 | **使用限制** | 无限（16次/分钟限速） | 按计算量计费 | 按生成量计费 | 按生成量计费 | 按生成量计费 |
+
+## ⚙️ 配置说明
+
+所有配置均通过环境变量设置，无需配置文件。如需一份带注释的模板，可直接复制项目自带的 `.env.example`：
+
+```bash
+cp .env.example .env    # 然后编辑其中的 AGNES_API_KEY
+```
+
+[`.env.example`](.env.example) 列出了全部支持的环境变量及其默认值：API Key、多 Key 轮询、限速参数、服务端口、模型覆盖与运维选项。
+
+> **有多个 API Key？** 依次设置 `AGNES_API_KEY`、`AGNES_API_KEY_2`、`AGNES_API_KEY_3` …（序号必须连续）。限速配额会随 Key 数量线性放大，遇到 429 会自动轮换到下一个 Key，并发上限也随之提升。
+
+完整步骤见：[快速开始 → 配置 API Key](docs/public/getting-started.zh.md)。
 
 ## 📚 文档导航
 

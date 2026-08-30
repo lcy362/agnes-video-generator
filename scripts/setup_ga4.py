@@ -80,11 +80,11 @@ def print_permission_help(property_id: str):
     print("=" * 60)
     print("服务账号尚未被授权访问该 GA4 媒体资源，请完成以下两步：")
     if email:
-        print(f"\n  1. 打开 https://analytics.google.com 并登录（需媒体资源所有者账号）")
-        print(f"  2. 左下角「管理」→「媒体资源访问权限管理」→ 右上角「+」")
+        print("\n  1. 打开 https://analytics.google.com 并登录（需媒体资源所有者账号）")
+        print("  2. 左下角「管理」→「媒体资源访问权限管理」→ 右上角「+」")
         print(f"     添加用户/邮箱：{email}")
-    print(f"     角色选「查看者」即可（Admin API 写入会自动获得对应权限）")
-    print(f"\n完成后重新运行本脚本即可继续（无需其他改动）。")
+    print("     角色选「查看者」即可（Admin API 写入会自动获得对应权限）")
+    print("\n完成后重新运行本脚本即可继续（无需其他改动）。")
     print("=" * 60)
 
 

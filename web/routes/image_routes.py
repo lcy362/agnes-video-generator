@@ -14,7 +14,6 @@ from core.api.agnes_image import AgnesImageAPI
 from core.config import API_KEY_MISSING_MSG, get_api_key
 from core.task_manager import TaskManager
 from models.task import SimpleImageTask, StepStatus
-
 from web import helpers
 
 logger = logging.getLogger(__name__)

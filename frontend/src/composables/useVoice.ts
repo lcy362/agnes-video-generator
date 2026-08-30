@@ -3,9 +3,11 @@ import { appState } from '@/store'
 import * as api from '@/api'
 import { t, currentLang } from '@/i18n'
 import { useToast } from './useToast'
+import { useConfirm } from './useConfirm'
 import type { Voice } from '@/types'
 
 const { showToast } = useToast()
+const { confirmAsync } = useConfirm()
 
 // 4 个任务的音色选择（c/m/a/p）
 export const voiceSelections = reactive<Record<string, string>>({
@@ -23,6 +25,7 @@ const query = ref('')
 const selectedId = ref<string | null>(null)
 
 let vpAudio: HTMLAudioElement | null = null
+let vpAudioUrl: string | null = null
 const playingId = ref<string | null>(null)
 
 const voiceIndex = computed(() => appState.voiceIndex)
@@ -123,16 +126,24 @@ async function previewVoice(id: string) {
     const r = await fetch(url)
     if (!r.ok) throw new Error('preview failed')
     const blob = await r.blob()
-    const audioUrl = URL.createObjectURL(blob)
-    vpAudio = new Audio(audioUrl)
+    vpAudioUrl = URL.createObjectURL(blob)
+    vpAudio = new Audio(vpAudioUrl)
     vpAudio.onended = () => {
       playingId.value = null
       vpAudio = null
+      if (vpAudioUrl) {
+        URL.revokeObjectURL(vpAudioUrl)
+        vpAudioUrl = null
+      }
     }
     await vpAudio.play()
   } catch (err) {
     console.error('voice preview error:', err)
     playingId.value = null
+    if (vpAudioUrl) {
+      URL.revokeObjectURL(vpAudioUrl)
+      vpAudioUrl = null
+    }
     showToast(t('previewFailed'), 3000)
   }
 }
@@ -142,10 +153,14 @@ function stopVoicePreview() {
     vpAudio.pause()
     vpAudio = null
   }
+  if (vpAudioUrl) {
+    URL.revokeObjectURL(vpAudioUrl)
+    vpAudioUrl = null
+  }
   playingId.value = null
 }
 
-function confirmVoiceSelection() {
+async function confirmVoiceSelection() {
   if (!pickerTask.value || !selectedId.value) {
     closeVoicePicker()
     return
@@ -155,7 +170,7 @@ function confirmVoiceSelection() {
   const compat = (appState.voiceCatalog && appState.voiceCatalog.compat_hint) || {}
   const supported = compat[voiceLang] || []
   if (voiceLang !== currentLang.value && !supported.includes(currentLang.value)) {
-    const ok = confirm(t('voiceCompatWarning'))
+    const ok = await confirmAsync(t('voiceCompatWarning'))
     if (!ok) return
   }
   voiceSelections[pickerTask.value] = selectedId.value

@@ -39,6 +39,14 @@ curl -X POST http://localhost:8765/api/config \
   -d '{"api_key": "your-api-key"}'
 ```
 
+> **💡 Prefer a config file?** Copy the bundled template [`.env.example`](../../.env.example) to `.env` in the project root and fill in your key. It documents every supported variable with its default — multi-key rotation, rate limits, port, model overrides:
+>
+> ```bash
+> cp .env.example .env    # then edit AGNES_API_KEY inside
+> ```
+>
+> **Using several API keys?** Name them `AGNES_API_KEY`, `AGNES_API_KEY_2`, `AGNES_API_KEY_3` … (numbering must be contiguous). Rate-limit quotas scale with the number of keys, and a `429` automatically rotates to the next key.
+
 **Step 3 — Create Your First Video**
 
 Open `http://localhost:8765`, choose a video mode (Simple / Creative / Manuscript / Anchor), enter your idea, and click "Start Generating".

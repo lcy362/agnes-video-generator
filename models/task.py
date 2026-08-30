@@ -12,10 +12,9 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
-
 
 # ═══════════════════════════════════════════════════
 # 枚举
@@ -184,6 +183,11 @@ class BaseTaskState(BaseModel):
     current_status: str = ""      # "running" | "completed" | "failed"
     current_progress: float = 0.0  # 0.0 ~ 1.0
     current_message: str = ""     # 人类可读消息
+
+    # ── v6.2.2：完整异常 traceback（诊断端点/前端反馈报告暴露，定位环境级异常如 [WinError 2]）──
+    # 流水线通用异常捕获时用 traceback.format_exc() 落盘，供用户无需翻服务端控制台即可
+    # 复制完整报错到 issue。默认空串，保证旧 task_state.json 加载向后兼容。
+    error_traceback: str = ""
 
     # ── v5.0 Batch 3（S4）：音频/字幕配置上提为共享字段 ──
     # Creative/Manuscript/Anchor/Poetry 统一继承，消除子类重复声明与

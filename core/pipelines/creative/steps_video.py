@@ -4,6 +4,7 @@ import os
 import re
 from typing import List
 
+from core.api.agnes_video import is_remote_video_failure
 from core.pipelines import PipelineShutdown
 from models.task import StepStatus
 
@@ -217,7 +218,7 @@ class VideoStepsMixin:
             )
             try:
                 video_output = await self.video_generator.wait_for_video(info["video_id"])
-                video_output.save(info["video_path"])
+                await video_output.save(info["video_path"])
                 await self._emit(
                     "video_gen", "running",
                     f"场景 {scene_idx+1}/{total}: 完成",
@@ -225,9 +226,13 @@ class VideoStepsMixin:
                 )
             except Exception as e:
                 logger.error(f"Scene {scene_idx} video failed: {e}")
-                task_file = os.path.join(info["scene_dir"], "task.json")
-                if os.path.exists(task_file):
-                    os.remove(task_file)
+                # 优化路线图 0.2：仅「服务端确认失败」才丢弃 video_id；
+                # 超时/用户取消/网络中断保留 task.json 供续传复用，
+                # 避免重复提交浪费 1 次/分钟/Key 的视频配额
+                if is_remote_video_failure(e):
+                    task_file = os.path.join(info["scene_dir"], "task.json")
+                    if os.path.exists(task_file):
+                        os.remove(task_file)
                 raise
 
         all_video_paths: List[str] = []
@@ -299,9 +304,19 @@ class VideoStepsMixin:
                     f"场景 {scene_idx+1}/{total}: 提交任务 (ti2vid)...",
                     _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * scene_idx / total,
                 )
+                # 优化路线图 3.6：双参考图——尾帧（时序连贯）+ 角色参考图
+                # （身份稳定），缓解链式生成的角色漂移累积。
+                # 首场景 current_image == reference_image 时避免重复提交同一张图。
+                ref_paths = [current_image]
+                if (
+                    reference_image
+                    and os.path.exists(reference_image)
+                    and current_image != reference_image
+                ):
+                    ref_paths = [current_image, reference_image]
                 video_id = await self.video_generator.submit_video(
                     prompt=scene_text,
-                    reference_image_paths=[current_image],
+                    reference_image_paths=ref_paths,
                     duration=self._scene_duration(scene_idx),
                     width=vw,
                     height=vh,
@@ -316,12 +331,15 @@ class VideoStepsMixin:
             )
             try:
                 video_output = await self.video_generator.wait_for_video(existing_video_id)
-                video_output.save(video_path)
+                await video_output.save(video_path)
             except Exception as e:
                 logger.error(f"Scene {scene_idx} video failed: {e}")
-                task_file = os.path.join(scene_dir, "task.json")
-                if os.path.exists(task_file):
-                    os.remove(task_file)
+                # 优化路线图 0.2：仅「服务端确认失败」才丢弃 video_id；
+                # 超时/用户取消/网络中断保留 task.json 供续传复用
+                if is_remote_video_failure(e):
+                    task_file = os.path.join(scene_dir, "task.json")
+                    if os.path.exists(task_file):
+                        os.remove(task_file)
                 raise
 
             all_video_paths.append(video_path)
@@ -351,7 +369,7 @@ class VideoStepsMixin:
                     reference_image_paths=[last_frame_url],
                     size=f"{vw}x{vh}",
                 )
-                img_output.save(transition_path)
+                await img_output.save(transition_path)
                 current_image = transition_path
 
             await self._emit(
@@ -483,7 +501,7 @@ class VideoStepsMixin:
                                 prompt=end_frame_prompt,
                                 size=f"{vw}x{vh}",
                             )
-                        img_output.save(end_frame_path)
+                        await img_output.save(end_frame_path)
 
             first_frame_url = await self.video_generator._resolve_image_ref(current_first_frame)
             end_frame_url = await self.video_generator._resolve_image_ref(end_frame_path)
@@ -547,7 +565,7 @@ class VideoStepsMixin:
             )
             try:
                 video_output = await self.video_generator.wait_for_video(info["video_id"])
-                video_output.save(info["video_path"])
+                await video_output.save(info["video_path"])
                 await self._emit(
                     "video_gen", "running",
                     f"场景 {scene_idx+1}/{total}: 完成",
@@ -555,9 +573,13 @@ class VideoStepsMixin:
                 )
             except Exception as e:
                 logger.error(f"Scene {scene_idx} video failed: {e}")
-                task_file = os.path.join(info["scene_dir"], "task.json")
-                if os.path.exists(task_file):
-                    os.remove(task_file)
+                # 优化路线图 0.2：仅「服务端确认失败」才丢弃 video_id；
+                # 超时/用户取消/网络中断保留 task.json 供续传复用，
+                # 避免重复提交浪费 1 次/分钟/Key 的视频配额
+                if is_remote_video_failure(e):
+                    task_file = os.path.join(info["scene_dir"], "task.json")
+                    if os.path.exists(task_file):
+                        os.remove(task_file)
                 raise
 
         all_video_paths: List[str] = []

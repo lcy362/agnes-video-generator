@@ -5,26 +5,12 @@ models — Agnes Video Generator v2.0 数据模型层
 """
 
 from models.task import (
-    # 枚举
-    StepStatus,
-    TaskType,
-    VideoMode,
-    # 配置类
-    AudioConfig,
-    SubtitleStyle,
-    # 子结构
-    ManuscriptParagraph,
-    SceneTask,
     # 任务状态模型
     AnchorVideoTask,
     AnyTaskState,
+    # 配置类
+    AudioConfig,
     BaseTaskState,
-    CreativeVideoTask,
-    ManuscriptVideoTask,
-    SimpleImageTask,
-    SimpleVideoTask,
-    # 工厂函数
-    parse_task_state,
     # 请求模型
     CreateAnchorTaskRequest,
     CreateCreativeTaskRequest,
@@ -33,10 +19,24 @@ from models.task import (
     CreateSimpleTaskRequest,
     # 向后兼容别名（Batch B/C 迁移完成后移除）
     CreateTaskRequest,
-    TaskState,
+    CreativeVideoTask,
+    # 子结构
+    ManuscriptParagraph,
+    ManuscriptVideoTask,
+    SceneTask,
+    SimpleImageTask,
+    SimpleVideoTask,
+    # 枚举
+    StepStatus,
+    SubtitleStyle,
     # 响应模型
     TaskResponse,
+    TaskState,
+    TaskType,
+    VideoMode,
     WSMessage,
+    # 工厂函数
+    parse_task_state,
 )
 
 __all__ = [
