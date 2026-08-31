@@ -30,11 +30,103 @@ logger = logging.getLogger(__name__)
 _SENTENCE_END_RE = re.compile(r"(?<=[。！？])")
 
 # Estimated Chinese speech rate: ~4 characters per second.
+# CJK is character-dense (one character ~= one syllable), but alphabetic scripts
+# (Arabic, Latin, Cyrillic, ...) read much faster per character (spaces + multi-char
+# words) — measured edge-tts Arabic narration averages ~12-13 chars/sec at default
+# rate. Using 4.0 for those scripts makes requested video duration ~3x longer than
+# the actual TTS audio, leaving most of the video with no narration at all.
 _CHARS_PER_SEC = 4.0
+_CHARS_PER_SEC_ALPHABETIC = 13.0
+
+# Arabic tashkeel (harakat) combining marks: they clarify pronunciation but add
+# zero speech duration, so they must be stripped before estimating duration
+# from character count -- otherwise a fully-diacritized script (roughly +40-60%
+# more codepoints) makes every duration estimate wildly overshoot the real TTS
+# audio length, leaving generated video clips with long silent/frozen tails.
+_ARABIC_DIACRITICS_RE = re.compile(r"[ً-ْٰ]")
+
+
+def _duration_len(text: str) -> int:
+    """Character count used for duration estimation (diacritics stripped)."""
+    return len(_ARABIC_DIACRITICS_RE.sub("", text))
+
+
+def _estimate_chars_per_sec(text: str) -> float:
+    """Pick a speech-rate estimate based on the text's dominant script."""
+    from core.audio.voices import detect_text_script
+
+    script = detect_text_script(text)
+    if script in ("zh", "ja", "ko"):
+        return _CHARS_PER_SEC
+    return _CHARS_PER_SEC_ALPHABETIC
 
 # Greedy-merge duration thresholds (seconds).
 _MAX_SEGMENT_DURATION = 12.0
 _MIN_SEGMENT_DURATION = 5.0
+
+
+def split_manuscript_text(text: str) -> List[str]:
+    """将长文本按朗读时长拆分为段落文本列表（纯函数，无实例状态）。
+
+    拆分策略:
+        1. 先按换行符 (``\\n``) 切分为粗段落。
+        2. 每个粗段落再按中文句末标点 (``。！？``) 切分为候选句。
+        3. 对候选句进行贪心合并：累积时长 <= 12s，最短 >= 5s。
+        4. 短句 (< 5s) 合并到前一个段落；长句 (> 12s) 保持原样不拆分。
+    """
+    chars_per_sec = _estimate_chars_per_sec(text)
+
+    # Step 1: split by newline.
+    raw_blocks = [b.strip() for b in text.split("\n") if b.strip()]
+
+    # Step 2: further split each block by Chinese sentence-ending punctuation.
+    candidate_sentences: List[str] = []
+    for block in raw_blocks:
+        parts = _SENTENCE_END_RE.split(block)
+        for part in parts:
+            part = part.strip()
+            if part:
+                candidate_sentences.append(part)
+
+    if not candidate_sentences:
+        return []
+
+    # Step 3: greedy merge.
+    merged: List[str] = []
+    current_text = ""
+    current_duration = 0.0
+
+    for sentence in candidate_sentences:
+        sentence_duration = _duration_len(sentence) / chars_per_sec
+
+        if not current_text:
+            current_text = sentence
+            current_duration = sentence_duration
+            continue
+
+        prospective_duration = current_duration + sentence_duration
+
+        if prospective_duration <= _MAX_SEGMENT_DURATION:
+            current_text += sentence
+            current_duration = prospective_duration
+        else:
+            merged.append(current_text)
+            current_text = sentence
+            current_duration = sentence_duration
+
+    if current_text:
+        merged.append(current_text)
+
+    # Step 4: post-process -- merge short trailing segments into previous.
+    final_texts: List[str] = []
+    for segment in merged:
+        seg_duration = _duration_len(segment) / chars_per_sec
+        if seg_duration < _MIN_SEGMENT_DURATION and final_texts:
+            final_texts[-1] += segment
+        else:
+            final_texts.append(segment)
+
+    return final_texts
 
 # 重试间隔基数（秒）：delay = 基数 * (retry + 1)
 _SUBMIT_RETRY_INTERVAL_BASE_SECONDS = 15
@@ -77,7 +169,9 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         super().__init__(api_key, task_id, dir_name, progress_callback, shutdown_event)
         self.video_api = AgnesVideoAPI(api_key=api_key, model=video_model)
         self.video_api.shutdown_event = shutdown_event
-        self.screenwriter = Screenwriter(api_key=api_key, model=chat_model)
+        # language="en"：系统提示词固定用英文书写，比默认的中文提示词更能可靠地
+        # 遵守"输出语言跟随输入"的规则（中文提示词下，英文输入偶发被错误写成中文）。
+        self.screenwriter = Screenwriter(api_key=api_key, model=chat_model, language="en")
 
     # ------------------------------------------------------------------
     # 模板钩子：数据来源
@@ -111,7 +205,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                 index=p.index,
                 scene_prompt=p.scene_prompt,
                 narration_text=p.text,
-                duration=max(int(math.ceil(len(p.text) / _CHARS_PER_SEC)), 3),
+                duration=max(int(math.ceil(_duration_len(p.text) / _estimate_chars_per_sec(p.text))), 3),
             )
             for p in self._state.paragraphs
         ]
@@ -158,57 +252,12 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             return self._state.paragraphs
 
         logger.info("[Manuscript] split_text: splitting %d chars...", len(text))
+        chars_per_sec = _estimate_chars_per_sec(text)
 
-        # Step 1: split by newline.
-        raw_blocks = [b.strip() for b in text.split("\n") if b.strip()]
-
-        # Step 2: further split each block by Chinese sentence-ending punctuation.
-        candidate_sentences: List[str] = []
-        for block in raw_blocks:
-            parts = _SENTENCE_END_RE.split(block)
-            for part in parts:
-                part = part.strip()
-                if part:
-                    candidate_sentences.append(part)
-
-        if not candidate_sentences:
+        final_texts = split_manuscript_text(text)
+        if not final_texts:
             logger.warning("[Manuscript] split_text: no sentences found in text")
             return []
-
-        # Step 3: greedy merge.
-        merged: List[str] = []
-        current_text = ""
-        current_duration = 0.0
-
-        for sentence in candidate_sentences:
-            sentence_duration = len(sentence) / _CHARS_PER_SEC
-
-            if not current_text:
-                current_text = sentence
-                current_duration = sentence_duration
-                continue
-
-            prospective_duration = current_duration + sentence_duration
-
-            if prospective_duration <= _MAX_SEGMENT_DURATION:
-                current_text += sentence
-                current_duration = prospective_duration
-            else:
-                merged.append(current_text)
-                current_text = sentence
-                current_duration = sentence_duration
-
-        if current_text:
-            merged.append(current_text)
-
-        # Step 4: post-process -- merge short trailing segments into previous.
-        final_texts: List[str] = []
-        for segment in merged:
-            seg_duration = len(segment) / _CHARS_PER_SEC
-            if seg_duration < _MIN_SEGMENT_DURATION and final_texts:
-                final_texts[-1] += segment
-            else:
-                final_texts.append(segment)
 
         # Build ManuscriptParagraph list.
         paragraphs: List[ManuscriptParagraph] = []
@@ -216,7 +265,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             paragraphs.append(ManuscriptParagraph(index=idx, text=para_text))
             logger.info(
                 "[Manuscript] Paragraph %d: %d chars, ~%.1fs",
-                idx, len(para_text), len(para_text) / _CHARS_PER_SEC,
+                idx, len(para_text), len(para_text) / chars_per_sec,
             )
 
         logger.info(
@@ -324,12 +373,14 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                 _PROGRESS_SUBMIT_START + _PROGRESS_SUBMIT_SPAN * (i / max(total, 1)),
             )
 
-            para_duration = max(int(math.ceil(len(para.text) / _CHARS_PER_SEC)), 3)
+            para_duration = max(int(math.ceil(_duration_len(para.text) / _estimate_chars_per_sec(para.text))), 3)
+            ref_images = self._state.reference_images.get(str(para.index), [])
 
             for retry in range(_SUBMIT_RETRIES):
                 try:
                     video_id = await self.video_api.submit_video(
                         prompt=para.scene_prompt,
+                        reference_image_paths=ref_images,
                         duration=para_duration,
                         width=self._state.video_width,
                         height=self._state.video_height,
@@ -399,6 +450,11 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             logger.warning("[Manuscript] audio: empty full text, skipping")
             return None
 
+        if audio_config.add_tashkeel:
+            from core.audio.tashkeel import add_tashkeel_safe
+
+            full_text = add_tashkeel_safe(full_text)
+
         audio_path = os.path.join(self.working_dir, "full_narration.mp3")
         # v5.x 产物规范前置：导出旁白纯文本（供外部 Agent/工具处理）
         self._save_narration_txt(full_text, audio_path)
@@ -443,7 +499,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
 
         segment_durations = []
         for p in paragraphs:
-            dur = max(len(p.text) / _CHARS_PER_SEC, 2.0) if p.text else 5.0
+            dur = max(_duration_len(p.text) / _estimate_chars_per_sec(p.text), 2.0) if p.text else 5.0
             segment_durations.append(dur)
 
         await self._emit(

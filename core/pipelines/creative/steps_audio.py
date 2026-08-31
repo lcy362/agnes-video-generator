@@ -207,8 +207,15 @@ class AudioStepsMixin:
 
         if not narration or len(narration) < 5:
             logger.warning("[Pipeline] LLM returned empty/short narration, using cleaned story fallback")
-            max_chars = max(int(total_duration * _CHARS_PER_SEC), 40)
+            from core.screenwriter.story import _narration_chars_per_sec
+
+            max_chars = max(int(total_duration * _narration_chars_per_sec(story)), 40)
             narration = clean_narration_text(_trim_to_sentence(story, max_chars)) if story else ""
+
+        if self._state.audio_config.add_tashkeel:
+            from core.audio.tashkeel import add_tashkeel_safe
+
+            narration = add_tashkeel_safe(narration)
 
         self._state.narrations = [narration]
         self.task_manager.update_state(narrations=[narration])

@@ -69,7 +69,9 @@ class CreativeVideoPipeline(
         """
         super().__init__(api_key, task_id, dir_name, progress_callback, shutdown_event)
 
-        self.screenwriter = Screenwriter(api_key=api_key, model=chat_model)
+        # language="en"：系统提示词固定用英文书写，比默认的中文提示词更能可靠地
+        # 遵守"输出语言跟随输入"的规则（中文提示词下，英文输入偶发被错误写成中文）。
+        self.screenwriter = Screenwriter(api_key=api_key, model=chat_model, language="en")
         self.image_generator = AgnesImageAPI(api_key=api_key, model=image_model)
         self.video_generator = AgnesVideoAPI(api_key=api_key, model=video_model)
         self.video_generator.shutdown_event = shutdown_event

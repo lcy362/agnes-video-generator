@@ -18,6 +18,11 @@ srt>=3.5.0,<4.0.0               # SRT 字幕解析/生成工具
 arabic-reshaper>=3.0.0,<4.0.0
 python-bidi>=0.4.2,<1.0.0
 
+# 阿拉伯语旁白自动加变音符号（tashkeel/harakat），提升 TTS 朗读准确度。
+# 用规则形态学分析而非 LLM：LLM 方案实测会偶发替换借词/连词拼写，不适合
+# 直接送入 TTS（core/audio/tashkeel.py 另有逐字符合并校验作为双重保险）。
+mishkal>=0.4.1,<0.5.0
+
 # v5.0 优化（可选依赖：缺失时自动降级，行为与旧版一致）
 json-repair>=0.25.0,<1.0.0      # LLM JSON 输出容错（optimization_roadmap §4）
 python-dotenv>=1.0.0,<2.0.0     # .env 支持（optimization_roadmap §1.8，.env.example 模板）

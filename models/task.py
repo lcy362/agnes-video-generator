@@ -98,6 +98,7 @@ class AudioConfig(BaseModel):
     enabled: bool = True
     voice: str = "zh-CN-XiaoxiaoNeural"
     rate: str = "+0%"
+    add_tashkeel: bool = False  # 阿拉伯语旁白自动加变音符号，提升 TTS 朗读准确度
 
 
 class ManualConfig(BaseModel):
@@ -323,6 +324,7 @@ class ManuscriptVideoTask(BaseTaskState):
 
     manuscript_text: str = ""
     style: str = ""  # 可选画面风格描述，传给场景 prompt 生成（默认空，保持旧行为）
+    reference_images: dict = Field(default_factory=dict)  # {段落 index(str): [本地图片路径, ...]}
     paragraphs: List[ManuscriptParagraph] = Field(default_factory=list)
     # v4.0 重构：通用场景列表（由 _build_scenes 填充，供模板与下游步骤引用）
     scenes: List[SceneTask] = Field(default_factory=list)

@@ -232,6 +232,7 @@ async def create_creative_task(
     audio_voice: str = Form("zh-CN-XiaoxiaoNeural"),
     audio_rate: str = Form("+0%"),
     audio_lang: str = Form(""),  # 页面语言，用于音色兼容性校验
+    audio_add_tashkeel: bool = Form(False),  # 阿拉伯语旁白自动加变音符号
     # v3.0 字幕独立配置
     subtitle_enabled: bool = Form(True),
     subtitle_style_mode: str = Form("fixed"),
@@ -277,6 +278,7 @@ async def create_creative_task(
         enabled=audio_enabled,
         voice=audio_voice,
         rate=audio_rate,
+        add_tashkeel=audio_add_tashkeel,
     )
     # 构建独立字幕配置（v3.0）
     subtitle_config = _build_subtitle_config(
@@ -352,6 +354,8 @@ async def create_manuscript_task(
     manuscript_text: str = Form(...),
     creative_name: str = Form(""),
     style: str = Form(""),
+    reference_images: List[UploadFile] = File([]),
+    reference_images_map: str = Form("[]"),  # JSON: 每个上传图片对应的段落 index 数组，顺序与 reference_images 一致
     video_width: int = Form(768),
     video_height: int = Form(1152),
     video_duration: int = Form(10),
@@ -360,6 +364,7 @@ async def create_manuscript_task(
     audio_voice: str = Form("zh-CN-XiaoxiaoNeural"),
     audio_rate: str = Form("+0%"),
     audio_lang: str = Form(""),  # 页面语言，用于音色兼容性校验
+    audio_add_tashkeel: bool = Form(False),  # 阿拉伯语旁白自动加变音符号
     # v3.0 字幕独立配置
     subtitle_enabled: bool = Form(True),
     subtitle_style_mode: str = Form("fixed"),
@@ -394,11 +399,28 @@ async def create_manuscript_task(
     name = creative_name.strip() if creative_name else f"manuscript_{task_id}"
     dir_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_id}"
 
+    # 处理逐段参考图上传：每张图对应一组段落 index，用于 i2v 引导该场景画面
+    ref_images_by_para: dict = {}
+    if reference_images:
+        try:
+            idx_map = json.loads(reference_images_map) if reference_images_map else []
+        except Exception:
+            raise HTTPException(status_code=422, detail="reference_images_map 必须为 JSON 数组")
+        upload_dir = helpers.get_upload_dir()
+        for i, up in enumerate(reference_images):
+            if not up or not up.filename:
+                continue
+            saved_path = await _save_upload_file(up, upload_dir, f"{task_id}_ref{i}")
+            para_indices = idx_map[i] if i < len(idx_map) else []
+            for pidx in para_indices:
+                ref_images_by_para.setdefault(str(pidx), []).append(saved_path)
+
     # 构建音频配置
     audio_config = AudioConfig(
         enabled=audio_enabled,
         voice=audio_voice,
         rate=audio_rate,
+        add_tashkeel=audio_add_tashkeel,
     )
     # 构建独立字幕配置（v3.0）
     subtitle_config = _build_subtitle_config(
@@ -412,6 +434,7 @@ async def create_manuscript_task(
         creative_name=name,
         manuscript_text=manuscript_text.strip(),
         style=style.strip(),
+        reference_images=ref_images_by_para,
         video_width=video_width,
         video_height=video_height,
         video_duration=video_duration,
@@ -657,6 +680,7 @@ async def create_task_legacy(
         audio_voice="zh-CN-XiaoxiaoNeural",
         audio_rate="+0%",
         audio_lang="",
+        audio_add_tashkeel=False,
         subtitle_enabled=True,
         subtitle_style_mode="fixed",
         subtitle_style_hints="",

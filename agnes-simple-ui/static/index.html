@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agnes Simple Video Maker</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="wrap">
+  <h1>🎬 Simple Video Maker</h1>
+  <p class="subtitle">Type a topic or paste a script → pick a voice → generate a Short.</p>
+
+  <!-- Language -->
+  <div class="card">
+    <h2>Language</h2>
+    <div class="toggle-group" id="lang-toggle">
+      <button data-lang="ar" class="active">العربية</button>
+      <button data-lang="en">English</button>
+    </div>
+  </div>
+
+  <!-- Content mode -->
+  <div class="card">
+    <h2>Content</h2>
+    <div class="toggle-group" id="mode-toggle">
+      <button data-mode="script" class="active">I have a script</button>
+      <button data-mode="topic">Just a topic</button>
+    </div>
+
+    <!-- Script mode -->
+    <div id="script-panel">
+      <label for="manuscript-text">Full script / narration text</label>
+      <textarea id="manuscript-text" rows="8" placeholder="اكتب أو الصق النص الكامل هنا…"></textarea>
+      <div class="actions">
+        <button class="secondary" id="btn-preview-split">Preview Split</button>
+        <button class="secondary hidden" id="btn-cancel-split">Cancel</button>
+      </div>
+      <div id="split-result" class="scene-list hidden"></div>
+    </div>
+
+    <!-- Topic mode -->
+    <div id="topic-panel" class="hidden">
+      <label for="topic-idea">Topic / idea</label>
+      <textarea id="topic-idea" rows="3" placeholder="اكتب فكرتك هنا…"></textarea>
+      <div class="row">
+        <div>
+          <label for="scene-count">Number of scenes</label>
+          <input type="number" id="scene-count" value="5" min="2" max="10" />
+        </div>
+        <div>
+          <label for="total-duration">Total duration (sec)</label>
+          <input type="number" id="total-duration" value="40" min="10" max="120" />
+        </div>
+      </div>
+      <div class="actions">
+        <button class="secondary" id="btn-preview-script">Preview Script</button>
+        <button class="secondary hidden" id="btn-cancel-script">Cancel</button>
+      </div>
+      <div id="script-result" class="scene-list hidden"></div>
+    </div>
+
+    <label for="style-text">Visual style (used for every scene's image/video prompt)</label>
+    <textarea id="style-text" rows="4">Write this visual prompt in English regardless of the narration's language — video generation models respond more precisely to English prompts. Cinematic, realistic, high detail. Critical: do NOT depict any readable text, numbers, writing, or letters anywhere in the scene — AI video generation cannot render legible script and produces garbled nonsense.</textarea>
+
+    <label for="ref-image">Reference image(s) (optional — you can pick more than one)</label>
+    <input type="file" id="ref-image" accept="image/*" multiple />
+    <p class="hint" id="ref-image-hint">
+      Script mode: every image you pick is used to keep the same look across all scenes.
+      Topic mode: the first image sets the overall look for the whole video; any extra
+      images are each assigned to one scene (2nd image → scene 2, 3rd → scene 3, …).
+    </p>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="subtitle-toggle" />
+      <label for="subtitle-toggle">Burn in subtitles</label>
+    </div>
+    <div id="subtitle-options" class="subtitle-options hidden">
+      <div class="row">
+        <div>
+          <label for="subtitle-color">Text color</label>
+          <select id="subtitle-color">
+            <option value="white" selected>White</option>
+            <option value="yellow">Yellow</option>
+            <option value="black">Black</option>
+          </select>
+        </div>
+        <div>
+          <label for="subtitle-position">Position</label>
+          <select id="subtitle-position">
+            <option value="bottom" selected>Bottom</option>
+            <option value="center">Center</option>
+            <option value="top">Top</option>
+          </select>
+        </div>
+        <div>
+          <label for="subtitle-fontsize">Font size</label>
+          <input type="number" id="subtitle-fontsize" value="48" min="24" max="80" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Voice -->
+  <div class="card">
+    <h2>Voice</h2>
+    <div class="voice-row">
+      <select id="voice-select"></select>
+      <button class="icon-btn" id="btn-voice-preview" title="Preview voice">▶</button>
+    </div>
+    <audio id="voice-preview-audio" class="hidden"></audio>
+    <p class="hint" id="voice-hint"></p>
+  </div>
+
+  <!-- Generate -->
+  <div class="card">
+    <h2>Generate</h2>
+    <button class="primary" id="btn-generate" disabled>Generate Video</button>
+    <p class="hint">Run "Preview Split" or "Preview Script" above first.</p>
+
+    <div id="progress-area" class="hidden">
+      <div class="progress-bar"><div class="progress-bar-fill" id="progress-fill"></div></div>
+      <p class="status-msg" id="status-msg"></p>
+      <button class="secondary" id="btn-cancel-generate">Cancel</button>
+    </div>
+
+    <div id="narration-preview" class="hidden">
+      <label>🔊 Narration preview</label>
+      <audio id="narration-audio" controls></audio>
+    </div>
+
+    <div id="video-result" class="hidden">
+      <video id="result-video" controls></video>
+      <div class="actions">
+        <a id="video-download" class="download-link" download="video.mp4">⬇ Download video</a>
+        <button class="secondary" id="btn-open-folder">📁 Show in Finder</button>
+      </div>
+    </div>
+
+    <div id="generate-error" class="error-box hidden"></div>
+  </div>
+
+  <!-- Cover -->
+  <div class="card">
+    <h2>Cover image</h2>
+    <label for="cover-prompt">Background visual prompt</label>
+    <textarea id="cover-prompt" rows="3">Dramatic split-composition cinematic 3D render, deep black space background with soft volumetric lighting, high contrast, no text, no letters, no logos.</textarea>
+    <label for="cover-title">Title text (burned into the cover)</label>
+    <input type="text" id="cover-title" placeholder="عنوان الفيديو" />
+    <div class="actions">
+      <button class="primary" id="btn-generate-cover">Generate Cover</button>
+      <button class="secondary hidden" id="btn-cancel-cover">Cancel</button>
+    </div>
+    <div id="cover-progress" class="hint hidden">Generating…</div>
+    <div id="cover-result" class="hidden">
+      <img id="cover-img" class="preview-img" />
+      <a id="cover-download" class="download-link" download="cover.png">Download cover</a>
+    </div>
+    <div id="cover-error" class="error-box hidden"></div>
+  </div>
+
+  <!-- Projects -->
+  <div class="card">
+    <button class="secondary" id="btn-toggle-projects" style="width:100%; text-align:left;">
+      📂 Projects (<span id="projects-count">0</span>) — click to expand
+    </button>
+    <div id="projects-list" class="scene-list hidden" style="margin-top:12px;"></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

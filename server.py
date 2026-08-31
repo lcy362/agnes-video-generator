@@ -22,6 +22,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -32,6 +33,7 @@ from web.routes import (
     config_routes,
     health_routes,
     image_routes,
+    preview_routes,
     task_creation_routes,
     task_routes,
     utility_routes,
@@ -116,6 +118,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# 本地简化 UI（agnes-simple-ui，独立项目，:8787）跨源调用本服务 API 所需。
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8787", "http://127.0.0.1:8787"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # ═══════════════════════════════════════════════════
 # Static files
@@ -160,6 +170,7 @@ app.include_router(image_routes.router)
 app.include_router(video_routes.router)
 app.include_router(task_routes.router)
 app.include_router(task_creation_routes.router)
+app.include_router(preview_routes.router)
 
 
 # ═══════════════════════════════════════════════════
