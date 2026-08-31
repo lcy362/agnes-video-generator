@@ -21,20 +21,30 @@ function setGaOptOut(on: boolean) {
   }
 }
 
+// 加载 gtag 脚本并触发一次匿名 page_view（供 PV/UV 统计）
+function loadGtag() {
+  window.dataLayer = window.dataLayer || []
+  window.gtag = function (...args: unknown[]) {
+    window.dataLayer!.push(args)
+  }
+  const s = document.createElement('script')
+  s.async = true
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA_MEASUREMENT_ID)
+  document.head.appendChild(s)
+  window.gtag('js', new Date())
+  window.gtag('config', GA_MEASUREMENT_ID)
+}
+
+let initialized = false
 function initGA() {
-  if (gaEnabled || isGaOptedOut()) return
-  gaEnabled = true
+  if (initialized) return
+  initialized = true
   try {
-    window.dataLayer = window.dataLayer || []
-    window.gtag = function (...args: unknown[]) {
-      window.dataLayer!.push(args)
-    }
-    const s = document.createElement('script')
-    s.async = true
-    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA_MEASUREMENT_ID)
-    document.head.appendChild(s)
-    window.gtag('js', new Date())
-    window.gtag('config', GA_MEASUREMENT_ID)
+    // 3.4：隐私开关关闭（opt-out）时也上报一次匿名 page_view，保证 GA 的
+    // PV/UV 统计准确；但 gaEnabled 保持 false，拦截后续事件/异常上报，
+    // 不分享用户内容、API Key 等任何其他信息。
+    loadGtag()
+    gaEnabled = !isGaOptedOut()
   } catch (e) {
     console.warn('GA init failed:', e)
     gaEnabled = false

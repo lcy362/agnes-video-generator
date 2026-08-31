@@ -557,7 +557,7 @@
   "fbRepErrInfo": "Error Message",
   "privacyTitle": "Privacy",
   "gaOptOutLabel": "Opt out of anonymous analytics",
-  "gaOptOutHint": "When enabled, no analytics scripts (Google Analytics 4) are loaded and no data is reported.",
+  "gaOptOutHint": "When enabled, only a single anonymous page view (for PV/UV stats) is kept; no other information is reported.",
   "gaReportTitle": "When analytics is on, the following is reported anonymously",
   "gaReportItem1": "Task events: create, complete, fail, stop, delete",
   "gaReportItem2": "Task type and generation mode (e.g. Simple/t2v, Creative)",
