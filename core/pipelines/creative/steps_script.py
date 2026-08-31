@@ -254,7 +254,7 @@ class ScriptStepsMixin:
             self.screenwriter.develop_story,
             self._state.idea,
             "",
-            self._state.style,
+            self._style_with_language_directive(),
             image_context,
             self._state.scene_count,
             self._state.scene_durations,
@@ -377,7 +377,7 @@ class ScriptStepsMixin:
         await self._emit("script", "running", "正在编写脚本...", _PROGRESS_SCRIPT_START)
         scenes = await asyncio.to_thread(
             self.screenwriter.write_script, story, "",
-            self._state.style,
+            self._style_with_language_directive(),
             self._state.scene_count,
             self._state.scene_durations,
         )

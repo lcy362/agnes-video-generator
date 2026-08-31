@@ -186,18 +186,24 @@ def detect_text_script(text: str) -> str:
 # 单一公共实现（PRD 1.3a）：story.py / manuscript_video.py / preview_routes
 # 均从本模块导入，消除此前两处 4.0/13.0 常量与脚本判断的重复副本。
 
-# CJK 字符密度高（一字近一音节），约 4 字/秒
+# CJK 字符密度高（一字近一音节），约 4 字/秒（实测 zh-CN-Xiaoxiao ≈ 4.7，取保守值）
 _CHARS_PER_SEC_CJK = 4.0
-# 阿拉伯文/拉丁文/西里尔文等字母文字含空格与多字符单词，实测约 13 字符/秒
+# 阿拉伯文（2026-08-31 实测校准：ar-SA-Hamed/Zariyah ≈ 10.4-10.6、ar-EG-Shakir ≈ 12.0
+# 字符/秒，真实旁白含句间停顿更低，取 10.5；PR #33 原沿用的统一 13 偏快，会导致
+# 旁白比画面长出约 40%，视频被迫定格等待旁白结束）
+_CHARS_PER_SEC_ARABIC = 10.5
+# 其余字母文字（拉丁/西里尔/泰文/天城文/孟加拉文等）统一 13 字符/秒
+# （英文实测 15.7-16.8 偏快、法/西/俄未实测，13 为折中保守值，后续可分档校准）
 _CHARS_PER_SEC_ALPHABETIC = 13.0
 
 
 def estimate_chars_per_sec(text: str) -> float:
     """按文本主要文字体系估算朗读语速（字符/秒）。
 
-    中文/日文/韩文按 CJK 速率（4.0 字/秒）；其余脚本（阿拉伯/拉丁/西里尔/
-    泰文/天城文/孟加拉文等）统一按字母文字速率（13.0 字符/秒，沿自 PR #33
-    对阿拉伯文的实测，泰文等未实测脚本先用统一值，后续可校准）。
+    中文/日文/韩文按 CJK 速率（4.0 字/秒）；阿拉伯文按实测速率（10.5 字符/秒，
+    见 ``_CHARS_PER_SEC_ARABIC`` 校准记录）；其余脚本（拉丁/西里尔/泰文/
+    天城文/孟加拉文等）统一按字母文字速率（13.0 字符/秒，泰文等未实测脚本
+    先用统一值，后续可校准）。
 
     Args:
         text: 待估算朗读时长的文本。
@@ -208,6 +214,8 @@ def estimate_chars_per_sec(text: str) -> float:
     script = detect_text_script(text)
     if script in ("zh", "ja", "ko"):
         return _CHARS_PER_SEC_CJK
+    if script == "arabic":
+        return _CHARS_PER_SEC_ARABIC
     return _CHARS_PER_SEC_ALPHABETIC
 
 

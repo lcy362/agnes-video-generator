@@ -49,6 +49,52 @@ def is_prompt_language_explicit() -> bool:
     except Exception:
         return False
 
+
+def build_input_language_directive(text: str) -> str:
+    """为非中文输入构建前置到 style 的显式语言指令（PRD 1.4 pinning 的补充）。
+
+    背景：agnes-2.0-flash 在英文系统提示词（language pinning）下仍会因 user
+    prompt 内的中文章节片段（如"共 N 个场景，时长分别为…"）把非中文 idea 写成
+    中文故事/旁白（2026-08-31 实测复现）。仅靠 pinning 不足，需要一条显式目标
+    语言指令前置到 style——与 preview 端点的 ``_language_directive`` 同机制。
+
+    中文/无法识别脚本返回空串（无指令，保持既有行为）；场景视觉提示词仍保持
+    英文（视频生成模型对英文提示词响应更精确）。
+
+    Args:
+        text: 输入文本（创意流水线为 idea），用于检测主要文字体系。
+
+    Returns:
+        前置到 style 的语言指令字符串；无需指令时为空串。
+    """
+    from core.audio.voices import detect_text_script
+
+    if not text or not text.strip():
+        return ""
+    script = detect_text_script(text)
+    if script in ("zh", "unknown"):
+        return ""
+    labels = {"arabic": "Arabic", "ru": "Russian", "ja": "Japanese", "ko": "Korean"}
+    label = labels.get(script)
+    if label:
+        head = (
+            f"IMPORTANT: Write the story and the narration text in {label} only — "
+            "do not use any other language."
+        )
+    else:
+        # latin/thai/bengali/devanagari 等无法从文字体系唯一确定语言，
+        # 用"与输入同语言"指令并显式禁止漂移到中文。
+        head = (
+            "IMPORTANT: Write the story and the narration text in the SAME "
+            "language as the input idea — do not switch to another language "
+            "(in particular, do not write in Chinese unless the input is Chinese)."
+        )
+    return (
+        head
+        + " For scene visual prompts specifically, still write in English instead "
+        "(video generation models respond more precisely to English prompts).\n\n"
+    )
+
 # 图片描述重试间隔基数（秒）：delay = 基数 * (attempt + 1)
 _DESCRIBE_RETRY_BASE_DELAY_SECONDS = 15
 

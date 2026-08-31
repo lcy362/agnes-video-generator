@@ -27,7 +27,7 @@ from fastapi import APIRouter, Form, HTTPException
 from core.audio.voices import duration_len, estimate_chars_per_sec
 from core.config import API_KEY_MISSING_MSG, get_api_key, get_selected_models
 from core.pipelines.manuscript_video import split_manuscript_text
-from core.screenwriter import Screenwriter
+from core.screenwriter import Screenwriter, is_prompt_language_explicit
 
 logger = logging.getLogger(__name__)
 
@@ -201,12 +201,15 @@ async def preview_creative_script(
         style = _language_directive(content_lang) + style
 
         text_model = get_selected_models()["text"]
-        # 显式指定 language="en"：Screenwriter 的系统提示词默认使用 PROMPT_LANGUAGE
-        # 环境变量（默认 "zh"），而非固定跟随输入语言。中文系统提示词会让模型倾向于
-        # 输出中文，即使提示词本身写明"使用与输入相同的语言"——实测英文 idea 在中文
-        # 系统提示词下会被错误地写成中文故事/旁白。英文系统提示词经验证对阿拉伯语和
-        # 英语输入都能正确遵循"与输入语言一致"的规则，因此固定使用 "en"。
-        screenwriter = Screenwriter(api_key=api_key, model=text_model, language="en")
+        # 语言 pinning 与流水线（PRD 1.4）保持同一语义：默认 en、尊重显式配置。
+        # 仅当用户未显式设置 PROMPT_LANGUAGE（使用默认 zh）时固定 language="en"——
+        # 中文系统提示词会让模型倾向于输出中文，即使提示词本身写明"使用与输入
+        # 相同的语言"（实测英文 idea 会被错误地写成中文故事/旁白）。英文系统提示词
+        # 经验证对阿拉伯语和英语输入都能正确遵循"与输入语言一致"的规则。
+        # 若用户显式配置了 PROMPT_LANGUAGE，则 language=None 走 PROMPT_LANGUAGE
+        # （显式配置代表用户知情选择，不应被硬编码覆盖；content_lang 指令仍前置）。
+        _sw_language = None if is_prompt_language_explicit() else "en"
+        screenwriter = Screenwriter(api_key=api_key, model=text_model, language=_sw_language)
 
         story = await asyncio.to_thread(
             screenwriter.develop_story, idea, "", style, "", scene_count, scene_durations,

@@ -204,7 +204,7 @@ class AudioStepsMixin:
             story,
             scenes,
             total_duration,
-            self._state.style,
+            self._style_with_language_directive(),
         )
 
         if not narration or len(narration) < 5:

@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 _SENTENCE_END_RE = re.compile(r"(?<=[。！？])")
 
 # 语速估算统一走 core.audio.voices（PRD 1.3a），此处不再维护重复常量：
-# CJK ~4 字/秒，阿拉伯文/拉丁文等字母文字 ~13 字符/秒。
+# CJK ~4 字/秒，阿拉伯文 10.5 字符/秒（2026-08-31 实测校准），其余字母文字 ~13 字符/秒。
 
 # Greedy-merge duration thresholds (seconds).
 _MAX_SEGMENT_DURATION = 12.0

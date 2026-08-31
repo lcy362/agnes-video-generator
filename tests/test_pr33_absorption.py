@@ -40,9 +40,16 @@ class TestSpeechRateEstimate:
         from core.audio.voices import estimate_chars_per_sec
 
         assert estimate_chars_per_sec("English narration text") == 13.0
-        # 阿拉伯语：字母文字（PR #33 实测 12-13 字符/秒）
-        assert estimate_chars_per_sec("مرحبا بالعالم") == 13.0
         assert estimate_chars_per_sec("Русский текст") == 13.0
+
+    def test_arabic_script_uses_calibrated_rate(self):
+        """阿拉伯文单独一档（2026-08-31 实测校准：SA 音色 ≈10.4-10.6、EG ≈12.0）。
+
+        PR #33 原统一 13 字符/秒偏快，导致旁白比画面长出约 40%。
+        """
+        from core.audio.voices import estimate_chars_per_sec
+
+        assert estimate_chars_per_sec("مرحبا بالعالم") == 10.5
 
     def test_duration_len_strips_arabic_diacritics(self):
         from core.audio.tashkeel import strip_diacritics
@@ -131,6 +138,51 @@ class TestPromptLanguageExplicit:
         assert is_prompt_language_explicit() is True
 
 
+class TestInputLanguageDirective:
+    """非中文输入的显式语言指令（pinning 的补充，2026-08-31 实测发现 pinning 不足）。"""
+
+    def test_chinese_and_unknown_return_empty(self):
+        from core.screenwriter import build_input_language_directive
+
+        assert build_input_language_directive("海边小镇的暖心故事") == ""
+        assert build_input_language_directive("") == ""
+        assert build_input_language_directive("   ") == ""
+        assert build_input_language_directive("12345") == ""
+
+    def test_arabic_directive_mentions_language(self):
+        from core.screenwriter import build_input_language_directive
+
+        d = build_input_language_directive("رحلة قصيرة في الصحراء")
+        assert "Arabic" in d
+        assert "English" in d  # 场景视觉提示词仍英文的约定
+
+    def test_known_scripts_have_explicit_labels(self):
+        from core.screenwriter import build_input_language_directive
+
+        assert "Russian" in build_input_language_directive("Русский текст")
+        assert "Japanese" in build_input_language_directive("日本語のテスト")
+        assert "Korean" in build_input_language_directive("한국어 테스트")
+
+    def test_latin_uses_same_language_phrase(self):
+        from core.screenwriter import build_input_language_directive
+
+        d = build_input_language_directive("A story about a lighthouse keeper")
+        assert "SAME language as the input idea" in d
+        assert "Chinese" in d  # 显式禁止漂移到中文
+
+    def test_creative_pipeline_style_helper(self):
+        """_style_with_language_directive：指令 + 用户 style 拼接。"""
+        from core.pipelines.creative.pipeline import CreativeVideoPipeline
+
+        p = object.__new__(CreativeVideoPipeline)
+        p._state = type("S", (), {"idea": "مرحبا", "style": "cinematic"})()
+        combined = CreativeVideoPipeline._style_with_language_directive(p)
+        assert "Arabic" in combined and combined.endswith("cinematic")
+
+        p._state = type("S", (), {"idea": "中文故事", "style": "cinematic"})()
+        assert CreativeVideoPipeline._style_with_language_directive(p) == "cinematic"
+
+
 # ═══════════════════════════════════════════════
 # 5. Preview 端点（PRD 1.1 / 1.1a）
 # ═══════════════════════════════════════════════
@@ -217,6 +269,55 @@ class TestPreviewEndpoints:
         with TestClient(app) as client:
             r = client.post("/api/manuscript/preview-split", data={"manuscript_text": ""})
             assert r.status_code == 422  # Form 必填
+
+    def test_preview_script_language_pinning(self, monkeypatch):
+        """preview 的 Screenwriter language 与流水线（PRD 1.4）同语义。
+
+        未显式设置 PROMPT_LANGUAGE → 固定 "en"（中文系统提示词会把非中文
+        idea 写成中文）；显式设置 → language=None 走用户配置，不被覆盖。
+        """
+        import web.routes.preview_routes as preview_mod
+
+        captured = {}
+
+        class _FakeScreenwriter:
+            def __init__(self, *, api_key, model, language):
+                captured["language"] = language
+
+            def develop_story(self, *a, **k):
+                return "story"
+
+            def write_script(self, *a, **k):
+                return ["scene 1"]
+
+            def generate_narration_for_video(self, *a, **k):
+                return "narration text"
+
+        monkeypatch.setattr(preview_mod, "Screenwriter", _FakeScreenwriter)
+
+        from fastapi.testclient import TestClient
+
+        from server import app
+
+        # 未显式设置 → pin 到 "en"
+        monkeypatch.delenv("PROMPT_LANGUAGE", raising=False)
+        with TestClient(app) as client:
+            r = client.post(
+                "/api/creative/preview-script",
+                data={"idea": "a story", "content_lang": "en"},
+            )
+            assert r.status_code == 200
+            assert captured["language"] == "en"
+
+        # 显式设置 → 走用户配置（language=None）
+        monkeypatch.setenv("PROMPT_LANGUAGE", "zh")
+        with TestClient(app) as client:
+            r = client.post(
+                "/api/creative/preview-script",
+                data={"idea": "a story", "content_lang": "en"},
+            )
+            assert r.status_code == 200
+            assert captured["language"] is None
 
 
 # ═══════════════════════════════════════════════

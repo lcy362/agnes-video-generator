@@ -74,6 +74,9 @@ class CreativeVideoPipeline(
         # 实测英文/阿拉伯文 idea 在中文提示词下偶发被错误写成中文故事/旁白。
         # 仅当用户未显式设置 PROMPT_LANGUAGE（使用默认 zh）时固定 language="en"；
         # 显式配置代表用户知情选择，以用户配置为准（language=None 走 PROMPT_LANGUAGE）。
+        # 补充（2026-08-31 实测）：英文系统提示词下模型仍会因 user prompt 内的中文章节
+        # 片段把非中文 idea 写成中文——流水线三处 LLM 调用（故事/脚本/旁白）额外前置
+        # 显式语言指令（_style_with_language_directive），与 preview 端点同机制。
         from core.screenwriter import is_prompt_language_explicit
 
         _sw_language = None if is_prompt_language_explicit() else "en"
@@ -83,6 +86,17 @@ class CreativeVideoPipeline(
         self.video_generator.shutdown_event = shutdown_event
 
         self._state: Optional[CreativeVideoTask] = None
+
+    def _style_with_language_directive(self) -> str:
+        """用户 style 前置基于 idea 文字体系的显式语言指令。
+
+        idea 为非中文脚本时返回「指令 + style」，中文 idea 原样返回 style
+        （指令为空串）。指令确保故事/旁白跟随输入语言，同时保留"场景视觉提示词
+        用英文"的既有约定。
+        """
+        from core.screenwriter import build_input_language_directive
+
+        return build_input_language_directive(self._state.idea) + self._state.style
 
     # ------------------------------------------------------------------
     # Properties

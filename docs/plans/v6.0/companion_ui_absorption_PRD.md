@@ -158,7 +158,7 @@ Not scheduled yet; recorded here so the intent is explicit. A "simple mode" tab 
   Spotted 2026-08-30 while implementing the Arabic PR #32 follow-up
   (`docs/plans/optimization-research/arabic_pr_followup.md`); both sets were
   verified equal at that point.
-- **泰文/天城文/孟加拉文语速实测校准。** 1.3 的 `estimate_chars_per_sec` 对全部非 CJK 脚本统一用 13 字/秒（沿自 PR #33 对阿拉伯文的实测）。泰文（无空格分词）、天城文、孟加拉文的真实 edge-tts 语速未实测，先用统一值上线，后续用真实 TTS 时长数据分脚本校准。
+- **泰文/天城文/孟加拉文/拉丁语种语速分档校准。** `estimate_chars_per_sec` 已于 2026-08-31 实测校准阿拉伯文（10.5 字符/秒，单独一档；PR #33 原沿用的统一 13 偏快，导致阿拉伯语旁白比画面长出约 40%）。其余脚本仍统一 13：泰文（无空格分词）、天城文、孟加拉文未实测；英文实测 15.7-16.8（偏快，但法/西/俄未实测，13 为折中保守值），后续用真实 TTS 时长数据继续分脚本校准。
 
 ---
 
@@ -181,4 +181,25 @@ Not scheduled yet; recorded here so the intent is explicit. A "simple mode" tab 
 
 ---
 
-*Document version: v0.2 (draft) — 2026-08-31*
+## 12. v0.3 修订记录（2026-08-31，验收执行发现的落地补丁）
+
+真实 API 验收（PRD §4 Acceptance criteria）发现三项实现不足，已修复：
+
+1. **仅靠 language pinning 不足以约束输出语言。** 实测 agnes-2.0-flash 在英文系统提示词下，
+   仍会因 user prompt 内的中文章节片段（"共 N 个场景，时长分别为…"）把英文/阿拉伯文 idea 写成中文故事。
+   修复：新增 `core.screenwriter.build_input_language_directive()`（基于 `detect_text_script` 检测 idea 文字体系，
+   非 CJK 脚本生成显式目标语言指令，与 preview 端点 `_language_directive` 同机制），创意流水线三处 LLM 调用
+   （develop_story / write_script / generate_narration_for_video）经 `_style_with_language_directive()` 前置该指令。
+   验收：阿拉伯语/英文 idea 均产出对应语言故事与旁白。
+2. **阿拉伯语语速估算偏快。** PR #33 沿用的统一 13 字符/秒导致 40 秒视频的阿拉伯语旁白实测可听 55.5 秒（+39%）。
+   实测校准（ar-SA-Hamed/Zariyah ≈10.4-10.6、ar-EG-Shakir ≈12.0 字符/秒）后单独一档取 10.5
+   （`_CHARS_PER_SEC_ARABIC`）。验收：旁白可听时长比例进入 ±20% 区间。
+3. **旁白字数软约束被模型无视（超长）。** 860 字 vs 上限 520。prompt 中字数范围改为硬约束表述
+   （双语版本），重测均在目标区间。
+
+附带发现（未修复，记录在案）：`AgnesChatAPI.chat` 对 API 偶发空响应不重试、静默返回空串；
+创意流水线对空旁白已有 fallback（steps_audio），但 `develop_story` 空响应无兜底，属既有问题，另行处理。
+
+---
+
+*Document version: v0.3 — 2026-08-31*

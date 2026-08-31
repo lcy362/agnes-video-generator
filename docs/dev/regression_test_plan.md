@@ -37,7 +37,7 @@
 | C2 | 参考图生成尾帧+关键帧+无配音 | keyframes | 上传参考图 | 关闭 | `generate_end_frames_from_ref`、i2i 端帧生成、keyframes |
 | C3 | 带字幕+配音+关键帧 | keyframes | 无 | 开启 | TTS 旁白 + 字幕叠加 + 视频拼接 + keyframes |
 | C4 | 用户上传分镜图+关键帧 | keyframes | 上传分镜图 | 关闭 | 用户分镜图覆盖 AI 分镜、关键帧 + 双图提交（3.6） |
-| C5 | 阿拉伯语创意+变音符号（tashkeel） | keyframes | 无 | 开启+`audio_add_tashkeel` | 非中文 idea 语言 pinning（英文故事）、语速公共估算（13 字符/秒）、tashkeel 仅送 TTS、**字幕/`narration.txt` 不含 harakat**（PRD 1.2/1.2a/1.3/1.4，PR #33 吸收） |
+| C5 | 阿拉伯语创意+变音符号（tashkeel） | keyframes | 无 | 开启+`audio_add_tashkeel` | 非中文 idea 语言 pinning + 显式语言指令（阿拉伯语故事/旁白）、语速公共估算（阿拉伯文 10.5 字符/秒，2026-08-31 实测校准）、tashkeel 仅送 TTS、**字幕/`narration.txt` 不含 harakat**、旁白可听时长 ≈ 视频时长 ±20%（PRD 1.2/1.2a/1.3/1.4，PR #33 吸收） |
 
 ### 2.3 稿件视频 (ManuscriptVideoPipeline)
 
