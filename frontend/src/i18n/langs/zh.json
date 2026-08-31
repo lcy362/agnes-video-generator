@@ -557,7 +557,7 @@
   "fbRepErrInfo": "错误信息",
   "privacyTitle": "隐私设置",
   "gaOptOutLabel": "关闭匿名使用统计",
-  "gaOptOutHint": "开启后不再加载任何分析脚本（Google Analytics 4），也不会上报任何数据。",
+  "gaOptOutHint": "开启后仅保留一次匿名页面访问统计（用于 PV/UV 统计），不上报任何其他信息。",
   "gaReportTitle": "开启统计时会匿名上报以下信息",
   "gaReportItem1": "任务操作事件：创建、完成、失败、停止、删除任务",
   "gaReportItem2": "任务类型与生成模式（如 简单视频/t2v、创意长视频 等）",
