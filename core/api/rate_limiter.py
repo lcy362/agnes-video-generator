@@ -167,14 +167,19 @@ class AgnesRateLimiter:
     def acquire(self) -> None:
         """阻塞式获取一个令牌（同步场景 / 脚本 / 测试用）。
 
-        如果桶中有令牌，立即消耗并返回；否则 ``time.sleep()`` 直到令牌可用。
+        如果桶中有令牌，立即消耗并返回；否则 ``time.sleep()`` 等待令牌可用。
+
+        ⚠️ 修复（回归活锁）：此处采用与 ``acquire_async`` 一致的**预支语义**——
+        ``_try_acquire`` 已把 ``last_refill`` 预留到 ``now + wait_time`` 并清空令牌，
+        sleep 期间令牌尚未重新累积，再次循环调用 ``_try_acquire`` 会算出 ``elapsed≈0``
+        而**永远不足 1 个令牌**，导致令牌永不补充、等待者永久卡死（多并发时逐个推挤
+        ``last_refill`` 还使 wait_time 越滚越大）。因此 sleep 完成后直接视为已获取。
         """
-        while True:
-            wait_time = self._try_acquire()
-            if wait_time is None:
-                return
-            self._record_wait(wait_time)
-            time.sleep(wait_time)
+        wait_time = self._try_acquire()
+        if wait_time is None:
+            return
+        self._record_wait(wait_time)
+        time.sleep(wait_time)
 
     async def acquire_async(self, stop_event: asyncio.Event | None = None) -> None:
         """异步原生获取令牌（优化路线图 2.3）。

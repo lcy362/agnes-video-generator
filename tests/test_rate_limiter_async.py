@@ -1,5 +1,6 @@
 """2.3 限速器异步化测试（_try_acquire 解耦 / acquire_async / 除零防护）。"""
 import asyncio
+import threading
 import time
 
 from core.api.rate_limiter import AgnesRateLimiter
@@ -61,3 +62,40 @@ async def test_acquire_async_cancellable():
     except asyncio.CancelledError:
         pass
     assert limiter.tokens == 0.0  # 取消不消耗令牌、不破坏桶
+
+
+def test_sync_acquire_no_livelock_after_burst_exhausted():
+    """回归：同步 acquire 在突发令牌耗尽、多并发等待下不活锁。
+
+    复现现场：共享桶 32/min、突发 8、先耗尽突发令牌，再起 6 个并发等待者。
+    修复前：每个等待者 sleep 后循环 re-acquire，因 ``last_refill`` 被预支到未来，
+    ``elapsed≈0`` 令牌永不累积，所有等待者永久卡死（0 个成功）。
+    修复后：同步 acquire 采用预支语义，sleep 足够 wait_time 后即视为已获取。
+    6 个等待者应在约 6 × (60/32) ≈ 11.25s 内全部通过，故设 30s 硬上限。
+    """
+    limiter = AgnesRateLimiter(rate_per_minute=32, max_burst=8)  # 与回归现场一致
+    # 耗尽 8 个突发令牌（模拟回归启动的 8 任务风暴）
+    for _ in range(8):
+        assert limiter._try_acquire() is None
+
+    results = []
+    done_evt = threading.Event()
+
+    def worker(i):
+        t0 = time.monotonic()
+        limiter.acquire()
+        results.append((i, time.monotonic() - t0))
+        if len(results) == 6:
+            done_evt.set()
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(6)]
+    for t in threads:
+        t.start()
+
+    # 6 个等待者必须在 30s 内全部获取到令牌（修复前 6 个全部卡死 → 断言失败）
+    assert done_evt.wait(timeout=30), (
+        f"活锁复现：30s 后仅 {len(results)}/6 个等待者获得令牌"
+    )
+    for t in threads:
+        t.join(15)
+    assert len(results) == 6
