@@ -13,6 +13,8 @@ from typing import NamedTuple, Optional
 
 from core.config import resolve_font_path
 
+from core.compositor.ffmpeg_tool import resolve_binary
+
 logger = logging.getLogger(__name__)
 
 _CJK_RE = re.compile(r'[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]')
@@ -194,7 +196,7 @@ def add_watermark(
 
         # ffmpeg overlay: 将水印 PNG 叠加到视频上，无损流式拷贝
         cmd = [
-            "ffmpeg", "-y",
+            resolve_binary("ffmpeg"), "-y",
             "-i", input_path,
             "-i", wm_png_path,
             "-filter_complex", f"[0:v][1:v]overlay={layout.pos_x}:{layout.pos_y}[v]",

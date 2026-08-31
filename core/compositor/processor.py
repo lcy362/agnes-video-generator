@@ -6,6 +6,8 @@
 import logging
 import os
 
+from core.compositor.ffmpeg_tool import resolve_binary
+
 logger = logging.getLogger(__name__)
 
 
@@ -20,7 +22,7 @@ class VideoProcessor:
 
         import subprocess
         subprocess.run([
-            "ffmpeg", "-y", "-i", input_path,
+            resolve_binary("ffmpeg"), "-y", "-i", input_path,
             "-vf", f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
                     f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2",
             "-c:v", "libx264", "-preset", "fast",
@@ -37,7 +39,7 @@ class VideoProcessor:
 
         import subprocess
         subprocess.run([
-            "ffmpeg", "-y",
+            resolve_binary("ffmpeg"), "-y",
             "-sseof", "-1",
             "-i", video_path,
             "-frames:v", "1",
@@ -55,7 +57,7 @@ class VideoProcessor:
 
         import subprocess
         subprocess.run([
-            "ffmpeg", "-y",
+            resolve_binary("ffmpeg"), "-y",
             "-f", "lavfi",
             "-i", "anullsrc=r=44100:cl=mono",
             "-t", str(duration_sec),
@@ -87,7 +89,7 @@ class VideoProcessor:
         # 注意：勿再用 -t {freeze_duration}，那会把整个输出截断成只剩冻结段。
         try:
             subprocess.run([
-                "ffmpeg", "-y",
+                resolve_binary("ffmpeg"), "-y",
                 "-i", video_path,
                 "-vf", f"tpad=stop_mode=clone:stop_duration={freeze_duration}",
                 "-c:v", "libx264", "-preset", "fast",

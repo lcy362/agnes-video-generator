@@ -17,6 +17,8 @@ from models.task import SubtitleStyle
 
 from .concat import _AUDIO_BITRATE, _AUDIO_CODEC, _AUDIO_FPS, _VIDEO_FPS
 
+from core.compositor.ffmpeg_tool import resolve_binary
+
 logger = logging.getLogger(__name__)
 
 # ── 2.1c：ASS 字幕渲染辅助 ──
@@ -137,7 +139,7 @@ class AudioOverlayMixin:
             tmp_files.append(extend_path)
             pad_dur = final_dur - video_dur
             VideoConcatenator._run_ffmpeg(
-                ["ffmpeg", "-y",
+                [resolve_binary("ffmpeg"), "-y",
                  "-i", silent_path,
                  "-vf", f"tpad=stop_mode=clone:stop_duration={pad_dur:.2f}",
                  "-c:v", "libx264", "-pix_fmt", "yuv420p",
@@ -154,7 +156,7 @@ class AudioOverlayMixin:
             tmp_files.append(apad_path)
             pad_dur = final_dur - audio_dur
             VideoConcatenator._run_ffmpeg(
-                ["ffmpeg", "-y",
+                [resolve_binary("ffmpeg"), "-y",
                  "-i", audio_path,
                  "-af", f"apad=pad_dur={pad_dur:.2f},volume=1.5",
                  "-c:a", "libmp3lame", "-q:a", "2",
@@ -167,7 +169,7 @@ class AudioOverlayMixin:
             vol_path = audio_path.replace(".mp3", "_vol.mp3")
             tmp_files.append(vol_path)
             VideoConcatenator._run_ffmpeg(
-                ["ffmpeg", "-y",
+                [resolve_binary("ffmpeg"), "-y",
                  "-i", audio_path,
                  "-af", "volume=1.5",
                  "-c:a", "libmp3lame", "-q:a", "2",
@@ -290,7 +292,7 @@ class AudioOverlayMixin:
         else:
             v_chain = f"[0:v]tpad=stop_mode=clone:stop_duration={final_dur:.2f}[v]"
         cmd = [
-            "ffmpeg", "-y",
+            resolve_binary("ffmpeg"), "-y",
             "-i", silent_path,
             "-i", audio_path,
             "-filter_complex",
@@ -315,7 +317,7 @@ class AudioOverlayMixin:
         """ffprobe 获取视频宽高，失败回退 (768, 1152)。"""
         try:
             r = subprocess.run(
-                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                [resolve_binary("ffprobe"), "-v", "error", "-select_streams", "v:0",
                  "-show_entries", "stream=width,height",
                  "-of", "csv=s=x:p=0", video_path],
                 stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=15,
@@ -706,7 +708,7 @@ class AudioOverlayMixin:
         """
         try:
             n = len(audio_paths)
-            cmd = ["ffmpeg", "-y"]
+            cmd = [resolve_binary("ffmpeg"), "-y"]
             for ap in audio_paths:
                 cmd += ["-i", ap]
             filters = []
@@ -811,7 +813,7 @@ class AudioOverlayMixin:
 
         # Step 1: Get clip duration
         probe = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+            [resolve_binary("ffprobe"), "-v", "error", "-show_entries", "format=duration",
              "-of", "csv=p=0", clip_path],
             stdin=subprocess.DEVNULL,
             capture_output=True, text=True, timeout=15,
@@ -836,7 +838,7 @@ class AudioOverlayMixin:
         # Step 4: Concatenate with xfade cross-fade transitions
         try:
             subprocess.run(
-                ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                [resolve_binary("ffmpeg"), "-y", "-f", "concat", "-safe", "0",
                  "-i", concat_file,
                  "-c", "copy",
                  "-t", str(needed),
@@ -850,7 +852,7 @@ class AudioOverlayMixin:
             # xfade filter 构建已由上方 trim 循环拼接替代（死代码，3.3 清理）
 
             subprocess.run(
-                ["ffmpeg", "-y",
+                [resolve_binary("ffmpeg"), "-y",
                  "-stream_loop", str(n - 1), "-i", clip_path,
                  "-filter_complex",
                  f"[0:v]trim=duration={needed}[v]",

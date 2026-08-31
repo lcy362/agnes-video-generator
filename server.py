@@ -105,6 +105,21 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"[Startup] Stale task sweep failed ({e})")
 
+    # ffmpeg 启动检测（非阻断）：解析一次并打印来源；缺失仅告警、不阻止启动。
+    try:
+        from core.compositor.ffmpeg_tool import resolve_binary
+        ffmpeg_bin = resolve_binary("ffmpeg")
+        if ffmpeg_bin:
+            logger.info(f"[Compositor] ffmpeg resolved: {ffmpeg_bin}")
+        else:
+            logger.warning(
+                "[Compositor] ffmpeg NOT found (no system PATH nor builtin "
+                "imageio-ffmpeg). Video/audio composition will fail later; "
+                "install ffmpeg or verify imageio-ffmpeg dependency."
+            )
+    except Exception as e:
+        logger.warning(f"[Compositor] ffmpeg detection failed: {e}")
+
     yield
 
 
