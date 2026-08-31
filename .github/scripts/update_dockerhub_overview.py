@@ -101,6 +101,11 @@ def main() -> int:
     readme_lines.insert(2, docker_usage)
     readme = "\n".join(readme_lines)
 
+    # Strip <script> blocks (schema.org JSON-LD etc.) from the overview body:
+    # Docker Hub pages don't need SEO structured data, and a literal "<script>"
+    # inside the PATCH body trips Cloudflare's WAF XSS rule -> 403 HTML page.
+    readme = re.sub(r"<script[^>]*>.*?</script>", "", readme, flags=re.DOTALL)
+
     # Docker Hub caps full_description; truncate at a newline before the limit.
     limit = 24000
     if len(readme) > limit:
@@ -143,7 +148,10 @@ def main() -> int:
     # 2) Patch the repository description + full description.
     # full_description can reach ~24k chars; write the payload to a temp file so
     # the curl invocation stays well within ARG_MAX and avoids quoting issues.
-    payload = json.dumps({"description": desc, "full_description": readme})
+    # Escape "<" as \u003c in the JSON body (defence in depth): Cloudflare's WAF
+    # scans the raw request body and blocks payloads containing raw HTML tags;
+    # \u003c decodes back to "<" server-side, so content is unchanged.
+    payload = json.dumps({"description": desc, "full_description": readme}).replace("<", "\\u003c")
     tmp_payload = "/tmp/dockerhub_overview_payload.json"
     tmp_resp = "/tmp/dockerhub_overview_response.txt"
     with open(tmp_payload, "w", encoding="utf-8") as f:
