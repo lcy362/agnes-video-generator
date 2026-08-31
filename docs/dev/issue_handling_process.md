@@ -108,11 +108,12 @@ gh issue list --repo lcy362/agnes-video-generator --state open \
 
 > 处理每一条 Issue 后，如属可复现或有代表性，追加到本表；达到一定规模或到周期时统一写入官网 FAQ。
 
-| 现象                                                                                          | 根因                                                                                                            | 应对                                     | 关联 Issue |
-| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------- | -------- |
-| （示例）视频生成报 `ComfyUI inference timeout` / 连接 `apihub.agnes-ai.cn` 失败                          | 上游偶发超时 + 域名间歇不可达                                                                                              | 稍后重试；切换域名 cn/com；更换视频模型                | #31      |
-| 视频提交报 `HTTP 403 insufficient_user_quota`（预扣费额度不足）                                           | 上游 Agnes 账户余额 < 本次视频预扣金额                                                                                      | 充值/增加账户额度后重试；缩短时长/降低分辨率降低单次成本；不需要可删除任务 | #34      |
-| （待确认）Windows 下 `scene_prompts` 步骤报 `[WinError 2] The system cannot find the file specified` | 该步骤仅 LLM 调用，疑为环境问题：SSL CA/证书包缺失、SSL DLL 缺失，或 HTTP(S)\_PROXY / REQUESTS\_CA\_BUNDLE / SSL\_CERT\_FILE 指向不存在的路径 | 待用户补充完整 traceback 与部署方式、环境变量后定位        | #35      |
+| 现象                                                                                          | 根因                                                                                                            | 应对                                                                                  | 关联 Issue |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------- |
+| （示例）视频生成报 `ComfyUI inference timeout` / 连接 `apihub.agnes-ai.cn` 失败                          | 上游偶发超时 + 域名间歇不可达                                                                                              | 稍后重试；切换域名 cn/com；更换视频模型                                                             | #31      |
+| 视频提交报 `HTTP 403 insufficient_user_quota`（预扣费额度不足）                                           | 上游 Agnes 账户余额 < 本次视频预扣金额                                                                                      | 充值/增加账户额度后重试；缩短时长/降低分辨率降低单次成本；不需要可删除任务                                              | #34      |
+| （待确认）Windows 下 `scene_prompts` 步骤报 `[WinError 2] The system cannot find the file specified` | 该步骤仅 LLM 调用，疑为环境问题：SSL CA/证书包缺失、SSL DLL 缺失，或 HTTP(S)\_PROXY / REQUESTS\_CA\_BUNDLE / SSL\_CERT\_FILE 指向不存在的路径 | 待用户补充完整 traceback 与部署方式、环境变量后定位                                                     | #35      |
+| 国内站域名应为 `api.agnes-ai.cn` 而非 `apihub.agnes-ai.cn`                                           | Agnes 官方域名划分：国内站（中国站）= `api.agnes-ai.cn/v1`，`apihub.agnes-ai.cn` 仅作国际站备用（实测两者同一 IP、均可访问）                      | `core/config.py` `AGNES_DOMAIN_MAP["cn"]` 已改为 `api.agnes-ai.cn` + 前端域名选择区同步更新（v6.x） | #37      |
 
 ***
 

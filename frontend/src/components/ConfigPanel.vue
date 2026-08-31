@@ -62,6 +62,11 @@ function vmRatioListText(item: { model: string; caps: Record<string, any> }): st
   return ratios.map((r: string) => vmCaps.ratioWHText(r, item.model)).join(' / ')
 }
 
+// 域名展示：cn 为国内站 api.agnes-ai.cn，com 为国际站 apihub.agnes-ai.com
+function displayDomain(root = appState.agnesDomain): string {
+  return root === 'cn' ? 'api.agnes-ai.cn' : 'apihub.agnes-ai.com'
+}
+
 // 折叠状态（5 个配置面板）
 const collapsed = reactive<Record<string, boolean>>({
   apikey: false,
@@ -373,7 +378,7 @@ initCollapse()
         <span class="text-sm text-muted">
           <span class="text-ink-2 font-medium">{{ t('domainTitle') }}</span>
           <span class="text-muted mx-2">·</span>
-          <span :class="appState.agnesDomain === 'cn' ? 'text-green-400' : 'text-muted'">apihub.agnes-ai.{{ appState.agnesDomain }}</span>
+          <span :class="appState.agnesDomain === 'cn' ? 'text-green-400' : 'text-muted'">{{ displayDomain() }}</span>
         </span>
       </div>
       <span class="text-muted text-xs">▶</span>
@@ -383,7 +388,7 @@ initCollapse()
         <h2 class="text-lg font-semibold text-accent">{{ t('domainTitle') }}</h2>
         <div class="flex items-center gap-2">
           <span class="text-xs px-2 py-1 rounded-full" :class="appState.agnesDomain === 'cn' ? 'bg-green-900/40 text-green-300' : 'bg-paper-2 text-muted'">
-            apihub.agnes-ai.{{ appState.agnesDomain }}
+            {{ displayDomain() }}
           </span>
           <button class="text-xs text-muted hover:text-ink-2 transition px-2 py-1 rounded" @click="toggleConfigPanel('domain')">▲</button>
         </div>
@@ -400,7 +405,7 @@ initCollapse()
         <label class="flex items-center gap-3 glass-input rounded-lg px-4 py-3 cursor-pointer hover:border-blue-500/40 transition">
           <input v-model="appState.agnesDomain" type="radio" name="agnes-domain" value="cn" class="accent-blue-500 w-4 h-4 cursor-pointer" />
           <div>
-            <span class="text-sm text-ink-2 font-medium">apihub.agnes-ai.cn</span>
+            <span class="text-sm text-ink-2 font-medium">api.agnes-ai.cn</span>
             <span class="text-xs text-muted ml-2">{{ t('domainCnLabel') }}</span>
           </div>
         </label>

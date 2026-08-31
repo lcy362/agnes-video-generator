@@ -966,9 +966,12 @@ def get_video_model_capabilities() -> dict:
 # ═══════════════════════════════════════════════════
 
 # 可用域名映射
+# 注：Agnes 官方域名划分（来源：AgnesAI-Labs skills 的 model_catalog 参考值）：
+#   - com 国际站（主）：apihub.agnes-ai.com
+#   - cn  国内站（中国站）：api.agnes-ai.cn（apihub.agnes-ai.cn 仅作国际站备用，非国内站）
 AGNES_DOMAIN_MAP = {
     "com": "https://apihub.agnes-ai.com",
-    "cn": "https://apihub.agnes-ai.cn",
+    "cn": "https://api.agnes-ai.cn",
 }
 
 _DEFAULT_DOMAIN = "com"
