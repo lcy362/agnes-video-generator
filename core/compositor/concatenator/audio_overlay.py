@@ -13,11 +13,10 @@ from typing import List, Optional, Tuple
 import srt as srt_lib
 from moviepy import AudioFileClip, CompositeVideoClip, VideoFileClip
 
+from core.compositor.ffmpeg_tool import resolve_binary
 from models.task import SubtitleStyle
 
 from .concat import _AUDIO_BITRATE, _AUDIO_CODEC, _AUDIO_FPS, _VIDEO_FPS
-
-from core.compositor.ffmpeg_tool import resolve_binary
 
 logger = logging.getLogger(__name__)
 

@@ -11,9 +11,8 @@ import subprocess
 import tempfile
 from typing import NamedTuple, Optional
 
-from core.config import resolve_font_path
-
 from core.compositor.ffmpeg_tool import resolve_binary
+from core.config import resolve_font_path
 
 logger = logging.getLogger(__name__)
 
