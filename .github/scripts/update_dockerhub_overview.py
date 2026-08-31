@@ -104,7 +104,7 @@ def main() -> int:
     # Strip <script> blocks (schema.org JSON-LD etc.) from the overview body:
     # Docker Hub pages don't need SEO structured data, and a literal "<script>"
     # inside the PATCH body trips Cloudflare's WAF XSS rule -> 403 HTML page.
-    readme = re.sub(r"<script[^>]*>.*?</script>", "", readme, flags=re.DOTALL)
+    readme = re.sub(r"<script[^>]*>.*?</script[^>]*>", "", readme, flags=re.DOTALL | re.IGNORECASE)
 
     # Docker Hub caps full_description; truncate at a newline before the limit.
     limit = 24000
