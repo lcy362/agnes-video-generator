@@ -69,7 +69,15 @@ class CreativeVideoPipeline(
         """
         super().__init__(api_key, task_id, dir_name, progress_callback, shutdown_event)
 
-        self.screenwriter = Screenwriter(api_key=api_key, model=chat_model)
+        # PRD 1.4：Screenwriter language pinning——默认 en、尊重显式配置。
+        # 默认中文系统提示词会让模型倾向于输出中文（即使提示词写明"跟随输入语言"），
+        # 实测英文/阿拉伯文 idea 在中文提示词下偶发被错误写成中文故事/旁白。
+        # 仅当用户未显式设置 PROMPT_LANGUAGE（使用默认 zh）时固定 language="en"；
+        # 显式配置代表用户知情选择，以用户配置为准（language=None 走 PROMPT_LANGUAGE）。
+        from core.screenwriter import is_prompt_language_explicit
+
+        _sw_language = None if is_prompt_language_explicit() else "en"
+        self.screenwriter = Screenwriter(api_key=api_key, model=chat_model, language=_sw_language)
         self.image_generator = AgnesImageAPI(api_key=api_key, model=image_model)
         self.video_generator = AgnesVideoAPI(api_key=api_key, model=video_model)
         self.video_generator.shutdown_event = shutdown_event

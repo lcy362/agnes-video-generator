@@ -29,6 +29,26 @@ logger = logging.getLogger(__name__)
 from core.config import get_settings as _get_settings  # noqa: I001 就地导入避免循环依赖
 PROMPT_LANGUAGE = _get_settings().prompt_language
 
+
+def is_prompt_language_explicit() -> bool:
+    """用户是否显式配置了 ``PROMPT_LANGUAGE``（环境变量或 .env 文件）。
+
+    用于 Screenwriter language pinning 决策（PRD 1.4）：非中文 idea 在默认中文
+    系统提示词下偶发被写成中文，因此**未显式配置**时流水线把 Screenwriter 语言
+    固定为 ``en``（pinning 生效）；**显式配置**代表用户知情选择，以用户配置为准、
+    不做硬编码覆盖（显式设置 ``PROMPT_LANGUAGE=zh`` 时中文 idea 仍产出中文故事）。
+
+    Returns:
+        True 表示用户显式配置了 PROMPT_LANGUAGE；False 表示使用默认值（未配置）。
+    """
+    if os.environ.get("PROMPT_LANGUAGE"):
+        return True
+    try:
+        from core.config import _dotenv_value
+        return bool(_dotenv_value("PROMPT_LANGUAGE"))
+    except Exception:
+        return False
+
 # 图片描述重试间隔基数（秒）：delay = 基数 * (attempt + 1)
 _DESCRIBE_RETRY_BASE_DELAY_SECONDS = 15
 

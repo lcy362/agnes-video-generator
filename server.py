@@ -22,6 +22,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -32,6 +33,7 @@ from web.routes import (
     config_routes,
     health_routes,
     image_routes,
+    preview_routes,
     task_creation_routes,
     task_routes,
     utility_routes,
@@ -117,6 +119,35 @@ app = FastAPI(
 )
 
 
+# Phase 2（PR #33 吸收）：可配置 CORS 白名单——取代原 PR 硬编码的 :8787。
+# 空（默认）→ 不启用中间件（攻击面不变）；设置 AGNES_CORS_ORIGINS 后仅允许
+# 列出的源跨源调用。认证走显式 API Key（请求头），不使用 Cookie，因此
+# allow_credentials=False 始终安全。
+from core.config import get_settings as _settings  # noqa: E402 就地导入
+
+_cors_settings = _settings()
+_cors_origins = [
+    o.strip() for o in (_cors_settings.agnes_cors_origins or "").split(",") if o.strip()
+]
+_cors_enabled = _cors_settings.agnes_cors_enabled
+if _cors_enabled is None:
+    _cors_enabled = bool(_cors_origins)
+if _cors_enabled and _cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=False,
+    )
+    logger.info(f"[Startup] CORS enabled for origins: {_cors_origins}")
+elif _cors_settings.agnes_cors_origins:
+    logger.warning(
+        "[Startup] CORS origins set but AGNES_CORS_ENABLED=false, "
+        "middleware disabled",
+    )
+
+
 # ═══════════════════════════════════════════════════
 # Static files
 # ═══════════════════════════════════════════════════
@@ -160,6 +191,7 @@ app.include_router(image_routes.router)
 app.include_router(video_routes.router)
 app.include_router(task_routes.router)
 app.include_router(task_creation_routes.router)
+app.include_router(preview_routes.router)
 
 
 # ═══════════════════════════════════════════════════

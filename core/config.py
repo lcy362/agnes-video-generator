@@ -202,6 +202,13 @@ try:
         agnes_subtitle_ass: bool = True          # 2.1c 字幕 ASS 单链灰度开关
         agnes_video_poll_timeout: int = 1800     # 1.2 视频轮询总超时
 
+        # ── CORS（PR #33 吸收 Phase 2：可配置跨源白名单）──
+        # 供独立本地伴侣工具（如 agnes-simple-ui）从浏览器跨源调用本服务 API。
+        # agnes_cors_origins: 逗号分隔的允许源列表，空 = 不启用 CORS（默认，攻击面不变）。
+        # agnes_cors_enabled: None=auto（设置了 origins 才启用）；显式 "false" 即使设置了 origins 也禁用。
+        agnes_cors_origins: str = ""
+        agnes_cors_enabled: bool | None = None
+
         # ── 运维 ──
         agnes_log_file: str = ""
         agnes_sweep_age_days: int | None = None
@@ -235,6 +242,14 @@ except ImportError:  # pragma: no cover - pydantic-settings 为必备依赖，�
                 "0", "false", "off",
             )
             self.agnes_video_poll_timeout = int(os.environ.get("AGNES_VIDEO_POLL_TIMEOUT", "1800"))
+            self.agnes_cors_origins = os.environ.get("AGNES_CORS_ORIGINS", "")
+            _cors_enabled = os.environ.get("AGNES_CORS_ENABLED", "").strip().lower()
+            if _cors_enabled in ("0", "false", "off"):
+                self.agnes_cors_enabled = False
+            elif _cors_enabled in ("1", "true", "on"):
+                self.agnes_cors_enabled = True
+            else:
+                self.agnes_cors_enabled = None
             self.agnes_log_file = os.environ.get("AGNES_LOG_FILE", "")
             self.agnes_sweep_age_days = _env_int("AGNES_SWEEP_AGE_DAYS")
             self.agnes_config_id_hmac_key = os.environ.get(

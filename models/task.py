@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import uuid
 from enum import Enum
-from typing import List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -98,6 +98,7 @@ class AudioConfig(BaseModel):
     enabled: bool = True
     voice: str = "zh-CN-XiaoxiaoNeural"
     rate: str = "+0%"
+    add_tashkeel: bool = False  # 阿拉伯语旁白自动加变音符号（harakat），提升 TTS 朗读准确度
 
 
 class ManualConfig(BaseModel):
@@ -323,6 +324,9 @@ class ManuscriptVideoTask(BaseTaskState):
 
     manuscript_text: str = ""
     style: str = ""  # 可选画面风格描述，传给场景 prompt 生成（默认空，保持旧行为）
+    # PR #33 吸收：逐段参考图，{段落 index(str): [本地图片路径, ...]}
+    # 一张图可服务多个段落（reference_images_map 按 index 显式映射），用于 i2v 引导画面
+    reference_images: Dict[str, List[str]] = Field(default_factory=dict)
     paragraphs: List[ManuscriptParagraph] = Field(default_factory=list)
     # v4.0 重构：通用场景列表（由 _build_scenes 填充，供模板与下游步骤引用）
     scenes: List[SceneTask] = Field(default_factory=list)

@@ -6,6 +6,7 @@ import os
 import re
 from typing import Optional
 
+from core.audio.voices import estimate_chars_per_sec
 from core.compositor.concatenator import VideoConcatenator
 from core.screenwriter import clean_narration_text
 from models.task import StepStatus
@@ -13,7 +14,6 @@ from models.task import StepStatus
 logger = logging.getLogger(__name__)
 
 
-_CHARS_PER_SEC = 4.0
 _SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[。！？.!?])")
 
 # 音频/字幕阶段起始进度（阶段内线性插值）
@@ -120,15 +120,16 @@ class AudioStepsMixin:
         # On resume, re-trim existing narrations (old untrimmed data may persist)
         if self._state.narrations:
             _scenes = self._state.scenes
+            _cps = estimate_chars_per_sec(story)
             needs_update = any(
-                len(n) > max(int((_scenes[i].duration if i < len(_scenes) else self._state.video_duration) * _CHARS_PER_SEC), 20)
+                len(n) > max(int((_scenes[i].duration if i < len(_scenes) else self._state.video_duration) * _cps), 20)
                 for i, n in enumerate(self._state.narrations)
             )
             if needs_update:
                 self._state.narrations = [
                     _trim_to_sentence(
                         n,
-                        max(int((_scenes[i].duration if i < len(_scenes) else self._state.video_duration) * _CHARS_PER_SEC), 20),
+                        max(int((_scenes[i].duration if i < len(_scenes) else self._state.video_duration) * _cps), 20),
                     )
                     for i, n in enumerate(self._state.narrations)
                 ]
@@ -155,12 +156,13 @@ class AudioStepsMixin:
             narrations.append("\n".join(narrative_paras[idx : idx + count]))
             idx += count
 
-        # Trim each narration to fit within its scene's duration * 4 chars/sec speaking rate
+        # Trim each narration to fit within its scene's duration * estimated speaking rate
         _scenes = self._state.scenes
+        _cps = estimate_chars_per_sec(story)
         narrations = [
             _trim_to_sentence(
                 n,
-                max(int((_scenes[i].duration if i < len(_scenes) else self._state.video_duration) * _CHARS_PER_SEC), 20),
+                max(int((_scenes[i].duration if i < len(_scenes) else self._state.video_duration) * _cps), 20),
             )
             for i, n in enumerate(narrations)
         ]
@@ -207,7 +209,7 @@ class AudioStepsMixin:
 
         if not narration or len(narration) < 5:
             logger.warning("[Pipeline] LLM returned empty/short narration, using cleaned story fallback")
-            max_chars = max(int(total_duration * _CHARS_PER_SEC), 40)
+            max_chars = max(int(total_duration * estimate_chars_per_sec(story)), 40)
             narration = clean_narration_text(_trim_to_sentence(story, max_chars)) if story else ""
 
         self._state.narrations = [narration]
@@ -257,13 +259,28 @@ class AudioStepsMixin:
         # v5.x 产物规范前置：导出旁白纯文本（供外部 Agent/工具处理）
         narration_text = self._state.narrations[0] if self._state.narrations else ""
         self._save_narration_txt(narration_text, combined_audio)
+
+        # PRD 1.2a：tashkeel 只作用于送入 TTS 的文本，字幕/旁白导出产物用 plain 版本。
+        # state.narrations 始终保留无变音符号文本（字幕与 narration.txt 由此生成），
+        # 仅 narration_tts 加 tashkeel 送 TTS（含续传重采 cues）。
+        narration_tts = narration_text
+        if self._state.audio_config.add_tashkeel:
+            from core.audio.tashkeel import add_tashkeel_safe
+
+            narration_tts = add_tashkeel_safe(narration_text)
+            if narration_tts != narration_text:
+                logger.info(
+                    "[Pipeline] Step audio: tashkeel applied "
+                    "(plain kept for subtitles/export, %d chars)", len(narration_text),
+                )
+
         if os.path.exists(combined_audio) and os.path.getsize(combined_audio) > 0:
             logger.info("[Pipeline] Step audio: SKIP (file exists)")
             self._state.step_audio = StepStatus.COMPLETED
             self.task_manager.update_step("step_audio", StepStatus.COMPLETED)
             # 续传：音频已存在则仅重采 cues，避免字幕退回 legacy 启发式
             return await self._recover_sub_maker(
-                narration_text,
+                narration_tts,
                 self._state.audio_config, self._state.subtitle_config,
                 combined_audio,
             )
@@ -283,7 +300,7 @@ class AudioStepsMixin:
 
         sub_maker = await self._generate_audio_with_fallback(
             output_path=combined_audio,
-            text=narration_text,
+            text=narration_tts,
             audio_config=self._state.audio_config,
             subtitle_config=self._state.subtitle_config,
             duration_sec=total_duration,

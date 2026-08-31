@@ -16,9 +16,10 @@ import re
 from typing import Callable, List, Optional
 
 from core.api.agnes_video import AgnesVideoAPI, VideoTaskCancelled
+from core.audio.voices import duration_len, estimate_chars_per_sec
 from core.compositor.concatenator import VideoConcatenator
 from core.pipelines import MultiScenePipeline
-from core.screenwriter import Screenwriter
+from core.screenwriter import Screenwriter, is_prompt_language_explicit
 from models.task import (
     ManuscriptParagraph,
     SceneTask,
@@ -29,12 +30,86 @@ logger = logging.getLogger(__name__)
 # Chinese sentence-ending punctuation pattern.
 _SENTENCE_END_RE = re.compile(r"(?<=[。！？])")
 
-# Estimated Chinese speech rate: ~4 characters per second.
-_CHARS_PER_SEC = 4.0
+# 语速估算统一走 core.audio.voices（PRD 1.3a），此处不再维护重复常量：
+# CJK ~4 字/秒，阿拉伯文/拉丁文等字母文字 ~13 字符/秒。
 
 # Greedy-merge duration thresholds (seconds).
 _MAX_SEGMENT_DURATION = 12.0
 _MIN_SEGMENT_DURATION = 5.0
+
+
+def split_manuscript_text(text: str) -> List[str]:
+    """将长文本按朗读时长拆分为段落文本列表（纯函数，无实例状态）。
+
+    与正式流水线共用同一实现（PRD 1.6），preview 端点也调用本函数；
+    语速估算按文本主要脚本取公共实现（CJK 4 字/秒 / 字母文字 13 字符/秒），
+    字符数统计剥离阿拉伯语变音符号（不产生语音时长）。
+
+    拆分策略:
+        1. 先按换行符 (``\\n``) 切分为粗段落。
+        2. 每个粗段落再按中文句末标点 (``。！？``) 切分为候选句。
+        3. 对候选句进行贪心合并：累积时长 <= 12s，最短 >= 5s。
+        4. 短句 (< 5s) 合并到前一个段落；长句 (> 12s) 保持原样不拆分。
+
+    Args:
+        text: 待拆分的稿件文本。
+
+    Returns:
+        段落文本列表。
+    """
+    chars_per_sec = estimate_chars_per_sec(text)
+
+    # Step 1: split by newline.
+    raw_blocks = [b.strip() for b in text.split("\n") if b.strip()]
+
+    # Step 2: further split each block by Chinese sentence-ending punctuation.
+    candidate_sentences: List[str] = []
+    for block in raw_blocks:
+        parts = _SENTENCE_END_RE.split(block)
+        for part in parts:
+            part = part.strip()
+            if part:
+                candidate_sentences.append(part)
+
+    if not candidate_sentences:
+        return []
+
+    # Step 3: greedy merge.
+    merged: List[str] = []
+    current_text = ""
+    current_duration = 0.0
+
+    for sentence in candidate_sentences:
+        sentence_duration = duration_len(sentence) / chars_per_sec
+
+        if not current_text:
+            current_text = sentence
+            current_duration = sentence_duration
+            continue
+
+        prospective_duration = current_duration + sentence_duration
+
+        if prospective_duration <= _MAX_SEGMENT_DURATION:
+            current_text += sentence
+            current_duration = prospective_duration
+        else:
+            merged.append(current_text)
+            current_text = sentence
+            current_duration = sentence_duration
+
+    if current_text:
+        merged.append(current_text)
+
+    # Step 4: post-process -- merge short trailing segments into previous.
+    final_texts: List[str] = []
+    for segment in merged:
+        seg_duration = duration_len(segment) / chars_per_sec
+        if seg_duration < _MIN_SEGMENT_DURATION and final_texts:
+            final_texts[-1] += segment
+        else:
+            final_texts.append(segment)
+
+    return final_texts
 
 # 重试间隔基数（秒）：delay = 基数 * (retry + 1)
 _SUBMIT_RETRY_INTERVAL_BASE_SECONDS = 15
@@ -77,7 +152,10 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         super().__init__(api_key, task_id, dir_name, progress_callback, shutdown_event)
         self.video_api = AgnesVideoAPI(api_key=api_key, model=video_model)
         self.video_api.shutdown_event = shutdown_event
-        self.screenwriter = Screenwriter(api_key=api_key, model=chat_model)
+        # PRD 1.4：Screenwriter language pinning——默认 en、尊重显式配置
+        # （未显式设置 PROMPT_LANGUAGE 时固定 en，修复非中文稿件被写成中文的问题）。
+        _sw_language = None if is_prompt_language_explicit() else "en"
+        self.screenwriter = Screenwriter(api_key=api_key, model=chat_model, language=_sw_language)
 
     # ------------------------------------------------------------------
     # 模板钩子：数据来源
@@ -105,28 +183,47 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         # 为缺失 scene_prompt 的段落生成视频描述
         await self._generate_scene_prompts(self._state.paragraphs)
 
+        # 逐段参考图：越界 index（超出实际拆段结果）记 warning 并忽略该图，不阻断
+        if self._state.reference_images:
+            valid_indices = {p.index for p in self._state.paragraphs}
+            for k in list(self._state.reference_images.keys()):
+                try:
+                    idx = int(k)
+                except (TypeError, ValueError):
+                    idx = -1
+                if idx not in valid_indices:
+                    logger.warning(
+                        "[Manuscript] reference image for paragraph %s out of "
+                        "range (%d paragraphs), ignored", k, len(self._state.paragraphs),
+                    )
+                    del self._state.reference_images[k]
+            self.task_manager.update_state(reference_images=self._state.reference_images)
+
         # 填充通用 scenes 列表（供模板与下游步骤引用）
         self._state.scenes = [
             SceneTask(
                 index=p.index,
                 scene_prompt=p.scene_prompt,
                 narration_text=p.text,
-                duration=max(int(math.ceil(len(p.text) / _CHARS_PER_SEC)), 3),
+                duration=max(int(math.ceil(duration_len(p.text) / estimate_chars_per_sec(p.text))), 3),
             )
             for p in self._state.paragraphs
         ]
         self.task_manager.update_state(scenes=[s.model_dump() for s in self._state.scenes])
 
     async def _build_reference_images(self) -> None:
-        """稿件视频无参考图阶段，空实现跳过。"""
+        """稿件参考图阶段：参考图在任务创建时已上传并映射到段落，
+        此步骤为空实现（作为手动模式检查点 / 模板阶段占位）。"""
         return
 
-    # v6.0 P3：稿件无参考图 → references 检查点不可暂停
+    # v6.0 P3 / PRD 1.7：稿件默认无参考图 → references 检查点不可暂停；
+    # 引入逐段参考图（reference_images）后恢复为可暂停检查点。
     def _get_pausable_steps(self) -> set:
         from core.pipelines import _STEP_TO_CHECKPOINT
 
         steps = set(_STEP_TO_CHECKPOINT.keys())
-        steps.discard("step_reference_images")
+        if not (self._state and getattr(self._state, "reference_images", None)):
+            steps.discard("step_reference_images")
         return steps
 
     # ------------------------------------------------------------------
@@ -159,64 +256,21 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
 
         logger.info("[Manuscript] split_text: splitting %d chars...", len(text))
 
-        # Step 1: split by newline.
-        raw_blocks = [b.strip() for b in text.split("\n") if b.strip()]
-
-        # Step 2: further split each block by Chinese sentence-ending punctuation.
-        candidate_sentences: List[str] = []
-        for block in raw_blocks:
-            parts = _SENTENCE_END_RE.split(block)
-            for part in parts:
-                part = part.strip()
-                if part:
-                    candidate_sentences.append(part)
-
-        if not candidate_sentences:
+        # 拆分逻辑收敛为公共函数（PRD 1.6），与 preview 端点共用；
+        # 语速估算与变音符号剥离统一走 core.audio.voices。
+        final_texts = split_manuscript_text(text)
+        if not final_texts:
             logger.warning("[Manuscript] split_text: no sentences found in text")
             return []
 
-        # Step 3: greedy merge.
-        merged: List[str] = []
-        current_text = ""
-        current_duration = 0.0
-
-        for sentence in candidate_sentences:
-            sentence_duration = len(sentence) / _CHARS_PER_SEC
-
-            if not current_text:
-                current_text = sentence
-                current_duration = sentence_duration
-                continue
-
-            prospective_duration = current_duration + sentence_duration
-
-            if prospective_duration <= _MAX_SEGMENT_DURATION:
-                current_text += sentence
-                current_duration = prospective_duration
-            else:
-                merged.append(current_text)
-                current_text = sentence
-                current_duration = sentence_duration
-
-        if current_text:
-            merged.append(current_text)
-
-        # Step 4: post-process -- merge short trailing segments into previous.
-        final_texts: List[str] = []
-        for segment in merged:
-            seg_duration = len(segment) / _CHARS_PER_SEC
-            if seg_duration < _MIN_SEGMENT_DURATION and final_texts:
-                final_texts[-1] += segment
-            else:
-                final_texts.append(segment)
-
+        chars_per_sec = estimate_chars_per_sec(text)
         # Build ManuscriptParagraph list.
         paragraphs: List[ManuscriptParagraph] = []
         for idx, para_text in enumerate(final_texts):
             paragraphs.append(ManuscriptParagraph(index=idx, text=para_text))
             logger.info(
                 "[Manuscript] Paragraph %d: %d chars, ~%.1fs",
-                idx, len(para_text), len(para_text) / _CHARS_PER_SEC,
+                idx, len(para_text), duration_len(para_text) / chars_per_sec,
             )
 
         logger.info(
@@ -324,12 +378,15 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                 _PROGRESS_SUBMIT_START + _PROGRESS_SUBMIT_SPAN * (i / max(total, 1)),
             )
 
-            para_duration = max(int(math.ceil(len(para.text) / _CHARS_PER_SEC)), 3)
+            para_duration = max(int(math.ceil(duration_len(para.text) / estimate_chars_per_sec(para.text))), 3)
+            # 逐段参考图（PRD 1.5）：用户上传图按段落 index 映射，用于 i2v 引导画面
+            ref_images = self._state.reference_images.get(str(para.index), [])
 
             for retry in range(_SUBMIT_RETRIES):
                 try:
                     video_id = await self.video_api.submit_video(
                         prompt=para.scene_prompt,
+                        reference_image_paths=ref_images,
                         duration=para_duration,
                         width=self._state.video_width,
                         height=self._state.video_height,
@@ -399,28 +456,42 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             logger.warning("[Manuscript] audio: empty full text, skipping")
             return None
 
+        # PRD 1.2a：tashkeel 与字幕隔离——字幕/旁白导出产物用无变音符号的 plain 文本，
+        # TTS 用加 tashkeel 版本（提升阿拉伯语朗读准确度）。仅当启用 add_tashkeel 时。
+        narration_plain = full_text
+        narration_tts = full_text
+        if audio_config.add_tashkeel:
+            from core.audio.tashkeel import add_tashkeel_safe
+
+            narration_tts = add_tashkeel_safe(narration_plain)
+            if narration_tts != narration_plain:
+                logger.info(
+                    "[Manuscript] audio: tashkeel applied to %d chars "
+                    "(plain kept for subtitles/export)", len(narration_plain),
+                )
+
         audio_path = os.path.join(self.working_dir, "full_narration.mp3")
-        # v5.x 产物规范前置：导出旁白纯文本（供外部 Agent/工具处理）
-        self._save_narration_txt(full_text, audio_path)
+        # v5.x 产物规范前置：导出旁白纯文本（供外部 Agent/工具处理）——用 plain 版本
+        self._save_narration_txt(narration_plain, audio_path)
 
         if os.path.exists(audio_path) and os.path.getsize(audio_path) > 0:
             self._state.combined_audio = audio_path
             logger.info("[Manuscript] audio: file already exists, skipping")
             # 续传：音频已存在则仅重采 cues，避免字幕退回 legacy 启发式
             return await self._recover_sub_maker(
-                full_text, self._state.audio_config, self._state.subtitle_config,
+                narration_tts, self._state.audio_config, self._state.subtitle_config,
                 audio_path,
             )
 
         await self._emit(
             "audio", "running",
-            f"生成整段旁白 ({len(full_text)} 字)...",
+            f"生成整段旁白 ({len(narration_tts)} 字)...",
             _PROGRESS_AUDIO_START,
         )
 
         sub_maker = await self._generate_audio_with_fallback(
             output_path=audio_path,
-            text=full_text,
+            text=narration_tts,
             audio_config=audio_config,
             subtitle_config=self._state.subtitle_config,
             duration_sec=0.0,  # 原实现未指定时长，由引擎按文本估算
@@ -443,7 +514,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
 
         segment_durations = []
         for p in paragraphs:
-            dur = max(len(p.text) / _CHARS_PER_SEC, 2.0) if p.text else 5.0
+            dur = max(duration_len(p.text) / estimate_chars_per_sec(p.text), 2.0) if p.text else 5.0
             segment_durations.append(dur)
 
         await self._emit(

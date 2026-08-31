@@ -446,7 +446,14 @@ language that focuses on what the camera sees and how it feels.
         Returns:
             完整的旁白文本字符串（语言与输入一致）
         """
-        max_chars = max(int(total_duration * 4.0), 40)
+        # 语速估算走公共实现（PRD 1.3a）：CJK ~4 字/秒，字母文字 ~13 字符/秒。
+        # 此前硬编码 4 字/秒会令阿拉伯文等字母文字的旁白目标长度压缩到实际
+        # 所需的三分之一，导致 40 秒视频只拿到约 10 秒旁白。
+        from core.audio.voices import estimate_chars_per_sec
+
+        chars_per_sec = estimate_chars_per_sec(story)
+        max_chars = max(int(total_duration * chars_per_sec), 40)
+        min_chars = max(int(total_duration * chars_per_sec * 0.75), 30)
         scene_count = len(scenes)
 
         scene_summary = "\n".join(
@@ -461,9 +468,11 @@ language that focuses on what the camera sees and how it feels.
 
 规则：
 - 使用与输入故事相同的语言编写，自然且适合配音朗读。
-- 旁白应不超过 {max_chars} 字，以适配一个\
+- 旁白字数应在 {min_chars}-{max_chars} 字之间，以适配一个\
 {total_duration:.0f} 秒的视频（{scene_count} 个场景 × 每场景 {total_duration/scene_count:.0f} 秒，\
-语速约 4 字/秒）。
+按该语言实际语速约 {chars_per_sec:.0f} 字/秒估算）。不要写得过短——\
+旁白需要有足够的内容实质性地讲述完整故事、覆盖全部 {scene_count} 个场景，\
+而不是一两句简短概括。
 - 作为一个连贯的配音讲述完整故事——不要将每个\
 场景视为独立的旁白。这是覆盖整个视频的\
 一段连续旁白。
@@ -485,7 +494,7 @@ language that focuses on what the camera sees and how it feels.
 - 旁白应像一个引人入胜的音频故事——让暗示\
 和氛围承载分量，而非直白描写。
 
-目标长度约为 {max_chars} 字。
+目标长度约为 {max_chars} 字（不少于 {min_chars} 字）。
 """,
             en_text=f"""\
 You are a professional video narrator and scriptwriter. Given the full story \
@@ -494,9 +503,12 @@ voiceover that covers the ENTIRE video from beginning to end.
 
 Rules:
 - Write in the SAME LANGUAGE as the input story, natural and suitable for voiceover narration.
-- The narration should be {max_chars} characters or fewer to fit a \
+- The narration should be {min_chars}-{max_chars} characters to fit a \
 {total_duration:.0f}-second video ({scene_count} scenes × {total_duration/scene_count:.0f}s each, \
-speech rate ~4 chars/sec).
+estimated at this language's real reading speed of ~{chars_per_sec:.0f} chars/sec). \
+Do NOT make it too short — it needs enough substance to meaningfully narrate \
+the complete story across all {scene_count} scenes, not just a one- or \
+two-sentence summary.
 - Tell the complete story as a cohesive voiceover — do NOT treat each \
 scene as a separate narration. This is ONE continuous narration for the \
 whole video.
@@ -518,7 +530,7 @@ the mood of the moment.
 - The narration should feel like a compelling audio story — let implication \
 and atmosphere carry weight rather than explicit description.
 
-The target length is approximately {max_chars} characters total.
+The target length is approximately {max_chars} characters total (at least {min_chars}).
 """,
         )
         style_block = f"\n<style>{style}</style>\n" if style else ""

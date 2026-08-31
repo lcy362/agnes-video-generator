@@ -232,6 +232,7 @@ async def create_creative_task(
     audio_voice: str = Form("zh-CN-XiaoxiaoNeural"),
     audio_rate: str = Form("+0%"),
     audio_lang: str = Form(""),  # 页面语言，用于音色兼容性校验
+    audio_add_tashkeel: bool = Form(False),  # 阿拉伯语旁白自动加变音符号（harakat）
     # v3.0 字幕独立配置
     subtitle_enabled: bool = Form(True),
     subtitle_style_mode: str = Form("fixed"),
@@ -277,6 +278,7 @@ async def create_creative_task(
         enabled=audio_enabled,
         voice=audio_voice,
         rate=audio_rate,
+        add_tashkeel=audio_add_tashkeel,
     )
     # 构建独立字幕配置（v3.0）
     subtitle_config = _build_subtitle_config(
@@ -352,6 +354,10 @@ async def create_manuscript_task(
     manuscript_text: str = Form(...),
     creative_name: str = Form(""),
     style: str = Form(""),
+    # v6.4（PR #33 吸收）：逐段参考图——每张上传图对应一组段落 index（reference_images_map），
+    # 用于该段落视频的 i2v 画面引导；一张图可服务多个段落。
+    reference_images: List[UploadFile] = File([]),
+    reference_images_map: str = Form("[]"),  # JSON: [[0,2],[1],...] 顺序与 reference_images 一致
     video_width: int = Form(768),
     video_height: int = Form(1152),
     video_duration: int = Form(10),
@@ -360,6 +366,7 @@ async def create_manuscript_task(
     audio_voice: str = Form("zh-CN-XiaoxiaoNeural"),
     audio_rate: str = Form("+0%"),
     audio_lang: str = Form(""),  # 页面语言，用于音色兼容性校验
+    audio_add_tashkeel: bool = Form(False),  # 阿拉伯语旁白自动加变音符号（harakat）
     # v3.0 字幕独立配置
     subtitle_enabled: bool = Form(True),
     subtitle_style_mode: str = Form("fixed"),
@@ -394,11 +401,44 @@ async def create_manuscript_task(
     name = creative_name.strip() if creative_name else f"manuscript_{task_id}"
     dir_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_id}"
 
+    # 处理逐段参考图上传（PRD 1.5）：每张图对应一组段落 index，用于 i2v 引导该段落画面。
+    # reference_images_map 校验：必须为 JSON 数组，每个元素为「非负整数数组」；
+    # 上界（段落数）在任务执行拆段后才确定，此处不校验，越界 index 由流水线 warning 忽略。
+    ref_images_by_para: dict = {}
+    if reference_images:
+        try:
+            idx_map = json.loads(reference_images_map) if reference_images_map else []
+            if not isinstance(idx_map, list):
+                raise ValueError("not a list")
+            for item in idx_map:
+                if not isinstance(item, list) or not all(isinstance(i, int) for i in item):
+                    raise ValueError("element must be list[int]")
+        except Exception:
+            raise HTTPException(
+                status_code=422,
+                detail="reference_images_map 必须为 JSON 数组，元素为段落 index 的整数数组",
+            )
+        upload_dir = helpers.get_upload_dir()
+        for i, up in enumerate(reference_images):
+            if not up or not up.filename:
+                continue
+            saved_path = await _save_upload_file(up, upload_dir, f"{task_id}_ref{i}")
+            para_indices = idx_map[i] if i < len(idx_map) else []
+            for pidx in para_indices:
+                if pidx < 0:
+                    logger.warning(
+                        "[Manuscript] reference image %d has negative paragraph "
+                        "index %d, ignored", i, pidx,
+                    )
+                    continue
+                ref_images_by_para.setdefault(str(pidx), []).append(saved_path)
+
     # 构建音频配置
     audio_config = AudioConfig(
         enabled=audio_enabled,
         voice=audio_voice,
         rate=audio_rate,
+        add_tashkeel=audio_add_tashkeel,
     )
     # 构建独立字幕配置（v3.0）
     subtitle_config = _build_subtitle_config(
@@ -412,6 +452,7 @@ async def create_manuscript_task(
         creative_name=name,
         manuscript_text=manuscript_text.strip(),
         style=style.strip(),
+        reference_images=ref_images_by_para,
         video_width=video_width,
         video_height=video_height,
         video_duration=video_duration,
@@ -657,6 +698,7 @@ async def create_task_legacy(
         audio_voice="zh-CN-XiaoxiaoNeural",
         audio_rate="+0%",
         audio_lang="",
+        audio_add_tashkeel=False,
         subtitle_enabled=True,
         subtitle_style_mode="fixed",
         subtitle_style_hints="",

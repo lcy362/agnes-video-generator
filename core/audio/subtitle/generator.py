@@ -253,6 +253,14 @@ class SubtitleSrtMixin:
             if text:
                 items.append((start_s, end_s, text))
 
+        # PRD 1.2a：TTS 若送入了加 tashkeel 的阿拉伯语文本，cues 文本会连带
+        # 变音符号——字幕显示前统一剥离（仅阿拉伯语变音符号，其他语言无副作用）。
+        from core.audio.tashkeel import strip_diacritics
+
+        items = [(s, e, strip_diacritics(t)) for s, e, t in items]
+        if not items:
+            return ""
+
         if not items:
             return ""
 
@@ -593,6 +601,13 @@ class SubtitleSrtMixin:
                 items.append((s, e, t))
         if not items:
             return ""
+
+        # PRD 1.2a：TTS 若送入了加 tashkeel 的阿拉伯语文本，cues 文本会连带
+        # 变音符号——字幕显示前统一剥离（仅阿拉伯语变音符号，其他语言无副作用）。
+        # 剥离后再做归一化对齐，保证与 plain 的 segment_texts 策略 A 字符区间匹配。
+        from core.audio.tashkeel import strip_diacritics
+
+        items = [(s, e, strip_diacritics(t)) for s, e, t in items]
 
         # 残余归一化：把最后一条 cue 的 end 钳到实际音频时长（避免尾差留白未覆盖）
         if audio_duration and audio_duration > 0 and items[-1][1] > audio_duration:

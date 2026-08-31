@@ -180,6 +180,57 @@ def detect_text_script(text: str) -> str:
     return "unknown"
 
 
+# ═══════════════════════════════════════════════════
+# 语速估算（PR #33 吸收：跨脚本朗读速率差异 + 变音符号剥离）
+# ═══════════════════════════════════════════════════
+# 单一公共实现（PRD 1.3a）：story.py / manuscript_video.py / preview_routes
+# 均从本模块导入，消除此前两处 4.0/13.0 常量与脚本判断的重复副本。
+
+# CJK 字符密度高（一字近一音节），约 4 字/秒
+_CHARS_PER_SEC_CJK = 4.0
+# 阿拉伯文/拉丁文/西里尔文等字母文字含空格与多字符单词，实测约 13 字符/秒
+_CHARS_PER_SEC_ALPHABETIC = 13.0
+
+
+def estimate_chars_per_sec(text: str) -> float:
+    """按文本主要文字体系估算朗读语速（字符/秒）。
+
+    中文/日文/韩文按 CJK 速率（4.0 字/秒）；其余脚本（阿拉伯/拉丁/西里尔/
+    泰文/天城文/孟加拉文等）统一按字母文字速率（13.0 字符/秒，沿自 PR #33
+    对阿拉伯文的实测，泰文等未实测脚本先用统一值，后续可校准）。
+
+    Args:
+        text: 待估算朗读时长的文本。
+
+    Returns:
+        语速（字符/秒）。
+    """
+    script = detect_text_script(text)
+    if script in ("zh", "ja", "ko"):
+        return _CHARS_PER_SEC_CJK
+    return _CHARS_PER_SEC_ALPHABETIC
+
+
+def duration_len(text: str) -> int:
+    """用于时长估算的字符数（剥离阿拉伯语变音符号后计数）。
+
+    阿拉伯语变音符号（harakat/tashkeel）只标注发音、不产生语音时长，
+    估算前必须剥离，否则加全变音符号的文本（codepoint 增加 40-60%）
+    会让时长估算严重偏长，导致生成视频尾部大片静音/定格。
+
+    Args:
+        text: 原始文本（可为空）。
+
+    Returns:
+        剥离变音符号后的字符数。
+    """
+    if not text:
+        return 0
+    from core.audio.tashkeel import strip_diacritics
+
+    return len(strip_diacritics(text))
+
+
 # edge-tts voice id 前缀 → 项目语言 code 映射。
 # 例外：Tagalog 音色在 edge-tts 中用 ISO 639-3 代码 `fil`（如 fil-PH-AngeloNeural），
 # 而项目/前端 UI 用 ISO 639-1 `tl`，故需显式归一。
