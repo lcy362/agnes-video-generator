@@ -95,7 +95,7 @@ async def generate_image(
     img_filename = "final_image.png"
     img_path = os.path.join(tm.task_dir, img_filename)
     try:
-        output.save(img_path)
+        await output.save(img_path)
     except Exception as e:
         state.status = StepStatus.FAILED
         tm.update_state(status=StepStatus.FAILED)
