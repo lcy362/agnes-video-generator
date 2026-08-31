@@ -13,6 +13,8 @@ from moviepy import VideoFileClip, concatenate_videoclips
 
 from models.task import SubtitleStyle
 
+from core.compositor.ffmpeg_tool import resolve_binary
+
 logger = logging.getLogger(__name__)
 
 
@@ -114,7 +116,7 @@ class ConcatMixin:
             sigs = set()
             for p in video_paths:
                 r = subprocess.run(
-                    ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                    [resolve_binary("ffprobe"), "-v", "error", "-select_streams", "v:0",
                      "-show_entries", "stream=width,height,avg_frame_rate",
                      "-of", "csv=s=x:p=0", p],
                     stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=15,
@@ -137,7 +139,7 @@ class ConcatMixin:
                     f.write(f"file '{esc}'\n")
             try:
                 r = subprocess.run(
-                    ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                    [resolve_binary("ffmpeg"), "-y", "-f", "concat", "-safe", "0",
                      "-i", concat_file, "-c", "copy", output_path],
                     stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=600,
                 )
@@ -383,7 +385,7 @@ class ConcatMixin:
         """用 ffprobe 获取媒体文件时长（秒）。"""
         try:
             r = subprocess.run(
-                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                [resolve_binary("ffprobe"), "-v", "error", "-show_entries", "format=duration",
                  "-of", "csv=p=0", path],
                 stdin=subprocess.DEVNULL,
                 capture_output=True, text=True, timeout=15,
@@ -396,6 +398,12 @@ class ConcatMixin:
     def _run_ffmpeg(cmd: list, desc: str = "") -> None:
         """执行 ffmpeg 命令，失败时抛 RuntimeError。"""
         logger.info(f"[Compositor] ffmpeg: {desc}")
+        if not cmd or cmd[0] is None:
+            raise RuntimeError(
+                "ffmpeg not available (no system PATH ffmpeg nor builtin "
+                "imageio-ffmpeg). Please install ffmpeg or verify imageio-ffmpeg "
+                "is installed."
+            )
         try:
             r = subprocess.run(
                 cmd, stdin=subprocess.DEVNULL,
