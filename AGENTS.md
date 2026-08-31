@@ -113,7 +113,7 @@ agnes-video-generator/
 │   ├── app_state.py                  # 应用级全局状态：并发控制（WeightedSemaphore）/ active_pipelines / 生命周期
 │   ├── helpers.py                    # 纯工具函数：字幕样式解析、音色试听/兼容、时长提取、图片 prompt
 │   ├── deps.py                       # 共享依赖：Pipeline 工厂 + 并发受控执行器（含下划线兼容别名）
-│   └── routes/                       # 8 个 APIRouter 模块（config/workspace/voice/image/video/task/creation/utility）
+│   └── routes/                       # 9 个 APIRouter 模块（config/workspace/voice/image/video/task/creation/utility/preview）
 ├── start.sh                          # 一键启动脚本（venv + pip install + run）
 ├── Dockerfile                        # 多平台 Docker 镜像（Python 3.11 + imageio-ffmpeg 静态二进制）
 ├── docker-compose.yml                # Docker Compose（bind mount 持久化工作区 + 配置）

@@ -10,10 +10,10 @@
 | 任务类型 | 测试场景数 | 涉及核心模块 |
 |----------|-----------|-------------|
 | 简单视频 (Type 1) | 1 | `simple_video.py`, `agnes_video.py`, `task_manager.py` |
-| 创意视频 (Type 2) | 3 | `creative_video.py`, `agnes_image.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py` |
-| 稿件视频 (Type 3) | 2 | `manuscript_video.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `concatenator.py` |
+| 创意视频 (Type 2) | 5 | `creative_video.py`, `agnes_image.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `tashkeel.py` |
+| 稿件视频 (Type 3) | 4 | `manuscript_video.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `concatenator.py`, `preview_routes.py` |
 | 数字人口播 (Type 4) | 2 | `anchor_video.py`, `agnes_image.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `concatenator.py` |
-| **总计** | **8** | |
+| **总计** | **14**（S1/C1-C5/M1-M4/A1-A2/P1/I1） | |
 
 ---
 
@@ -37,6 +37,7 @@
 | C2 | 参考图生成尾帧+关键帧+无配音 | keyframes | 上传参考图 | 关闭 | `generate_end_frames_from_ref`、i2i 端帧生成、keyframes |
 | C3 | 带字幕+配音+关键帧 | keyframes | 无 | 开启 | TTS 旁白 + 字幕叠加 + 视频拼接 + keyframes |
 | C4 | 用户上传分镜图+关键帧 | keyframes | 上传分镜图 | 关闭 | 用户分镜图覆盖 AI 分镜、关键帧 + 双图提交（3.6） |
+| C5 | 阿拉伯语创意+变音符号（tashkeel） | keyframes | 无 | 开启+`audio_add_tashkeel` | 非中文 idea 语言 pinning（英文故事）、语速公共估算（13 字符/秒）、tashkeel 仅送 TTS、**字幕/`narration.txt` 不含 harakat**（PRD 1.2/1.2a/1.3/1.4，PR #33 吸收） |
 
 ### 2.3 稿件视频 (ManuscriptVideoPipeline)
 
@@ -46,6 +47,8 @@
 |----|------|---------|------|---------|
 | M1 | 多段稿件+配音 | ~130 字 / 8 句 | 开启 | split 多段合并 → 多段 prompt → 多段 video 批量 → 合并 TTS+SRT → concat overlay |
 | M2 | 多段稿件+自定义字幕 | ~130 字 / 8 句 | 开启 | 自定义 stroke/position/bg 字幕样式 + 多段拆分路径 |
+| M3 | 多段稿件+逐段参考图 | ~130 字 / 8 句 | 开启 | `reference_images` + `reference_images_map` 按段落 index 映射 → i2v 提交（task_state 含 `reference_images`，para_N/task.json 提交带参考图） |
+| M4 | 稿件分段预览（preview-split） | 任意 | — | `POST /api/manuscript/preview-split` 返回段落/估算时长，与正式任务共用 `split_manuscript_text`；`POST /api/creative/preview-script` 白名单校验/并发 429（PRD 1.1/1.1a/1.6） |
 
 **统一稿件文本（M1/M2 共用）**：
 
@@ -234,8 +237,8 @@ python scripts/scene_runner.py --scenario C3 --resume --task-id <task_id>
 | 场景类型 | 权重 |
 |---------|------|
 | 简单 (S1) | 1 |
-| 创意 (C1-C4) | 3-3-3-3 |
-| 稿件 (M1-M2) | 4-4 |
+| 创意 (C1-C5) | 3-3-3-3-3 |
+| 稿件 (M1-M4) | 4-4-4-4 |
 | 数字人 (A1-A2) | 2-2 |
 | 诗词 (P1) | 2 |
 | 简单图片 (I1) | 1 |
@@ -369,6 +372,8 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 | C1 | `/api/tasks/creative` | chaining_mode=keyframes, ref | 120m |
 | C2 | `/api/tasks/creative` | keyframes+end_frame_from_ref | 120m |
 | C3 | `/api/tasks/creative` | keyframes, audio+subtitle | 120m |
+| C4 | `/api/tasks/creative` | keyframes + scene_reference_images | 120m |
+| C5 | `/api/tasks/creative` | 阿拉伯语 idea + audio_add_tashkeel + 字幕 | 120m |
 
 ---
 
@@ -404,6 +409,8 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 `execution_mode` 缺省 `auto` 时 `_maybe_pause` 不生效（`pause_points` 为空），行为零变化。
 | M1 | `/api/tasks/manuscript` | 8句稿件, audio_enabled | 60m |
 | M2 | `/api/tasks/manuscript` | 自定义字幕样式 | 60m |
+| M3 | `/api/tasks/manuscript` | reference_images + reference_images_map | 60m |
+| M4 | `/api/manuscript/preview-split` 等 | preview 端点（不创建任务） | 10m |
 | A1 | `/api/tasks/anchor` | audio_source=post_stitch | 60m |
 | A2 | `/api/tasks/anchor` | audio_source=model | 60m |
 
@@ -441,4 +448,4 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 
 ---
 
-*文档版本：v3.3 | 更新日期：2026-08-25 | 变更：新增 v6.1 问题反馈模块回归（F1-F5 / D1-D3）与端点*
+*文档版本：v3.4 | 更新日期：2026-08-31 | 变更：新增 PR #33 吸收场景（C5 阿拉伯语+tashkeel / M3 稿件参考图 / M4 preview 端点）*

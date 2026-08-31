@@ -1,6 +1,6 @@
 # PRD: Absorbing agnes-simple-ui (PR #33) into the Core Project
 
-> **Status**: Draft v0.2 — pending maintainer approval
+> **Status**: Implemented（Phase 1-3 已按 v0.2 落地，2026-08-31；Phase 4 简单模式未排期）
 > **Date**: 2026-08-31（v0.2 修订，吸收实现审查发现的 10 项问题）
 > **Source**: PR #33 (`feat: add agnes-simple-ui companion tool, Arabic tashkeel, and per-language narration fixes`) by @Khaled97Sho
 > **Related docs**: `docs/public/architecture.md`, `docs/dev/regression_test_plan.md`, `docs/dev/pipeline_products.md`
