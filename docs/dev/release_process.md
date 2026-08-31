@@ -166,7 +166,7 @@ release 内容后续会在**官网开辟板块展示**，并被搜索引擎**独
 
 > **Docker / npm 页面前置规则**：每个版本的 release 新增内容（`## What's New` 章节）必须自动展示在 **Docker Hub 仓库页**与 **npm 包 README** 的**前部**（顶部），让访问分发页面的用户第一眼看到本版更新。此规则已固化在 CI（第 8 步），发版时无需手工操作；但**缺失 release notes 文档时 CI 会跳过前置并输出 warning**，因此第 4 步的文档是强制项。
 
-> **Docker / npm 页面前置规则**：每个版本的 release 新增内容（`## What's New` 章节）必须自动展示在 **Docker Hub 仓库页**与 **npm 包 README** 的**前部**（顶部），让访问分发页面的用户第一眼看到本版更新。此规则已固化在 CI（第 8 步），发版时无需手工操作；但**缺失 release notes 文档时 CI 会跳过前置并输出 warning**，因此第 4 步的文档是强制项。
+> **🔴 Docker Hub overview 更新的 Cloudflare WAF 坑（v6.3.0 实录，2026-08-30）**：`update_dockerhub_overview.py` 脚本 PATCH `hub.docker.com/v2/repositories/{user}/{repo}/` 返回 403，响应体是 **Cloudflare "Attention Required!" HTML 页面**（而非 Docker Hub API 的 JSON 错误）——请求被 WAF 拦截，未到达 API 层。**根因：README 中的 schema.org JSON-LD `<script type="application/ld+json">` 块**（v6.2.1 发版后当天由 BK-1 提交引入）：PATCH 请求体携带原始 `<script>` 文本触发 Cloudflare WAF 的 XSS 拦截规则。**易误判方向**（均已排查排除）：token 权限（docker CLI 推送同 token 正常，因其走 registry API 不经该 WAF）、TLS 指纹（urllib / curl / curl_cffi impersonate chrome 均被拦）、payload 大小（15KB 修复版可过、13KB 含 `<script>` 被拦）。**修复（已固化在脚本，2026-08-31）**：① 从 `full_description` 剥离 `<script>` 块（Docker Hub 页面无需 SEO 结构化数据）；② JSON 序列化时将 `<` 转义为 `\u003c`（纵深防御，服务端解码后内容不变）。**预防**：README 新增 HTML 标签（script/iframe 等）后，Docker Hub overview 自动更新可能被 WAF 拦截；该步骤为 `continue-on-error` 非关键步骤，临时可到 Docker Hub 网页手动更新。诊断技巧：单独建一个仅跑该脚本的临时 workflow（checkout + 直接执行），远快于重推 tag 触发完整 release（5 分钟镜像构建）。
 
 ### 用户要求与版本号映射
 
@@ -179,4 +179,4 @@ release 内容后续会在**官网开辟板块展示**，并被搜索引擎**独
 
 ---
 
-*文档版本：v1.3 | 更新日期：2026-08-28 | 状态：✅ 已生效*
+*文档版本：v1.4 | 更新日期：2026-08-31 | 状态：✅ 已生效*
