@@ -11,9 +11,8 @@ from typing import List, Optional
 import srt as srt_lib
 from moviepy import VideoFileClip, concatenate_videoclips
 
-from models.task import SubtitleStyle
-
 from core.compositor.ffmpeg_tool import resolve_binary
+from models.task import SubtitleStyle
 
 logger = logging.getLogger(__name__)
 
