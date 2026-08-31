@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import hashlib
-import hmac
 import os
 import re
 import time
@@ -101,18 +100,26 @@ def _mask_key(key: str) -> str:
     return f"{key[:6]}...{key[-4:]}" if len(key) > 12 else "***"
 
 
-def _key_id(key: str) -> str:
-    """生成 Key 的稳定标识（HMAC-SHA256 前 12 位），供前端删除时定位，不回传明文。
+# _key_id 用带迭代的 PBKDF2（慢哈希）生成 Key 标识。迭代次数为速度与强度的折中：
+# 本机约 15ms/次，少量 Key 场景下 GET /api/config/keys 可接受；同时满足
+# CodeQL 对「有限输入空间敏感数据」使用抗爆破哈希的推荐（HMAC-SHA256 会被标记）。
+_KEY_ID_PBKDF2_ITERATIONS = 100_000
 
-    使用 HMAC-SHA256（等效 keyed 强度、不可反向爆破），避免对敏感
+
+def _key_id(key: str) -> str:
+    """生成 Key 的稳定标识（PBKDF2-HMAC-SHA256 前 24 位），供前端删除时定位，不回传明文。
+
+    使用带迭代的 PBKDF2（keyed 慢哈希、不可离线爆破），避免对敏感
     Key 使用可直接哈希爆破的算法。ID 每次 GET 动态生成，算法更换无兼容性影响。
     """
     from core.config import get_settings
     secret = get_settings().agnes_config_id_hmac_key.encode("utf-8")
-    # 注意：message 参数（第一个位置参数）必须传入 Key 明文本身。此前误写成仅传
+    # 注意：password 参数（第一个位置参数）必须传入 Key 明文本身。此前误写成仅传
     # key=secret 而漏掉 message，导致对空串做哈希——所有 Key 生成相同 id，
     # 多 Key 场景下按 id 删除会永远命中第一个（见优化路线图 0.7）。
-    return hmac.new(secret, key.encode("utf-8"), hashlib.sha256).hexdigest()[:24]
+    return hashlib.pbkdf2_hmac(
+        "sha256", key.encode("utf-8"), secret, _KEY_ID_PBKDF2_ITERATIONS
+    ).hex()[:24]
 
 
 @router.get("/api/config/keys")
