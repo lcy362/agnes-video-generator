@@ -117,9 +117,16 @@ def test_module_level_helpers_present():
 
 
 def test_module_level_constants_values():
-    """模块级常量按值保持（每字秒数 4.0 / 句子边界正则）。"""
-    assert steps_audio._CHARS_PER_SEC == 4.0
+    """模块级常量按值保持（句子边界正则）。
+
+    PRD 1.3a：语速估算收敛为 core.audio.voices 公共函数后，steps_audio 不再
+    维护 _CHARS_PER_SEC 常量，改由 estimate_chars_per_sec() 提供（CJK 4.0）。
+    """
     assert steps_audio._SENTENCE_BOUNDARY_RE.pattern == r"(?<=[。！？.!?])"
+    from core.audio.voices import estimate_chars_per_sec
+
+    assert estimate_chars_per_sec("中文测试") == 4.0
+    assert estimate_chars_per_sec("English narration") == 13.0
 
 
 # ═══════════════════════════════════════════════
