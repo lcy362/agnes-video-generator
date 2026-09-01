@@ -49,9 +49,15 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.12"]
+    # SONAR_TOKEN 提升到 job 级 env：if 条件与 with 均可引用（步骤级 env 不可用于 if）
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          # SonarScanner 需要完整 git 历史计算新代码差异（sonar.python.coverage.reportPaths 依赖）
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -68,9 +74,11 @@ jobs:
           sudo apt-get install -y ffmpeg fonts-noto-cjk
 
       - name: Install dependencies
+        # --only-binary :all:：所有依赖仅从预编译 wheel 安装，杜绝
+        # setup.py 执行任意代码的供应链风险（S8541）。
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
+          pip install --only-binary :all: -r requirements.txt -r requirements-dev.txt
 
       - name: Lint (ruff)
         run: ruff check core/ web/ utils/ models/ scripts/ --output-format=github
@@ -82,7 +90,9 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install --no-audit --no-fund
+        # npm ci：严格按 package-lock.json 锁定版本（S8543）；
+        # --ignore-scripts：禁止依赖生命周期脚本（S6505）。
+        run: npm ci --no-audit --no-fund --ignore-scripts
 
       - name: Run frontend unit tests (vitest)
         working-directory: frontend
@@ -139,6 +149,16 @@ jobs:
               fh.write("\n".join(lines) + "\n")
           PY
 
+      - name: SonarQube Cloud Scan
+        # CI-based analysis：SonarScanner 显式运行，自动读取
+        # sonar-project.properties 中的 sonar.python.coverage.reportPaths=coverage.xml，
+        # 覆盖率随本次分析一并上报（Automatic Analysis 无法读取 CI 本地产物）。
+        # 仅 Python 3.12 执行一次，避免矩阵重复分析；未配置 SONAR_TOKEN 时自动跳过。
+        if: ${{ matrix.python-version == '3.12' && env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2  # v7
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+
       - name: Upload HTML coverage report
         if: always()
         uses: actions/upload-artifact@v4
@@ -172,7 +192,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend deps
-        run: npm ci
+        # --ignore-scripts：禁止依赖生命周期脚本执行（S6505）
+        run: npm ci --ignore-scripts
         working-directory: frontend
 
       - name: Build frontend

@@ -46,6 +46,9 @@ router = APIRouter(tags=["config"])
 # TTL 默认 5 分钟；?refresh=1 或缓存过期时重新拉取。
 _MODEL_CACHE = {"models": None, "ts": 0.0, "ttl": 300}
 
+# 通用错误消息（复用点 > 1，提取常量避免重复字面量）
+_MSG_KEY_NOT_FOUND = "Key 不存在"
+
 
 @router.get("/api/config")
 async def get_config():
@@ -159,12 +162,18 @@ async def get_config_keys():
     }
 
 
-@router.delete("/api/config/keys")
-async def remove_config_key(id: str = Form(""), key: str = Form("")):
+@router.delete(
+    "/api/config/keys",
+    responses={
+        400: {"description": "Key 来自环境变量，无法从界面移除；或 Key 参数缺失"},
+        404: {"description": "Key 不存在"},
+    },
+)
+async def remove_config_key(key_id: str = Form("", alias="id"), key: str = Form("")):
     """移除单个 Key（仅针对 config 中保存的 Key；env 来源不可在此移除）。
 
     Args:
-        id: Key 的稳定标识（GET /api/config/keys 返回的 id，掩码接口的定位方式）。
+        key_id: Key 的稳定标识（GET /api/config/keys 返回的 id，掩码接口的定位方式）。
         key: Key 明文（向后兼容的旧参数；新前端请用 id，避免明文回传）。
 
     Returns:
@@ -174,9 +183,9 @@ async def remove_config_key(id: str = Form(""), key: str = Form("")):
         400: Key 来自环境变量，无法从界面移除；或 Key 参数缺失。
         404: Key 不存在。
     """
-    id = (id or "").strip()
+    key_id = (key_id or "").strip()
     key = (key or "").strip()
-    if not key and not id:
+    if not key and not key_id:
         raise HTTPException(status_code=400, detail="Key 参数缺失")
 
     items = get_api_keys_with_sources()
@@ -185,12 +194,12 @@ async def remove_config_key(id: str = Form(""), key: str = Form("")):
         env_has = any(it["source"] == "env" and it["key"] == key for it in items)
         config_has = any(it["source"] == "config" and it["key"] == key for it in items)
         if not env_has and not config_has:
-            raise HTTPException(status_code=404, detail="Key 不存在")
+            raise HTTPException(status_code=404, detail=_MSG_KEY_NOT_FOUND)
     else:
         # 掩码接口：按稳定 id 定位明文 Key
-        matched = [it for it in items if _key_id(it["key"]) == id]
+        matched = [it for it in items if _key_id(it["key"]) == key_id]
         if not matched:
-            raise HTTPException(status_code=404, detail="Key 不存在")
+            raise HTTPException(status_code=404, detail=_MSG_KEY_NOT_FOUND)
         key = matched[0]["key"]
         env_has = matched[0]["source"] == "env"
         config_has = not env_has
@@ -284,15 +293,22 @@ async def save_config_keys(keys_json: str = Form(""), append: bool = Form(False)
     }
 
 
-@router.post("/api/config/keys/domain")
-async def save_config_key_domain(id: str = Form(""), domain: str = Form("")):
+@router.post(
+    "/api/config/keys/domain",
+    responses={
+        400: {"description": "Key 来自环境变量，无法持久化域名"},
+        404: {"description": "id 未匹配到任何 Key"},
+        422: {"description": "domain 不在 AGNES_DOMAIN_MAP 内"},
+    },
+)
+async def save_config_key_domain(key_id: str = Form("", alias="id"), domain: str = Form("")):
     """设置单个 Key 绑定的域名（config 来源 Key）。
 
     通过 GET /api/config/keys 返回的 stable id 定位 Key，避免重复回传明文。
     env 来源的 Key 不可落盘 (400)。domain 为空表示清除绑定（回退全局域名）。
 
     Args:
-        id: Key 的稳定标识（GET /api/config/keys 返回的 id）。
+        key_id: Key 的稳定标识（GET /api/config/keys 返回的 id）。
         domain: 期望域名（com/cn/cn_bak），空串清除绑定。
 
     Raises:
@@ -300,7 +316,7 @@ async def save_config_key_domain(id: str = Form(""), domain: str = Form("")):
         404: id 未匹配到任何 Key。
         422: domain 不在 AGNES_DOMAIN_MAP 内。
     """
-    id = (id or "").strip()
+    key_id = (key_id or "").strip()
     domain = (domain or "").strip().lower()
     if domain and domain not in AGNES_DOMAIN_MAP:
         raise HTTPException(
@@ -308,9 +324,9 @@ async def save_config_key_domain(id: str = Form(""), domain: str = Form("")):
             detail=f"域名后缀必须为 {list(AGNES_DOMAIN_MAP.keys())} 之一（或空以清除）",
         )
     items = get_api_keys_with_sources()
-    matched = [it for it in items if _key_id(it["key"]) == id]
+    matched = [it for it in items if _key_id(it["key"]) == key_id]
     if not matched:
-        raise HTTPException(status_code=404, detail="Key 不存在")
+        raise HTTPException(status_code=404, detail=_MSG_KEY_NOT_FOUND)
     entry = matched[0]
     if entry["source"] == "env":
         raise HTTPException(status_code=400, detail="该 Key 来自环境变量，无法为它保存域名")

@@ -31,6 +31,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -1141,7 +1142,10 @@ def _compute_expected_duration(task_state: dict, scenario: ScenarioConfig) -> fl
 
 def _asr_validate(video_path: str) -> dict:
     result = {"has_speech": False, "text": "", "duration": 0.0, "error": ""}
-    tmp_audio = video_path + "_asr_tmp.wav"
+    # 临时音频放在系统临时目录（tempfile 自动清理），
+    # 避免从外部派生路径直接拼接文件（路径穿越加固，S2083）
+    fd, tmp_audio = tempfile.mkstemp(suffix=".wav", prefix="asr_tmp_")
+    os.close(fd)
     try:
         subprocess.run(
             ["ffmpeg", "-y", "-i", video_path, "-vn", "-acodec", "pcm_s16le",

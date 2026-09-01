@@ -21,13 +21,18 @@ jobs:
           fetch-depth: 0
 
       - name: Push master to Gitee mirror
+        # secrets 经 env 注入（S7636：避免在 run 块中直接展开 secrets）
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
-          git remote add gitee https://sandgrid:${{ secrets.GITEE_TOKEN }}@gitee.com/sandgrid/agnes-video-generator.git
+          git remote add gitee https://sandgrid:${GITEE_TOKEN}@gitee.com/sandgrid/agnes-video-generator.git
           git push gitee master
 
       - name: Sync wiki to Gitee
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
           git clone https://github.com/lcy362/agnes-video-generator.wiki.git /tmp/wiki
           cd /tmp/wiki
-          git remote add gitee https://sandgrid:${{ secrets.GITEE_TOKEN }}@gitee.com/sandgrid/agnes-video-generator.wiki.git
+          git remote add gitee https://sandgrid:${GITEE_TOKEN}@gitee.com/sandgrid/agnes-video-generator.wiki.git
           git push gitee master

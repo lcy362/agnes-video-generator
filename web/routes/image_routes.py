@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 
 from core.api.agnes_image import AgnesImageAPI
 from core.config import API_KEY_MISSING_MSG, get_api_key
+from core.path_security import safe_join
 from core.task_manager import TaskManager
 from models.task import SimpleImageTask, StepStatus
 from web import helpers
@@ -24,6 +25,9 @@ _VALID_SIZES = {
     "1024x1024", "768x1152", "1152x768", "768x1344",
     "1344x768", "1792x1024", "1024x1792",
 }
+
+# 参考图上传允许的扩展名白名单（拒绝任意后缀，杜绝路径穿越/异常文件）
+_ALLOWED_UPLOAD_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 
 
 @router.post("/api/image/generate")
@@ -67,10 +71,13 @@ async def generate_image(
 
     ref_paths = []
     if reference_image and reference_image.filename:
-        ext = os.path.splitext(reference_image.filename)[1] or ".png"
+        # 扩展名白名单：拒绝用户可控 filename 中夹带的路径片段，杜绝路径穿越
+        ext = (os.path.splitext(reference_image.filename)[1] or ".png").lower()
+        if ext not in _ALLOWED_UPLOAD_EXTS:
+            ext = ".png"
         upload_dir = helpers.get_upload_dir()
         os.makedirs(upload_dir, exist_ok=True)
-        ref_path = os.path.join(upload_dir, f"img_ref_{uuid.uuid4().hex[:8]}{ext}")
+        ref_path = safe_join(upload_dir, f"img_ref_{uuid.uuid4().hex[:8]}{ext}")
         with open(ref_path, "wb") as f:
             f.write(await reference_image.read())
         ref_paths.append(ref_path)

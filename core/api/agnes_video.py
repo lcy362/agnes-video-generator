@@ -71,6 +71,22 @@ def is_remote_video_failure(exc: BaseException) -> bool:
     return "Video generation failed:" in str(exc)
 
 
+def _read_json_cache(path: str) -> dict:
+    """读取 JSON 缓存文件（线程池执行，避免阻塞事件循环，S7493）。"""
+    with open(path, "r", encoding="utf-8") as f:
+        return json.loads(f.read())
+
+
+def _write_json_cache(path: str, data: dict) -> None:
+    """原子写入 JSON 缓存文件（先写临时文件再 replace，线程池执行）。"""
+    tmp_file = path + ".tmp"
+    with open(tmp_file, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_file, path)
+
+
 class VideoOutput:
     def __init__(self, fmt: str, ext: str, data: str):
         self.fmt = fmt
@@ -147,8 +163,7 @@ class AgnesVideoAPI:
             _URL_CACHE_MAX_AGE = 3600  # 1 小时
             if os.path.exists(url_file):
                 try:
-                    with open(url_file, "r", encoding="utf-8") as f:
-                        cache_data = json.loads(f.read())
+                    cache_data = await asyncio.to_thread(_read_json_cache, url_file)
                     cached_url = cache_data.get("url", "")
                     cached_ts = cache_data.get("ts", 0)
                     age = time.time() - cached_ts
@@ -170,13 +185,7 @@ class AgnesVideoAPI:
             url = await self._upload_image_to_url(ref)
             if url:
                 try:
-                    cache_data = {"url": url, "ts": time.time()}
-                    tmp_file = url_file + ".tmp"
-                    with open(tmp_file, "w", encoding="utf-8") as f:
-                        json.dump(cache_data, f)
-                        f.flush()
-                        os.fsync(f.fileno())
-                    os.replace(tmp_file, url_file)
+                    await asyncio.to_thread(_write_json_cache, url_file, {"url": url, "ts": time.time()})
                 except Exception as e:
                     logger.debug(f"[AgnesVideo] Failed to cache URL: {e}")
                 return url

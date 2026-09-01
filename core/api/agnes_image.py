@@ -148,7 +148,11 @@ class AgnesImageAPI:
                 "image": resolved,
             }
 
-        logger.info(f"[AgnesImage] Generating ({'i2i' if use_i2i else 't2i'}): {prompt[:80]}...")
+        # S5145：不在日志中记录用户 prompt 内容（可能含敏感信息），只记模式与长度
+        logger.info(
+            f"[AgnesImage] Generating ({'i2i' if use_i2i else 't2i'}): "
+            f"prompt {len(prompt)} chars"
+        )
 
         resp = None
         attempt = 0

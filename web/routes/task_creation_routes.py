@@ -18,6 +18,7 @@ from core.config import (
     get_selected_models,
     is_v25_video_model,
 )
+from core.path_security import safe_join
 from core.pipelines import ALL_CHECKPOINTS
 from core.pipelines.poetry_video import POETRY_SUBTITLE_STYLE
 from core.screenwriter import build_poetry_scene_prompt
@@ -40,6 +41,9 @@ from web import app_state, deps, helpers
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["task-creation"])
+
+# 上传文件允许的扩展名白名单（拒绝任意后缀，杜绝路径穿越）
+_ALLOWED_UPLOAD_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".mp4", ".mov", ".webm"}
 
 
 def _parse_scene_durations_json(scene_durations_json: str) -> list:
@@ -120,10 +124,16 @@ def _build_subtitle_config(
 
 
 async def _save_upload_file(upload: UploadFile, upload_dir: str, prefix: str) -> str:
-    """保存上传文件（用 UUID 替代客户端文件名，避免路径穿越），返回落盘路径。"""
-    ext = os.path.splitext(upload.filename)[1] or ".png"
+    """保存上传文件（用 UUID 替代客户端文件名，避免路径穿越），返回落盘路径。
+
+    扩展名取自白名单：客户端 filename 中夹带的任意后缀一律拒绝，
+    再经 ``safe_join`` 锚定到 upload_dir 内，杜绝路径穿越（S2083）。
+    """
+    ext = (os.path.splitext(upload.filename)[1] or ".png").lower()
+    if ext not in _ALLOWED_UPLOAD_EXTS:
+        ext = ".png"
     os.makedirs(upload_dir, exist_ok=True)
-    upload_path = os.path.join(upload_dir, f"{prefix}{ext}")
+    upload_path = safe_join(upload_dir, f"{prefix}{ext}")
     with open(upload_path, "wb") as f:
         f.write(await upload.read())
     return upload_path

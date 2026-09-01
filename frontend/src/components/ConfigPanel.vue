@@ -248,11 +248,14 @@ initCollapse()
             :title="t('keyDomainNotSetHint')"
           >{{ t('keyDomainNotSet') }}</span>
           <!-- 每 Key 域名选择：仅 config 来源可持久化；env 来源回退全局域名不可改 -->
+          <label v-if="item.persistable" :for="'key-domain-select-' + item.id" class="sr-only">{{ t('keyDomainSelectTitle') }}</label>
           <select
+            :id="'key-domain-select-' + item.id"
             v-if="item.persistable"
             :value="item.domain || ''"
             class="glass-input rounded px-1.5 py-0.5 text-[10px] text-ink cursor-pointer"
             :title="t('keyDomainSelectTitle')"
+            :aria-label="t('keyDomainSelectTitle')"
             @change="onKeyDomainChange(item, ($event.target as HTMLSelectElement).value)"
           >
             <option value="">{{ t('keyDomainAuto') }}（{{ displayDomain() }}）</option>

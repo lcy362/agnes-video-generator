@@ -7,9 +7,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+# 权限最小化：仅在需要写权限的 job 上按需授予（S8233）
 permissions:
-  contents: write      # 创建 GitHub Release
-  packages: write      # 推送 GHCR
+  contents: read
 
 env:
   IMAGE_NAME: free-short-video
@@ -18,9 +18,12 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write      # 创建 GitHub Release
+      packages: write      # 推送 GHCR
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       # ── 版本号同步：更新 docker-compose.yml 中的镜像 tag ──
       - name: Bump version references in project files
@@ -37,14 +40,14 @@ jobs:
           grep -n "v[0-9]" AGENTS.md | head -5 || true
 
       - name: Set up QEMU（多架构模拟）
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130  # v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
 
       # ── 冒烟测试：本地构建单平台镜像并验证服务可启动 ──
       - name: Build image for smoke test
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25  # v5
         with:
           context: .
           platforms: linux/amd64
@@ -73,7 +76,7 @@ jobs:
       # GHCR 命名空间只有 user / org（ghcr.io/OWNER/IMAGE），不存在"仓库级路径"。
       # 用 GITHUB_TOKEN 从 workflow 推送会自动将包关联到仓库、出现在 Packages 页。
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -81,7 +84,7 @@ jobs:
 
       - name: Extract image metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051  # v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
           labels: |
@@ -92,7 +95,7 @@ jobs:
             type=raw,value=latest                 # latest
 
       - name: Build and push to GHCR
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25  # v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -106,14 +109,14 @@ jobs:
       # 在仓库 Settings → Secrets 配置 DOCKERHUB_USERNAME / DOCKERHUB_TOKEN 后生效
       - name: Log in to Docker Hub
         if: ${{ env.DOCKERHUB_USERNAME != '' }}
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Push to Docker Hub
         if: ${{ env.DOCKERHUB_USERNAME != '' }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25  # v5
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -138,6 +141,9 @@ jobs:
       # What's New = read from the release notes doc (docs/public/release-notes/)
       # Spec: docs/dev/release_process.md — all release body sections are in English.
       - name: Prepare GitHub Release body
+        # secrets 通过 env 注入（S7636：避免在 run 块中直接展开 secrets）
+        env:
+          DH_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           BODY=/tmp/release_body.md
@@ -157,7 +163,7 @@ jobs:
           
           Docker Hub:
           ```bash
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          docker pull __DH_USERNAME__/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
           ```
           
           #### Run
@@ -193,7 +199,7 @@ jobs:
           Then open **http://localhost:8765**.
           
           **Notes**
-          - Prefer Docker Hub? Replace the image with `${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}`.
+          - Prefer Docker Hub? Replace the image with `__DH_USERNAME__/${{ env.IMAGE_NAME }}:${{ github.ref_name }}`.
           - The image already declares `VOLUME` for both paths, so `docker run -p 8765:8765 <image>` (no `-v`) keeps data only while you reuse the same container (`stop`/`start`); recreating the container starts fresh.
           - `AGNES_API_KEY` can also be set later in the Web UI; it is then stored in the mounted config volume.
           
@@ -213,6 +219,10 @@ jobs:
           > Requires Python 3.10+ and ffmpeg on your system.
           > On first run, a Python virtual environment is auto-created and dependencies are installed.
           EOF
+          # 将占位符替换为 Docker Hub 用户名（从 env 读取，避免在 run 中展开 secrets）
+          if [ -n "$DH_USERNAME" ]; then
+            sed -i "s|__DH_USERNAME__|${DH_USERNAME}|g" "$BODY"
+          fi
           # Append the What's New section (from the release notes doc onward)
           NOTES="docs/public/release-notes/release_notes_v${VERSION}.md"
           if [ -f "$NOTES" ]; then
@@ -223,7 +233,7 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:
           body_path: /tmp/release_body.md
 
@@ -237,10 +247,10 @@ jobs:
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'

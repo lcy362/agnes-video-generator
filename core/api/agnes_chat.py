@@ -217,16 +217,17 @@ class AgnesChatAPI:
             # Step 1: 去围栏
             cleaned = strip_code_fence(content)
             # Step 2: 直接解析
+            # json.JSONDecodeError 是 ValueError 的子类，仅捕获 ValueError（S5713）
             try:
                 return json.loads(cleaned)
-            except (json.JSONDecodeError, ValueError):
+            except ValueError:
                 pass
             # Step 3: 正则提取首个 {…} 块
             match = _JSON_BLOCK_RE.search(cleaned)
             if match:
                 try:
                     return json.loads(match.group())
-                except (json.JSONDecodeError, ValueError):
+                except ValueError:
                     pass
             # Step 3.5: json_repair 修复（可选依赖，修复 LLM 常见缺冒号/尾随逗号/单引号）
             if repair_json is not None:
