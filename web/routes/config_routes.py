@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import re
 import time
 
 from fastapi import APIRouter, Form, HTTPException
+
+logger = logging.getLogger(__name__)
 
 from core.api.agnes_models import fetch_available_models
 from core.api.key_manager import reset_key_ring
@@ -366,7 +369,9 @@ async def detect_config_key_domains(force: bool = Form(False)):
     并限量并发（网络超时 10s，最多 4 个并发），避免阻塞 & 打爆外部接口。
 
     ``force=True`` 时对所有 config Key 重新探测并覆盖已有绑定；
-    默认仅补写尚未绑定域名的 Key（已绑定的跳过）。
+    默认对尚未绑定域名的 Key 补写映射；对已绑定域名也会重新校验，
+    若绑定域名已失效（401/超时，如把国际站 key 误绑到 api.agnes-ai.cn）
+    则重新探测候选域名纠正，避免陈旧绑定在运行期报 401。
 
     env 来源的 Key 不参与探测（无法持久化域名）。
 
@@ -388,11 +393,18 @@ async def detect_config_key_domains(force: bool = Form(False)):
 
     async def probe(entry: dict) -> None:
         key = entry["key"]
-        if not force and current.get(key) in AGNES_DOMAIN_MAP:
-            results.append(
-                {"id": _key_id(key), "mask": _mask_key(key), "domain": current[key], "ok": True, "skipped": True}
+        existing = current.get(key, "")
+        if not force and existing in AGNES_DOMAIN_MAP:
+            # 已绑定域名仍有效 → 跳过；失效（401/超时）→ 重新探测纠正，
+            # 避免陈旧绑定（如把国际站 key 误绑到 api.agnes-ai.cn）在运行期报 401。
+            if await asyncio.to_thread(_probe_domain, key, existing):
+                results.append(
+                    {"id": _key_id(key), "mask": _mask_key(key), "domain": existing, "ok": True, "skipped": True}
+                )
+                return
+            logger.warning(
+                f"[Config] Key {_key_id(key)} 现有绑定域名 {existing} 已失效，重新探测候选域名"
             )
-            return
         for d in _DETECT_CANDIDATES:
             ok = await asyncio.to_thread(_probe_domain, key, d)
             if ok:
