@@ -572,5 +572,17 @@
   "gaNeverUploadTitle": "スイッチの状態に関わらず、以下は絶対にアップロードされません",
   "gaNeverUploadText": "プロンプト、原稿、詩の原文などの創作コンテンツ、APIキー、参照画像。すべてのコンテンツフィールドは送信前に <redacted> マーカーに置き換えられ、長いテキストは自動的に切り詰められ、分析システムには入りません。",
   "gaStatOn": "統計オン",
-  "gaStatOff": "統計オフ"
+  "gaStatOff": "統計オフ",
+  "keyDomainNotSet": "未设置域名",
+  "keyDomainNotSetHint": "该 Key 尚未绑定域名，将回退到全局配置。建议为每个 Key 选择匹配的域名。",
+  "keyDomainSelectTitle": "为该 Key 选择绑定域名（空=跟随全局）",
+  "keyDomainAuto": "跟随全局",
+  "keyDomainSaved": "Key 域名已保存",
+  "failSaveKeyDomain": "保存 Key 域名失败",
+  "detectKeysBtn": "自动探测域名",
+  "detectKeysRunning": "探测中…",
+  "detectKeysHint": "自动为每个 Key 探测并补写匹配的域名",
+  "detectKeysDone": "域名探测完成，已更新",
+  "detectKeysBusy": "探测正在进行或触发过于频繁，请稍候再试",
+  "failDetectKeys": "域名探测失败"
 }

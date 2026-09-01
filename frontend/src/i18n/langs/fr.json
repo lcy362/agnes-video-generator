@@ -572,5 +572,17 @@
   "gaNeverUploadTitle": "Les éléments suivants ne sont jamais téléversés, quel que soit l'état de l'interrupteur",
   "gaNeverUploadText": "Contenu créatif tel que prompts, manuscrits et poèmes ; clés API ; images de référence. Tous les champs de contenu sont remplacés par un marqueur <redacted> avant l'envoi, les textes longs sont tronqués et rien n'entre dans le système d'analyse.",
   "gaStatOn": "Statistiques activées",
-  "gaStatOff": "Statistiques désactivées"
+  "gaStatOff": "Statistiques désactivées",
+  "keyDomainNotSet": "未设置域名",
+  "keyDomainNotSetHint": "该 Key 尚未绑定域名，将回退到全局配置。建议为每个 Key 选择匹配的域名。",
+  "keyDomainSelectTitle": "为该 Key 选择绑定域名（空=跟随全局）",
+  "keyDomainAuto": "跟随全局",
+  "keyDomainSaved": "Key 域名已保存",
+  "failSaveKeyDomain": "保存 Key 域名失败",
+  "detectKeysBtn": "自动探测域名",
+  "detectKeysRunning": "探测中…",
+  "detectKeysHint": "自动为每个 Key 探测并补写匹配的域名",
+  "detectKeysDone": "域名探测完成，已更新",
+  "detectKeysBusy": "探测正在进行或触发过于频繁，请稍候再试",
+  "failDetectKeys": "域名探测失败"
 }

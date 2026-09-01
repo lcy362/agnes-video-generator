@@ -572,5 +572,17 @@
   "gaNeverUploadTitle": "토글 상태와 관계없이 다음은 절대 업로드되지 않습니다",
   "gaNeverUploadText": "프롬프트, 원고, 시 원문 등의 창작 콘텐츠, API 키, 참조 이미지. 모든 콘텐츠 필드는 보고 전에 <redacted> 표시로 대체되며 긴 텍스트는 자동으로 잘리고 분석 시스템에 들어가지 않습니다.",
   "gaStatOn": "통계 켜짐",
-  "gaStatOff": "통계 꺼짐"
+  "gaStatOff": "통계 꺼짐",
+  "keyDomainNotSet": "未设置域名",
+  "keyDomainNotSetHint": "该 Key 尚未绑定域名，将回退到全局配置。建议为每个 Key 选择匹配的域名。",
+  "keyDomainSelectTitle": "为该 Key 选择绑定域名（空=跟随全局）",
+  "keyDomainAuto": "跟随全局",
+  "keyDomainSaved": "Key 域名已保存",
+  "failSaveKeyDomain": "保存 Key 域名失败",
+  "detectKeysBtn": "自动探测域名",
+  "detectKeysRunning": "探测中…",
+  "detectKeysHint": "自动为每个 Key 探测并补写匹配的域名",
+  "detectKeysDone": "域名探测完成，已更新",
+  "detectKeysBusy": "探测正在进行或触发过于频繁，请稍候再试",
+  "failDetectKeys": "域名探测失败"
 }

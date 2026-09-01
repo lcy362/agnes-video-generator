@@ -571,5 +571,17 @@
   "gaNeverUploadTitle": "لن يتم رفع ما يلي أبدًا بغض النظر عن حالة المفتاح",
   "gaNeverUploadText": "المحتوى الإبداعي مثل المطالبات والمخطوطات والنصوص الشعرية؛ مفاتيح API؛ الصور المرجعية. يتم استبدال جميع حقول المحتوى بعلامة <redacted> قبل الإرسال، ويتم اقتطاع النصوص الطويلة تلقائيًا، ولا يدخل شيء إلى نظام التحليلات.",
   "gaStatOn": "الإحصائيات مفعّلة",
-  "gaStatOff": "الإحصائيات متوقفة"
+  "gaStatOff": "الإحصائيات متوقفة",
+  "keyDomainNotSet": "未设置域名",
+  "keyDomainNotSetHint": "该 Key 尚未绑定域名，将回退到全局配置。建议为每个 Key 选择匹配的域名。",
+  "keyDomainSelectTitle": "为该 Key 选择绑定域名（空=跟随全局）",
+  "keyDomainAuto": "跟随全局",
+  "keyDomainSaved": "Key 域名已保存",
+  "failSaveKeyDomain": "保存 Key 域名失败",
+  "detectKeysBtn": "自动探测域名",
+  "detectKeysRunning": "探测中…",
+  "detectKeysHint": "自动为每个 Key 探测并补写匹配的域名",
+  "detectKeysDone": "域名探测完成，已更新",
+  "detectKeysBusy": "探测正在进行或触发过于频繁，请稍候再试",
+  "failDetectKeys": "域名探测失败"
 }
