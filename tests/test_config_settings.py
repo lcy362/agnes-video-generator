@@ -22,7 +22,6 @@ from pydantic import ValidationError
 import core.config as config
 from core.config import AppSettings, WatermarkSettings, WorkspaceEntry
 
-
 # ═══════════════════════════════════════════════
 # 1. 模型默认值与构造期校验
 # ═══════════════════════════════════════════════
@@ -233,3 +232,97 @@ def test_rate_limiter_reads_settings(monkeypatch):
     monkeypatch.setenv("AGNES_RATE_LIMIT", "0")
     # 0/未配置 → 回退动态计算（>0）
     assert _effective_rate() > 0
+
+
+# ═══════════════════════════════════════════════════
+# 4. per-Key 域名绑定（get_api_key_domains / set_api_key_domains / set_api_keys）
+# ═══════════════════════════════════════════════════
+
+def test_get_api_key_domains_empty(conf_file):
+    """无配置 → 返回空 dict。"""
+    conf_file({})
+    assert config.get_api_key_domains() == {}
+
+
+def test_get_api_key_domains_reads_bindings(conf_file):
+    """从 api_keys 列表读取 key -> domain 绑定。"""
+    conf_file({"api_keys": [
+        {"key": "sk-a", "domain": "com"},
+        {"key": "sk-b", "domain": "cn"},
+    ]})
+    assert config.get_api_key_domains() == {"sk-a": "com", "sk-b": "cn"}
+
+
+def test_get_api_key_domains_dict_entry(conf_file):
+    """api_keys 为 dict 结构（旧格式）时返回空——get_api_key_domains 仅识别列表结构，
+    列表化兼容由 get_api_keys_with_sources 处理。"""
+    conf_file({"api_keys": {"sk-a": "cn"}})
+    assert config.get_api_key_domains() == {}
+
+
+def test_set_api_key_domains_writes(conf_file):
+    """set_api_key_domains 落盘 domain 绑定。"""
+    conf_file({"api_keys": [{"key": "sk-a", "domain": ""}]})
+    config.set_api_key_domains({"sk-a": "cn"})
+    assert config.get_api_key_domains() == {"sk-a": "cn"}
+
+
+def test_set_api_key_domains_invalid_domain_cleared(conf_file):
+    """无效域名 → 清空为 ''。"""
+    conf_file({"api_keys": [{"key": "sk-a", "domain": ""}]})
+    config.set_api_key_domains({"sk-a": "evil"})
+    assert config.get_api_key_domains() == {"sk-a": ""}
+
+
+def test_set_api_key_domains_empty_clears(conf_file):
+    """空串 domain → 清除绑定。"""
+    conf_file({"api_keys": [{"key": "sk-a", "domain": "com"}]})
+    config.set_api_key_domains({"sk-a": ""})
+    assert config.get_api_key_domains() == {"sk-a": ""}
+
+
+def test_set_api_key_domains_ignores_env_key(conf_file):
+    """未提及的 config key 保留原绑定。"""
+    conf_file({"api_keys": [
+        {"key": "sk-a", "domain": "com"},
+        {"key": "sk-b", "domain": "cn"},
+    ]})
+    config.set_api_key_domains({"sk-b": "com"})
+    domains = config.get_api_key_domains()
+    assert domains["sk-a"] == "com"  # 保留
+    assert domains["sk-b"] == "com"  # 更新
+
+
+def test_set_api_keys_preserves_domains(conf_file, monkeypatch):
+    """set_api_keys 保留仍在列表中的 Key 的域名绑定。"""
+    monkeypatch.delenv("AGNES_API_KEY", raising=False)
+    conf_file({"api_keys": [{"key": "sk-a", "domain": "cn"}]})
+    config.set_api_keys(["sk-a", "sk-b"])
+    assert config.get_api_key_domains() == {"sk-a": "cn", "sk-b": ""}
+
+
+def test_set_api_keys_empty_removes_field(conf_file, monkeypatch):
+    """空数组 → 移除 api_keys 字段。"""
+    monkeypatch.delenv("AGNES_API_KEY", raising=False)
+    conf_file({"api_keys": [{"key": "sk-a", "domain": ""}]})
+    config.set_api_keys([])
+    assert config.get_api_key_domains() == {}
+
+
+def test_remove_api_key_single(conf_file, monkeypatch):
+    """remove_api_key_single 移除单个 Key，返回 (changed, still_active)。"""
+    monkeypatch.delenv("AGNES_API_KEY", raising=False)
+    conf_file({"api_keys": [{"key": "sk-a", "domain": ""}, {"key": "sk-b", "domain": ""}]})
+    changed, still_active = config.remove_api_key_single("sk-a")
+    assert changed is True
+    assert still_active is False
+    assert config.get_api_keys() == ["sk-b"]
+
+
+def test_remove_api_key_single_missing(conf_file, monkeypatch):
+    """移除不存在的 Key → (False, False)。"""
+    monkeypatch.delenv("AGNES_API_KEY", raising=False)
+    conf_file({"api_keys": [{"key": "sk-a", "domain": ""}]})
+    changed, still_active = config.remove_api_key_single("sk-nope")
+    assert changed is False
+    assert still_active is False

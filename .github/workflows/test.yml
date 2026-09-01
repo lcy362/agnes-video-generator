@@ -103,11 +103,12 @@ jobs:
         run: npm run build
 
       - name: Run tests with coverage
-        # --cov-fail-under=55：覆盖率跌破当前基线（58%）即判红，防静默退化。
-        # 补完 server.py / config.py 等单测后可逐步上调（目标 65）。
+        # --cov-fail-under=55：覆盖率跌破当前基线即判红，防静默退化。
+        # --cov=web：包含路由层（此前缺失导致 Sonar 中 web/ 覆盖率恒为 0）；
+        # scripts/ 为一次性回归工具，不在单测范围内（sonar-project.properties 亦排除）。
         run: |
           python -m pytest tests/ \
-            --cov=core --cov=models --cov=utils \
+            --cov=core --cov=models --cov=utils --cov=web \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
             --cov-report=html:htmlcov \
