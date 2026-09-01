@@ -12,7 +12,7 @@ from core.config import (
     DEFAULT_IMAGE_MODEL,
     DEFAULT_TEXT_MODEL,
     DEFAULT_VIDEO_MODEL,
-    get_agnes_base_url,
+    get_base_url_for_key,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def fetch_available_models(api_key: str) -> dict:
         接口失败（网络/鉴权/非 200）时返回硬编码兜底列表。
     """
     try:
-        endpoint = f"{get_agnes_base_url()}/models?all=true"
+        endpoint = f"{get_base_url_for_key(api_key)}/models?all=true"
         resp = requests.get(
             endpoint,
             headers={"Authorization": f"Bearer {api_key}"},

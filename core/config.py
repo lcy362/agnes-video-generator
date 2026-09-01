@@ -334,7 +334,7 @@ def get_api_keys() -> list:
     """返回所有可用 API Key（去重、去空），合并顺序：
 
     1. 环境变量 / .env：AGNES_API_KEY, AGNES_API_KEY_2 ... _N（环境变量覆盖 .env）
-    2. 配置文件：api_keys 列表（新字段）或旧 api_key 单个字段（向后兼容）
+    2. 配置文件：api_keys 列表（新字段，条目可为字符串或 {key, domain}）或旧 api_key 单个字段
 
     两来源合并后去重（同 Key 只保留一次，env 位置优先）。因此：
     - Web UI 保存的多 Key（config）与 env Key 可并存；
@@ -345,22 +345,86 @@ def get_api_keys() -> list:
     cfg_keys = config.get("api_keys", []) or []
     if not cfg_keys and config.get("api_key"):
         cfg_keys = [config["api_key"]]
-    cfg_keys = [k for k in cfg_keys if k]
+    cfg_keys = [_extract_key(k) for k in cfg_keys if _extract_key(k)]
     return _dedup(env_keys + cfg_keys)
+
+
+def _extract_key(entry) -> str:
+    """从 api_keys 条目中提取 Key 明文（兼容字符串或 {key, domain} 字典）。"""
+    if isinstance(entry, dict):
+        return str(entry.get("key") or "").strip()
+    return str(entry or "").strip()
+
+
+def _key_domain_from_config(config: dict, key: str) -> str:
+    """从已加载的 config dict 中查找某 Key 绑定的域名（未绑定返回空串）。"""
+    entries = config.get("api_keys", []) or []
+    if isinstance(entries, dict):
+        entries = [entries]
+    for e in entries:
+        if isinstance(e, dict) and _extract_key(e) == key:
+            return str(e.get("domain") or "").strip()
+    return ""
+
+
+def get_api_key_domains() -> dict:
+    """返回 config 中每个 Key 绑定的域名（key -> domain，env key 不在内）。
+
+    Returns:
+        {"sk-...": "com"|"cn"|"cn_bak"|"", ...}
+        未绑定的 Key 值为空串。
+    """
+    config = load_config()
+    out: dict = {}
+    entries = config.get("api_keys", []) or []
+    if isinstance(entries, dict):
+        entries = [entries]
+    for e in entries:
+        k = _extract_key(e)
+        if not k or k in out:
+            continue
+        d = ""
+        if isinstance(e, dict):
+            d = str(e.get("domain") or "").strip()
+        out[k] = d
+    return out
+
+
+def set_api_key_domains(mapping: dict) -> None:
+    """按 key -> domain 写入 config api_keys 的域名绑定（仅 config 来源 key）。
+
+    未提及的 config key 保留其现有 domain；无效域名（不在 AGNES_DOMAIN_MAP）视为空。
+    不涉及 env key（env key 无法落盘，始终走全局默认域名）。
+
+    Args:
+        mapping: {key 明文: 域名}，domain 为空串表示清除绑定（回退全局域名）。
+    """
+    config = load_config()
+    curr = get_api_key_domains()
+    for k, d in mapping.items():
+        k = _extract_key(k)
+        d = str(d or "").strip()
+        if k:
+            curr[k] = d if d in AGNES_DOMAIN_MAP else ""
+    config["api_keys"] = [{"key": k, "domain": curr[k]} for k in curr]
+    config.pop("api_key", None)
+    save_config(config)
 
 
 def set_api_keys(keys: list) -> None:
     """持久化多 Key 到配置文件 ``api_keys`` 字段（原子写 + 0o600 权限）。
 
     keys 为空数组时：移除配置中的 api_keys 字段，使采集回退到 env（.env/环境变量）。
+    已存在的 Key 会保留其域名绑定（仅对仍在 keys 中的 Key）。
 
     写入后必须在调用侧重建 KeyRing 与限速器（reset_key_ring / reset_rate_limiter），
     否则旧配置（单桶 + 旧 KeyRing）继续生效。
     """
     config = load_config()
-    cleaned = _dedup([k for k in keys])
+    current = get_api_key_domains()
+    cleaned = _dedup([_extract_key(k) for k in keys])
     if cleaned:
-        config["api_keys"] = cleaned
+        config["api_keys"] = [{"key": k, "domain": current.get(k, "")} for k in cleaned]
         config.pop("api_key", None)
     else:
         config.pop("api_keys", None)
@@ -373,7 +437,7 @@ def _collect_config_keys() -> list:
     cfg_keys = config.get("api_keys", []) or []
     if not cfg_keys and config.get("api_key"):
         cfg_keys = [config["api_key"]]
-    return _dedup([k for k in cfg_keys if k])
+    return _dedup([_extract_key(k) for k in cfg_keys if _extract_key(k)])
 
 
 def get_api_keys_with_sources() -> list:
@@ -410,18 +474,18 @@ def remove_api_key_single(key: str) -> tuple:
     """
     config = load_config()
     changed = False
-    # 1. 从 api_keys 列表移除
-    cfg_keys = config.get("api_keys", []) or []
-    if key in cfg_keys:
-        cfg_keys = [k for k in cfg_keys if k != key]
+    # 1. 从 api_keys 列表移除（保留其余条目的 domain 绑定）
+    raw_cfg = config.get("api_keys", []) or []
+    if any(_extract_key(e) == key for e in raw_cfg):
+        kept = [e for e in raw_cfg if _extract_key(e) != key]
         changed = True
     # 2. 命中旧 api_key 字段
     if config.get("api_key") == key:
         config.pop("api_key", None)
         changed = True
     if changed:
-        if cfg_keys:
-            config["api_keys"] = cfg_keys
+        if kept:
+            config["api_keys"] = kept
         else:
             config.pop("api_keys", None)
         save_config(config)
@@ -1005,8 +1069,27 @@ def set_agnes_domain(domain: str):
 
 
 def get_agnes_base_url() -> str:
-    """返回基于当前域名配置的完整 API Base URL（含 /v1 后缀）。"""
+    """返回基于当前全局域名配置的完整 API Base URL（含 /v1 后缀）。
+
+    未绑定域名的 Key 与 env Key 以及模型列表等全局操作均走这里。
+    """
     domain = get_agnes_domain()
+    root = AGNES_DOMAIN_MAP.get(domain, AGNES_DOMAIN_MAP[_DEFAULT_DOMAIN])
+    return f"{root}/v1"
+
+
+def get_base_url_for_key(key: str) -> str:
+    """返回某 Key 应使用的 API Base URL（含 /v1 后缀），按 Key 绑定域名路由。
+
+    - 若该 Key 在配置中绑定了有效域名（com/cn/cn_bak）→ 走该域名；
+    - 否则（未绑定 / env key / 无效域名）→ 回退到全局 agnes_domain。
+
+    供各 API 客户端在选中具体 Key 后据此构造请求 URL。
+    """
+    config = load_config()
+    domain = _key_domain_from_config(config, key)
+    if domain not in AGNES_DOMAIN_MAP:
+        domain = config.get("agnes_domain") or _DEFAULT_DOMAIN
     root = AGNES_DOMAIN_MAP.get(domain, AGNES_DOMAIN_MAP[_DEFAULT_DOMAIN])
     return f"{root}/v1"
 

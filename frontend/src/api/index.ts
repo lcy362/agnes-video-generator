@@ -51,6 +51,19 @@ export function saveDomain(domain: string) {
   form.append('domain', domain)
   return fetch('/api/config/domain', { method: 'POST', body: form })
 }
+// per-key 域名绑定（v2.3）：为单个 config Key 保存其绑定的域名后缀
+export function saveConfigKeyDomain(id: string, domain: string) {
+  const form = new FormData()
+  form.append('id', id)
+  form.append('domain', domain)
+  return fetch('/api/config/keys/domain', { method: 'POST', body: form }).then((r) => r.json())
+}
+// per-key 域名自动探测：逐 key 按候选域名探测，返回每个 key 的探测结果
+export function detectConfigKeyDomains(force = false) {
+  const form = new FormData()
+  if (force) form.append('force', 'true')
+  return fetch('/api/config/keys/detect', { method: 'POST', body: form }).then((r) => r.json())
+}
 export function saveModels(models: { text?: string; image?: string; video?: string }) {
   const form = new FormData()
   if (models.text) form.append('text', models.text)

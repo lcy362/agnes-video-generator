@@ -23,6 +23,7 @@ from core.config import (
     get_api_key,
     get_api_key_source,
     get_api_keys,
+    get_api_key_domains,
     get_api_keys_source,
     get_api_keys_with_sources,
     get_selected_models,
@@ -33,6 +34,7 @@ from core.config import (
     remove_api_key_single,
     set_agnes_domain,
     set_api_key,
+    set_api_key_domains,
     set_api_keys,
     set_selected_models,
     set_watermark_config,
@@ -138,12 +140,20 @@ async def get_config_keys():
         }
     """
     items = get_api_keys_with_sources()
+    domains = get_api_key_domains()
     return {
         "ok": True,
         "key_count": len(items),
         "source": get_api_keys_source(),
         "keys": [
-            {"id": _key_id(it["key"]), "mask": _mask_key(it["key"]), "source": it["source"]}
+            {
+                "id": _key_id(it["key"]),
+                "mask": _mask_key(it["key"]),
+                "source": it["source"],
+                # 每个 Key 绑定的域名；config 来源可持久化，env 来源无法落盘（回退全局域名）
+                "domain": domains.get(it["key"], ""),
+                "persistable": it["source"] == "config",
+            }
             for it in items
         ],
     }
@@ -272,6 +282,121 @@ async def save_config_keys(keys_json: str = Form(""), append: bool = Form(False)
         "key_count": len(get_api_keys()),
         "source": get_api_keys_source(),
     }
+
+
+@router.post("/api/config/keys/domain")
+async def save_config_key_domain(id: str = Form(""), domain: str = Form("")):
+    """设置单个 Key 绑定的域名（config 来源 Key）。
+
+    通过 GET /api/config/keys 返回的 stable id 定位 Key，避免重复回传明文。
+    env 来源的 Key 不可落盘 (400)。domain 为空表示清除绑定（回退全局域名）。
+
+    Args:
+        id: Key 的稳定标识（GET /api/config/keys 返回的 id）。
+        domain: 期望域名（com/cn/cn_bak），空串清除绑定。
+
+    Raises:
+        400: Key 来自环境变量，无法持久化域名。
+        404: id 未匹配到任何 Key。
+        422: domain 不在 AGNES_DOMAIN_MAP 内。
+    """
+    id = (id or "").strip()
+    domain = (domain or "").strip().lower()
+    if domain and domain not in AGNES_DOMAIN_MAP:
+        raise HTTPException(
+            status_code=422,
+            detail=f"域名后缀必须为 {list(AGNES_DOMAIN_MAP.keys())} 之一（或空以清除）",
+        )
+    items = get_api_keys_with_sources()
+    matched = [it for it in items if _key_id(it["key"]) == id]
+    if not matched:
+        raise HTTPException(status_code=404, detail="Key 不存在")
+    entry = matched[0]
+    if entry["source"] == "env":
+        raise HTTPException(status_code=400, detail="该 Key 来自环境变量，无法为它保存域名")
+    set_api_key_domains({entry["key"]: domain})
+    return {"ok": True, "mask": _mask_key(entry["key"]), "domain": domain}
+
+
+# 探测候选域名顺序：官方国际站优先，其次国内站备用，最后严格国内站专属端点
+_DETECT_CANDIDATES = ["com", "cn_bak", "cn"]
+# 探测 /v1/models 的超时与并发上限
+_DETECT_TIMEOUT = 10
+_DETECT_CONCURRENCY = 4
+
+
+def _probe_domain(key: str, domain: str) -> bool:
+    """同步探测单个 Key 在某个域名下是否鉴权通过（/v1/models 返回 200）。"""
+    import requests
+
+    root = AGNES_DOMAIN_MAP[domain]
+    try:
+        resp = requests.get(
+            f"{root}/v1/models",
+            headers={"Authorization": f"Bearer {key}"},
+            timeout=_DETECT_TIMEOUT,
+        )
+        return resp.status_code == 200
+    except Exception:  # noqa: BLE001 — 连接/超时均视为该域名不可用
+        return False
+
+
+@router.post("/api/config/keys/detect")
+async def detect_config_key_domains(force: bool = Form(False)):
+    """自动探测每个 config Key 应绑定的域名，并补写 key -> domain 映射。
+
+    逐个 Key 按候选域名顺序（com / cn_bak / cn）探测 GET /v1/models：
+    首个返回 200 的域名即判定为该 Key 的有效域名并落盘。探测并行执行，
+    并限量并发（网络超时 10s，最多 4 个并发），避免阻塞 & 打爆外部接口。
+
+    ``force=True`` 时对所有 config Key 重新探测并覆盖已有绑定；
+    默认仅补写尚未绑定域名的 Key（已绑定的跳过）。
+
+    env 来源的 Key 不参与探测（无法持久化域名）。
+
+    Returns:
+        {
+          "ok": true,
+          "applied": int,      # 本次新增/覆盖的绑定数
+          "results": [{"id","mask","domain","ok","skipped"}],  # 每个 config Key 的探测结果
+        }
+    """
+    import asyncio
+
+    items = get_api_keys_with_sources()
+    cfg_items = [it for it in items if it["source"] == "config"]
+    current = get_api_key_domains()
+    results = []
+    mapping = {}
+    sem = asyncio.Semaphore(_DETECT_CONCURRENCY)
+
+    async def probe(entry: dict) -> None:
+        key = entry["key"]
+        if not force and current.get(key) in AGNES_DOMAIN_MAP:
+            results.append(
+                {"id": _key_id(key), "mask": _mask_key(key), "domain": current[key], "ok": True, "skipped": True}
+            )
+            return
+        for d in _DETECT_CANDIDATES:
+            ok = await asyncio.to_thread(_probe_domain, key, d)
+            if ok:
+                mapping[key] = d
+                results.append(
+                    {"id": _key_id(key), "mask": _mask_key(key), "domain": d, "ok": True, "skipped": False}
+                )
+                return
+        results.append(
+            {"id": _key_id(key), "mask": _mask_key(key), "domain": "", "ok": False, "skipped": False}
+        )
+
+    async def bounded(entry: dict) -> None:
+        async with sem:
+            await probe(entry)
+
+    await asyncio.gather(*[bounded(it) for it in cfg_items])
+    if mapping:
+        set_api_key_domains(mapping)
+    return {"ok": True, "applied": len(mapping), "results": results}
 
 
 @router.get("/api/models")

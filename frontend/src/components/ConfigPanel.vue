@@ -24,6 +24,9 @@ const {
   saveMultiKeys,
   loadKeyInfo,
   removeKey,
+  saveKeyDomain,
+  detectKeyDomains,
+  detectingKeys,
   clearApiKey,
   modelSyncStatus,
   modelSaveStatus,
@@ -74,6 +77,16 @@ function domainEntry(root = appState.agnesDomain) {
 }
 function displayDomain(root = appState.agnesDomain): string {
   return domainEntry(root).url
+}
+// per-key 域名下拉展示：给定域名后缀返回其 URL（未绑定/未知返回空串）
+function keyDomainUrl(root?: string): string {
+  if (!root) return ''
+  const e = DOMAIN_ENTRIES.find((d) => d.key === root)
+  return e ? e.url : ''
+}
+// 保存某 Key 的域名（下拉 change 触发；空值清除绑定 → 回退全局域名）
+async function onKeyDomainChange(item: any, domain: string) {
+  await saveKeyDomain(item.id, domain)
 }
 
 // 折叠状态（5 个配置面板）
@@ -212,18 +225,39 @@ initCollapse()
           {{ t('multiKeyActive') }}
         </span>
       </div>
-      <!-- Key 列表：后端掩码展示 + 来源 + 按稳定 id 单个移除 -->
+      <!-- Key 列表：后端掩码展示 + 来源 + 按稳定 id 单个移除 + per-key 域名选择 -->
       <div v-if="keyList.length > 0" class="mt-3 space-y-1.5">
         <div
           v-for="(item, idx) in keyList"
           :key="item.id + idx"
-          class="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-paper-3/70 text-xs"
+          class="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-paper-3/70 text-xs flex-wrap"
         >
-          <code class="flex-1 font-mono text-ink-2 truncate">{{ item.mask }}</code>
+          <code class="flex-1 font-mono text-ink-2 truncate min-w-[8rem]">{{ item.mask }}</code>
           <span
             class="px-1.5 py-0.5 rounded text-[10px] uppercase"
             :class="item.source === 'env' ? 'bg-amber-900/60 text-amber-300' : 'bg-paper-3 text-muted'"
           >{{ item.source === 'env' ? t('keySrcEnv') : t('keySrcConfig') }}</span>
+          <span
+            v-if="item.domain && keyDomainUrl(item.domain)"
+            class="px-1.5 py-0.5 rounded text-[10px] font-mono"
+            :class="item.domain === 'cn' ? 'bg-green-900/60 text-green-300' : 'bg-blue-900/60 text-blue-300'"
+          >{{ keyDomainUrl(item.domain) }}</span>
+          <span
+            v-else
+            class="px-1.5 py-0.5 rounded text-[10px] text-amber-300/80 bg-amber-900/30"
+            :title="t('keyDomainNotSetHint')"
+          >{{ t('keyDomainNotSet') }}</span>
+          <!-- 每 Key 域名选择：仅 config 来源可持久化；env 来源回退全局域名不可改 -->
+          <select
+            v-if="item.persistable"
+            :value="item.domain || ''"
+            class="glass-input rounded px-1.5 py-0.5 text-[10px] text-ink cursor-pointer"
+            :title="t('keyDomainSelectTitle')"
+            @change="onKeyDomainChange(item, ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">{{ t('keyDomainAuto') }}（{{ displayDomain() }}）</option>
+            <option v-for="d in DOMAIN_ENTRIES" :key="d.key" :value="d.key">{{ d.url }}</option>
+          </select>
           <button
             v-if="item.source !== 'env'"
             class="text-red-300 hover:text-red-200 transition"
@@ -233,6 +267,17 @@ initCollapse()
             ✕
           </button>
           <span v-else class="text-muted/50" :title="t('keySrcEnvHint')">•</span>
+        </div>
+        <!-- 自动探测按钮：逐 key 探测并补写 key -> domain 映射 -->
+        <div class="flex items-center gap-2 pt-1">
+          <button
+            class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-medium transition"
+            :disabled="detectingKeys"
+            @click="detectKeyDomains()"
+          >
+            {{ detectingKeys ? t('detectKeysRunning') : t('detectKeysBtn') }}
+          </button>
+          <span class="text-xs text-muted">{{ t('detectKeysHint') }}</span>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-3 text-xs">
