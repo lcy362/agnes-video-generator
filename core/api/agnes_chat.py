@@ -16,7 +16,6 @@ import requests
 
 from core.api.error_collector import collect_error, collect_error_from_exception
 from core.api.rate_limiter import get_rate_limiter, request_with_key_rotation
-from core.config import get_agnes_base_url
 
 logger = logging.getLogger(__name__)
 
@@ -69,13 +68,18 @@ class AgnesChatAPI:
         # 向后兼容：旧调用方可能读取 self.headers
         self.headers = dict(self._base_headers)
 
-    def _auth_headers(self) -> dict:
-        """每次请求前生成带当前 Key 的 headers 副本（从 KeyRing 轮转取 Key）。"""
+    def _auth_headers(self, key: str | None = None) -> dict:
+        """每次请求前生成带当前 Key 的 headers 副本。
+
+        Args:
+            key: 显式指定 Key（供按 Key 绑定域名路由时与 URL 保持一致）。
+                省略时从 KeyRing 轮转取当前 Key。
+        """
         from core.api.key_manager import get_key_ring
 
-        key = get_key_ring().next()
+        k = key or get_key_ring().next()
         h = dict(self._base_headers)
-        h["Authorization"] = f"Bearer {key}"
+        h["Authorization"] = f"Bearer {k}"
         return h
 
     def _image_to_b64_uri(self, path: str) -> str:
@@ -128,7 +132,7 @@ class AgnesChatAPI:
             get_rate_limiter().acquire()
             resp = request_with_key_rotation(
                 requests.post,
-                f"{get_agnes_base_url()}/chat/completions",
+                "/chat/completions",
                 max_retries=_MAX_RETRIES,
                 retry_base_delay=_RETRY_BASE_DELAY,
                 json=payload,

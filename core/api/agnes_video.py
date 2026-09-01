@@ -17,7 +17,7 @@ from core.api.rate_limiter import get_rate_limiter, get_video_submit_limiter
 from core.config import (
     VIDEO_ASPECT_RATIOS,
     get_agnes_api_root,
-    get_agnes_base_url,
+    get_base_url_for_key,
     is_v25_video_model,
 )
 from utils.image_normalizer import normalize_reference_path
@@ -118,11 +118,16 @@ class AgnesVideoAPI:
         # 向后兼容：旧调用方可能读取 self.headers
         self.headers = dict(self._base_headers)
 
-    def _auth_headers(self) -> dict:
-        """每次请求前生成带当前 Key 的 headers 副本（从 KeyRing 轮转取 Key）。"""
-        key = get_key_ring().next()
+    def _auth_headers(self, key: str | None = None) -> dict:
+        """每次请求前生成带当前 Key 的 headers 副本。
+
+        Args:
+            key: 显式指定 Key（供按 Key 绑定域名路由时与 URL 保持一致）。
+                省略时从 KeyRing 轮转取当前 Key。
+        """
+        k = key or get_key_ring().next()
         h = dict(self._base_headers)
-        h["Authorization"] = f"Bearer {key}"
+        h["Authorization"] = f"Bearer {k}"
         return h
 
     def _path_to_b64(self, path: str) -> str:
@@ -202,10 +207,11 @@ class AgnesVideoAPI:
                 }
                 logger.info(f"[AgnesVideo] Uploading image to hosted URL (attempt {attempt + 1}/{retries})...")
                 await get_rate_limiter().acquire_async(self.shutdown_event)
+                key = ring.next()
                 resp = await asyncio.to_thread(
                     requests.post,
-                    f"{get_agnes_base_url()}/images/generations",
-                    headers=self._auth_headers(),
+                    f"{get_base_url_for_key(key)}/images/generations",
+                    headers=self._auth_headers(key),
                     json=payload,
                     timeout=(30, 120),
                 )
@@ -405,11 +411,12 @@ class AgnesVideoAPI:
                 # 2.3 异步原生，停止可打断）
                 await get_video_submit_limiter().acquire_async(self.shutdown_event)
                 # M2: 缩短读超时从 180s 到 60s，使 stop() 更快生效
+                key = ring.next()
                 resp = await asyncio.wait_for(
                     asyncio.to_thread(
                         requests.post,
-                        f"{get_agnes_base_url()}/videos",
-                        headers=self._auth_headers(),
+                        f"{get_base_url_for_key(key)}/videos",
+                        headers=self._auth_headers(key),
                         json=payload,
                         timeout=(15, 60),
                     ),

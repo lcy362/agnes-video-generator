@@ -326,6 +326,7 @@
   "domainHint": "Pilih domain API Agnes. Di China, .cn direkomendasikan untuk akses lebih stabil.",
   "domainComLabel": "Global",
   "domainCnLabel": "China (direkomendasikan)",
+  "domainCnBakLabel": "Tiongkok cadangan (tidak dalam dokumentasi resmi, dapat dihapus)",
   "domainSaved": "Disimpan",
   "domainSaveFailed": "Gagal simpan",
   "ttImage": "Gambar Sederhana",

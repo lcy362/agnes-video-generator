@@ -341,6 +341,7 @@
   "domainHint": "اختر نطاق الوصول إلى Agnes API. في الصين يُنصح باستخدام .cn للحصول على اتصال أكثر استقرارًا.",
   "domainComLabel": "دولي",
   "domainCnLabel": "الصين (موصى به)",
+  "domainCnBakLabel": "الصين احتياطي (غير مذكور في الوثائق الرسمية، قد يُحذف)",
   "domainSaved": "تم الحفظ",
   "domainSaveFailed": "فشل الحفظ",
   "ttPoetry": "فيديو شعر",

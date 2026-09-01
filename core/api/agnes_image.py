@@ -12,7 +12,7 @@ import requests
 from core.api.error_collector import collect_error, collect_error_from_exception
 from core.api.key_manager import get_key_ring
 from core.api.rate_limiter import get_rate_limiter
-from core.config import get_agnes_base_url
+from core.config import get_base_url_for_key
 from utils.image import download_image
 from utils.image_normalizer import normalize_reference_path
 
@@ -77,11 +77,16 @@ class AgnesImageAPI:
         # 向后兼容：旧调用方可能读取 self.headers
         self.headers = dict(self._base_headers)
 
-    def _auth_headers(self) -> dict:
-        """每次请求前生成带当前 Key 的 headers 副本（从 KeyRing 轮转取 Key）。"""
-        key = get_key_ring().next()
+    def _auth_headers(self, key: str | None = None) -> dict:
+        """每次请求前生成带当前 Key 的 headers 副本。
+
+        Args:
+            key: 显式指定 Key（供按 Key 绑定域名路由时与 URL 保持一致）。
+                省略时从 KeyRing 轮转取当前 Key。
+        """
+        k = key or get_key_ring().next()
         h = dict(self._base_headers)
-        h["Authorization"] = f"Bearer {key}"
+        h["Authorization"] = f"Bearer {k}"
         return h
 
     async def _path_to_b64(self, path: str) -> str:
@@ -156,10 +161,11 @@ class AgnesImageAPI:
                 await get_rate_limiter().acquire_async()
                 # 动态超时：第一次 120s，后续逐步增加（图像生成较慢，放宽读超时）
                 read_timeout = _READ_TIMEOUT_BASE_SECONDS * (attempt + 1)
+                key = ring.next()
                 resp = await asyncio.to_thread(
                     requests.post,
-                    f"{get_agnes_base_url()}/images/generations",
-                    headers=self._auth_headers(),
+                    f"{get_base_url_for_key(key)}/images/generations",
+                    headers=self._auth_headers(key),
                     json=payload,
                     timeout=(30, read_timeout),
                 )

@@ -15,7 +15,8 @@ const apiKeyStatus = ref<'none' | 'configured' | 'env'>('none')
 // 多 Key（v5.0 优化）：当前 Key 数 + 采集来源 + 去重后的 Key 列表（掩码 + 来源 + 稳定 id，无明文）
 const keyCount = ref(0)
 const keySource = ref('')
-const keyList = ref<{ id: string; mask: string; source: string }[]>([])
+// domain: 该 Key 绑定的域名后缀（''=未绑定，回退全局域名）；persistable: 是否可持久化（仅 config 来源）
+const keyList = ref<{ id: string; mask: string; source: string; domain: string; persistable: boolean }[]>([])
 
 function isApiKeyConfigured() {
   return apiKeyStatus.value !== 'none'
@@ -44,6 +45,44 @@ async function loadKeyInfo() {
     }
   } catch (e) {
     console.error('load /api/config/keys failed:', e)
+  }
+}
+
+// 保存单个 Key 绑定的域名（config 来源可持久化；env 来源前端不会调用）
+async function saveKeyDomain(id: string, domain: string) {
+  const r = await api.saveConfigKeyDomain(id, domain)
+  if (r.ok) {
+    trackEvent('config_action', { action: 'save_key_domain', domain: domain || '(unset)' })
+    showToast(t('keyDomainSaved'), 3000)
+    keyList.value = (await api.getConfigKeys()).keys || []
+    return true
+  }
+  showToast(r.detail || t('failSaveKeyDomain'), 4500)
+  return false
+}
+
+// per-key 域名自动探测：逐 key 探测并补写 key -> domain 映射，返回结果供 UI 提示
+const detectingKeys = ref(false)
+let lastDetectAt = 0
+async function detectKeyDomains(force = false): Promise<{ updated: number; failed: string[] } | null> {
+  // 防抖：10 秒内不重复触发（避免频繁探测外部接口）
+  if (detectingKeys.value || Date.now() - lastDetectAt < 10000) {
+    showToast(t('detectKeysBusy'), 2500)
+    return null
+  }
+  detectingKeys.value = true
+  try {
+    const d = await api.detectConfigKeyDomains(force)
+    lastDetectAt = Date.now()
+    showToast(t('detectKeysDone') + ': ' + (d.applied || 0), 3000)
+    keyList.value = (await api.getConfigKeys()).keys || []
+    const failed = (d.results || []).filter((x: any) => !x.ok).map((x: any) => x.mask)
+    return { updated: d.applied || 0, failed }
+  } catch (e: any) {
+    showToast(e?.message || t('failDetectKeys'), 4500)
+    return null
+  } finally {
+    detectingKeys.value = false
   }
 }
 
@@ -303,6 +342,9 @@ export function useConfig() {
     saveMultiKeys,
     loadKeyInfo,
     removeKey,
+    saveKeyDomain,
+    detectKeyDomains,
+    detectingKeys,
     clearApiKey,
     modelSyncStatus,
     modelSaveStatus,

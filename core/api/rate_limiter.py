@@ -269,7 +269,7 @@ def reset_rate_limiter() -> None:
 
 def request_with_key_rotation(
     requester,
-    url: str,
+    endpoint: str,
     *,
     max_retries: int = 3,
     retry_base_delay: float = 20.0,
@@ -279,7 +279,8 @@ def request_with_key_rotation(
     """429 换 Key 立即重试；全 Key 429 或 5xx/超时/连接错误才指数退避。
 
     规则：
-    1. 每请求前 key_ring.next()（round-robin，均匀分摊），生成带当前 Key 的 headers
+    1. 每请求前 key_ring.next()（round-robin，均匀分摊），生成带当前 Key 的 headers，
+       并按该 Key 绑定域名构造 URL（``get_base_url_for_key``，未绑定回退全局域名）
     2. 429 且 has_multiple() -> key_ring.rotate() 立即重试（不 sleep、不计入退避）
        —— Key 级隔离限速，换 Key 后配额是满的
     3. 所有 Key 均 429（rotation 计数达到 len(keys) × 退避上限）-> 指数退避
@@ -287,7 +288,8 @@ def request_with_key_rotation(
 
     Args:
         requester: 可调用 (url, headers, **kw) -> requests.Response。
-        url: 请求 URL。
+        endpoint: API 接口相对路径（如 "/chat/completions"）。完整 URL 依当前 Key
+            绑定域名经 ``get_base_url_for_key`` 动态拼接。
         max_retries: 退避重试上限。
         retry_base_delay: 指数退避基数（秒），delay = 基数 × (retries + 1)。
         key_ring: KeyRing 实例；None 时取全局单例。
@@ -302,6 +304,8 @@ def request_with_key_rotation(
     """
     import requests
 
+    from core.config import get_base_url_for_key
+
     ring = key_ring or get_key_ring()
     base_headers = requester_kwargs.pop("headers", None) or {}
     retries = 0
@@ -309,8 +313,10 @@ def request_with_key_rotation(
     max_rotations = len(ring) * max_retries
     while True:
         # 每请求前轮转 Key：round-robin 均匀分摊；429 换 Key（rotate 推进计数）后
-        # 下次 next() 自然取到下一个 Key
-        headers = {**base_headers, "Authorization": f"Bearer {ring.next()}"}
+        # 下次 next() 自然取到下一个 Key。URL 按该 Key 绑定域名动态拼接。
+        key = ring.next()
+        headers = {**base_headers, "Authorization": f"Bearer {key}"}
+        url = f"{get_base_url_for_key(key)}{endpoint}"
         try:
             resp = requester(url, headers=headers, **requester_kwargs)
         except (requests.ConnectionError, requests.Timeout) as e:

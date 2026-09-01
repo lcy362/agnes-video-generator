@@ -341,6 +341,7 @@
   "domainHint": "Piliin ang Agnes API access domain. Sa China, inirerekomenda ang .cn para sa mas matatag na koneksyon.",
   "domainComLabel": "International",
   "domainCnLabel": "China (inirerekomenda)",
+  "domainCnBakLabel": "China backup (hindi nakalista sa opisyal na dokyumento, maaaring alisin)",
   "domainSaved": "Nai-save na",
   "domainSaveFailed": "Bigo ang pag-save",
   "ttPoetry": "Poetry Video",

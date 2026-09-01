@@ -341,6 +341,7 @@
   "domainHint": "Chọn tên miền truy cập API Agnes. Tại Trung Quốc nên dùng .cn để kết nối ổn định hơn.",
   "domainComLabel": "Quốc tế",
   "domainCnLabel": "Trung Quốc (khuyên dùng)",
+  "domainCnBakLabel": "Trung Quốc dự phòng (không có trong tài liệu chính thức, có thể bị gỡ)",
   "domainSaved": "Đã lưu",
   "domainSaveFailed": "Lưu thất bại",
   "ttPoetry": "Video Thơ",
