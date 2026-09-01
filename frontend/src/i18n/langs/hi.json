@@ -341,6 +341,7 @@
   "domainHint": "Agnes API एक्सेस डोमेन चुनें। चीन में बेहतर कनेक्टिविटी के लिए .cn अनुशंसित है।",
   "domainComLabel": "अंतर्राष्ट्रीय",
   "domainCnLabel": "चीन (अनुशंसित)",
+  "domainCnBakLabel": "चीन बैकअप (आधिकारिक दस्तावेज़ में उल्लेखित नहीं, हटाया जा सकता है)",
   "domainSaved": "सहेजा गया",
   "domainSaveFailed": "सहेजना विफल",
   "ttPoetry": "कविता वीडियो",

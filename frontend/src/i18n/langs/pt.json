@@ -328,6 +328,7 @@
   "domainHint": "Escolha o domínio da API Agnes. Na China, recomenda-se .cn para melhor conectividade.",
   "domainComLabel": "Global",
   "domainCnLabel": "China (recomendado)",
+  "domainCnBakLabel": "China reserva (não mencionado na documentação oficial, pode ser removido)",
   "domainSaved": "Salvo",
   "domainSaveFailed": "Falha ao salvar",
   "ttImage": "Imagem simples",

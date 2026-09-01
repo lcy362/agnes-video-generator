@@ -62,9 +62,18 @@ function vmRatioListText(item: { model: string; caps: Record<string, any> }): st
   return ratios.map((r: string) => vmCaps.ratioWHText(r, item.model)).join(' / ')
 }
 
-// 域名展示：cn 为国内站 api.agnes-ai.cn，com 为国际站 apihub.agnes-ai.com
+// 域名展示：key → 接入端点。cn 为国内站 api.agnes-ai.cn，com 为国际站 apihub.agnes-ai.com，
+// cn_bak 为国内站备用 apihub.agnes-ai.cn（官方文档未提及、可能下线，接受国际站 key）
+const DOMAIN_ENTRIES = [
+  { key: 'com', url: 'apihub.agnes-ai.com', labelKey: 'domainComLabel' },
+  { key: 'cn', url: 'api.agnes-ai.cn', labelKey: 'domainCnLabel' },
+  { key: 'cn_bak', url: 'apihub.agnes-ai.cn', labelKey: 'domainCnBakLabel' },
+]
+function domainEntry(root = appState.agnesDomain) {
+  return DOMAIN_ENTRIES.find((d) => d.key === root) || DOMAIN_ENTRIES[0]
+}
 function displayDomain(root = appState.agnesDomain): string {
-  return root === 'cn' ? 'api.agnes-ai.cn' : 'apihub.agnes-ai.com'
+  return domainEntry(root).url
 }
 
 // 折叠状态（5 个配置面板）
@@ -378,7 +387,7 @@ initCollapse()
         <span class="text-sm text-muted">
           <span class="text-ink-2 font-medium">{{ t('domainTitle') }}</span>
           <span class="text-muted mx-2">·</span>
-          <span :class="appState.agnesDomain === 'cn' ? 'text-green-400' : 'text-muted'">{{ displayDomain() }}</span>
+          <span :class="appState.agnesDomain === 'com' ? 'text-muted' : 'text-green-400'">{{ displayDomain() }}</span>
         </span>
       </div>
       <span class="text-muted text-xs">▶</span>
@@ -387,7 +396,7 @@ initCollapse()
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-lg font-semibold text-accent">{{ t('domainTitle') }}</h2>
         <div class="flex items-center gap-2">
-          <span class="text-xs px-2 py-1 rounded-full" :class="appState.agnesDomain === 'cn' ? 'bg-green-900/40 text-green-300' : 'bg-paper-2 text-muted'">
+          <span class="text-xs px-2 py-1 rounded-full" :class="appState.agnesDomain === 'com' ? 'bg-paper-2 text-muted' : 'bg-green-900/40 text-green-300'">
             {{ displayDomain() }}
           </span>
           <button class="text-xs text-muted hover:text-ink-2 transition px-2 py-1 rounded" @click="toggleConfigPanel('domain')">▲</button>
@@ -395,18 +404,11 @@ initCollapse()
       </div>
       <p class="text-xs text-muted mb-4">{{ t('domainHint') }}</p>
       <div class="space-y-3">
-        <label class="flex items-center gap-3 glass-input rounded-lg px-4 py-3 cursor-pointer hover:border-blue-500/40 transition">
-          <input v-model="appState.agnesDomain" type="radio" name="agnes-domain" value="com" class="accent-blue-500 w-4 h-4 cursor-pointer" />
+        <label v-for="d in DOMAIN_ENTRIES" :key="d.key" class="flex items-center gap-3 glass-input rounded-lg px-4 py-3 cursor-pointer hover:border-blue-500/40 transition">
+          <input v-model="appState.agnesDomain" type="radio" name="agnes-domain" :value="d.key" class="accent-blue-500 w-4 h-4 cursor-pointer" />
           <div>
-            <span class="text-sm text-ink-2 font-medium">apihub.agnes-ai.com</span>
-            <span class="text-xs text-muted ml-2">{{ t('domainComLabel') }}</span>
-          </div>
-        </label>
-        <label class="flex items-center gap-3 glass-input rounded-lg px-4 py-3 cursor-pointer hover:border-blue-500/40 transition">
-          <input v-model="appState.agnesDomain" type="radio" name="agnes-domain" value="cn" class="accent-blue-500 w-4 h-4 cursor-pointer" />
-          <div>
-            <span class="text-sm text-ink-2 font-medium">api.agnes-ai.cn</span>
-            <span class="text-xs text-muted ml-2">{{ t('domainCnLabel') }}</span>
+            <span class="text-sm text-ink-2 font-medium">{{ d.url }}</span>
+            <span class="text-xs text-muted ml-2">{{ t(d.labelKey) }}</span>
           </div>
         </label>
       </div>

@@ -328,6 +328,7 @@
   "domainHint": "Kies het API-domein voor Agnes. In China wordt .cn aanbevolen voor een betere connectiviteit.",
   "domainComLabel": "Globaal",
   "domainCnLabel": "China (aanbevolen)",
+  "domainCnBakLabel": "China backup (niet vermeld in officiële docs, kan worden verwijderd)",
   "domainSaved": "Opgeslagen",
   "domainSaveFailed": "Opslaan mislukt",
   "ttImage": "Eenvoudige afbeelding",

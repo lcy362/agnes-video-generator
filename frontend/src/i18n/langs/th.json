@@ -341,6 +341,7 @@
   "domainHint": "เลือกโดเมนเข้าถึง API Agnes ในจีนแนะนำ .cn เพื่อการเชื่อมต่อที่เสถียรขึ้น",
   "domainComLabel": "นานาชาติ",
   "domainCnLabel": "จีน (แนะนำ)",
+  "domainCnBakLabel": "จีนสำรอง (ไม่ได้อยู่ในเอกสารอย่างเป็นทางการ อาจถูกลบ)",
   "domainSaved": "บันทึกแล้ว",
   "domainSaveFailed": "บันทึกล้มเหลว",
   "ttPoetry": "วิดีโอกลอน",

@@ -328,6 +328,7 @@
   "domainHint": "Agnes API 도메인을 선택하세요. 중국에서는 .cn 사용을 권장합니다.",
   "domainComLabel": "글로벌",
   "domainCnLabel": "중국 (권장)",
+  "domainCnBakLabel": "중국 예비 (공식 문서에 언급되지 않음, 제거될 수 있음)",
   "domainSaved": "저장됨",
   "domainSaveFailed": "저장 실패",
   "ttImage": "간단 이미지",

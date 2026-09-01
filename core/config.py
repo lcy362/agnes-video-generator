@@ -967,11 +967,18 @@ def get_video_model_capabilities() -> dict:
 
 # 可用域名映射
 # 注：Agnes 官方域名划分（来源：AgnesAI-Labs skills 的 model_catalog 参考值）：
-#   - com 国际站（主）：apihub.agnes-ai.com
-#   - cn  国内站（中国站）：api.agnes-ai.cn（apihub.agnes-ai.cn 仅作国际站备用，非国内站）
+#   - com 国际站（主）：apihub.agnes-ai.com（官方文档，接受国际站 key）
+#   - cn  国内站（中国站）：api.agnes-ai.cn（官方文档，仅接受国内站专属 key，国际站 key 会 401）
+#   - cn_bak  国内站备用端点：apihub.agnes-ai.cn
+#       ⚠️ 官方文档未提及，仅作临时备用，后续可能下线
+#       ⚠️ 该端点接受国际站 key（在 platform.agnes-ai.com 领取的 key），
+#          避免切换 cn 后因国际站 key 撞上 api.agnes-ai.cn 得到 401。
+#       ⚠️ 推荐用户选择与自身 key 匹配的域名：key 是国际站 → 用 com / cn_bak；
+#          key 是国内站专属 → 用 cn（api.agnes-ai.cn）。长期仍应跟随官方文档域名。
 AGNES_DOMAIN_MAP = {
-    "com": "https://apihub.agnes-ai.com",
-    "cn": "https://api.agnes-ai.cn",
+    "com": "https://apihub.agnes-ai.com",   # 国际站（官方文档）
+    "cn": "https://api.agnes-ai.cn",        # 国内站（官方文档，需国内站专属 key）
+    "cn_bak": "https://apihub.agnes-ai.cn", # 国内站备用（官方文档未提及，可能下线；接受国际站 key）
 }
 
 _DEFAULT_DOMAIN = "com"

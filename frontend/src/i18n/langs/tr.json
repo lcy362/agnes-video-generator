@@ -341,6 +341,7 @@
   "domainHint": "Agnes API erişim alan adını seçin. Çin içinde .cn daha iyi bağlantı için önerilir.",
   "domainComLabel": "Global",
   "domainCnLabel": "Çin (önerilen)",
+  "domainCnBakLabel": "Çin yedek (resmi belgelerde geçmiyor, kaldırılabilir)",
   "domainSaved": "Kaydedildi",
   "domainSaveFailed": "Kaydetme başarısız",
   "ttPoetry": "Şiir Videosu",
