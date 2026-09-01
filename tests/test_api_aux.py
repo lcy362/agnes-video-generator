@@ -162,3 +162,51 @@ class TestRequestWithKeyRotation:
         out = request_with_key_rotation(requester, "/videos", key_ring=self._make_ring(), max_retries=2)
         assert out.status_code == 200
         assert calls["n"] == 2
+
+
+# ═══════════════════════════════════════════════
+# agnes_chat: chat_json JSON 解析路径（S5713 修复分支）
+# ═══════════════════════════════════════════════
+
+class TestChatJson:
+    def _api(self):
+        from core.api.agnes_chat import AgnesChatAPI
+        return AgnesChatAPI(api_key="sk-test")
+
+    def test_direct_json(self, monkeypatch):
+        """直接 JSON → 返回解析结果。"""
+        api = self._api()
+        monkeypatch.setattr(api, "chat", lambda *a, **k: '{"ok": true}')
+        assert api.chat_json("sys", "user") == {"ok": True}
+
+    def test_code_fence_json(self, monkeypatch):
+        """代码围栏包裹 → 去围栏后解析。"""
+        api = self._api()
+        monkeypatch.setattr(api, "chat", lambda *a, **k: '```json\n{"ok": true}\n```')
+        assert api.chat_json("sys", "user") == {"ok": True}
+
+    def test_regex_extract(self, monkeypatch):
+        """围栏外有杂文本 → 正则提取首个 JSON 块。"""
+        api = self._api()
+        monkeypatch.setattr(api, "chat", lambda *a, **k: 'Here is the result: {"ok": true}')
+        assert api.chat_json("sys", "user") == {"ok": True}
+
+    def test_retry_then_success(self, monkeypatch):
+        """首次失败 → 重试一次 chat → 成功。"""
+        api = self._api()
+        calls = {"n": 0}
+
+        def fake_chat(*a, **k):
+            calls["n"] += 1
+            return '{"ok": true}' if calls["n"] > 1 else 'not json at all'
+
+        monkeypatch.setattr(api, "chat", fake_chat)
+        assert api.chat_json("sys", "user") == {"ok": True}
+        assert calls["n"] == 2
+
+    def test_final_failure_raises(self, monkeypatch):
+        """两轮均失败 → 抛 ValueError。"""
+        api = self._api()
+        monkeypatch.setattr(api, "chat", lambda *a, **k: "no json here")
+        with pytest.raises(ValueError):
+            api.chat_json("sys", "user")

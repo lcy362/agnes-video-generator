@@ -21,12 +21,13 @@ config/keys 与 config/keys/domain 路由单测 — tests/test_config_keys_route
     .venv/bin/python -m pytest tests/test_config_keys_routes.py -v
 """
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
+import requests
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -208,3 +209,131 @@ class TestSaveConfigKeyDomain:
         assert resp.status_code == 200
         assert resp.json()["domain"] == ""
         assert saved.get(key) == ""
+
+
+class TestSaveConfigKeys:
+    def test_json_array(self, client, monkeypatch):
+        """JSON 数组 → 保存多个 Key。"""
+        monkeypatch.setattr(config_routes, "get_api_keys", lambda: ["sk-a", "sk-b"])
+        monkeypatch.setattr(config_routes, "get_api_keys_source", lambda: "config")
+        monkeypatch.setattr(config_routes, "set_api_keys", lambda k: None)
+        monkeypatch.setattr(config_routes, "reset_key_ring", lambda: None)
+        monkeypatch.setattr(config_routes, "reset_rate_limiter", lambda: None)
+
+        resp = client.post("/api/config/keys", data={"keys_json": '["sk-a","sk-b"]'})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        assert body["key_count"] == 2
+
+    def test_plain_text_split(self, client, monkeypatch):
+        """非 JSON 文本 → 按空白/逗号拆分。"""
+        monkeypatch.setattr(config_routes, "get_api_keys", lambda: ["a", "b", "c"])
+        monkeypatch.setattr(config_routes, "get_api_keys_source", lambda: "config")
+        monkeypatch.setattr(config_routes, "set_api_keys", lambda k: None)
+        monkeypatch.setattr(config_routes, "reset_key_ring", lambda: None)
+        monkeypatch.setattr(config_routes, "reset_rate_limiter", lambda: None)
+
+        resp = client.post("/api/config/keys", data={"keys_json": "sk-a, sk-b sk-c"})
+        assert resp.status_code == 200
+        assert resp.json()["key_count"] == 3
+
+    def test_empty_overwrite_clears(self, client, monkeypatch):
+        """覆盖模式空输入 → 清空 config Key。"""
+        monkeypatch.setattr(config_routes, "get_api_keys", lambda: [])
+        monkeypatch.setattr(config_routes, "get_api_keys_source", lambda: "env")
+        monkeypatch.setattr(config_routes, "set_api_keys", lambda k: None)
+        monkeypatch.setattr(config_routes, "reset_key_ring", lambda: None)
+        monkeypatch.setattr(config_routes, "reset_rate_limiter", lambda: None)
+
+        resp = client.post("/api/config/keys", data={"keys_json": ""})
+        assert resp.status_code == 200
+        assert resp.json()["key_count"] == 0
+
+    def test_empty_append_keeps(self, client, monkeypatch):
+        """追加模式空输入 → 不改动现有配置。"""
+        monkeypatch.setattr(config_routes, "get_api_keys", lambda: ["sk-old"])
+        monkeypatch.setattr(config_routes, "get_api_keys_source", lambda: "config")
+        monkeypatch.setattr(config_routes, "set_api_keys", lambda k: None)
+        monkeypatch.setattr(config_routes, "reset_key_ring", lambda: None)
+        monkeypatch.setattr(config_routes, "reset_rate_limiter", lambda: None)
+
+        resp = client.post("/api/config/keys", data={"keys_json": "", "append": "true"})
+        assert resp.status_code == 200
+        assert resp.json()["key_count"] == 1
+
+    def test_append_merges(self, client, monkeypatch):
+        """追加模式 → 现有 config Key 与新 Key 合并后保存。"""
+        saved = {}
+        monkeypatch.setattr(config_routes, "get_api_keys", lambda: ["a", "b"])
+        monkeypatch.setattr(config_routes, "get_api_keys_source", lambda: "config")
+        monkeypatch.setattr(config_routes, "load_config", lambda: {"api_keys": [{"key": "sk-a"}]})
+        monkeypatch.setattr(config_routes, "set_api_keys", lambda k: saved.update({"keys": k}))
+        monkeypatch.setattr(config_routes, "reset_key_ring", lambda: None)
+        monkeypatch.setattr(config_routes, "reset_rate_limiter", lambda: None)
+
+        resp = client.post("/api/config/keys", data={"keys_json": '["sk-new"]', "append": "true"})
+        assert resp.status_code == 200
+        # existing 直接取自 load_config（保留原始 dict 结构），新 Key 追加其后
+        assert "sk-new" in [str(k) for k in saved["keys"]]
+        assert len(saved["keys"]) == 2
+
+
+class TestDetectConfigKeyDomains:
+    def test_detect_applies(self, client, monkeypatch):
+        """force=True → 探测并补写 config Key 域名。"""
+        key = "sk-test-abcdef1234567890"
+        monkeypatch.setattr(config_routes, "AGNES_DOMAIN_MAP", {"com": "https://api.com", "cn": "https://api.cn"})
+        monkeypatch.setattr(
+            config_routes, "get_api_keys_with_sources",
+            lambda: _make_items((key, "config")),
+        )
+        monkeypatch.setattr(config_routes, "get_api_key_domains", lambda: {})
+        saved = {}
+        monkeypatch.setattr(config_routes, "set_api_key_domains", lambda m: saved.update(m))
+        # 模拟探测：com 返回 200
+        monkeypatch.setattr(config_routes, "_probe_domain", lambda k, d: d == "com")
+
+        resp = client.post("/api/config/keys/detect", data={"force": "true"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        assert body["applied"] == 1
+        assert saved.get(key) == "com"
+        assert body["results"][0]["domain"] == "com"
+
+    def test_detect_skips_existing_valid(self, client, monkeypatch):
+        """已绑定且仍有效 → skipped，不重复探测。"""
+        key = "sk-test-abcdef1234567890"
+        monkeypatch.setattr(config_routes, "AGNES_DOMAIN_MAP", {"com": "https://api.com"})
+        monkeypatch.setattr(
+            config_routes, "get_api_keys_with_sources",
+            lambda: _make_items((key, "config")),
+        )
+        monkeypatch.setattr(config_routes, "get_api_key_domains", lambda: {key: "com"})
+        saved = {}
+        monkeypatch.setattr(config_routes, "set_api_key_domains", lambda m: saved.update(m))
+        monkeypatch.setattr(config_routes, "_probe_domain", lambda k, d: True)
+
+        resp = client.post("/api/config/keys/detect", data={})
+        assert resp.status_code == 200
+        assert resp.json()["applied"] == 0
+        assert resp.json()["results"][0]["skipped"] is True
+
+    def test_probe_domain_ok(self, monkeypatch):
+        """_probe_domain 直接单元测试：200 → True。"""
+        resp = requests.Response()
+        resp.status_code = 200
+        monkeypatch.setattr(config_routes, "AGNES_DOMAIN_MAP", {"com": "https://api.com"})
+        monkeypatch.setattr(requests, "get", lambda *a, **k: resp)
+        assert config_routes._probe_domain("sk-test", "com") is True
+
+    def test_probe_domain_exception(self, monkeypatch):
+        """_probe_domain 异常 → False。"""
+        monkeypatch.setattr(config_routes, "AGNES_DOMAIN_MAP", {"com": "https://api.com"})
+
+        def boom(*a, **k):
+            raise TimeoutError
+
+        monkeypatch.setattr(requests, "get", boom)
+        assert config_routes._probe_domain("sk-test", "com") is False
