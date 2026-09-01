@@ -74,11 +74,11 @@ jobs:
           sudo apt-get install -y ffmpeg fonts-noto-cjk
 
       - name: Install dependencies
-        # --only-binary :all:：所有依赖仅从预编译 wheel 安装，杜绝
-        # setup.py 执行任意代码的供应链风险（S8541）。
+        # 说明：依赖中含 srt 等仅有 sdist 的纯 Python 包，
+        # 无法使用 --only-binary :all:（详见 sonar-project.properties 中的 S8541 豁免说明）。
         run: |
           python -m pip install --upgrade pip
-          pip install --only-binary :all: -r requirements.txt -r requirements-dev.txt
+          pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Lint (ruff)
         run: ruff check core/ web/ utils/ models/ scripts/ --output-format=github
