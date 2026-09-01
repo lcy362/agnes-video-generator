@@ -11,6 +11,7 @@
 > - 流水线产物逻辑：`docs/dev/pipeline_products.md`（权威参考）
 > - 大版本回归：`docs/dev/regression_test_plan.md`（含场景矩阵、命令、报告）
 > - 测试覆盖 & CI：`docs/dev/test_coverage_and_ci.md`
+> - SonarCloud 分析工作流：`docs/dev/sonarcloud_analysis_workflow.md`（提交代码 → Sonar 分析的完整链路、触发条件、配置项、故障排查）
 > - 优化路线图：`docs/plans/v6.0/optimization_roadmap.md`（合并版，现行唯一路线图，计划 v6 版本线内完成；已取代并废弃 `docs/plans/v5.0/optimization_roadmap.md`）
 > - 待调研存档：`docs/plans/optimization-research/README.md`
 > - 发版规范：`docs/dev/release_process.md`（版本号规则 + 新增内容规范 + 发布流程）

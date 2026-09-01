@@ -157,8 +157,12 @@
 
 - 触发：**`push` 到任意分支**（`branches: ["**"]`）、所有 `pull_request`、`workflow_dispatch`
 - 步骤：Checkout → 设 Python 3.12（带 pip 缓存）→ 装 ffmpeg + `fonts-noto-cjk` → 装依赖 → `pytest --cov` → 上传 `htmlcov/` + `coverage.xml` artifact → 将覆盖率写入 **Job Summary**
+- **Sonar 扫描**：Python 3.12 矩阵项末尾执行 `SonarSource/sonarqube-scan-action@v7`（CI-based analysis），自动读取 `sonar-project.properties` 与 `coverage.xml` 上报 SonarCloud
 - **防回归门禁**：`--cov-fail-under=55`，覆盖率跌破当前基线即小红叉
 - 可选：把 `python-version` 改成矩阵可验证 3.11 / 3.12 多版本
+
+> 📌 **从提交代码到 Sonar 分析的完整流程、触发条件、配置项与故障排查**，
+> 见 [`docs/dev/sonarcloud_analysis_workflow.md`](./sonarcloud_analysis_workflow.md)。
 
 > ⚠️ CI 注意点：字幕渲染依赖 CJK 字体 `resource/fonts/STHeitiMedium.ttc`（已入库）。
 > 本地通过；ubuntu-latest 上该 `.ttc` 随仓库 checkout 可用，且已补装 `fonts-noto-cjk` 兜底，避免「中文方块/字体缺失」。
