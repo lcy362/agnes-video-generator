@@ -402,11 +402,11 @@ async def detect_config_key_domains(force: bool = Form(False)):
                     {"id": _key_id(key), "mask": _mask_key(key), "domain": existing, "ok": True, "skipped": True}
                 )
                 return
-            # 不在日志中记录 Key 相关标识（CodeQL py/clear-text-logging-sensitive-data），
-            # 仅记录域名失效本身；Key 通过 _mask_key 掩码后出现在 results 中供前端定位。
-            logger.warning(
-                f"[Config] 现有绑定域名 {existing} 已失效，重新探测候选域名"
-            )
+            # 日志不记录任何从配置 dict 取出的值（含域名）：域名由
+            # get_api_key_domains() 返回、其数据流源自 API Key 配置，
+            # CodeQL py/clear-text-logging-sensitive-data 会将其标记为敏感。
+            # 域名信息已通过 results[].domain 返回给前端，无需在日志中重复。
+            logger.warning("[Config] 现有绑定域名已失效，重新探测候选域名")
         for d in _DETECT_CANDIDATES:
             ok = await asyncio.to_thread(_probe_domain, key, d)
             if ok:
