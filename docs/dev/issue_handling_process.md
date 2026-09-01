@@ -114,6 +114,7 @@ gh issue list --repo lcy362/agnes-video-generator --state open \
 | 视频提交报 `HTTP 403 insufficient_user_quota`（预扣费额度不足）                                           | 上游 Agnes 账户余额 < 本次视频预扣金额                                                                                      | 充值/增加账户额度后重试；缩短时长/降低分辨率降低单次成本；不需要可删除任务                                              | #34      |
 | （待确认）Windows 下 `scene_prompts` 步骤报 `[WinError 2] The system cannot find the file specified` | 该步骤仅 LLM 调用，疑为环境问题：SSL CA/证书包缺失、SSL DLL 缺失，或 HTTP(S)\_PROXY / REQUESTS\_CA\_BUNDLE / SSL\_CERT\_FILE 指向不存在的路径 | 待用户补充完整 traceback 与部署方式、环境变量后定位                                                     | #35      |
 | 国内站域名应为 `api.agnes-ai.cn` 而非 `apihub.agnes-ai.cn`                                           | Agnes 官方域名划分：国内站（中国站）= `api.agnes-ai.cn/v1`，`apihub.agnes-ai.cn` 仅作国际站备用（实测两者同一 IP、均可访问）                      | `core/config.py` `AGNES_DOMAIN_MAP["cn"]` 已改为 `api.agnes-ai.cn` + 前端域名选择区同步更新（v6.x） | #37      |
+| 请求报 `HTTP 401` / `无效的令牌`（含 `api.agnes-ai.cn/v1`、simple/manuscript 提交等）                          | API Key 与请求域名不匹配：跨站 key（国际站 key 用国内站专属域名，或反之）认证失败                                                                            | 升级 v6.4.2：per-key 域名绑定 + 「自动探测域名」按钮逐 key 补全匹配域名；国际站 key 用 `apihub.agnes-ai.com` 或 `cn_bak` 兜底（兼容国内/国际 key） | #38, #44 |
 
 ***
 
