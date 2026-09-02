@@ -320,7 +320,7 @@ async def create_creative_task(
 
     logger.info(
         "[Pipeline] Scene config: source=%s, scenes=%s, durations=%s, uniform=%s, manual=%s",
-        safe_log(duration_source), scene_count, scene_durations,
+        safe_log(duration_source), scene_count, safe_log(scene_durations),
         uniform_duration, safe_log(execution_mode),
     )
 

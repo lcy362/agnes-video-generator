@@ -204,6 +204,6 @@ def init_runtime_state() -> None:
                                 os.remove(tmp_path)
                             raise
                         logger.info("[Startup] Reset stale %s task %s -> pending",
-                                    old_status, safe_log(name))
+                                    safe_log(old_status), safe_log(name))
                 except Exception as e:
                     logger.debug(f"[Startup] Failed to reset stale task {name}: {e}")
