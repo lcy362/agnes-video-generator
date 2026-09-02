@@ -3,6 +3,8 @@ import asyncio
 import threading
 import time
 
+import pytest
+
 from core.api.rate_limiter import AgnesRateLimiter
 
 
@@ -64,6 +66,7 @@ async def test_acquire_async_cancellable():
     assert limiter.tokens == 0.0  # 取消不消耗令牌、不破坏桶
 
 
+@pytest.mark.slow  # 真实计时验证 6 线程按 32/min 排队（约 11s），默认排除，CI 全量执行
 def test_sync_acquire_no_livelock_after_burst_exhausted():
     """回归：同步 acquire 在突发令牌耗尽、多并发等待下不活锁。
 

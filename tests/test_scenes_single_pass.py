@@ -4,6 +4,9 @@ import subprocess
 
 import pytest
 
+# 真实调用 subprocess/ffmpeg 进行视频合成，属慢速集成测试，默认排除，CI 全量执行。
+pytestmark = pytest.mark.slow
+
 from core.compositor.concatenator.audio_overlay import AudioOverlayMixin
 from core.compositor.concatenator.concat import VideoConcatenator
 

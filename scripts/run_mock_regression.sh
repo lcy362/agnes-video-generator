@@ -158,6 +158,7 @@ run_tests() {
   # 构建 pytest 参数
   local pytest_args=(
     "$test_path"
+    "-o" "addopts=-ra -q"
     -v --tb=short --color=yes
     "--html=$REPORT_HTML" "--self-contained-html"
     "-p" "no:warnings"

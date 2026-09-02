@@ -106,8 +106,11 @@ jobs:
         # --cov-fail-under=55：覆盖率跌破当前基线即判红，防静默退化。
         # --cov=web：包含路由层（此前缺失导致 Sonar 中 web/ 覆盖率恒为 0）；
         # scripts/ 为一次性回归工具，不在单测范围内（sonar-project.properties 亦排除）。
+        # -o addopts="-ra -q"：覆盖 pytest.ini 默认的 "-m not slow"，
+        #   CI 走全量（含 slow 真实媒体/真实计时回归），保证覆盖率与回归效果不因本地快集裁剪而回退。
         run: |
           python -m pytest tests/ \
+            -o addopts="-ra -q" \
             --cov=core --cov=models --cov=utils --cov=web \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \

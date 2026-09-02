@@ -9,6 +9,10 @@ import pytest
 import asyncio
 import logging
 
+# 全文件为慢速回归：真实运行多场景媒体合成（ffmpeg），默认被 -m "not slow" 排除，
+# CI 通过 overridden addopts 仍全量执行。
+pytestmark = pytest.mark.slow
+
 from models.task import (
     StepStatus,
     AudioConfig,

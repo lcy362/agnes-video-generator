@@ -1458,9 +1458,11 @@ class TestMultiGenerateVideos:
         pipe.video_api.wait_for_video.assert_awaited_once()
         assert pipe.video_api.submit_video.await_count == 0
 
-    def test_failure_propagates(self, tmp_path):
+    def test_failure_propagates(self, tmp_path, monkeypatch):
         pipe = _make_multi(tmp_path, scenes=[SceneTask(index=0, duration=5)])
         pipe.video_api.wait_for_video.side_effect = RuntimeError("boom")
+        # 失败会触发真实重试退避 sleep（base 20s 起），mock 掉避免白等约 60s
+        monkeypatch.setattr("asyncio.sleep", mock.AsyncMock())
         with pytest.raises(RuntimeError):
             asyncio.run(pipe._generate_videos())
 
