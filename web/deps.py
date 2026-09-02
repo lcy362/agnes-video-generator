@@ -217,9 +217,11 @@ async def run_pipeline_with_concurrency(
         # 启动 pipeline
         await run_pipeline(pipeline, state)
     except asyncio.CancelledError:
-        # 任务被取消（如 stop 操作）
+        # 任务被取消（如 stop 操作）：清理后必须重新抛出，
+        # 否则取消信号被吞掉，上层无法感知（S7497）。
         app_state._queued_tasks.pop(task_id, None)
         logger.info(f"[Concurrency] Task {task_id} cancelled while queued")
+        raise
     except Exception as e:
         # 0.4：获取槽位阶段的异常不再静默吞掉，落盘为 FAILED 供用户查看
         logger.error(

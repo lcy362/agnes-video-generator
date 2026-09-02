@@ -13,6 +13,7 @@ from core.audio.voices import (
     is_voice_compatible,
 )
 from web import helpers
+from web.log_safe import safe_log
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ async def preview_voice(voice: str, text: str = ""):
     try:
         cache_path = await helpers._get_or_generate_preview(voice, preview_text)
     except Exception as e:
-        logger.warning(f"[Preview] voice={voice} failed: {e}")
+        logger.warning("[Preview] voice=%s failed: %s", safe_log(voice), e)
         raise HTTPException(
             status_code=400,
             detail=f"该音色不支持此语言的试听文本（跨文字体系无法朗读）：{e}",

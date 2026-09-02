@@ -90,7 +90,9 @@ async def lifespan(app: FastAPI):
         logger.info("[Startup] Voice catalog loaded")
     except asyncio.TimeoutError:
         logger.warning("[Startup] Voice catalog load timed out (>3s); continuing in background")
-        asyncio.create_task(_load_voice_catalog_bg())
+        # 必须持有强引用：裸 create_task() 的返回值若被丢弃，任务可能在
+        # 执行完成前被垃圾回收（S7502）。
+        app_state.launch_background_task(_load_voice_catalog_bg())
     except Exception as e:
         logger.warning(f"[Startup] Voice catalog load failed ({e}); will use fallback")
 

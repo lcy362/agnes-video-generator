@@ -24,6 +24,7 @@ _ENCODING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
     max_workers=2, thread_name_prefix="encoding"
 )
 
+from core.async_io import read_text, write_text
 from core.compositor.watermark import add_watermark, detect_language
 from core.config import get_watermark_config
 from core.task_manager import TaskManager
@@ -542,8 +543,7 @@ class BasePipeline(ABC):
                 )
 
             if srt_content.strip():
-                with open(srt_path, "w", encoding="utf-8") as f:
-                    f.write(srt_content)
+                await write_text(srt_path, srt_content)
                 entry_count = srt_content.count("\n\n") + 1 if "\n\n" in srt_content else 0
                 logger.info(
                     "[Subtitle] Scene-aware SRT: %d entries across %d segments",
@@ -557,19 +557,17 @@ class BasePipeline(ABC):
             total_dur = actual_audio_dur if actual_audio_dur > 0 else sum(segment_durations)
             SubtitleGenerator.text_to_srt(full_text, srt_path, total_dur)
         else:
-            with open(srt_path, "w", encoding="utf-8") as f:
-                f.write("")
+            await write_text(srt_path, "")
 
         # ── 2.5 统一后处理：确保每条字幕不超过 2 行（参考中文短字幕规范，适配所有语言）──
         try:
-            raw_srt = open(srt_path, "r", encoding="utf-8").read()
+            raw_srt = await read_text(srt_path)
             fixed_srt = SubtitleGenerator.enforce_max_lines(
                 raw_srt, max_lines=2,
                 video_width=video_width, fontsize=subtitle_config.style.fontsize,
             )
             if fixed_srt and fixed_srt != raw_srt:
-                with open(srt_path, "w", encoding="utf-8") as f:
-                    f.write(fixed_srt)
+                await write_text(srt_path, fixed_srt)
                 entry_count = fixed_srt.count("\n\n") + 1 if "\n\n" in fixed_srt else 1
                 logger.info(
                     "[Subtitle] enforce_max_lines applied: ≤2 lines/entry (%d entries)",
@@ -593,8 +591,7 @@ class BasePipeline(ABC):
                         style_hints=subtitle_config.style.style_hints,
                         **({"role": role} if role else {}),
                     )
-                    with open(sp, "w", encoding="utf-8") as f:
-                        json.dump(styles, f, ensure_ascii=False, indent=2)
+                    await write_text(sp, json.dumps(styles, ensure_ascii=False, indent=2))
                     styles_path = sp
                     logger.info(
                         "[Subtitle] LLM styles saved: %s (%d entries)",

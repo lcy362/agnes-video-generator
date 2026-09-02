@@ -11,11 +11,13 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from core.api.agnes_image import AgnesImageAPI
+from core.async_io import write_bytes
 from core.config import API_KEY_MISSING_MSG, get_api_key
 from core.path_security import safe_join
 from core.task_manager import TaskManager
 from models.task import SimpleImageTask, StepStatus
 from web import helpers
+from web.log_safe import safe_log
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +80,7 @@ async def generate_image(
         upload_dir = helpers.get_upload_dir()
         os.makedirs(upload_dir, exist_ok=True)
         ref_path = safe_join(upload_dir, f"img_ref_{uuid.uuid4().hex[:8]}{ext}")
-        with open(ref_path, "wb") as f:
-            f.write(await reference_image.read())
+        await write_bytes(ref_path, await reference_image.read())
         ref_paths.append(ref_path)
 
     try:
@@ -113,7 +114,8 @@ async def generate_image(
     state.final_video_file = img_path
     tm.update_state(status=StepStatus.COMPLETED, final_video_file=img_path)
 
-    logger.info(f"[Image] Task {task_id} completed: {img_path}, prompt={prompt[:60]}...")
+    logger.info("[Image] Task %s completed: %s, prompt=%s...",
+                safe_log(task_id), img_path, safe_log(prompt[:60]))
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
 
 

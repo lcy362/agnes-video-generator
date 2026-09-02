@@ -6,6 +6,7 @@ import os
 import re
 from typing import Optional
 
+from core.async_io import read_text
 from core.audio.voices import estimate_chars_per_sec
 from core.compositor.concatenator import VideoConcatenator
 from core.screenwriter import clean_narration_text
@@ -222,8 +223,7 @@ class AudioStepsMixin:
         script_path = os.path.join(self.working_dir, "script.json")
         if os.path.exists(script_path):
             try:
-                with open(script_path, "r", encoding="utf-8") as f:
-                    script_prompts = json.load(f)
+                script_prompts = json.loads(await read_text(script_path))
             except Exception:
                 pass
         prompts_data = {
@@ -401,10 +401,8 @@ class AudioStepsMixin:
                 prompts_path = os.path.join(self.working_dir, "prompts.json")
                 existing = {}
                 if os.path.exists(prompts_path):
-                    with open(prompts_path, "r", encoding="utf-8") as f:
-                        existing = json.load(f)
-                with open(styles_path, "r", encoding="utf-8") as f:
-                    existing["subtitle_styles"] = json.load(f)
+                    existing = json.loads(await read_text(prompts_path))
+                existing["subtitle_styles"] = json.loads(await read_text(styles_path))
                 self.save_prompts(existing)
             except Exception:
                 pass

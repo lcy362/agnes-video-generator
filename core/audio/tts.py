@@ -11,6 +11,8 @@ from typing import Optional, Tuple
 
 import edge_tts
 
+from core.async_io import async_open
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,10 +62,10 @@ class EdgeTTSEngine(TTSEngine):
                 sub_maker = edge_tts.SubMaker()
 
                 tmp_path = output_path + ".tmp"
-                with open(tmp_path, "wb") as audio_file:
+                async with await async_open(tmp_path, "wb") as audio_file:
                     async for chunk in communicate.stream():
                         if chunk["type"] == "audio":
-                            audio_file.write(chunk["data"])
+                            await audio_file.write(chunk["data"])
                         elif chunk["type"] in ("WordBoundary", "SentenceBoundary"):
                             sub_maker.feed(chunk)
 

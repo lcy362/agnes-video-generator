@@ -47,9 +47,6 @@ _PROGRESS_AUDIO_SCENE = 0.75
 _PROGRESS_SUBTITLE_SCENE = 0.87
 _PROGRESS_COMPOSITE_SCENE = 0.90
 
-_SCENE_LABEL_RE = re.compile(r"^(场景|Scene)\s*\d+|[（(]\s*\d+\s*:\s*\d+")
-
-
 def _is_scene_label(line: str) -> bool:
     """判断一行是否为纯场景标签（如「场景 1（00:00 - 00:10）」），而非分镜描述。
 
@@ -424,9 +421,9 @@ class PoetryVideoPipeline(MultiScenePipeline):
                 f"生成字幕 {idx+1}/{len(scenes)}...", _PROGRESS_SUBTITLE_SCENE,
             )
             # v2.0：优先用该场景 cues 生成精确字幕；cues 缺失则回退纯文本估算
-            sub_maker = getattr(self, "_scene_sub_makers", {}).get(idx)
-            if sub_maker is not None and getattr(sub_maker, "cues", None):
-                SubtitleGenerator.cues_to_srt(sub_maker, srt_path)
+            scene_sub_maker = getattr(self, "_scene_sub_makers", {}).get(idx)
+            if scene_sub_maker is not None and getattr(scene_sub_maker, "cues", None):
+                SubtitleGenerator.cues_to_srt(scene_sub_maker, srt_path)
             if not (os.path.exists(srt_path) and os.path.getsize(srt_path) > 0):
                 SubtitleGenerator.text_to_srt(
                     text, srt_path, duration_sec=dur, chars_per_sec=_CHARS_PER_SEC,

@@ -555,13 +555,18 @@ class TestRunPipelineWithConcurrency:
         assert "tid" not in app_state._queued_tasks
 
     def test_cancelled_while_queued(self, monkeypatch):
+        """取消后必须清理排队列表，并把 CancelledError 重新抛出（S7497）。
+
+        吞掉取消信号会让上层（stop / 关闭流程）误判任务已正常结束。
+        """
         sem = FakeSemaphore(max_weight=10)
         ran = self._patch(monkeypatch, sem, weights={TaskType.CREATIVE: 1})
         tm = MagicMock()
         sem.acquire_error = asyncio.CancelledError()
-        _run(deps.run_pipeline_with_concurrency(
-            FakePipeline("tid"), _make_state(), tm
-        ))
+        with pytest.raises(asyncio.CancelledError):
+            _run(deps.run_pipeline_with_concurrency(
+                FakePipeline("tid"), _make_state(), tm
+            ))
         assert ran == []
         assert "tid" not in app_state._queued_tasks
 

@@ -22,6 +22,7 @@ from models.task import (
     TaskType,
 )
 from web import app_state, deps, helpers
+from web.log_safe import safe_log
 
 logger = logging.getLogger(__name__)
 
@@ -253,7 +254,8 @@ async def resume_task(task_id: str):
         if task_id in app_state.active_pipelines:
             existing = app_state.active_pipelines[task_id]
             if existing._stop_event.is_set():
-                logger.info(f"[Resume] Replacing stopped pipeline for task {task_id}")
+                logger.info("[Resume] Replacing stopped pipeline for task %s",
+                            safe_log(task_id))
                 del app_state.active_pipelines[task_id]
             else:
                 raise HTTPException(status_code=400, detail="Task is already running")
@@ -267,7 +269,8 @@ async def resume_task(task_id: str):
         if state.status == StepStatus.COMPLETED:
             raise HTTPException(status_code=400, detail="Task is already completed")
 
-        logger.info(f"[Resume] Starting resume for task {task_id}, type={state.task_type}, status={state.status}")
+        logger.info("[Resume] Starting resume for task %s, type=%s, status=%s",
+                    safe_log(task_id), state.task_type, state.status)
 
         # v2.0：根据 task_type 选择对应的 Pipeline
         pipeline = deps.create_pipeline_for_type(state.task_type, api_key, task_id, dir_name)
@@ -292,9 +295,9 @@ async def stop_task(task_id: str):
     state = tm.load()
     if state and state.status in (StepStatus.RUNNING, StepStatus.QUEUED):
         tm.update_state(status=StepStatus.PENDING)
-        logger.info(f"[Stop] Task {task_id} status -> pending")
+        logger.info("[Stop] Task %s status -> pending", safe_log(task_id))
 
-    logger.info(f"[Stop] Task {task_id} stop requested")
+    logger.info("[Stop] Task %s stop requested", safe_log(task_id))
     return {"ok": True, "task_id": task_id}
 
 
@@ -341,9 +344,11 @@ async def switch_task_mode(task_id: str, mode: str = Form(...)):
         if task_id in app_state.active_pipelines:
             app_state.active_pipelines[task_id].stop()
         elif task_id in app_state._queued_tasks:
-            logger.info(f"[Mode] Task {task_id} queued, will skip on slot acquire")
+            logger.info("[Mode] Task %s queued, will skip on slot acquire",
+                        safe_log(task_id))
         else:
-            logger.info(f"[Mode] Task {task_id} not running, marking manual only")
+            logger.info("[Mode] Task %s not running, marking manual only",
+                        safe_log(task_id))
 
         # 计算当前检查点边界 + 落盘
         checkpoint = compute_current_checkpoint(state)
@@ -361,7 +366,8 @@ async def switch_task_mode(task_id: str, mode: str = Form(...)):
                 if checkpoint else "已切换为手动模式"
             ),
         )
-        logger.info(f"[Mode] Task {task_id} switched to manual (checkpoint={checkpoint})")
+        logger.info("[Mode] Task %s switched to manual (checkpoint=%s)",
+                    safe_log(task_id), safe_log(checkpoint))
         return {"ok": True, "task_id": task_id, "mode": "manual",
                 "current_checkpoint": checkpoint, "changed": True}
 
@@ -374,7 +380,8 @@ async def switch_task_mode(task_id: str, mode: str = Form(...)):
         current_status="resumed",
         current_message="已切换为自动模式",
     )
-    logger.info(f"[Mode] Task {task_id} switched to auto (was_paused={was_paused})")
+    logger.info("[Mode] Task %s switched to auto (was_paused=%s)",
+                safe_log(task_id), was_paused)
 
     if was_paused:
         # 切换即继续：立即走现有 resume 逻辑跑完

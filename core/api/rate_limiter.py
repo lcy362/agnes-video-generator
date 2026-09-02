@@ -187,21 +187,19 @@ class AgnesRateLimiter:
         等待在事件循环中执行（不再占线程池）；可被任务取消打断，或经
         ``stop_event`` 提前放行（停止后调用方不会再发请求，无需令牌）。
         """
-        while True:
-            wait_time = self._try_acquire()
-            if wait_time is None:
-                return
-            self._record_wait(wait_time)
-            remaining = wait_time
-            while remaining > 0:
-                if stop_event is not None and stop_event.is_set():
-                    return
-                await asyncio.sleep(min(0.1, remaining))
-                remaining -= 0.1
-            # 预支语义（与同步 acquire 一致）：等待完成即视为已获取令牌。
-            # 注意不能再调用 _try_acquire()——last_refill 已被推进到
-            # now+wait_time，再次计算会因 elapsed≈0 而永远不足。
+        wait_time = self._try_acquire()
+        if wait_time is None:
             return
+        self._record_wait(wait_time)
+        remaining = wait_time
+        while remaining > 0:
+            if stop_event is not None and stop_event.is_set():
+                return
+            await asyncio.sleep(min(0.1, remaining))
+            remaining -= 0.1
+        # 预支语义（与同步 acquire 一致）：等待完成即视为已获取令牌。
+        # 注意不能再调用 _try_acquire()——last_refill 已被推进到
+        # now+wait_time，再次计算会因 elapsed≈0 而永远不足。
 
     @property
     def stats(self) -> dict:

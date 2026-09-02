@@ -72,13 +72,16 @@ os.makedirs(VOICE_PREVIEW_CACHE_DIR, exist_ok=True)
 
 
 def _preview_cache_key(voice_id: str, text: str) -> str:
-    """生成试听缓存文件名：{md5(voice_id)}__{md5(text)}.mp3
+    """生成试听缓存文件名：{hash(voice_id)}__{hash(text)}.mp3
 
     对 voice_id 一并做哈希，避免用户可控的 voice_id（可能含路径分隔符 / ``..``）
     流入缓存文件路径造成路径穿越。
+
+    用 SHA-256 而非 MD5：MD5 已被证实可碰撞（弱哈希，Sonar S4790），
+    此处哈希值直接参与文件名拼接，需抗碰撞。
     """
-    voice_hash = hashlib.md5(voice_id.encode("utf-8")).hexdigest()
-    text_hash = hashlib.md5(text.encode("utf-8")).hexdigest()
+    voice_hash = hashlib.sha256(voice_id.encode("utf-8")).hexdigest()[:32]
+    text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
     return f"{voice_hash}__{text_hash}"
 
 

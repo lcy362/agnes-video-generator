@@ -15,6 +15,7 @@ from typing import Dict, Set
 from core.api.error_collector import set_workspace_root
 from core.config import get_settings, get_working_dir
 from models.task import TaskType
+from web.log_safe import safe_log
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +203,7 @@ def init_runtime_state() -> None:
                             if os.path.exists(tmp_path):
                                 os.remove(tmp_path)
                             raise
-                        logger.info(f"[Startup] Reset stale {old_status} task {name} -> pending")
+                        logger.info("[Startup] Reset stale %s task %s -> pending",
+                                    old_status, safe_log(name))
                 except Exception as e:
                     logger.debug(f"[Startup] Failed to reset stale task {name}: {e}")

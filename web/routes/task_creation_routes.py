@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
+from core.async_io import write_bytes
 from core.config import (
     API_KEY_MISSING_MSG,
     DURATION_FRAME_MAP,
@@ -37,6 +38,7 @@ from models.task import (
     VideoMode,
 )
 from web import app_state, deps, helpers
+from web.log_safe import safe_log
 
 logger = logging.getLogger(__name__)
 
@@ -134,8 +136,7 @@ async def _save_upload_file(upload: UploadFile, upload_dir: str, prefix: str) ->
         ext = ".png"
     os.makedirs(upload_dir, exist_ok=True)
     upload_path = safe_join(upload_dir, f"{prefix}{ext}")
-    with open(upload_path, "wb") as f:
-        f.write(await upload.read())
+    await write_bytes(upload_path, await upload.read())
     return upload_path
 
 
@@ -318,9 +319,9 @@ async def create_creative_task(
     )
 
     logger.info(
-        f"[Pipeline] Scene config: source={duration_source}, "
-        f"scenes={scene_count}, durations={scene_durations}, uniform={uniform_duration}, "
-        f"manual={execution_mode}"
+        "[Pipeline] Scene config: source=%s, scenes=%s, durations=%s, uniform=%s, manual=%s",
+        safe_log(duration_source), scene_count, scene_durations,
+        uniform_duration, safe_log(execution_mode),
     )
 
     upload_dir = helpers.get_upload_dir()
@@ -355,7 +356,8 @@ async def create_creative_task(
     tm.create(state)
     deps.mark_task_queued(tm)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
-    logger.info(f"[Creative] Task created: {task_id}, idea={idea[:40]}... (queued)")
+    logger.info("[Creative] Task created: %s, idea=%s... (queued)",
+                safe_log(task_id), safe_log(idea[:40]))
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
 
 
@@ -580,7 +582,8 @@ async def create_poetry_task(
     tm.create(state)
     deps.mark_task_queued(tm)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
-    logger.info(f"[Poetry] Task created: {task_id}, poem={poem_text[:20]!r} (queued)")
+    logger.info("[Poetry] Task created: %s, poem=%r (queued)",
+                safe_log(task_id), safe_log(poem_text[:20]))
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
 
 

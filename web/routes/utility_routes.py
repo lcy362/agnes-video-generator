@@ -9,6 +9,7 @@ import shutil
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
+from core.async_io import read_text
 from core.config import get_working_dir
 
 logger = logging.getLogger(__name__)
@@ -40,8 +41,7 @@ async def cleanup_regression():
             detail="未找到回归测试产物清单，可能没有执行过回归测试")
 
     try:
-        with open(manifest_path, "r") as f:
-            manifest = json.load(f)
+        manifest = json.loads(await read_text(manifest_path))
     except (json.JSONDecodeError, OSError) as e:
         raise HTTPException(
             status_code=500,

@@ -17,12 +17,14 @@ from core.artifacts import (
     resolve_artifact,
     write_checkpoint_manifest,
 )
+from core.async_io import read_text, write_bytes
 from core.config import get_working_dir
 from core.dependency_graph import get_dependency_graph
 from core.path_security import UnsafePathError, safe_join
 from core.task_manager import TaskManager
 from models.task import StepStatus
 from web import app_state, helpers
+from web.log_safe import safe_log
 
 logger = logging.getLogger(__name__)
 
@@ -137,8 +139,7 @@ async def get_task_manifest(task_id: str):
     if not os.path.exists(manifest_path):
         write_manifest(state, tm.task_dir)
     try:
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            manifest = json.load(f)
+        manifest = json.loads(await read_text(manifest_path))
     except (OSError, ValueError):
         # 清单损坏/不可读 → 现场重建
         manifest = build_manifest(state, tm.task_dir)
@@ -242,8 +243,9 @@ async def delete_task_artifact(task_id: str, artifact_id: str):
     tm.update_state(**update_kwargs)
 
     logger.info(
-        f"[Artifacts] Deleted {len(deleted_files)} files for task {task_id}, "
-        f"artifact={artifact_id}, reset_steps={plan.steps_to_reset}"
+        "[Artifacts] Deleted %d files for task %s, artifact=%s, reset_steps=%s",
+        len(deleted_files), safe_log(task_id), safe_log(artifact_id),
+        plan.steps_to_reset,
     )
 
     return {
@@ -286,9 +288,11 @@ async def delete_task(task_id: str):
             if os.path.exists(real_task_dir):
                 shutil.rmtree(real_task_dir, ignore_errors=True)
                 removed_dir = True
-                logger.info(f"[Delete] Task {task_id} directory removed: {real_task_dir}")
+                logger.info("[Delete] Task %s directory removed: %s",
+                            safe_log(task_id), real_task_dir)
         else:
-            logger.warning(f"[Delete] Unsafe task dir for {task_id}, skipped: {dir_name}")
+            logger.warning("[Delete] Unsafe task dir for %s, skipped: %s",
+                           safe_log(task_id), safe_log(dir_name))
 
     # 3. 从活动注册表 / 排队列表摘除
     app_state.active_pipelines.pop(task_id, None)
@@ -334,8 +338,7 @@ async def list_task_checkpoints(task_id: str):
     if not os.path.exists(ckpt_path):
         write_checkpoint_manifest(state, tm.task_dir)
     try:
-        with open(ckpt_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        data = json.loads(await read_text(ckpt_path))
     except (OSError, ValueError):
         data = build_checkpoint_manifest(state, tm.task_dir)
 
@@ -446,8 +449,7 @@ async def upload_task_artifact(
 
     os.makedirs(os.path.dirname(real_abs_path), exist_ok=True)
     content = await file.read()
-    with open(real_abs_path, "wb") as f:
-        f.write(content)
+    await write_bytes(real_abs_path, content)
 
     # 标记脏：记录回填产物 id（手动模式）
     mc = getattr(state, "manual_config", None)
@@ -459,7 +461,8 @@ async def upload_task_artifact(
     # 刷新清单
     write_checkpoint_manifest(state, tm.task_dir)
 
-    logger.info("[Artifacts] Uploaded %s for task %s (%d bytes)", artifact_id, task_id, len(content))
+    logger.info("[Artifacts] Uploaded %s for task %s (%d bytes)",
+                safe_log(artifact_id), safe_log(task_id), len(content))
     return {"ok": True, "artifact_id": artifact_id, "size": len(content)}
 
 
@@ -538,7 +541,8 @@ async def approve_checkpoint(task_id: str, checkpoint: str,
 
     logger.info(
         "[Approve] Task %s checkpoint '%s' approved, deleted=%d, reset=%s",
-        task_id, checkpoint, len(deleted_files), plan.steps_to_reset,
+        safe_log(task_id), safe_log(checkpoint),
+        len(deleted_files), plan.steps_to_reset,
     )
 
     # 6. 走现有 resume 恢复执行
