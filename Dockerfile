@@ -20,10 +20,10 @@ RUN if [ -n "$PIP_INDEX_URL" ]; then \
     && pip install --no-cache-dir --default-timeout=600 imageio-ffmpeg \
     && if [ -n "$PIP_INDEX_URL" ]; then \
         pip config unset global.index-url; \
-    fi \
-    && FFMPEG_BIN=$(python -c "import imageio_ffmpeg, os; \
-        b = os.path.join(os.path.dirname(imageio_ffmpeg.__file__), 'binaries'); \
-        print(os.path.join(b, os.listdir(b)[0]))") \
+    fi
+
+# 将 imageio-ffmpeg 提供的静态二进制暴露到 PATH（moviepy / ffmpeg CLI 均可调用）
+RUN FFMPEG_BIN=$(python -c "import imageio_ffmpeg, os; print(os.path.join(os.path.dirname(imageio_ffmpeg.__file__), 'binaries', os.listdir(os.path.join(os.path.dirname(imageio_ffmpeg.__file__), 'binaries'))[0]))") \
     && ln -sf "$FFMPEG_BIN" /usr/local/bin/ffmpeg \
     && FFMPEG_EXE=$(python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())") \
     && ln -sf "$FFMPEG_EXE" /usr/local/bin/ffmpeg \
@@ -39,17 +39,8 @@ RUN if [ -n "$PIP_INDEX_URL" ]; then \
         pip config unset global.index-url; \
     fi
 
-# 拷贝应用代码（resource/fonts 含 CJK 字体，必须随镜像）。
-# 避免 `COPY . .` 全量递归：只拷贝运行所需目录/文件（S6470），
-# 细粒度排除敏感与体积文件（.git、tests、docs、node_modules 等由 .dockerignore 兜底）。
-COPY server.py core/ web/ models/ utils/ resource/ static/ requirements.txt ./
-
-# S6471：python 镜像默认以 root 运行，改为非 root 最小权限用户。
-# server.py 启动后会在 /app 下创建 .working_dir / .agnes_config / uploads 等目录。
-RUN useradd --create-home --shell /bin/false appuser \
-    && chown -R appuser:appuser /app \
-    && mkdir -p /app/.working_dir /app/.agnes_config \
-    && chown appuser:appuser /app/.working_dir /app/.agnes_config
+# 拷贝应用代码（resource/fonts 含 CJK 字体，必须随镜像）
+COPY . .
 
 EXPOSE 8765
 
@@ -61,9 +52,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # 同一容器 stop/start 时数据保留；可用 `docker cp 容器名:/app/.working_dir ./out` 导出。
 # 若要数据直接落盘到本机并随时导出，推荐用 docker-compose.yml 或 docker-run.sh（bind mount）。
 VOLUME ["/app/.working_dir", "/app/.agnes_config"]
-
-# 以非 root 用户运行（S6471）
-USER appuser
 
 # server.py 内部以 host=0.0.0.0 port=8765 启动，容器外可访问
 # API Key 通过环境变量注入：-e AGNES_API_KEY=xxx（也可在 Web UI 配置）
