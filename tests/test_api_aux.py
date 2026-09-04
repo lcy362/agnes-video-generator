@@ -59,7 +59,8 @@ class TestFetchAvailableModels:
 
         monkeypatch.setattr(agnes_models.requests, "get", boom)
         out = agnes_models.fetch_available_models("sk-test")
-        assert out["image"] == [agnes_models.DEFAULT_IMAGE_MODEL]
+        # 兜底列表首个为当前默认图像模型（invariant）
+        assert out["image"][0] == agnes_models.DEFAULT_IMAGE_MODEL
 
 
 # ═══════════════════════════════════════════════

@@ -205,7 +205,7 @@ class AgnesVideoAPI:
             try:
                 b64_data = self._path_to_b64(image_path)
                 payload = {
-                    "model": "agnes-image-2.1-flash",
+                    "model": "agnes-image-2.5-flash",
                     "prompt": "Keep the image exactly as it is",
                     "n": 1,
                     "size": "1024x1024",

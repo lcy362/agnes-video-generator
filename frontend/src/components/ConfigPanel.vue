@@ -338,7 +338,10 @@ initCollapse()
         </div>
         <div>
           <label class="block text-xs text-muted mb-1">{{ t('modelImageLabel') }}</label>
-          <select v-model="appState.models.image" disabled class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-ink opacity-50 cursor-not-allowed"></select>
+          <select v-model="appState.models.image" class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
+            <option v-for="m in appState.modelListCache.image" :key="m" :value="m">{{ modelDisplayLabel(m) }}</option>
+          </select>
+          <p v-if="isPaidModel(appState.models.image)" class="text-xs text-amber-400 mt-1.5">{{ t('modelPaidHint') }}</p>
         </div>
         <!-- v6.2：开放视频模型选择 + 三模型差异说明 -->
         <div>

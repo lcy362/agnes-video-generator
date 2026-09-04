@@ -15,8 +15,8 @@ All core AI capabilities are **completely free** — no trial period, no waterma
 
 | Capability | Model | Cost |
 |-----------|-------|------|
-| Text / Script Generation | `agnes-2.0-flash` | Free |
-| Image Generation | `agnes-image-2.1-flash` | Free |
+| Text / Script Generation | `agnes-2.5-flash` | Free |
+| Image Generation | `agnes-image-2.5-flash` | Free |
 | Video Generation | `agnes-video-v2.0` | Free |
 | Text-to-Speech Narration | Edge TTS (Microsoft) | Free, no extra API key needed |
 

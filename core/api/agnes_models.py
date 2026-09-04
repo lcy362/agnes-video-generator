@@ -22,9 +22,12 @@ REQUEST_TIMEOUT = 20
 # 分组失败时的兜底列表
 _FALLBACK = {
     "text": [DEFAULT_TEXT_MODEL],
-    "image": [DEFAULT_IMAGE_MODEL],
+    "image": [DEFAULT_IMAGE_MODEL, "agnes-image-2.1-flash", "agnes-image-2.0-flash"],
     "video": [DEFAULT_VIDEO_MODEL],
 }
+
+# 已废弃、应从可选列表中剔除的模型 ID（如 agnes-2.0-flash，官方已迁移至 agnes-2.5-flash）
+_DEPRECATED_MODELS = {"agnes-2.0-flash"}
 
 
 def _classify(model_id: str) -> str:
@@ -32,7 +35,7 @@ def _classify(model_id: str) -> str:
 
     - ``agnes-image*`` → image
     - ``agnes-video*`` → video
-    - 其余（如 ``agnes-2.0-flash`` / ``agnes-2.5-flash``）→ text
+    - 其余（如 ``agnes-2.5-flash``）→ text
     """
     if model_id.startswith("agnes-image"):
         return "image"
@@ -68,13 +71,22 @@ def fetch_available_models(api_key: str) -> dict:
         grouped = {"text": [], "image": [], "video": []}
         for item in data.get("data", []):
             mid = item.get("id")
-            if not mid:
+            if not mid or mid in _DEPRECATED_MODELS:
                 continue
             grouped[_classify(mid)].append(mid)
         # 任一分类为空则补回默认，避免 UI 空下拉
         for k, default in _FALLBACK.items():
             if not grouped[k]:
                 grouped[k] = list(default)
+        # 确保各分类的默认模型始终在可选列表内（如服务端未返回时也能选择）
+        _defaults = {
+            "text": DEFAULT_TEXT_MODEL,
+            "image": DEFAULT_IMAGE_MODEL,
+            "video": DEFAULT_VIDEO_MODEL,
+        }
+        for k, d in _defaults.items():
+            if d not in grouped[k]:
+                grouped[k].append(d)
         return grouped
     except Exception as e:  # noqa: BLE001
         logger.warning("[AgnesModels] fetch failed (%s), using fallback", e)

@@ -15,8 +15,8 @@
 
 | 能力 | 模型 | 费用 |
 |------|------|------|
-| 文本 / 脚本生成 | `agnes-2.0-flash` | 免费 |
-| 图片生成 | `agnes-image-2.1-flash` | 免费 |
+| 文本 / 脚本生成 | `agnes-2.5-flash` | 免费 |
+| 图片生成 | `agnes-image-2.5-flash` | 免费 |
 | 视频生成 | `agnes-video-v2.0` | 免费 |
 | 语音旁白（TTS） | Edge TTS（微软） | 免费，无需额外 API Key |
 

@@ -209,7 +209,7 @@ def ensure_regression_video_model() -> None:
     try:
         r = requests.post(
             f"{SERVER_URL}/api/config/models",
-            data={"text": "agnes-2.0-flash", "video": model},
+            data={"text": "agnes-2.5-flash", "video": model},
             timeout=15,
         )
         if r.ok:

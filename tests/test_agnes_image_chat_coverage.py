@@ -195,7 +195,7 @@ async def test_image_t2i_success_url(image_api, monkeypatch):
     assert out.data == "http://img/generated.png"
     assert seen["url"] == "http://api.test/images/generations"
     assert seen["headers"]["Authorization"] == "Bearer k1"
-    assert seen["payload"]["model"] == "agnes-image-2.1-flash"
+    assert seen["payload"]["model"] == "agnes-image-2.5-flash"
     assert seen["payload"]["prompt"] == "一只猫"
     assert seen["payload"]["size"] == "1024x1024"
     assert seen["payload"]["n"] == 1
@@ -532,7 +532,7 @@ async def test_chat_success(chat_api, monkeypatch):
     result = chat_api.chat("你是助手", "你好吗", max_tokens=100)
     assert result == "你好"
     assert seen["endpoint"] == "/chat/completions"
-    assert seen["json"]["model"] == "agnes-2.0-flash"
+    assert seen["json"]["model"] == "agnes-2.5-flash"
     assert seen["json"]["temperature"] == 0.7
     assert seen["json"]["max_tokens"] == 100
     assert seen["timeout"] == 120

@@ -55,8 +55,8 @@ agnes-video-generator/
 |-------|--------|-------|
 | Backend | Python FastAPI | Async + WebSocket |
 | Frontend | Vue 3 + Vite + TypeScript + Tailwind (PostCSS) | Build output committed to `static/`; zero runtime deps for end users |
-| LLM | Agnes Chat (`agnes-2.0-flash`) | Free — story, script, narration generation |
-| Image AI | `agnes-image-2.1-flash` (t2i) / `agnes-image-2.0-flash` (i2i) | Free — reference images, end frames, standalone image generation |
+| LLM | Agnes Chat (`agnes-2.5-flash`) | Free — story, script, narration generation |
+| Image AI | `agnes-image-2.5-flash` (t2i / i2i) | Free — reference images, end frames, standalone image generation |
 | Video AI | `agnes-video-v2.0` | Free — text-to-video, image-to-video, keyframes |
 | TTS | Edge TTS (Microsoft) | Free — 4 Chinese voices, no extra API key needed |
 | Subtitles | moviepy + srt | Fine-grained word-level SRT, multi-line wrapping |

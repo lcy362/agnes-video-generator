@@ -73,7 +73,7 @@ class PoetryVideoPipeline(MultiScenePipeline):
         api_key: str,
         task_id: str,
         dir_name: Optional[str] = None,
-        chat_model: str = "agnes-2.0-flash",
+        chat_model: str = "agnes-2.5-flash",
         video_model: str = "agnes-video-v2.0",
         progress_callback: Optional[callable] = None,
         shutdown_event: Optional = None,

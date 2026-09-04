@@ -51,8 +51,8 @@ agnes-video-generator/
 |---|---|---|
 | 后端 | Python FastAPI | 异步 + WebSocket |
 | 前端 | HTML/CSS/JS + Tailwind CSS CDN | 零构建步骤，单文件 SPA |
-| LLM | Agnes Chat (`agnes-2.0-flash`) | 免费 — 故事、脚本、旁白生成 |
-| 图片 AI | `agnes-image-2.1-flash` (t2i) / `agnes-image-2.0-flash` (i2i) | 免费 — 参考图、尾帧、独立图片生成 |
+| LLM | Agnes Chat (`agnes-2.5-flash`) | 免费 — 故事、脚本、旁白生成 |
+| 图片 AI | `agnes-image-2.5-flash` (t2i / i2i) | 免费 — 参考图、尾帧、独立图片生成 |
 | 视频 AI | `agnes-video-v2.0` | 免费 — 文生视频、图生视频、关键帧 |
 | TTS | Edge TTS（微软） | 免费 — 4 种中文语音，无需额外 API Key |
 | 字幕 | moviepy + srt | 词级细粒度 SRT，多行自动换行 |

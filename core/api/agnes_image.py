@@ -52,7 +52,7 @@ class AgnesImageAPI:
     def __init__(
         self,
         api_key: str,
-        model: str = "agnes-image-2.1-flash",
+        model: str = "agnes-image-2.5-flash",
         i2i_model: Optional[str] = None,
     ):
         """初始化图片 API。
@@ -60,13 +60,13 @@ class AgnesImageAPI:
         Args:
             api_key: Agnes API Key。
             model: t2i 默认模型。
-            i2i_model: i2i 默认模型。默认与 ``model`` 相同（官方 agnes-image-2.1-flash
-                同时支持 t2i 与 i2i）。如需回退到 2.0，可通过环境变量
+            i2i_model: i2i 默认模型。默认与 ``model`` 相同（官方 agnes-image-2.5-flash
+                同时支持 t2i 与 i2i）。如需回退到旧版，可通过环境变量
                 ``AGNES_IMAGE_I2I_MODEL`` 或显式传参覆盖。
         """
         self.api_key = api_key
         self.model = model
-        # i2i 默认与 t2i 同模型（官方 2.1 同时支持 t2i/i2i）；环境变量可回退到 2.0。
+        # i2i 默认与 t2i 同模型（官方 2.5 同时支持 t2i/i2i）；环境变量可回退到旧版。
         from core.config import get_settings
         env_i2i = get_settings().agnes_image_i2i_model
         self.i2i_model = i2i_model or env_i2i or model
