@@ -24,9 +24,12 @@ function setGaOptOut(on: boolean) {
 // 加载 gtag 脚本并触发一次匿名 page_view（供 PV/UV 统计）
 function loadGtag() {
   window.dataLayer = window.dataLayer || []
-  window.gtag = function (...args: unknown[]) {
-    window.dataLayer!.push(args)
-  }
+  // 必须 push `arguments`（Arguments 对象）而非剩余参数数组：
+  // Google Tag 只消费 arguments 形态的 dataLayer 条目，普通 Array 会被静默忽略，
+  // 导致 config/event 全部丢失、collect 信标一次都不发（曾因此埋点完全不上报）。
+  window.gtag = function () {
+    window.dataLayer!.push(arguments as unknown as unknown[])
+  } as (...args: unknown[]) => void
   const s = document.createElement('script')
   s.async = true
   s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA_MEASUREMENT_ID)
