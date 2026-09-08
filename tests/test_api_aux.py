@@ -51,7 +51,7 @@ class TestFetchAvailableModels:
         resp.status_code = 500
         monkeypatch.setattr(agnes_models.requests, "get", lambda *a, **k: resp)
         out = agnes_models.fetch_available_models("sk-test")
-        assert out["text"] == [agnes_models.DEFAULT_TEXT_MODEL]
+        assert out["text"] == [agnes_models.DEFAULT_TEXT_MODEL, "agnes-2.5-flash"]
 
     def test_request_exception_falls_back(self, monkeypatch):
         def boom(*a, **k):
