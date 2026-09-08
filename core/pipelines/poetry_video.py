@@ -19,6 +19,7 @@ from core.api.agnes_video import AgnesVideoAPI
 from core.audio.subtitle import SubtitleGenerator
 from core.audio.tts import SilentTTSEngine
 from core.compositor.concatenator import VideoConcatenator
+from core.config import DEFAULT_TEXT_MODEL
 from core.pipelines import MultiScenePipeline
 from core.screenwriter import Screenwriter, clean_narration_text
 from models.task import (
@@ -73,7 +74,7 @@ class PoetryVideoPipeline(MultiScenePipeline):
         api_key: str,
         task_id: str,
         dir_name: Optional[str] = None,
-        chat_model: str = "agnes-3.0-flash",
+        chat_model: str = DEFAULT_TEXT_MODEL,
         video_model: str = "agnes-video-v2.0",
         progress_callback: Optional[callable] = None,
         shutdown_event: Optional = None,

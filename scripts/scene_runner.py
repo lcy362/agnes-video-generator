@@ -47,7 +47,7 @@ import requests
 # v6.2.1: 回归默认视频模型（2.5-flash 比例档位输出），可按需修改
 REGRESSION_VIDEO_MODEL = "agnes-video-2.5-flash"
 
-from core.config import get_selected_models, is_v25_video_model
+from core.config import DEFAULT_TEXT_MODEL, get_selected_models, is_v25_video_model
 
 # ═══════════════════════════════════════════════════
 # 配置
@@ -209,7 +209,7 @@ def ensure_regression_video_model() -> None:
     try:
         r = requests.post(
             f"{SERVER_URL}/api/config/models",
-            data={"text": "agnes-3.0-flash", "video": model},
+            data={"text": DEFAULT_TEXT_MODEL, "video": model},
             timeout=15,
         )
         if r.ok:

@@ -19,6 +19,7 @@ from core.api.agnes_video import AgnesVideoAPI, VideoTaskCancelled
 from core.async_io import read_text
 from core.audio.voices import duration_len, estimate_chars_per_sec
 from core.compositor.concatenator import VideoConcatenator
+from core.config import DEFAULT_TEXT_MODEL
 from core.pipelines import MultiScenePipeline
 from core.screenwriter import Screenwriter, is_prompt_language_explicit
 from models.task import (
@@ -144,7 +145,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         api_key: str,
         task_id: str,
         dir_name: str = None,
-        chat_model: str = "agnes-3.0-flash",
+        chat_model: str = DEFAULT_TEXT_MODEL,
         image_model: str = "agnes-image-2.5-flash",
         video_model: str = "agnes-video-v2.0",
         progress_callback: Optional[Callable] = None,

@@ -16,6 +16,7 @@ import requests
 
 from core.api.error_collector import collect_error, collect_error_from_exception
 from core.api.rate_limiter import get_rate_limiter, request_with_key_rotation
+from core.config import DEFAULT_TEXT_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def strip_code_fence(text: str) -> str:
 class AgnesChatAPI:
     """Agnes LLM Chat API 封装（text + multimodal）。"""
 
-    def __init__(self, api_key: str, model: str = "agnes-3.0-flash"):
+    def __init__(self, api_key: str, model: str = DEFAULT_TEXT_MODEL):
         self.api_key = api_key
         self.model = model
         # 基础 headers（不含 Authorization）：每次请求前经 _auth_headers() 注入当前 Key

@@ -11,6 +11,7 @@ import traceback
 from typing import Callable, Optional
 
 from core.api.agnes_video import AgnesVideoAPI
+from core.config import DEFAULT_TEXT_MODEL
 from core.pipelines import BasePipeline, PipelineShutdown
 from models.task import SimpleVideoTask, StepStatus
 
@@ -37,7 +38,7 @@ class SimpleVideoPipeline(BasePipeline):
         api_key: str,
         task_id: str,
         dir_name: str = None,
-        chat_model: str = "agnes-3.0-flash",
+        chat_model: str = DEFAULT_TEXT_MODEL,
         image_model: str = "agnes-image-2.5-flash",
         video_model: str = "agnes-video-v2.0",
         progress_callback: Optional[Callable] = None,

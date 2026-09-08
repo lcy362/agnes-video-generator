@@ -18,6 +18,7 @@ from typing import Callable, Optional
 from core.api.agnes_image import AgnesImageAPI
 from core.api.agnes_video import AgnesVideoAPI, VideoTaskCancelled
 from core.compositor.concatenator import VideoConcatenator
+from core.config import DEFAULT_TEXT_MODEL
 from core.pipelines import MultiScenePipeline
 from core.screenwriter import Screenwriter
 from models.task import (
@@ -75,7 +76,7 @@ class AnchorPipeline(MultiScenePipeline):
         api_key: str,
         task_id: str,
         dir_name: Optional[str] = None,
-        chat_model: str = "agnes-3.0-flash",
+        chat_model: str = DEFAULT_TEXT_MODEL,
         image_model: str = "agnes-image-2.5-flash",
         video_model: str = "agnes-video-v2.0",
         progress_callback: Optional[Callable] = None,

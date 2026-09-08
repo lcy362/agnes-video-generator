@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 #   "zh" — 所有 meta-prompt 使用中文（默认）
 #   "en" — 所有 meta-prompt 使用英文
 # 示例：export PROMPT_LANGUAGE=en
-from core.config import get_settings as _get_settings  # noqa: I001 就地导入避免循环依赖
+from core.config import DEFAULT_TEXT_MODEL, get_settings as _get_settings  # noqa: I001 就地导入避免循环依赖
 PROMPT_LANGUAGE = _get_settings().prompt_language
 
 
@@ -112,7 +112,7 @@ class Screenwriter(
     对外接口与拆分前完全一致（mixin 组合，方法经 MRO 解析）。
     """
 
-    def __init__(self, api_key: str, model: str = "agnes-3.0-flash", language: str = None):
+    def __init__(self, api_key: str, model: str = DEFAULT_TEXT_MODEL, language: str = None):
         self.api_key = api_key
         self.model = model
         self.language = language if language else PROMPT_LANGUAGE  # "zh" 中文 / "en" 英文
