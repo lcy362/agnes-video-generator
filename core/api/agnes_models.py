@@ -21,12 +21,12 @@ REQUEST_TIMEOUT = 20
 
 # 分组失败时的兜底列表
 _FALLBACK = {
-    "text": [DEFAULT_TEXT_MODEL],
+    "text": [DEFAULT_TEXT_MODEL, "agnes-2.5-flash"],
     "image": [DEFAULT_IMAGE_MODEL, "agnes-image-2.1-flash", "agnes-image-2.0-flash"],
     "video": [DEFAULT_VIDEO_MODEL],
 }
 
-# 已废弃、应从可选列表中剔除的模型 ID（如 agnes-2.0-flash，官方已迁移至 agnes-2.5-flash）
+# 已废弃、应从可选列表中剔除的模型 ID（如 agnes-2.0-flash，官方已迁移至新版本）
 _DEPRECATED_MODELS = {"agnes-2.0-flash"}
 
 
@@ -35,7 +35,7 @@ def _classify(model_id: str) -> str:
 
     - ``agnes-image*`` → image
     - ``agnes-video*`` → video
-    - 其余（如 ``agnes-2.5-flash``）→ text
+    - 其余（如 ``agnes-3.0-flash``）→ text
     """
     if model_id.startswith("agnes-image"):
         return "image"

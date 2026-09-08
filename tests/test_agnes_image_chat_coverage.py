@@ -532,7 +532,7 @@ async def test_chat_success(chat_api, monkeypatch):
     result = chat_api.chat("你是助手", "你好吗", max_tokens=100)
     assert result == "你好"
     assert seen["endpoint"] == "/chat/completions"
-    assert seen["json"]["model"] == "agnes-2.5-flash"
+    assert seen["json"]["model"] == "agnes-3.0-flash"
     assert seen["json"]["temperature"] == 0.7
     assert seen["json"]["max_tokens"] == 100
     assert seen["timeout"] == 120

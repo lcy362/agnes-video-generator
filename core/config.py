@@ -18,7 +18,7 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 # ═══════════════════════════════════════════════════
 # 应用版本号（v6.1 新增：发版时同步更新，见 docs/dev/release_process.md）
 # ═══════════════════════════════════════════════════
-APP_VERSION = "6.4.4"
+APP_VERSION = "6.4.5"
 
 # 未配置 API Key 时的统一报错文案（含免费获取与在线体验兜底，全站路由共用）
 API_KEY_MISSING_MSG = (
@@ -870,7 +870,7 @@ DURATION_FRAME_MAP = {
 # ═══════════════════════════════════════════════════
 
 # 各类型 Agnes 模型默认值（与三个 API 客户端的默认 model 对齐）
-DEFAULT_TEXT_MODEL = "agnes-2.5-flash"
+DEFAULT_TEXT_MODEL = "agnes-3.0-flash"
 DEFAULT_IMAGE_MODEL = "agnes-image-2.5-flash"
 DEFAULT_VIDEO_MODEL = "agnes-video-v2.0"
 
