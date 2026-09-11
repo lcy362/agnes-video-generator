@@ -2,7 +2,7 @@
 
 [![English](https://img.shields.io/badge/EN-English-blue)](/README.md)
 [![GitHub Stars](https://img.shields.io/github/stars/lcy362/agnes-video-generator?style=social)](https://github.com/lcy362/agnes-video-generator)
-[![License](https://img.shields.io/github/license/lcy362/agnes-video-generator)](https://github.com/lcy362/agnes-video-generator/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/lcy362/agnes-video-generator)](https://github.com/lcy362/agnes-video-generator/blob/HEAD/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue)](https://www.python.org/)
 [![Website](https://img.shields.io/badge/website-video.lichuanyang.top-8A2BE2)](https://video.lichuanyang.top)
 [![Docker Hub](https://img.shields.io/docker/pulls/lcy362/free-short-video?label=docker%20pulls)](https://hub.docker.com/r/lcy362/free-short-video)
@@ -159,7 +159,7 @@ cp .env.example .env    # 然后编辑其中的 AGNES_API_KEY
 - **[快速开始](docs/public/getting-started.zh.md)** — 4 种部署方式：手动（`start.sh`）、Docker、npm（`npx free-short-video`）、AI Agent 辅助。
 - **[使用说明](docs/public/usage.zh.md)** — 配置 API Key、选择视频模式、断点续传、三种串联模式，以及日志与输出目录。
 - **[项目架构](docs/public/architecture.zh.md)** — 项目结构与技术栈。
-- **[API 接口](docs/public/api.zh.md)** — 完整 REST + WebSocket 接口列表。
+- **[API 接口](docs/public/api.zh.md)** — 完整 REST 接口列表（进度经任务状态轮询获取，无 WebSocket）。
 - **[常见问题](docs/public/faq.zh.md)** — 高频疑问解答。
 - **[关于与许可](docs/public/about.zh.md)** — 致谢与 MIT 开源协议。
 

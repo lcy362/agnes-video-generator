@@ -103,7 +103,7 @@ All important operations are logged to the server console:
 | Prefix | Module |
 |--------|--------|
 | `[Startup]` | Server startup, stale task reset |
-| `[WS]` | WebSocket connect/disconnect |
+| `[Workspace]` / `[Concurrency]` | Workspace switch & concurrent-task limits |
 | `[Resume]` / `[Stop]` | Task resume/stop |
 | `[Pipeline]` / `[Simple]` / `[Manuscript]` | Pipeline step execution |
 | `[TTS]` / `[Subtitle]` | Audio and subtitle generation |

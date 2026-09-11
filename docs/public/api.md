@@ -46,7 +46,7 @@ AGNES_CORS_ORIGINS=http://localhost:8787,http://127.0.0.1:8787 bash start.sh
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/voices` | List available TTS voices (grouped by 13 languages) |
+| GET | `/api/voices` | List available TTS voices (grouped by 22 languages) |
 | GET | `/api/voices/preview` | Voice preview (generated/cached sample) |
 | GET | `/api/voices/compat` | Voice × language compatibility check |
 

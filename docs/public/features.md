@@ -20,17 +20,17 @@ All core AI capabilities are **completely free** — no trial period, no waterma
 | Video Generation | `agnes-video-v2.0` | Free |
 | Text-to-Speech Narration | Edge TTS (Microsoft) | Free, no extra API key needed |
 
-All AI API calls share a global token bucket rate limiter (16 requests/min), with automatic retries and exponential backoff to ensure stable operation.
+All AI API calls share a token-bucket rate limiter (shared bucket defaults to 20 × number of keys × 0.8 requests/min, plus a separate bucket for video submissions), with automatic retries and exponential backoff to ensure stable operation.
 
 ## 🎙️ AI Narration & Smart Subtitles
 
 Both Creative Video and Manuscript Video support:
 
-- **Free TTS narration**: Based on Microsoft Edge TTS, offering 4 Chinese voice roles (gentle female, steady male, lively female, young male) with adjustable speech rate (-30% to +30%)
+- **Free TTS narration**: Based on Microsoft Edge TTS, with a dynamic voice catalog grouped by the 22 UI languages (voice preview + cross-language compatibility checks) and adjustable speech rate
 - **Word-level fine-grained subtitles**: SRT subtitles generated from TTS word-level timestamps, one entry every 2-3 seconds, with precise audio-video sync
 - **Multi-line auto-wrapping**: Long subtitle text is intelligently split into two lines, preferring punctuation break points to prevent screen overflow
 - **Fully configurable subtitle style**: Font, color, size, position (top/bottom), stroke, and semi-transparent background
-- **Audio-video sync strategy**: All video clips are concatenated first, then audio and subtitles are overlaid as a whole, avoiding cumulative errors from per-segment overlay. TTS output is automatically amplified 2.5× to compensate for Edge TTS's low default volume
+- **Audio-video sync strategy**: All video clips are concatenated first, then audio and subtitles are overlaid as a whole, avoiding cumulative errors from per-segment overlay. TTS output is automatically amplified 1.5× to compensate for Edge TTS's low default volume
 
 ## 🎨 Flexible Creative Controls
 
@@ -46,7 +46,7 @@ Both Creative Video and Manuscript Video support:
 
 - **Checkpoint resume** — Automatically resumes from the last checkpoint after interruption; state is persisted after each step, no duplicate API calls
 - **Task management** — Create, view, resume, and stop tasks from the Web UI
-- **Real-time progress** — WebSocket pushes per-step generation progress (step name, status, percentage, current/total)
+- **Live progress** — Frontend polls task state (`GET /api/tasks/{id}`) for per-step generation progress (step name, status, percentage, current/total); no WebSocket needed
 - **Built-in CJK fonts** — Project ships with Chinese fonts, no garbled characters in subtitle rendering
 
 ## 🤖 AI Agent Friendly
@@ -57,11 +57,11 @@ Designed specifically for AI coding assistants (Claude, Cursor, QoderWork, etc.)
 - Install dependencies and start the server
 - Configure API key
 - Run 4-layer deployment verification (connectivity → static analysis → endpoint testing → subtitle feature)
-- Execute 10-scenario regression test suite
+- Execute 14-scenario regression test suite
 
 ## 🌐 Multilingual Web UI
 
-One-click launch, operate entirely in the browser. Interface available in **13 languages**: 中文, English, Deutsch, Français, Nederlands, Español, Português, Italiano, Русский, 日本語, 한국어, Bahasa Melayu, Bahasa Indonesia.
+One-click launch, operate entirely in the browser. Interface available in **22 languages**: 中文, English, Deutsch, Français, Nederlands, Español, Português, Italiano, Русский, 日本語, 한국어, Bahasa Melayu, Bahasa Indonesia, العربية, Türkçe, Tiếng Việt, ไทย, Tagalog, हिन्दी, فارسی, বাংলা, اردو. The voice catalog and subtitle font fallback cover the same 22 languages (including Arabic / Persian / Urdu RTL ligature shaping and Thai / Devanagari / Bengali font fallback).
 
 ## 🎬 Three AI Video Chaining Modes
 

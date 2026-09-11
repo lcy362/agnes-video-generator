@@ -2,7 +2,7 @@
 
 [![中文](https://img.shields.io/badge/CN-中文-red)](/README_ZH.md)
 [![GitHub Stars](https://img.shields.io/github/stars/lcy362/agnes-video-generator?style=social)](https://github.com/lcy362/agnes-video-generator)
-[![License](https://img.shields.io/github/license/lcy362/agnes-video-generator)](https://github.com/lcy362/agnes-video-generator/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/lcy362/agnes-video-generator)](https://github.com/lcy362/agnes-video-generator/blob/HEAD/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue)](https://www.python.org/)
 [![Website](https://img.shields.io/badge/website-video.lichuanyang.top-8A2BE2)](https://video.lichuanyang.top)
 [![Docker Hub](https://img.shields.io/docker/pulls/lcy362/free-short-video?label=docker%20pulls)](https://hub.docker.com/r/lcy362/free-short-video)
@@ -159,7 +159,7 @@ Full walkthrough: [Getting Started → Configure API Key](docs/public/getting-st
 - **[Getting Started](docs/public/getting-started.md)** — Install and deploy in 4 ways: Manual (`start.sh`), Docker, npm (`npx free-short-video`), or AI-Agent assisted.
 - **[Usage Guide](docs/public/usage.md)** — Configure your API key, pick a video mode, resume from checkpoints, the three chaining modes, and logs & output layout.
 - **[Architecture](docs/public/architecture.md)** — Project structure and tech stack.
-- **[API Reference](docs/public/api.md)** — Full REST + WebSocket endpoint list.
+- **[API Reference](docs/public/api.md)** — Full REST endpoint list (progress via polling, no WebSocket).
 - **[FAQ](docs/public/faq.md)** — Frequently asked questions.
 - **[About & License](docs/public/about.md)** — Acknowledgments and the MIT license.
 

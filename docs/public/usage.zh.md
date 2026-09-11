@@ -84,7 +84,7 @@ AI 驱动的多场景故事视频：
 | 前缀 | 模块 |
 |------|------|
 | `[Startup]` | 服务启动，残留任务重置 |
-| `[WS]` | WebSocket 连接/断开 |
+| `[Workspace]` / `[Concurrency]` | 工作区切换与并发任务数控制 |
 | `[Resume]` / `[Stop]` | 任务续传/停止 |
 | `[Pipeline]` / `[Simple]` / `[Manuscript]` | 流水线步骤执行 |
 | `[TTS]` / `[Subtitle]` | 音频和字幕生成 |

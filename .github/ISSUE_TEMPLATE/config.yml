@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 🎬 在线体验 / Try it online (no install)
+    url: https://video.lichuanyang.top/demo
+    about: 想直接生成视频请去这里（浏览器内运行，使用你自己的 API Key）。Issues 只用于缺陷反馈与功能请求。/ Generate videos here — Issues are not a generation entry point.
+  - name: 📖 使用文档 / Documentation
+    url: https://github.com/lcy362/agnes-video-generator/blob/master/docs/public/getting-started.md
+    about: 部署方式（手动 / Docker / npm）与任务类型说明。/ Deployment options and usage guide.
+  - name: ❓ 常见问题 / FAQ
+    url: https://video.lichuanyang.top/faq
+    about: 提交 Issue 前请先自查：401 / 403 / 超时等常见错误的成因与应对。/ Check 401 / 403 / timeout causes before opening an issue.

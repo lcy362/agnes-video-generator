@@ -14,15 +14,15 @@ Unlike commercial AI video tools that charge $10–$95/month, Agnes Video Genera
 
 ### What video generation modes are supported?
 
-Four modes: **Simple Video** (single prompt, full parameter control), **Creative Video** (AI story → multi-scene video with narration), **Manuscript Video** (long text → auto-split → narrated video), and **Digital Anchor** (AI anchor with TTS). Additional options include text-to-video, image-to-video, keyframes animation, and image-to-image end frame generation.
+Six task types: **Simple Video** (single prompt, full parameter control), **Creative Video** (AI story → multi-scene video with narration), **Manuscript Video** (long text → auto-split → narrated video), **Digital Anchor** (AI anchor with lip-synced speech), **Poetry Video** (a poem → per-line scenes → recitation + timed subtitles), and **Simple Image** (text-to-image / image-to-image in one call). Additional options include text-to-video, image-to-video, keyframes animation, and image-to-image end frame generation.
 
 ### Can I use my own images as references?
 
-Yes. You can upload reference images for character or scene consistency across scenes, use custom end frames for precise visual transitions, or choose img2img to auto-generate end frames from your reference. Reference images are supported in both Creative Video and Digital Anchor modes.
+Yes. You can upload reference images for character or scene consistency across scenes, use custom end frames for precise visual transitions, or choose img2img to auto-generate end frames from your reference. Reference images are supported in Creative Video, Manuscript Video (mapped per paragraph to guide i2v framing), and Digital Anchor modes.
 
 ### What languages does the UI support?
 
-The Web UI supports 13 languages: 中文, English, Deutsch, Français, Nederlands, Español, Português, Italiano, Русский, 日本語, 한국어, Bahasa Melayu, and Bahasa Indonesia. Subtitles are generated in the source text language with CJK font support built-in.
+The Web UI supports 22 languages: 中文, English, Deutsch, Français, Nederlands, Español, Português, Italiano, Русский, 日本語, 한국어, Bahasa Melayu, Bahasa Indonesia, العربية, Türkçe, Tiếng Việt, ไทย, Tagalog, हिन्दी, فارسی, বাংলা, اردو. Subtitles are generated in the source text language, with built-in font fallback for CJK, Arabic / Persian / Urdu (RTL), Thai, Devanagari and Bengali scripts.
 
 ### Can I run this with Docker?
 
@@ -43,6 +43,15 @@ If it still fails after several retries (≥ 2), the feedback area **auto-expand
 A `401 Unauthorized` or "无效的令牌 / invalid token" response usually means the **API Key does not match the domain** it is being sent to — for example, a key issued on the global site being used against the China-domestic endpoint `api.agnes-ai.cn` (or the reverse). Different keys are issued for different sites, so the wrong domain rejects the token.
 
 As of **v6.4.2**, each key can be bound to its own access domain, and a one-click **Auto-detect domains** button probes each key across `com` / `cn` / `cn_bak` and fills in the matching domain. In the API Key panel, pick the domain that matches your key, or just run auto-detect. Keys issued on the global site should use `apihub.agnes-ai.com`, or the `cn_bak` fallback (`apihub.agnes-ai.cn`), which accepts both domestic and global keys.
+
+### Can I get a video by posting my prompt in a GitHub Issue?
+
+No. This project is a **self-hosted application**, not a hosted generation service — maintainers don't run jobs for you, so a prompt pasted into an Issue (or a comment) produces nothing and gets closed as invalid. Use one of the two real entry points instead:
+
+- **Run it yourself**: `./start.sh` (or Docker / npm), then open `http://localhost:8765` and enter your prompt in the app. See [Getting Started](./getting-started.md).
+- **Try it online, no install**: the free browser demo at [video.lichuanyang.top/demo](https://video.lichuanyang.top/demo) — it runs entirely in your browser with your own Agnes API key.
+
+Please keep Issues for what they are for: **bug reports** (error message, task type, failed step — the in-app failure panel fills all of that in for you) and **feature requests**. If a prompt gives you poor results *inside the app*, that is a prompting/model question — include the prompt, mode, model and resolution you used and we'll take a look.
 
 ### How do I get help or report issues?
 
