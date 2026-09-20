@@ -28,6 +28,7 @@ frontend/.vite/
 
 # IDE 本地数据
 .codebuddy/
+.trae/
 
 # 模型接口报错收集
 error_logs/
