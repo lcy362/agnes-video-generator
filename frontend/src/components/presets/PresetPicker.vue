@@ -44,7 +44,14 @@ const groups = computed<Grouped[]>(() => {
       return ar - br
     })
   }
-  return Object.entries(byCat).map(([category, items]) => ({ category, items }))
+  // 用户自定义预设置于最前，其余按分类出现顺序
+  const entries = Object.entries(byCat)
+  entries.sort(([ca], [cb]) => {
+    if (ca === 'custom') return -1
+    if (cb === 'custom') return 1
+    return 0
+  })
+  return entries.map(([category, items]) => ({ category, items }))
 })
 
 function catName(cat: string): string {
