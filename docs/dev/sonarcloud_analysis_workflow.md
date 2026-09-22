@@ -120,17 +120,25 @@
 项目使用 SonarCloud **内置 `Sonar way` 门禁**（Free 计划**无法**修改门禁值、
 也无法将自定义门禁关联到项目——UI 明确提示需升级）。默认条件（**新代码**）：
 
-| 条件 | 阈值 | 当前状态 |
+| 条件 | 阈值 | 当前状态（2026-09-22 复核） |
 |------|------|---------|
-| `new_coverage`（新代码覆盖率） | ≥ 80% | ✅ 85.5% |
-| `new_reliability_rating`（可靠性） | = A | ✅ |
-| `new_security_rating`（安全） | = A | ✅ |
-| `new_maintainability_rating`（可维护性） | = A | ✅ |
-| `new_duplicated_lines_density`（重复行） | ≤ 3% | ✅ 0% |
-| `new_security_hotspots_reviewed`（安全热点） | 100% | ✅ |
+| `new_coverage`（新代码覆盖率） | ≥ 80% | ✅ 91.7% |
+| `new_reliability_rating`（可靠性） | = A | ✅ 1 |
+| `new_security_rating`（安全） | = A | ✅ 1 |
+| `new_maintainability_rating`（可维护性） | = A | ✅ 1 |
+| `new_duplicated_lines_density`（重复行） | ≤ 3% | ✅ 1.5% |
+| `new_security_hotspots_reviewed`（安全热点） | 100% | ✅ 100% |
 
 > **关键约束**：Free 计划下门禁只看「新代码」（previous_version 以来的改动），
 > 存量问题不阻塞门禁。门禁值不可调整，只能通过**补测试提升新代码覆盖率**达标。
+>
+> **2026-09-22 修复记录**（画廊 P1 新代码引入）：门禁曾因
+> `new_security_rating = 5`（2 个漏洞）+ `new_coverage = 75.9%` 判红。
+> 漏洞为 `pythonsecurity:S2083`（`gallery_routes.py` 缩略图路径穿越）与
+> `pythonsecurity:S6350`（`gallery_cache.py` ffmpeg 参数注入），根因同一条污点
+> 链路：URL 路径参数 `task_id` → 缓存文件名/成片路径。修复方式见 §7；
+> 覆盖率经 `tests/test_gallery_routes.py` + `tests/test_presets.py` 补测后
+> 由 75.9% → 91.7%。
 
 ---
 
@@ -152,8 +160,32 @@
 | Sonar 步骤 `EXECUTION FAILURE`，`analysis/jres` 返回 **403** | `SONAR_TOKEN` 无效/被删 | 在 SonarCloud 重新生成 token（长期 No expiration），用 `gh secret set SONAR_TOKEN` 更新 |
 | Sonar 中 `web/` 覆盖率恒为 **0%** | CI `--cov` 命令漏掉 `--cov=web` | 检查 test.yml 的 pytest 命令包含 `--cov=web` |
 | `new_coverage` 不达标（< 80%） | 泄漏周期内新代码测试不足 | 补单测；可用 Sonar API 定位未覆盖文件（见下） |
+| `new_security_rating` 不达标（= C/E） | 新代码中存在 `pythonsecurity:*` 漏洞 | 先拉污点链路定位（见下），再在**数据流源头**切断用户输入 |
 | Quality Gate 无法修改 | Free 计划限制 | 只能补测试；内置门禁不可改 |
 | 非主分支数据看不到 | Free 计划仅主分支可查 | 用 GitHub check 看结果，或用 master 分支查询 |
+
+### 定位安全漏洞的污点链路（`pythonsecurity:*`）
+
+`additionalFields=_all` 会返回 `flows`（Source → 中间传播点 → Sink 的完整行号链路），
+据此判断该在**哪一行**切断不可信数据，而不是盲目加校验：
+
+```bash
+# 1. 列出新代码中的漏洞及其 issue key
+curl -s "https://sonarcloud.io/api/issues/search?componentKeys=lcy362_agnes-video-generator&resolved=false&inNewCodePeriod=true&ps=100" \
+  | python3 -c 'import json,sys; [print(i["key"], i["rule"], i["component"], i.get("line"), i["message"]) for i in json.load(sys.stdin)["issues"] if i["type"]=="VULNERABILITY"]'
+
+# 2. 拉取某条 issue 的完整污点链路（Source/Sink 行号）
+curl -s "https://sonarcloud.io/api/issues/search?issues=<issue_key>&additionalFields=_all" \
+  | python3 -c 'import json,sys; [print(l["component"], (l.get("textRange") or {}).get("startLine"), l.get("msg")) for fl in json.load(sys.stdin)["issues"][0]["flows"] for l in fl["locations"]]'
+```
+
+> **经验（Python 引擎行为）**：任意函数调用都会把实参污点传播到返回值
+> （链路里会出现「This invocation can propagate malicious content to its return value」），
+> 因此把不可信值交给自定义校验函数**不能**消除告警，`safe_join` 这类自定义
+> 净化函数同样不被识别。可靠做法是让不可信值**不进入路径/参数构造**：
+> 例如画廊缩略图端点只用 URL 上的 `task_id` 与工作区扫描结果做**相等比较**，
+> 路径与文件名一律取自扫描到的可信标识（磁盘数据）；配合
+> `_TASK_ID_RE` 白名单形态校验 + `safe_join` / `safe_workspace_path` 做纵深防御。
 
 ### 定位泄漏周期内未覆盖文件
 
