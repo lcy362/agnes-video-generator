@@ -21,16 +21,25 @@ echo ================================================
 echo.
 
 REM ── 环境校验 ────────────────────────────────
+REM Python 探测：优先 `python`，未命中回退官方 `py` 启动器（py -3）。
+REM 两者都没有才报错。后续 venv 创建 / 版本检查统一走 %PY_CMD% %PY_ARGS%。
+set "PY_CMD=python"
+set "PY_ARGS="
 where python >nul 2>nul
 if errorlevel 1 (
-    call :msg "[X] 未找到 python，请先安装 Python 3.10+：https://www.python.org/downloads/" "[X] python not found. Please install Python 3.10+: https://www.python.org/downloads/"
-    pause
-    exit /b 1
+    where py >nul 2>nul
+    if errorlevel 1 (
+        call :msg "[X] 未找到 python / py，请先安装 Python 3.10+：https://www.python.org/downloads/" "[X] Neither python nor py found. Please install Python 3.10+: https://www.python.org/downloads/"
+        pause
+        exit /b 1
+    )
+    set "PY_CMD=py"
+    set "PY_ARGS=-3"
 )
 
-python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
+%PY_CMD% %PY_ARGS% -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
 if errorlevel 1 (
-    python --version
+    %PY_CMD% %PY_ARGS% --version
     call :msg "[X] Python 版本过低，需要 3.10+" "[X] Python version too old. Required: 3.10+"
     pause
     exit /b 1
@@ -62,7 +71,7 @@ set "VENV_PIP=%VENV_DIR%\Scripts\pip.exe"
 
 if not exist "%VENV_PYTHON%" (
     call :msg "[1/3] 创建虚拟环境..." "[1/3] Creating virtual environment..."
-    python -m venv "%VENV_DIR%"
+    %PY_CMD% %PY_ARGS% -m venv "%VENV_DIR%"
 )
 
 call :msg "[2/3] 安装依赖..." "[2/3] Installing dependencies..."
@@ -79,8 +88,11 @@ call :msg "   浏览器将自动打开 http://localhost:8765" "   The browser wi
 call :msg "   按 Ctrl+C 停止服务" "   Press Ctrl+C to stop the server"
 echo.
 
-REM 延迟 3 秒后打开浏览器（服务启动中）
-start /b cmd /c "timeout /t 3 /nobreak >nul && start http://localhost:8765"
+REM 服务就绪（http://localhost:8765 可连通）后再开浏览器，避免首次建 venv/装依赖
+REM 耗时超 3s 时浏览器打开即"无法访问"。最多等待 60s（120 × 0.5s），超时静默放弃，
+REM 用户可手动访问。判定语义与 start.sh 的 wait_ready 一致（可连通即视为就绪）。
+start "" /b powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "for ($i=0; $i -lt 120; $i++) { try { $r = Invoke-WebRequest -Uri 'http://localhost:8765/' -UseBasicParsing -TimeoutSec 2; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { Start-Process 'http://localhost:8765'; break } } catch {} ; Start-Sleep -Milliseconds 500 }"
 
 "%VENV_PYTHON%" server.py
 

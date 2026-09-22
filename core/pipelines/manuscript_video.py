@@ -20,7 +20,7 @@ from core.async_io import read_text
 from core.audio.voices import duration_len, estimate_chars_per_sec
 from core.compositor.concatenator import VideoConcatenator
 from core.config import DEFAULT_TEXT_MODEL
-from core.pipelines import MultiScenePipeline
+from core.pipelines import CheckpointPause, MultiScenePipeline, PipelineShutdown
 from core.screenwriter import Screenwriter, is_prompt_language_explicit
 from models.task import (
     ManuscriptParagraph,
@@ -309,19 +309,56 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                         para.text,
                         self._state.style,
                     )
-                    para.scene_prompt = prompt.strip()
+                    # stability_hardening P2：返回值防御归一化为 str（可能 None / 非 str）
+                    para.scene_prompt = (prompt or "").strip() if isinstance(prompt, str) else ""
 
-            await asyncio.gather(*[_gen_one(p) for p in pending])
+            # stability_hardening P2（M3）：单段 LLM 失败不累及整任务（issue #35 结构性来源）。
+            # 区分控制流异常与业务失败：
+            #   - 中止类（Cancelled / PipelineShutdown / CheckpointPause）→ 继续向上传播，不隔离；
+            #   - 业务失败 → 失败段 scene_prompt 留空，交下游跳过 + 续传重试。
+            results = await asyncio.gather(*(_gen_one(p) for p in pending), return_exceptions=True)
+            failures: list[tuple[ManuscriptParagraph, BaseException]] = []
+            for para, res in zip(pending, results):
+                if isinstance(res, (asyncio.CancelledError, PipelineShutdown, CheckpointPause)):
+                    raise res
+                if isinstance(res, BaseException):
+                    para.scene_prompt = ""
+                    failures.append((para, res))
+
+            if failures:
+                if len(failures) == len(pending):
+                    first = failures[0]
+                    # 全段失败：显式 raise（不静默产出空片），异常信息含首个失败段落 index 与原因
+                    raise RuntimeError(
+                        f"稿件场景描述生成全部失败 {len(pending)} 段，"
+                        f"首个失败段落 index={first[0].index}，原因: {str(first[1])[:200]}"
+                    ) from first[1]
+                # 部分失败：任务继续
+                msg = (
+                    f"场景描述生成完成 ({len(pending) - len(failures)}/{len(pending)} 段)"
+                    f"，{len(failures)} 段失败可 resume 重试"
+                )
+                logger.warning(
+                    "[Manuscript] scene_prompt: %d/%d 段生成失败，失败段落 index=%s，"
+                    "首个错误摘要: %s",
+                    len(failures), len(pending),
+                    [p.index for p, _ in failures],
+                    str(failures[0][1])[:200],
+                )
+            else:
+                msg = f"场景描述生成完成 ({len(pending)} 段)"
+
             await self._emit(
                 "scene_prompts", "completed",
-                f"场景描述生成完成 ({len(pending)} 段)",
+                msg,
                 _PROGRESS_SCENE_PROMPTS_START + _PROGRESS_SCENE_PROMPTS_SPAN,
             )
             for p in pending:
-                logger.info(
-                    "[Manuscript] scene_prompt %d: %s...",
-                    p.index, p.scene_prompt[:80],
-                )
+                if p.scene_prompt:
+                    logger.info(
+                        "[Manuscript] scene_prompt %d: %s...",
+                        p.index, p.scene_prompt[:80],
+                    )
 
         self.task_manager.update_state(paragraphs=paragraphs)
         self.save_prompts({

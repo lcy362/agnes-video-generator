@@ -164,6 +164,62 @@ class TestRequestWithKeyRotation:
         assert out.status_code == 200
         assert calls["n"] == 2
 
+    def test_timeout_retry_limit_1(self, monkeypatch):
+        """stability_hardening P1：timeout_retry_limit=1 时超时最多重试 1 次（共 2 次尝试）。"""
+        from unittest import mock
+
+        calls = {"n": 0}
+
+        def requester(url, headers, **kw):
+            calls["n"] += 1
+            raise requests.Timeout("slow")
+
+        monkeypatch.setattr("core.config.get_base_url_for_key", lambda k: "https://api.example.com")
+        monkeypatch.setattr("core.api.rate_limiter.time", mock.Mock(sleep=lambda s: None))
+        with pytest.raises(requests.Timeout):
+            request_with_key_rotation(
+                requester, "/chat/completions", key_ring=self._make_ring(),
+                timeout_retry_limit=1,
+            )
+        assert calls["n"] == 2
+
+    def test_timeout_retry_limit_0(self, monkeypatch):
+        """stability_hardening P1：timeout_retry_limit=0 时超时一次即抛，不重试。"""
+        from unittest import mock
+
+        calls = {"n": 0}
+
+        def requester(url, headers, **kw):
+            calls["n"] += 1
+            raise requests.Timeout("slow")
+
+        monkeypatch.setattr("core.config.get_base_url_for_key", lambda k: "https://api.example.com")
+        monkeypatch.setattr("core.api.rate_limiter.time", mock.Mock(sleep=lambda s: None))
+        with pytest.raises(requests.Timeout):
+            request_with_key_rotation(
+                requester, "/chat/completions", key_ring=self._make_ring(),
+                timeout_retry_limit=0,
+            )
+        assert calls["n"] == 1
+
+    def test_default_timeout_retries_full(self, monkeypatch):
+        """stability_hardening P1：默认 None 时超时退避按 max_retries 上限（行为与旧版一致）。"""
+        from unittest import mock
+
+        calls = {"n": 0}
+
+        def requester(url, headers, **kw):
+            calls["n"] += 1
+            raise requests.Timeout("slow")
+
+        monkeypatch.setattr("core.config.get_base_url_for_key", lambda k: "https://api.example.com")
+        monkeypatch.setattr("core.api.rate_limiter.time", mock.Mock(sleep=lambda s: None))
+        with pytest.raises(requests.Timeout):
+            request_with_key_rotation(
+                requester, "/chat/completions", key_ring=self._make_ring(), max_retries=2,
+            )
+        assert calls["n"] == 3  # 1 首试 + 2 退避重试
+
 
 # ═══════════════════════════════════════════════
 # agnes_chat: chat_json JSON 解析路径（S5713 修复分支）

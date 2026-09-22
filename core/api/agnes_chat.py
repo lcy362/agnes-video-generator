@@ -109,7 +109,10 @@ class AgnesChatAPI:
                 return content
         return ""
 
-    def _request_with_retry(self, payload: dict, timeout: int = 120) -> dict:
+    def _request_with_retry(
+        self, payload: dict, timeout: int = 120,
+        timeout_retry_limit: int | None = None,
+    ) -> dict:
         """带重试的 API 请求（429 换 Key + 5xx/超时/连接错误指数退避）。
 
         经 ``request_with_key_rotation`` 统一封装：
@@ -121,6 +124,7 @@ class AgnesChatAPI:
         Args:
             payload: 请求 JSON body。
             timeout: 请求超时秒数。
+            timeout_retry_limit: 超时/连接类错误的最大重试次数（None = 沿用 3）。
 
         Returns:
             解析后的响应 JSON dict。
@@ -136,6 +140,7 @@ class AgnesChatAPI:
                 "/chat/completions",
                 max_retries=_MAX_RETRIES,
                 retry_base_delay=_RETRY_BASE_DELAY,
+                timeout_retry_limit=timeout_retry_limit,
                 json=payload,
                 timeout=timeout,
             )
@@ -175,8 +180,17 @@ class AgnesChatAPI:
             raise
 
     def chat(self, system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> str:
-        """纯文本 Chat 调用（含重试）。"""
+        """纯文本 Chat 调用（含重试）。
+
+        stability_hardening P1：单次读超时读 ``AGNES_CHAT_TIMEOUT``（默认 300，
+        与 chat_multimodal 对齐，消除双标准）；超时类错误最多重试 1 次
+        （``timeout_retry_limit=1``），使"成功窗口从 120s 扩到 300s"的同时
+        最坏等待时长不再翻倍（约 10.3 分钟，与现状相当）。5xx / 429 重试不受影响。
+        """
         logger.info(f"[AgnesChat] Calling chat ({self.model}), prompt: {len(user_prompt)} chars...")
+        from core.config import get_settings
+
+        timeout_retry_limit = 1
         data = self._request_with_retry(
             {
                 "model": self.model,
@@ -187,7 +201,8 @@ class AgnesChatAPI:
                 "temperature": 0.7,
                 "max_tokens": max_tokens,
             },
-            timeout=120,
+            timeout=get_settings().agnes_chat_timeout,
+            timeout_retry_limit=timeout_retry_limit,
         )
         return data["choices"][0]["message"]["content"]
 

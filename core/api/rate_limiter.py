@@ -272,6 +272,7 @@ def request_with_key_rotation(
     max_retries: int = 3,
     retry_base_delay: float = 20.0,
     key_ring=None,
+    timeout_retry_limit: int | None = None,
     **requester_kwargs,
 ):
     """429 换 Key 立即重试；全 Key 429 或 5xx/超时/连接错误才指数退避。
@@ -284,6 +285,11 @@ def request_with_key_rotation(
     3. 所有 Key 均 429（rotation 计数达到 len(keys) × 退避上限）-> 指数退避
     4. 5xx / 超时 / 连接错误 -> 同 Key 指数退避（保持现状）
 
+    超时/连接错误单独受 ``timeout_retry_limit`` 约束（stability_hardening Phase 1）：
+    - 默认 ``None``：退回按 ``max_retries`` 上限，行为与旧版完全一致（仅新增分支，回归面为零）；
+    - 显式非 None：超时类错误的退避重试次数不超过该值（5xx / 429 的重试预算不受影响），
+      供 chat() 这类「扩大成功窗口但压缩失败等待」的调用方收紧超时重试。
+
     Args:
         requester: 可调用 (url, headers, **kw) -> requests.Response。
         endpoint: API 接口相对路径（如 "/chat/completions"）。完整 URL 依当前 Key
@@ -291,6 +297,7 @@ def request_with_key_rotation(
         max_retries: 退避重试上限。
         retry_base_delay: 指数退避基数（秒），delay = 基数 × (retries + 1)。
         key_ring: KeyRing 实例；None 时取全局单例。
+        timeout_retry_limit: 超时/连接类错误的最大重试次数；None = 沿用 max_retries。
         **requester_kwargs: 透传给 requester（json/timeout 等，不含 headers——
             headers 由本函数基于当前 Key 自动生成）。
 
@@ -307,6 +314,7 @@ def request_with_key_rotation(
     ring = key_ring or get_key_ring()
     base_headers = requester_kwargs.pop("headers", None) or {}
     retries = 0
+    timeout_retries = 0
     rotations = 0
     max_rotations = len(ring) * max_retries
     while True:
@@ -318,10 +326,15 @@ def request_with_key_rotation(
         try:
             resp = requester(url, headers=headers, **requester_kwargs)
         except (requests.ConnectionError, requests.Timeout) as e:
-            if retries < max_retries:
-                delay = retry_base_delay * (retries + 1)
-                logger.warning(f"[KeyRotation] {type(e).__name__}, 退避 {delay}s 后重试")
+            timeout_limit = timeout_retry_limit if timeout_retry_limit is not None else max_retries
+            if timeout_retries < timeout_limit and retries < max_retries:
+                delay = retry_base_delay * (timeout_retries + 1)
+                logger.warning(
+                    f"[KeyRotation] {type(e).__name__}, 退避 {delay}s 后重试 "
+                    f"(timeout retry {timeout_retries + 1}/{timeout_limit})"
+                )
                 time.sleep(delay)
+                timeout_retries += 1
                 retries += 1
                 continue
             raise

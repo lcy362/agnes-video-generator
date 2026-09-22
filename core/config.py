@@ -201,6 +201,7 @@ try:
         # ── 合成 / 字幕 ──
         agnes_subtitle_ass: bool = True          # 2.1c 字幕 ASS 单链灰度开关
         agnes_video_poll_timeout: int = 1800     # 1.2 视频轮询总超时
+        agnes_chat_timeout: int = 300            # stability_hardening P1：chat 单次读超时（默认与 chat_multimodal 对齐）
 
         # ── CORS（PR #33 吸收 Phase 2：可配置跨源白名单）──
         # 供独立本地伴侣工具（如 agnes-simple-ui）从浏览器跨源调用本服务 API。
@@ -242,6 +243,7 @@ except ImportError:  # pragma: no cover - pydantic-settings 为必备依赖，�
                 "0", "false", "off",
             )
             self.agnes_video_poll_timeout = int(os.environ.get("AGNES_VIDEO_POLL_TIMEOUT", "1800"))
+            self.agnes_chat_timeout = int(os.environ.get("AGNES_CHAT_TIMEOUT", "300"))
             self.agnes_cors_origins = os.environ.get("AGNES_CORS_ORIGINS", "")
             _cors_enabled = os.environ.get("AGNES_CORS_ENABLED", "").strip().lower()
             if _cors_enabled in ("0", "false", "off"):

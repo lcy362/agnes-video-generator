@@ -1,6 +1,6 @@
 # PRD: 三项稳定性加固（chat 超时与重试预算 / 稿件场景 prompt 失败隔离 / Windows 启动脚本对齐）
 
-> **Status**: Proposed（方案已定，尚未排期；建议编入 `optimization_roadmap.md` 批次 0）
+> **Status**: Implemented（Phase 1-3 已按本 PRD 落地，2026-09-22；Phase 1 采样未跑真实 API，按"出现 120-300s 区间成功/超时样本"预判实施联合调参；Phase 3 平台实测待 Windows 验证——两处均已记录在案）
 > **Date**: 2026-09-20
 > **Scope**: 三项改动均由本项目独立实现，仅借鉴问题定位与行为语义，不做代码级复用（见 §1.3）
 > **Related docs**: `optimization_roadmap.md`、`docs/dev/regression_test_plan.md`、`AGENTS.md`

@@ -169,6 +169,15 @@ class TestCreativeVideoPipeline(BasePipelineTest):
         state = await self._make_state(chaining_mode="keyframes")
         await self._run_and_verify(CreativeVideoPipeline, state, temp_workdir,
                                     verify_prompts=True)
+        # 视频生成后回写 scenes 状态（修复：链式路径此前不回写 video_file/video_status）
+        assert state.scenes, "expected scenes to be populated"
+        for scene in state.scenes:
+            assert scene.video_file and os.path.exists(scene.video_file), \
+                f"scene {scene.index} video_file not backfilled: {scene.video_file!r}"
+            assert scene.video_status == StepStatus.COMPLETED, \
+                f"scene {scene.index} video_status not COMPLETED: {scene.video_status}"
+            assert scene.status == StepStatus.COMPLETED, \
+                f"scene {scene.index} status not COMPLETED: {scene.status}"
 
     @pytest.mark.asyncio
     async def test_independent_mode(self, temp_workdir):

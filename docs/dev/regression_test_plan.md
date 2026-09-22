@@ -11,9 +11,9 @@
 |----------|-----------|-------------|
 | 简单视频 (Type 1) | 1 | `simple_video.py`, `agnes_video.py`, `task_manager.py` |
 | 创意视频 (Type 2) | 5 | `creative_video.py`, `agnes_image.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `tashkeel.py` |
-| 稿件视频 (Type 3) | 4 | `manuscript_video.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `concatenator.py`, `preview_routes.py` |
+| 稿件视频 (Type 3) | 5 | `manuscript_video.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `concatenator.py`, `preview_routes.py` |
 | 数字人口播 (Type 4) | 2 | `anchor_video.py`, `agnes_image.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `concatenator.py` |
-| **总计** | **14**（S1/C1-C5/M1-M4/A1-A2/P1/I1） | |
+| **总计** | **15**（S1/C1-C5/M1-M5/A1-A2/P1/I1） | |
 
 ---
 
@@ -49,6 +49,7 @@
 | M2 | 多段稿件+自定义字幕 | ~130 字 / 8 句 | 开启 | 自定义 stroke/position/bg 字幕样式 + 多段拆分路径 |
 | M3 | 多段稿件+逐段参考图 | ~130 字 / 8 句 | 开启 | `reference_images` + `reference_images_map` 按段落 index 映射 → i2v 提交（task_state 含 `reference_images`，para_N/task.json 提交带参考图） |
 | M4 | 稿件分段预览（preview-split） | 任意 | — | `POST /api/manuscript/preview-split` 返回段落/估算时长，与正式任务共用 `split_manuscript_text`；`POST /api/creative/preview-script` 白名单校验/并发 429（PRD 1.1/1.1a/1.6） |
+| M5 | 稿件单段失败隔离（stability_hardening P2） | 多段稿件 | 开启 | 注入某段 LLM 失败 → 任务不 FAILED，失败段留空被跳过、其余段正常生成；**续传仅重新生成失败段**（mock 计数断言 A/C 不重复调用）；全段失败显式报错（含首段 index）；停止/暂停类异常不被当作失败段（`docs/plans/v6.0/stability_hardening_PRD.md` Phase 2） |
 
 **统一稿件文本（M1/M2 共用）**：
 

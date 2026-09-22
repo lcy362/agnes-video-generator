@@ -9,7 +9,7 @@ from typing import Callable, Optional
 from core.api.agnes_image import AgnesImageAPI
 from core.api.agnes_video import AgnesVideoAPI
 from core.config import DEFAULT_TEXT_MODEL
-from core.pipelines import MultiScenePipeline
+from core.pipelines import MultiScenePipeline, StepStatus
 from core.screenwriter import Screenwriter
 from models.task import CreativeVideoTask
 
@@ -208,6 +208,24 @@ class CreativeVideoPipeline(
             self._end_frame_prompts, self._pregenerated_end_frames,
         )
         self._check_shutdown()
+
+        # 回写 scenes 状态：通用实现（multi_scene）会在生成时同步
+        # scene.video_file / video_status，但链式路径（steps_video）从不回写，
+        # 导致 task_state.scenes 始终停在 pending 空值。这里按文件系统补一次
+        # 回填，使续传/查询看到真实生成结果。
+        scenes = getattr(self._state, "scenes", None)
+        if scenes:
+            remap = {}
+            for idx, path in enumerate(self._all_video_paths):
+                remap[idx] = path
+            for i, scene in enumerate(scenes):
+                if i in remap:
+                    scene.video_file = remap[i]
+                    scene.video_status = StepStatus.COMPLETED
+                    scene.status = StepStatus.COMPLETED
+            self.task_manager.update_state(
+                scenes=[s.model_dump() for s in scenes],
+            )
 
     # ------------------------------------------------------------------
     # 音频生成（保留原逻辑）

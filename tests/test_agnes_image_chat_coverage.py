@@ -11,19 +11,18 @@
 - mock asyncio.sleep 或退避间隔用极小值，避免真实等待；
 - 完全不触网、不写真实文件到工作区（临时参考图仅用 tmp_path 单元验证编码）。
 """
-import asyncio
 import base64
 import json
-
-import pytest
-import requests as _requests
-
-import core.api.agnes_image as ai
-import core.api.agnes_chat as ac
 
 # 确保项目根目录可导入（-m pytest 时 cwd 已在 path，此处兜底，兼容其他调用方式）
 import os
 import sys
+
+import pytest
+import requests as _requests
+
+import core.api.agnes_chat as ac
+import core.api.agnes_image as ai
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
@@ -535,7 +534,7 @@ async def test_chat_success(chat_api, monkeypatch):
     assert seen["json"]["model"] == "agnes-3.0-flash"
     assert seen["json"]["temperature"] == 0.7
     assert seen["json"]["max_tokens"] == 100
-    assert seen["timeout"] == 120
+    assert seen["timeout"] == 300
 
 
 async def test_request_with_retry_exhausted_429_collects(chat_api, monkeypatch):
@@ -593,7 +592,7 @@ async def test_chat_multimodal_url_and_local(chat_api, monkeypatch, tmp_path):
     monkeypatch.setattr(ac, "request_with_key_rotation", fake_kr)
     seen = {}
 
-    def fake_rwr(payload, timeout=300):
+    def fake_rwr(payload, timeout=300, timeout_retry_limit=None):
         seen["payload"] = payload
         seen["timeout"] = timeout
         return {"choices": [{"message": {"content": "图中是三只猫"}}]}
@@ -615,7 +614,7 @@ async def test_chat_multimodal_url_and_local(chat_api, monkeypatch, tmp_path):
 
 
 async def test_chat_multimodal_skips_missing_file(chat_api, monkeypatch):
-    def fake_rwr(payload, timeout=300):
+    def fake_rwr(payload, timeout=300, timeout_retry_limit=None):
         msgs = payload["messages"]
         user_content = msgs[-1]["content"]
         # 不存在的本地文件不应被加入 image_url（无 base64 项）
@@ -631,7 +630,7 @@ async def test_chat_multimodal_skips_missing_file(chat_api, monkeypatch):
 
 
 async def test_chat_json_direct_parse(chat_api, monkeypatch):
-    def fake_rwr(payload, timeout=120):
+    def fake_rwr(payload, timeout=120, timeout_retry_limit=None):
         return {"choices": [{"message": {"content": "{\"a\": 1}"}}]}
 
     monkeypatch.setattr(chat_api, "_request_with_retry", fake_rwr)
@@ -639,7 +638,7 @@ async def test_chat_json_direct_parse(chat_api, monkeypatch):
 
 
 async def test_chat_json_regex_fallback(chat_api, monkeypatch):
-    def fake_rwr(payload, timeout=120):
+    def fake_rwr(payload, timeout=120, timeout_retry_limit=None):
         return {"choices": [{"message": {"content": "前缀说明 {\"a\": 1} 结尾"}}]}
 
     monkeypatch.setattr(chat_api, "_request_with_retry", fake_rwr)
@@ -647,7 +646,7 @@ async def test_chat_json_regex_fallback(chat_api, monkeypatch):
 
 
 async def test_chat_json_code_fence(chat_api, monkeypatch):
-    def fake_rwr(payload, timeout=120):
+    def fake_rwr(payload, timeout=120, timeout_retry_limit=None):
         content = "```json\n{\"b\": 2}\n```"
         return {"choices": [{"message": {"content": content}}]}
 
@@ -662,7 +661,7 @@ async def test_chat_json_repair_fallback(chat_api, monkeypatch):
     )
     calls = []
 
-    def fake_rwr(payload, timeout=120):
+    def fake_rwr(payload, timeout=120, timeout_retry_limit=None):
         calls.append(1)
         return {"choices": [{"message": {"content": "[不合法json"}}]}
 
@@ -676,7 +675,7 @@ async def test_chat_json_first_fails_then_succeeds(chat_api, monkeypatch):
     contents = ["坏 [json", "{\"ok\": true}"]
     calls = []
 
-    def fake_rwr(payload, timeout=120):
+    def fake_rwr(payload, timeout=120, timeout_retry_limit=None):
         calls.append(1)
         return {"choices": [{"message": {"content": contents[len(calls) - 1]}}]}
 
@@ -691,7 +690,7 @@ async def test_chat_json_final_failure_raises(chat_api, monkeypatch):
     monkeypatch.setattr(ac, "collect_error", lambda *a, **k: collected.append(k))
     calls = []
 
-    def fake_rwr(payload, timeout=120):
+    def fake_rwr(payload, timeout=120, timeout_retry_limit=None):
         calls.append(1)
         return {"choices": [{"message": {"content": "完全不是 json"}}]}
 

@@ -33,6 +33,9 @@
 | 0.7 | `_key_id` 未哈希 data → 多 Key 按 id 删除失效 | 🔴 | 多 Key 场景删除单个 Key 不再误删 | 小 | ✅ |
 | 0.8 | 前端 `v-html` 未转义 → XSS | 🔴 | 后端可控字符串不再注入前端脚本 | 小 | ✅ |
 | 0.9 | 图片生成无重复提交守卫 | 🔴 | 快速连点不再并发重复提交扣费 | 小 | ✅ |
+| 0.10 | chat 超时与重试预算联合加固 | 🔴 | 长 prompt 成功窗口 120s→300s，失败等待不翻倍 | 小 | ✅ |
+| 0.11 | 稿件场景 prompt 单段失败隔离 | 🔴 | 单段失败不再累及整任务，可续传重试 | 中 | ✅ |
+| 0.12 | Windows 启动脚本与 start.sh 对齐 | 🟡 | Windows 回退 `py` 启动器 + 就绪后开浏览器 | 小 | ✅ |
 | 1.1 | 任务状态单写者原则 | 🔴 | 停止/删除后磁盘状态不再回跳 | 中 | ✅ |
 | 1.2 | 断点续传补全（cues 持久化等） | 🟡 | 长任务续传不再重采 TTS | 中 | ✅ |
 | 1.3 | 并发等待 + 自适应轮询 | 🟡 | 多场景等待时延从线性叠加降为并行 | 中 | ✅ |
@@ -154,6 +157,28 @@
 **方案**：`submitImage` 增加独立 `imageSubmitting` 守卫，对应按钮绑定 `:disabled`；与视频提交的守卫统一抽取为可复用模式。
 
 **验收**：图片生成提交期间按钮禁用，连点不产生第二次请求。
+
+### 0.10 chat 超时与重试预算联合加固 🔴
+
+**方案**（`stability_hardening_PRD.md` Phase 1，2026-09-20 评审定稿）：`chat()` 单次读超时从固定 120 提升到 `AGNES_CHAT_TIMEOUT`（默认 300，与 `chat_multimodal` 对齐消除双标准）；`request_with_key_rotation` 新增 `timeout_retry_limit`（默认 `None` 行为不变），`chat()` 传 1，使超时类错误最多重试 1 次——成功窗口从 120s 扩到 300s，而最坏失败等待不翻倍（约 10.3 分钟，与现状 570s 相当）。5xx / 429 重试预算不受影响。
+
+**落地文件**：`core/config.py`（`agnes_chat_timeout`）、`core/api/agnes_chat.py`（`_request_with_retry` 透传 + `chat()`）、`core/api/rate_limiter.py`（`timeout_retry_limit`）。
+
+**验收**：`timeout_retry_limit=1` 时 `requests.Timeout` 仅重试 1 次（共 2 试）；`=0` 时一次即抛；默认 `None` 按 `max_retries` 退避（回归面为零）。单测见 `tests/test_api_aux.py::TestRequestWithKeyRotation`。
+
+### 0.11 稿件场景 prompt 单段失败隔离 🔴
+
+**方案**（`stability_hardening_PRD.md` Phase 2，issue #35 结构性来源）：`_generate_scene_prompts` 改用 `asyncio.gather(..., return_exceptions=True)` 并分类异常——中止类（`Cancelled / PipelineShutdown / CheckpointPause`）向上传播不隔离；业务失败段 `scene_prompt` 留空交下游跳过 + 续传重试；部分失败任务继续（进度文案含成功/失败计数），全段失败显式报错（含首段 index 与原因）。返回值防御归一化为 `str`。
+
+**落地文件**：`core/pipelines/manuscript_video.py`。
+
+**验收**：A/B/C 三段注入 B 段失败 → 任务不 FAILED，A/C 正常 B 跳过；续传仅重生成 B 段（mock 计数）；全段失败含 index；`PipelineShutdown` 不被吞掉。单测见 `tests/test_manuscript_scene_prompt_isolation.py`。
+
+### 0.12 Windows 启动脚本与 start.sh 对齐 🟡
+
+**方案**（`stability_hardening_PRD.md` Phase 3）：`start.bat` 引入 `PY_CMD`/`PY_ARGS` 探测（`python` 未命中回退官方 `py` 启动器，两者皆无才报错）；固定 `timeout /t 3` 延迟改为 PowerShell 轮询 `http://localhost:8765/` 可连通后开浏览器（最多 60s，超时静默放弃，不阻塞服务）。
+
+**落地文件**：`start.bat`。**注意**：按 PRD §5.4，合并/发布前需取得 Windows 实测记录；当前分支实现已完成但平台验证待补。
 
 ---
 
@@ -458,7 +483,8 @@
 | 2026-08-30 | 3.4 落地（移动端/可访问性/杂项） | `useGa.ts`（`localStorage 'ga_opt_out'` 开关 + `SENSITIVE_KEYS` 上报脱敏 + 长文本截断）；`useModalA11y.ts`（focus trap + ESC + 焦点还原，接入 ConfirmModal/VoicePickerModal）；`useVoice.ts`（blob URL revoke）；`useTheme.ts`（matchMedia 监听器清理）；`useDraft.ts`（表单草稿，接入 SimpleForm/CreativeForm）；`style.css`（`prefers-reduced-motion` + `:focus-visible`）；`App.vue`（窄屏字号/导航换行）；`ConfigPanel.vue`（隐私开关）+ i18n 22 语言 | `vue-tsc --noEmit` + `vite build` 通过；`i18n_check` 通过 |
 | 2026-08-30 | 3.5 落地（pydantic-settings 完整版） | `core/config.py`（`RuntimeSettings(BaseSettings)`：host/port/限速×4/i2i 模型/prompt_language/字幕 ASS/轮询超时/log_file/sweep/hmac_key/regression 工作目录，env_file=.env，无缓存每次动态读取保证测试可覆盖）；`requirements.txt`（+`pydantic-settings`）；收敛调用点：`rate_limiter.py`×4、`app_state.py`、`agnes_image.py`、`agnes_video.py`（轮询超时参数化）、`screenwriter`、`server.py`（host/port/log/sweep）、`config_routes.py`、`config.py`；`audio_overlay.py` 经 `subtitle_ass_enabled()` 联动 | 新增 6 项 `test_config_settings.py` 用例通过；`test_core`/`test_rate_limiter_async`/`test_subtitle_ass`/`test_scenes_single_pass` 全通过；无 pydantic-settings 时降级读 os.environ 兜底 |
 | 2026-08-30 | R3 落地（PR #32 阿语后续：多语言补齐） | A 节 `core/audio/voices.py`（`_ARABIC_RE` 排除 U+FEFF）；B 节 `core/audio/voices.py`（新增 8 语言 PROJECT_LANGUAGES/LANG_COMPAT/VOICE_PREVIEW_TEXTS/脚本检测正则/`_VOICE_NATIVE_NAMES`/`fil`→`tl` 归一，共 22 语言）、`core/config.py`（`DEFAULT_THAI_FONT`/`DEFAULT_DEVANAGARI_FONT`/`DEFAULT_BENGALI_FONT`）、`core/compositor/concatenator/{concat,audio_overlay}.py`（逐条脚本字体回退 + ASS `\fn`）、`resource/fonts/`（新增 3 个 Noto 字体）；fa/ur 复用 NotoNaskhArabicUI + reshape+bidi 管线 | 新增 `tests/test_voice_multilang.py` 32 项通过；全量单测（不含 mock_regression）459 项 + mock_regression 28 项通过；`ruff` 零告警；`i18n_check` 通过；目录含 22 语言分组（ar/tr/vi/th/tl/hi/fa/bn/ur 试听用本地姓名） |
+| 2026-09-22 | stability_hardening 三项（0.10/0.11/0.12）落地 | 0.10 `core/config.py`（`agnes_chat_timeout`）+`core/api/agnes_chat.py`（`_request_with_retry` 透传 + `chat()` 读配置、`timeout_retry_limit=1`）+`core/api/rate_limiter.py`（`request_with_key_rotation` 新增 `timeout_retry_limit` 参数，超时/连接错误独立退避上限，默认 None 行为不变）；0.11 `core/pipelines/manuscript_video.py`（`_generate_scene_prompts` 改 `return_exceptions=True` + 控制流异常与业务失败分类 + 部分/全段失败语义 + 返回值归一化）；0.12 `start.bat`（`PY_CMD`/`PY_ARGS` 探测 `py` 回退 + PowerShell 就绪轮询开浏览器） | 新增 `tests/test_api_aux.py` 3 项（timeout_retry_limit 1/0/默认）+`tests/test_manuscript_scene_prompt_isolation.py` 5 项通过；全量单测通过；`ruff` 零告警；`py_compile` 全通过；`regression_test_plan.md` 新增 M5 场景（15 场景）；0.12 平台验证待补（PRD §5.4 要求 Windows 实测） |
 
 ---
 
-*文档版本：v1.3（2026-08-30）| 创建日期：2026-08-26 | 目标版本：v6 版本线内全部完成 | 状态：**29 项全部完成**（批次 0 全 9、批次 1 全 8、批次 2 全 6（2.1a/2.1b/2.1c/2.2/2.3/2.4/2.5）、批次 3 全 7）*
+*文档版本：v1.4（2026-09-22）| 创建日期：2026-08-26 | 目标版本：v6 版本线内全部完成 | 状态：**32 项全部完成**（批次 0 全 12、批次 1 全 8、批次 2 全 6（2.1a/2.1b/2.1c/2.2/2.3/2.4/2.5）、批次 3 全 7）*
