@@ -109,4 +109,5 @@ export interface GalleryItem {
   description?: string
   title?: string
   media_url?: string
+  thumb_url?: string | null
 }

@@ -13,9 +13,10 @@ import logging
 import os
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 
+from core.gallery_cache import ensure_thumb
 from core.task_manager import TaskManager
-from models.task import StepStatus
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,48 @@ async def gallery(filter: str = "all", status: str = "all"):
             "description": description,
             "title": t.get("creative_name") or t["task_id"],
             "media_url": media_url,
+            # 视频条目附带惰性缩略图端点（首次访问才抽帧，缓存复用）
+            "thumb_url": (
+                None
+                if derived["is_image"]
+                else f"/api/gallery/thumbnail/{t['task_id']}"
+            ),
         })
 
     return {"ok": True, "items": items, "total": len(items)}
+
+
+def _find_task(tm: TaskManager, task_id: str) -> dict | None:
+    """按 task_id 在轻扫描结果中定位任务（task_id 与 dir_name 可能不同）。"""
+    for t in tm.list_tasks():
+        if t.get("task_id") == task_id:
+            return t
+    return None
+
+
+@router.get("/api/gallery/thumbnail/{task_id}")
+def gallery_thumbnail(task_id: str):
+    """惰性返回某视频成片的缩略图（首次访问抽帧缓存，之后直接送缓存文件）。
+
+    纯只读：只向独立缓存目录写缩略图，不写入任务目录、不产生删除副作用。
+    成片不存在 / 抽帧失败时返回 404，前端回退原生首帧。
+    """
+    tm = TaskManager("_")
+    meta = _find_task(tm, task_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    task_tm = TaskManager(task_id, dir_name=meta.get("dir_name"))
+    state = task_tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    final_file = getattr(state, "final_video_file", None)
+    if not final_file or not os.path.isfile(final_file):
+        raise HTTPException(status_code=404, detail="成片不存在")
+    thumb = ensure_thumb(task_id, final_file)
+    if not thumb:
+        raise HTTPException(status_code=404, detail="缩略图生成失败")
+    return FileResponse(
+        thumb,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )

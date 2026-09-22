@@ -70,18 +70,26 @@ onMounted(() => {
         @click="openItem(it.task_id, it.dir_name, it.task_type)"
       >
         <div class="relative aspect-video bg-paper-2 overflow-hidden">
-          <!-- 视频：浏览器原生首帧作为封面，hover 播放 -->
+          <!-- 视频：优先用服务端惰性缩略图作封面；缺失时用原生首帧；hover 播放 -->
+          <img
+            v-if="it.kind === 'video' && it.thumb_url"
+            :src="it.thumb_url"
+            class="absolute inset-0 w-full h-full object-cover transition group-hover:opacity-0"
+            loading="lazy"
+            alt=""
+          />
           <video
             v-if="it.kind === 'video'"
             :src="it.media_url"
-            class="w-full h-full object-cover group-hover:opacity-0 transition"
+            class="absolute inset-0 w-full h-full object-cover transition"
+            :class="it.thumb_url ? 'opacity-0 group-hover:opacity-100' : ''"
             preload="metadata"
             muted
             playsinline
             loop
           ></video>
           <!-- 图片：直链现有端点 -->
-          <img v-else-if="it.kind === 'image'" :src="it.media_url" class="w-full h-full object-cover" loading="lazy" alt="" />
+          <img v-else-if="it.kind === 'image'" :src="it.media_url" class="absolute inset-0 w-full h-full object-cover" loading="lazy" alt="" />
           <span class="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] uppercase bg-ink/70 text-ink-2">
             {{ it.kind }}
           </span>
