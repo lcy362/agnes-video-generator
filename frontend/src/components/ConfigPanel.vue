@@ -36,6 +36,19 @@ const {
   isPaidModel,
   syncModels,
   saveModels,
+  providerName,
+  providerApi,
+  providerBaseUrl,
+  providerApiKey,
+  providerTestModels,
+  providerTestSelected,
+  providerTestBusy,
+  providerSaveStatus,
+  providerErrorMsg,
+  loadTextProviders,
+  saveTextProvider,
+  deleteTextProvider,
+  testTextProvider,
   domainSaveStatus,
   domainErrorMsg,
   saveDomain,
@@ -89,18 +102,19 @@ async function onKeyDomainChange(item: any, domain: string) {
   await saveKeyDomain(item.id, domain)
 }
 
-// 折叠状态（5 个配置面板）
+// 折叠状态（6 个配置面板）
 const collapsed = reactive<Record<string, boolean>>({
   apikey: false,
   model: false,
   domain: false,
   workspace: false,
   privacy: true,
+  provider: false,
 })
 
 function initCollapse() {
   const prefs = getCollapsePrefs()
-  const keys = ['apikey', 'model', 'domain', 'workspace', 'privacy']
+  const keys = ['apikey', 'model', 'domain', 'workspace', 'privacy', 'provider']
   keys.forEach((k) => {
     const manual = prefs[k + '_manual']
     if (manual !== undefined) {
@@ -157,6 +171,95 @@ async function onAddWorkspace() {
   workspaceName.value = ''
 }
 
+// ── 文本模型供应商（v7.0）──
+// 合并文本模型下拉：agnes（modelListCache.text）在前，随后为各自定义供应商模型（带前缀标注）
+function providerDisplayName(p: any): string {
+  return (p && (p.display_name || p.provider)) || p?.provider || ''
+}
+function providerApiLabel(p: any): string {
+  const api = p?.api || ''
+  return api === 'anthropic-messages' ? t('providerApiAnthropic') : api === 'openai-completions' ? t('providerApiOpenai') : api
+}
+// 复合值：`<provider>|<model>`，实现选中值反查归属供应商
+const combinedTextModels = computed(() => {
+  const items: { key: string; provider: string; model: string; label: string }[] = []
+  ;(appState.modelListCache.text || []).forEach((m: string) => {
+    items.push({ key: 'agnes::' + m, provider: 'agnes', model: m, label: modelDisplayLabel(m) })
+  })
+  ;(appState.textProviders || []).forEach((p: any) => {
+    const models = Array.isArray(p.models) ? p.models : []
+    const prefix = providerDisplayName(p) || p.provider
+    models.forEach((m: string) => {
+      items.push({ key: p.provider + '::' + m, provider: p.provider, model: m, label: prefix + ' / ' + m })
+    })
+  })
+  return items
+})
+const textModelComposite = computed<string>({
+  get() {
+    const provider = appState.models.text_provider || 'agnes'
+    return provider + '::' + appState.models.text
+  },
+  set(val: string) {
+    const idx = val.lastIndexOf('::')
+    if (idx < 0) return
+    const provider = val.slice(0, idx)
+    const model = val.slice(idx + 2)
+    appState.models.text = model
+    appState.models.text_provider = provider === 'agnes' ? '' : provider
+    appState.textProviderSelected = provider === 'agnes' ? 'agnes' : provider
+  },
+})
+// 当前所选文本模型的归属供应商（供下拉标题/提示展示）
+const selectedTextProviderName = computed(() => {
+  const p = (appState.textProviders || []).find((x: any) => x.provider === appState.models.text_provider)
+  return p ? (p.display_name || p.provider) : appState.models.text_provider ? appState.models.text_provider : t('providerBuiltinAgnes')
+})
+// 供应商新增表单：拉取候选模型（不落盘）
+async function onFetchProviderModels() {
+  await testTextProvider({
+    base_url: providerBaseUrl.value.trim(),
+    api_key: providerApiKey.value.trim(),
+    api: providerApi.value,
+  })
+}
+// 保存新增供应商（携带所选候选模型）
+async function onSaveProvider() {
+  if (!providerName.value.trim()) {
+    showToast(t('providerNameRequired'), 3500)
+    return
+  }
+  if (!providerBaseUrl.value.trim()) {
+    showToast(t('providerBaseUrlRequired'), 3500)
+    return
+  }
+  if (!providerApiKey.value.trim()) {
+    showToast(t('providerApiKeyRequired'), 3500)
+    return
+  }
+  const models =
+    providerTestSelected.value.length > 0 ? providerTestSelected.value : providerTestModels.value
+  const ok = await saveTextProvider({
+    display_name: providerName.value.trim(),
+    api: providerApi.value,
+    base_url: providerBaseUrl.value.trim(),
+    api_key: providerApiKey.value.trim(),
+    models_json: JSON.stringify(models),
+  })
+  if (ok) {
+    providerName.value = ''
+    providerBaseUrl.value = ''
+    providerApiKey.value = ''
+    providerTestModels.value = []
+    providerTestSelected.value = []
+  }
+}
+// 删除供应商
+async function onDeleteProvider(id: string) {
+  await deleteTextProvider(id)
+}
+
+loadTextProviders()
 initCollapse()
 </script>
 
@@ -291,6 +394,128 @@ initCollapse()
     </div>
   </div>
 
+  <!-- 文本模型供应商（v7.0 可插拔多供应商） -->
+  <div class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
+    <div
+      v-if="collapsed.provider"
+      class="flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-paper-3 transition"
+      role="button"
+      tabindex="0"
+      @click="toggleConfigPanel('provider')"
+    >
+      <div class="flex items-center gap-3">
+        <span class="text-sm">🔌</span>
+        <span class="text-sm text-muted">
+          <span class="text-ink-2 font-medium">{{ t('providerTitle') }}</span>
+          <span class="text-muted mx-2">·</span>
+          <span v-if="appState.textProviders.length > 0" class="text-muted">{{ t('providerCount') }}: {{ appState.textProviders.length }}</span>
+          <span v-else class="text-muted">—</span>
+        </span>
+      </div>
+      <span class="text-muted text-xs">▶</span>
+    </div>
+    <div v-else class="p-6 pt-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-accent">{{ t('providerTitle') }}</h2>
+        <div class="flex items-center gap-2">
+          <span class="text-xs px-2 py-1 rounded-full bg-paper-2 text-muted">{{ t('providerCurrent') }}: {{ selectedTextProviderName }}</span>
+          <button class="text-xs text-muted hover:text-ink-2 transition px-2 py-1 rounded" @click="toggleConfigPanel('provider')">▲</button>
+        </div>
+      </div>
+      <p class="text-xs text-muted mb-4">{{ t('providerHint') }}</p>
+
+      <!-- 供应商列表 -->
+      <div class="space-y-2 mb-4">
+        <div
+          v-for="p in appState.textProviders"
+          :key="p.provider"
+          class="flex items-center justify-between glass-input rounded-lg px-4 py-2.5"
+        >
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <p class="text-sm text-ink font-medium truncate">{{ p.display_name || p.provider }}</p>
+              <span v-if="p.builtin" class="text-[10px] px-1.5 py-0.5 rounded bg-green-900 text-green-300">{{ t('providerBuiltin') }}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-paper-3 text-muted">{{ providerApiLabel(p) }}</span>
+            </div>
+            <p class="text-xs text-muted font-mono truncate mt-0.5">{{ p.base_url || '—' }}</p>
+            <p class="text-xs text-muted font-mono truncate">{{ p.api_key_mask || '' }}</p>
+          </div>
+          <div class="flex items-center gap-2 ml-3">
+            <span v-if="p.provider === (appState.models.text_provider || 'agnes')" class="text-[10px] px-2 py-1 rounded-full bg-blue-900 text-blue-300">{{ t('providerInUse') }}</span>
+            <button
+              v-if="!p.builtin"
+              class="px-3 py-1 bg-red-600/80 hover:bg-red-500 rounded-lg text-xs font-medium transition"
+              @click="onDeleteProvider(p.provider)"
+            >
+              {{ t('delete') }}
+            </button>
+            <span v-else class="text-xs text-muted/50" :title="t('providerBuiltinHint')">•</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 新增供应商表单 -->
+      <div class="rounded-lg bg-paper-3/60 p-4">
+        <p class="text-sm font-medium text-ink-2 mb-3">{{ t('providerAddTitle') }}</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-muted mb-1">{{ t('providerNameLabel') }}</label>
+            <input v-model="providerName" :placeholder="t('providerNamePlaceholder')" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink placeholder-muted" />
+          </div>
+          <div>
+            <label class="block text-xs text-muted mb-1">{{ t('providerApiLabel') }}</label>
+            <select v-model="providerApi" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
+              <option value="openai-completions">{{ t('providerApiOpenai') }}</option>
+              <option value="anthropic-messages">{{ t('providerApiAnthropic') }}</option>
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs text-muted mb-1">{{ t('providerBaseUrlLabel') }}</label>
+            <input v-model="providerBaseUrl" :placeholder="t('providerBaseUrlPlaceholder')" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink placeholder-muted" />
+          </div>
+          <div>
+            <label class="block text-xs text-muted mb-1">{{ t('providerApiKeyLabel') }}</label>
+            <input v-model="providerApiKey" type="password" :placeholder="t('providerApiKeyPlaceholder')" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink placeholder-muted" />
+          </div>
+          <div class="flex items-end">
+            <button
+              class="px-4 py-2.5 bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm font-medium transition whitespace-nowrap"
+              :disabled="providerTestBusy"
+              @click="onFetchProviderModels"
+            >
+              {{ providerTestBusy ? t('providerFetching') : t('providerFetchModels') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 拉取到的候选模型 -->
+        <div v-if="providerTestModels.length > 0" class="mt-3">
+          <p class="text-xs text-muted mb-1.5">{{ t('providerModelListHint') }}</p>
+          <div class="flex flex-wrap gap-2">
+            <label
+              v-for="m in providerTestModels"
+              :key="m"
+              class="flex items-center gap-1.5 glass-input rounded px-2 py-1 text-xs text-ink cursor-pointer"
+            >
+              <input
+                v-model="providerTestSelected"
+                type="checkbox"
+                :value="m"
+                class="accent-green-500 w-3.5 h-3.5 cursor-pointer"
+              />
+              <span class="font-mono">{{ m }}</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex gap-3 mt-4">
+          <button class="px-5 py-2.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition" @click="onSaveProvider">{{ t('save') }}</button>
+          <span v-if="providerSaveStatus === 'ok'" class="self-center text-xs text-green-400">{{ t('providerSaved') }}</span>
+          <span v-if="providerSaveStatus === 'error'" class="self-center text-xs text-red-400">{{ providerErrorMsg }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
   <!-- 模型选择 -->
   <div class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
     <div
@@ -324,10 +549,10 @@ initCollapse()
       <p class="text-xs text-muted mb-4">{{ t('modelHint') }}</p>
       <div class="space-y-3">
         <div>
-          <label class="block text-xs text-muted mb-1">{{ t('modelTextLabel') }}</label>
+          <label class="block text-xs text-muted mb-1">{{ t('modelTextLabel') }}（{{ selectedTextProviderName }}）</label>
           <div class="flex gap-3">
-            <select v-model="appState.models.text" class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
-              <option v-for="m in appState.modelListCache.text" :key="m" :value="m">{{ modelDisplayLabel(m) }}</option>
+            <select v-model="textModelComposite" class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
+              <option v-for="item in combinedTextModels" :key="item.key" :value="item.key">{{ item.label }}</option>
             </select>
             <button class="px-4 py-2.5 bg-paper-3 hover:bg-paper-3 rounded-lg text-sm font-medium transition whitespace-nowrap" @click="syncModels">
               {{ t('modelSync') }}

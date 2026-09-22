@@ -10,6 +10,7 @@ import time as _time
 from typing import List, Optional
 
 from core.api.agnes_chat import AgnesChatAPI
+from core.api.chat_providers import get_or_build_text_chat_client
 
 from .characters import ScreenwriterCharactersMixin
 from .scenes import ScreenwriterScenesMixin
@@ -116,7 +117,7 @@ class Screenwriter(
         self.api_key = api_key
         self.model = model
         self.language = language if language else PROMPT_LANGUAGE  # "zh" 中文 / "en" 英文
-        self.chat_api = AgnesChatAPI(api_key=api_key, model=model)
+        self.chat_api = get_or_build_text_chat_client(api_key=api_key, model=model)
         # 保持旧 headers 供直接引用（兼容）
         self.headers = {
             "Authorization": f"Bearer {api_key}",

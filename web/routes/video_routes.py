@@ -13,7 +13,7 @@ import tempfile
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from core.api.agnes_chat import AgnesChatAPI
+from core.api.chat_providers import get_or_build_text_chat_client
 from core.api.agnes_image import AgnesImageAPI
 from core.artifacts import (
     apply_cascade_plan,
@@ -683,7 +683,7 @@ async def ai_modify_artifact(
     try:
         if category in _TEXT_CATEGORIES:
             raw = await read_text(real_abs_path)
-            chat_api = AgnesChatAPI(api_key=api_key)
+            chat_api = get_or_build_text_chat_client(api_key=api_key)
             if category == "json":
                 parsed = await asyncio.to_thread(
                     chat_api.chat_json,
@@ -701,7 +701,7 @@ async def ai_modify_artifact(
                 )
             diff_summary = _text_diff_summary(raw, new_content)
         elif os.path.splitext(artifact.file_relpath)[1].lower() in _IMAGE_EXTS:
-            chat_api = AgnesChatAPI(api_key=api_key)
+            chat_api = get_or_build_text_chat_client(api_key=api_key)
             edit_prompt = await asyncio.to_thread(
                 chat_api.chat_multimodal,
                 "你是资深图像编辑。基于用户意见，输出一条简洁的中文改写要求，"

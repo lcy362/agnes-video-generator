@@ -65,12 +65,57 @@ export function detectConfigKeyDomains(force = false) {
   if (force) form.append('force', 'true')
   return fetch('/api/config/keys/detect', { method: 'POST', body: form }).then((r) => r.json())
 }
-export function saveModels(models: { text?: string; image?: string; video?: string }) {
+export function saveModels(models: { text?: string; image?: string; video?: string; text_provider?: string }) {
   const form = new FormData()
   if (models.text) form.append('text', models.text)
   if (models.image) form.append('image', models.image)
   if (models.video) form.append('video', models.video)
+  if (models.text_provider) form.append('text_provider', models.text_provider)
   return fetch('/api/config/models', { method: 'POST', body: form })
+}
+// ── 文本模型供应商（v7.0 可插拔多供应商）──
+// 列出供应商（api_key 只回掩码；内置 agnes 标 builtin 不可删）
+export function fetchTextProviders() {
+  return request('/api/config/text-providers')
+}
+// 新增/更新供应商（Form；models_json 为候选模型 JSON 数组）
+export function saveTextProvider(payload: {
+  provider?: string
+  display_name: string
+  api: string
+  base_url: string
+  api_key: string
+  models_json: string
+}) {
+  const form = new FormData()
+  if (payload.provider) form.append('provider', payload.provider)
+  form.append('display_name', payload.display_name)
+  form.append('api', payload.api)
+  form.append('base_url', payload.base_url)
+  form.append('api_key', payload.api_key)
+  form.append('models_json', payload.models_json)
+  return fetch('/api/config/text-providers', { method: 'POST', body: form }).then((r) => r.json())
+}
+// 删除供应商（内置 agnes 返回 400）
+export function deleteTextProvider(id: string) {
+  return fetch('/api/config/text-providers/' + encodeURIComponent(id), { method: 'DELETE' }).then((r) => r.json())
+}
+// 用用户此刻输入的 key+base_url 探测拉模型列表（不落盘）
+export function testTextProvider(payload: { base_url: string; api_key: string; api: string }) {
+  const form = new FormData()
+  form.append('base_url', payload.base_url)
+  form.append('api_key', payload.api_key)
+  form.append('api', payload.api)
+  return fetch('/api/config/text-providers/test', { method: 'POST', body: form }).then((r) => r.json())
+}
+// 将候选模型正式写入该供应商并落盘
+export function syncTextProviderModels(providerId: string, models: string[]) {
+  const form = new FormData()
+  form.append('models_json', JSON.stringify(models))
+  return fetch('/api/config/text-providers/' + encodeURIComponent(providerId) + '/sync', {
+    method: 'POST',
+    body: form,
+  }).then((r) => r.json())
 }
 export function setWatermark(enabled: boolean) {
   const form = new FormData()

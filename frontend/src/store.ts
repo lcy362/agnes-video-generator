@@ -25,8 +25,12 @@ export const appState = reactive({
   workingDirSource: 'config' as string,
   watermarkEnabled: false,
   agnesDomain: 'com' as string,
-  models: { text: '', image: '', video: '' },
+  models: { text: '', image: '', video: '', text_provider: '' },
   modelListCache: { text: [] as string[], image: [] as string[], video: [] as string[] },
+  // v7.0 文本模型供应商（可插拔多供应商）：列表 / 当前所选 / 各供应商候选模型缓存
+  textProviders: [] as any[],
+  textProviderSelected: '' as string, // 当前所选供应商 route key（'' = agnes）
+  providerModelCache: {} as Record<string, string[]>,
   // v6.2：视频模型能力元数据（来自 /api/models video_capabilities）
   videoCapabilities: {} as Record<string, any>,
   // 音色目录
