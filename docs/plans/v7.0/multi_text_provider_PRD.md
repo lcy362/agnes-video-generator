@@ -104,12 +104,12 @@ interface ProviderSpec {
 - `agnes` 内置 route：`api=openai-completions`，`base_url` 由现有 `get_base_url_for_key` 推导（不落盘），`provider=agnes`，不可删、不可改 `api`。
 - `api` 合法值集合即 deepseek-harness 支持的**线协议表**（本 PRD 只启用 `openai-completions` / `anthropic-messages` 两个消费方的子集；`openai-responses` 暂不启用，留作一行扩展——见 §五）。
 
-### 4.2 与 deepseek-harness 的差异：凭据存储
+### 4.2 与 deepseek-harness 的差异：凭据存储（已定稿）
 
-deepseek-harness **配置只携带凭据引用（`apiKeyEnv`），从不存密钥明文**，请求时经 `ctx.credentials` 解析。本 PRD 前序决策（用户已确认）为**密钥落盘**：
+> 决定：**一期凭证落盘**；与 dsh「仅引用(apiKeyEnv)不落盘」的差异、前因后果与后续优化方向，另见 `custom_provider_research_notes.md`（§十二）。
 
-- 为同时满足"完全参考 restructure"与"落盘"两条要求，字段使用 `ProviderSpec` 名，但保留 `api_key` 落盘字段作为本项目实现选择；返回给前端一律掩码。
-- 若未来要严格对齐"仅引用不落盘"，可把 `api_key` 替换为 `api_key_env`（环境变量引用）+ 运行时从 env 解析。**待用户最终定夺（见 §十 Open Questions）**。
+- 一期：`api_key` 落盘 `config.json`（原子写 + 0o600，开发/自部署易用），回传前端一律掩码。
+- 二期（可选优化）：严格对齐 dsh，将 `api_key` 改为 `api_key_env`（环境变量引用）+ 运行时从 env 解析，不落盘。实现细节见参考文档。
 
 ### 4.3 `config.py` 数据类型
 
@@ -175,7 +175,9 @@ deepseek-harness **配置只携带凭据引用（`apiKeyEnv`），从不存密�
 
 ---
 
-## 九、Anthropic 多模态支持分析（二期）
+## 九、Anthropic 多模态支持分析（暂缓，不在本期）
+
+> 决定：**本期不实施 Anthropic 多模态**，此节仅存档后续需求与实现路径，后续再启动。
 
 若需让 Anthropic 文本模型支持图片输入，相对 OpenAI 需要额外做：
 
@@ -205,7 +207,7 @@ deepseek-harness **配置只携带凭据引用（`apiKeyEnv`），从不存密�
 
 ### 9.3 建议
 
-二期排期时优先保障：
+后续启动时优先保障：
 - 本地图片 base64 + webp/png/jpeg 覆盖；
 - 远端 URL 下载折 base64；
 - 失败降级（不阻塞主流程）。
@@ -233,7 +235,7 @@ deepseek-harness **配置只携带凭据引用（`apiKeyEnv`），从不存密�
 
 ## 十二、Open Questions（评审待定）
 
-- **凭据存储最终形态**：落盘 `api_key`（当前选择）vs 参考 deepseek-harness 的 `api_key_env` 引用不落盘（§4.2）。
-- Anthropic 多模态二期排期与本 PRD 关系（见 §九）。
+> 已定稿：凭据一期落盘（§4.2，详见 `custom_provider_research_notes.md`）；Anthropic 多模态本期不做（§九）。
+
 - `openai-responses` 线协议是否一并启用（默认不启用，一行可扩展）。
 - 是否需要暴露供应商级 `max_tokens`/`temperature` 覆盖（默认沿用 4096/0.7）。
