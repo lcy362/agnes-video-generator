@@ -16,7 +16,7 @@ import os
 import uuid
 from datetime import datetime
 
-from core.config import CONFIG_DIR, _PROJECT_ROOT
+from core.config import _PROJECT_ROOT, CONFIG_DIR
 
 logger = logging.getLogger(__name__)
 
