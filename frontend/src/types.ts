@@ -88,3 +88,25 @@ export interface Workspace {
   name?: string
   is_default?: boolean
 }
+
+// ── 风格预设库（P0-1）──
+export interface Preset {
+  id: string
+  category?: string
+  prompt: string
+  name?: string
+  created_at?: string
+  kind?: 'system' | 'user'
+}
+
+// ── 产物画廊（P1，纯只读）──
+export interface GalleryItem {
+  task_id: string
+  dir_name: string
+  task_type: TaskType
+  status: string
+  kind: 'video' | 'image'
+  description?: string
+  title?: string
+  media_url?: string
+}

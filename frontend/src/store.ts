@@ -3,11 +3,11 @@ import type { TaskType, VoiceCatalog, Workspace } from './types'
 
 // 全局应用状态（模块级 reactive，跨组件共享）
 export const appState = reactive({
-  // 顶层视图：创建 / 任务列表 / 简易模式 / 任务进度页
-  view: 'create' as 'create' | 'list' | 'simple' | 'progress',
+  // 顶层视图：创建 / 任务列表 / 产物画廊 / 简易模式 / 任务进度页
+  view: 'create' as 'create' | 'list' | 'simple' | 'gallery' | 'progress',
   // 进度页当前任务（首次执行与任务列表进入复用同一页面）
   progressTaskId: null as string | null,
-  progressOrigin: 'create' as 'create' | 'list',
+  progressOrigin: 'create' as 'create' | 'list' | 'gallery',
   // 任务类型 tab
   currentTaskType: 'creative' as TaskType | string,
   // 运行中任务

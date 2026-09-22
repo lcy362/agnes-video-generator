@@ -1,0 +1,72 @@
+[
+  {
+    "id": "cinematic_realism",
+    "category": "cinematic",
+    "prompt": "cinematic lighting, shallow depth of field, 35mm film grain, realistic color grade, natural texture detail"
+  },
+  {
+    "id": "film_noir",
+    "category": "cinematic",
+    "prompt": "high-contrast black and white, dramatic side lighting, deep shadows, film noir mood, grainy texture"
+  },
+  {
+    "id": "minimalist_clean",
+    "category": "cinematic",
+    "prompt": "minimalist composition, generous negative space, clean geometry, soft neutral palette, studio lighting"
+  },
+  {
+    "id": "warm_afternoon",
+    "category": "realistic",
+    "prompt": "golden hour warm sunlight, soft long shadows, natural skin texture, warm saturated tones, realistic detail"
+  },
+  {
+    "id": "documentary",
+    "category": "realistic",
+    "prompt": "documentary naturalism, candid framing, realistic lighting, subdued color grade, authentic details"
+  },
+  {
+    "id": "ink_wash",
+    "category": "oriental",
+    "prompt": "traditional Chinese ink wash painting, rice paper texture, flowing brushstrokes, sparse composition, muted tones"
+  },
+  {
+    "id": "wuxia_epic",
+    "category": "oriental",
+    "prompt": "Chinese martial arts movie style, dramatic rim lighting, flowing silk robes, epic heroic composition"
+  },
+  {
+    "id": "watercolor",
+    "category": "painting",
+    "prompt": "soft watercolor painting, light washes, visible paper grain, delicate color blending, dreamy atmosphere"
+  },
+  {
+    "id": "oil_painting",
+    "category": "painting",
+    "prompt": "classic oil painting, rich painterly palette, visible brushstrokes, museum quality, textured canvas"
+  },
+  {
+    "id": "anime_style",
+    "category": "animation",
+    "prompt": "clean anime illustration, vibrant colors, cel shading, detailed expressive eyes, studio quality"
+  },
+  {
+    "id": "children_storybook",
+    "category": "animation",
+    "prompt": "children's storybook illustration, soft friendly shapes, cheerful pastel colors, whimsical detail"
+  },
+  {
+    "id": "pixel_art",
+    "category": "animation",
+    "prompt": "16-bit pixel art, retro game aesthetic, limited color palette, crisp blocky pixels, nostalgic vibe"
+  },
+  {
+    "id": "cyberpunk_neon",
+    "category": "fantasy",
+    "prompt": "neon cyberpunk, futuristic city, holographic glow, wet reflective surfaces, high contrast, night scene"
+  },
+  {
+    "id": "dreamscape",
+    "category": "fantasy",
+    "prompt": "surreal dreamlike scene, ethereal glow, soft focus, pastel tones, floating elements, otherworldly mood"
+  }
+]

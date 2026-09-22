@@ -7,6 +7,7 @@ import { useTaskSubmit, collectAudioSubtitleFields } from '@/composables/useTask
 import { useDraft } from '@/composables/useDraft'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
+import PresetPicker from '@/components/presets/PresetPicker.vue'
 
 const { voiceSelections } = useVoice()
 const { submitting, runSubmit } = useTaskSubmit()
@@ -21,7 +22,7 @@ const form = reactive({
   uniform: true,
   uniformDuration: 5,
   independentDurations: [] as number[],
-  style: '电影质感写实风格',
+  style: '',
   chaining: 'keyframes',
   resolution: '768x1152',
   refImage: null as File | null,
@@ -237,7 +238,10 @@ async function submitCreative() {
 
       <div class="mb-4">
         <label class="block text-sm text-muted mb-1.5">{{ t('visualStyle') }}</label>
-        <input v-model="form.style" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted" />
+        <div class="flex items-center gap-2">
+          <input v-model="form.style" class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted" />
+          <PresetPicker v-model="form.style" />
+        </div>
       </div>
     </div>
 
