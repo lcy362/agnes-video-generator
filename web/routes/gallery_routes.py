@@ -131,37 +131,35 @@ async def gallery(filter: str = "all", status: str = "all"):
     return {"ok": True, "items": items, "total": len(items)}
 
 
-def _find_task(tm: TaskManager, task_id: str) -> dict | None:
-    """按 task_id 在轻扫描结果中定位任务（task_id 与 dir_name 可能不同）。"""
-    for t in tm.list_tasks():
-        if t.get("task_id") == task_id:
-            return t
-    return None
-
-
 @router.get("/api/gallery/thumbnail/{task_id}")
 def gallery_thumbnail(task_id: str):
     """惰性返回某视频成片的缩略图（首次访问抽帧缓存，之后直接送缓存文件）。
 
     纯只读：只向独立缓存目录写缩略图，不写入任务目录、不产生删除副作用。
     成片不存在 / 抽帧失败时返回 404，前端回退原生首帧。
+
+    安全：``task_id`` 是不可信输入（URL 路径参数）。这里**只把它用于与工作区
+    扫描结果做相等比较**，随后的任务目录、成片路径、缓存文件名一律取自扫描
+    得到的可信标识（磁盘数据），从数据流上切断「用户输入 → 文件路径」链路，
+    杜绝路径穿越与命令参数注入。
     """
     tm = TaskManager("_")
-    meta = _find_task(tm, task_id)
-    if not meta:
-        raise HTTPException(status_code=404, detail="任务不存在")
-    task_tm = TaskManager(task_id, dir_name=meta.get("dir_name"))
-    state = task_tm.load()
-    if not state:
-        raise HTTPException(status_code=404, detail="任务不存在")
-    final_file = getattr(state, "final_video_file", None)
-    if not final_file or not os.path.isfile(final_file):
-        raise HTTPException(status_code=404, detail="成片不存在")
-    thumb = ensure_thumb(task_id, final_file)
-    if not thumb:
-        raise HTTPException(status_code=404, detail="缩略图生成失败")
-    return FileResponse(
-        thumb,
-        media_type="image/jpeg",
-        headers={"Cache-Control": "public, max-age=31536000, immutable"},
-    )
+    for meta in tm.list_tasks():
+        if meta.get("task_id") != task_id:
+            continue
+        task_tm = TaskManager(meta["task_id"], dir_name=meta.get("dir_name"))
+        state = task_tm.load()
+        if not state:
+            break
+        final_file = getattr(state, "final_video_file", None)
+        if not final_file or not os.path.isfile(final_file):
+            raise HTTPException(status_code=404, detail="成片不存在")
+        thumb = ensure_thumb(meta["task_id"], final_file)
+        if not thumb:
+            raise HTTPException(status_code=404, detail="缩略图生成失败")
+        return FileResponse(
+            thumb,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        )
+    raise HTTPException(status_code=404, detail="任务不存在")
