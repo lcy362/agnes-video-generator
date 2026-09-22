@@ -31,8 +31,10 @@ from web import app_state  # noqa: F401 兼容 re-export：旧代码 from server
 from web.app_state import init_runtime_state
 from web.routes import (
     config_routes,
+    gallery_routes,
     health_routes,
     image_routes,
+    preset_routes,
     preview_routes,
     task_creation_routes,
     task_routes,
@@ -204,9 +206,11 @@ app.include_router(health_routes.router)
 app.include_router(config_routes.router)
 app.include_router(workspace_routes.router)
 app.include_router(voice_routes.router)
+app.include_router(preset_routes.router)
 app.include_router(image_routes.router)
 app.include_router(video_routes.router)
 app.include_router(task_routes.router)
+app.include_router(gallery_routes.router)
 app.include_router(task_creation_routes.router)
 app.include_router(preview_routes.router)
 

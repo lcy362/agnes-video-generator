@@ -1,0 +1,92 @@
+[
+  {
+    "id": "docu_real",
+    "category": "photographic",
+    "prompt": "documentary photography, natural available light, authentic candid framing, photojournalistic realism, subdued natural color grade, fine film grain"
+  },
+  {
+    "id": "golden_hour",
+    "category": "photographic",
+    "prompt": "golden hour photography, warm low-angle sunlight, long soft shadows, warm color temperature, subtle lens flare, realistic texture, nostalgic feel"
+  },
+  {
+    "id": "studio_portrait",
+    "category": "photographic",
+    "prompt": "professional studio portrait, three-point soft lighting, clean gradient background, catchlight in eyes, sharp focus, 85mm shallow depth of field, smooth natural skin"
+  },
+  {
+    "id": "blockbuster",
+    "category": "cinematic",
+    "prompt": "epic cinematic look, anamorphic lens flare, shallow depth of field, dramatic lighting, teal-and-orange color grading, high contrast, Hollywood blockbuster feel"
+  },
+  {
+    "id": "film_noir",
+    "category": "cinematic",
+    "prompt": "film noir, high-contrast black and white, deep shadows, dramatic harsh lighting, venetian blind patterns, moody 1940s atmosphere, film grain"
+  },
+  {
+    "id": "moody_drama",
+    "category": "cinematic",
+    "prompt": "moody dramatic cinematic, low-key lighting, volumetric atmosphere, desaturated muted palette, intimate film aesthetics, shallow depth of field"
+  },
+  {
+    "id": "ink_wash",
+    "category": "oriental",
+    "prompt": "traditional Chinese ink wash painting, rice paper texture, flowing brushstrokes, sparse composition, muted ink tones, elegant minimalism"
+  },
+  {
+    "id": "wuxia",
+    "category": "oriental",
+    "prompt": "Chinese sword-fantasy cinema style, dramatic rim lighting, flowing silk robes, ethereal mist, epic heroic composition, cinematic color grade"
+  },
+  {
+    "id": "guofeng",
+    "category": "oriental",
+    "prompt": "refined Chinese classical art style, delicate intricate detail, elegant muted palette, balanced negative space, graceful cultural aesthetic"
+  },
+  {
+    "id": "watercolor",
+    "category": "painting",
+    "prompt": "soft watercolor painting, delicate washes, visible paper grain, fluid color blending, dreamy atmospheric mood, painterly texture"
+  },
+  {
+    "id": "oil_classic",
+    "category": "painting",
+    "prompt": "classic oil painting, rich impasto brushstrokes, warm museum lighting, textured canvas, fine art masterpiece quality"
+  },
+  {
+    "id": "storybook",
+    "category": "painting",
+    "prompt": "children's storybook illustration, hand-painted gouache, soft friendly shapes, cheerful pastel colors, whimsical detail, matte finish"
+  },
+  {
+    "id": "anime_vivid",
+    "category": "animation",
+    "prompt": "modern anime illustration, clean lineart, vibrant colors, cel shading, detailed expressive eyes, studio quality, high-key flat lighting, flat shading"
+  },
+  {
+    "id": "anime_retro",
+    "category": "animation",
+    "prompt": "retro anime aesthetic, 1980s hand-painted gouache backgrounds, cel-shaded characters, matte finish, nostalgic warm palette, flat shading"
+  },
+  {
+    "id": "pixel_art",
+    "category": "animation",
+    "prompt": "16-bit pixel art, retro game aesthetic, limited color palette, crisp blocky pixels, nostalgic mood, clean grid composition"
+  },
+  {
+    "id": "cyberpunk",
+    "category": "fantasy",
+    "prompt": "neon cyberpunk, futuristic cityscape, holographic glow, wet reflective surfaces, high contrast, night scene, anamorphic lens flare"
+  },
+  {
+    "id": "dreamscape",
+    "category": "fantasy",
+    "prompt": "surreal dreamlike scene, ethereal soft glow, soft focus, pastel tones, floating elements, otherworldly atmosphere"
+  },
+  {
+    "id": "epic_fantasy",
+    "category": "fantasy",
+    "prompt": "epic high-fantasy concept art, dramatic volumetric lighting, vast scale, rich detailed environment, cinematic color grade, awe-inspiring composition"
+  }
+]

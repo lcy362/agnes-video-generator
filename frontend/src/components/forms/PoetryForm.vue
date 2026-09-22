@@ -8,6 +8,7 @@ import { copyText } from '@/utils/clipboard'
 import * as api from '@/api'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
+import PresetPicker from '@/components/presets/PresetPicker.vue'
 
 const { voiceSelections } = useVoice()
 const { submitting, runSubmit } = useTaskSubmit()
@@ -22,7 +23,7 @@ const form = reactive({
   uniformDuration: 5,
   independentDurations: [] as number[],
   scenePrompts: '',
-  style: '电影质感写实风格',
+  style: '',
   resolution: '768x1152',
 })
 
@@ -211,7 +212,10 @@ async function submitPoetry() {
 
       <div class="mb-4">
         <label class="block text-sm text-muted mb-1.5">{{ t('visualStyle') }}</label>
-        <input v-model="form.style" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted" />
+        <div class="flex items-center gap-2">
+          <input v-model="form.style" class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted" />
+          <PresetPicker v-model="form.style" />
+        </div>
       </div>
     </div>
 

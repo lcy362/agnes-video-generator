@@ -8,11 +8,13 @@ import { useVoice } from '@/composables/useVoice'
 import { useTasks } from '@/composables/useTasks'
 import { useProgress } from '@/composables/useProgress'
 import { useNavigation } from '@/composables/useNavigation'
+import { useGallery } from '@/composables/useGallery'
 import { appState } from '@/store'
 import ConfigPanel from '@/components/ConfigPanel.vue'
 import CreatePanel from '@/components/CreatePanel.vue'
 import SimplePanel from '@/components/SimplePanel.vue'
 import TaskListPanel from '@/components/TaskListPanel.vue'
+import GalleryPanel from '@/components/GalleryPanel.vue'
 import ProgressPage from '@/components/ProgressPage.vue'
 import VoicePickerModal from '@/components/VoicePickerModal.vue'
 import Toast from '@/components/Toast.vue'
@@ -25,15 +27,21 @@ const { loadModels, renderWorkspaces } = useConfig()
 const { initVoiceSelector } = useVoice()
 const { loadTaskList, startTaskListTimer, stopTaskListTimer } = useTasks()
 const { parseHash } = useNavigation()
+const { loadGallery, startGalleryTimer, stopGalleryTimer } = useGallery()
 
-function switchMainTab(tab: 'create' | 'list' | 'simple') {
+function switchMainTab(tab: 'create' | 'list' | 'simple' | 'gallery') {
   appState.view = tab
-  location.hash = tab === 'list' ? '#/list' : tab === 'simple' ? '#/simple' : '#/create'
+  location.hash =
+    tab === 'list' ? '#/list' : tab === 'simple' ? '#/simple' : tab === 'gallery' ? '#/gallery' : '#/create'
   if (tab === 'list') {
     loadTaskList()
     startTaskListTimer()
+  } else if (tab === 'gallery') {
+    loadGallery()
+    startGalleryTimer()
   } else {
     stopTaskListTimer()
+    stopGalleryTimer()
   }
 }
 
@@ -49,6 +57,10 @@ onMounted(async () => {
     // 其余恢复逻辑由 ProgressPage 挂载时统一处理
   } else {
     appState.view = parsed.view
+    if (parsed.view === 'gallery') {
+      loadGallery()
+      startGalleryTimer()
+    }
   }
 
   try {
@@ -185,6 +197,13 @@ async function autoReconnectRunningTask() {
         </button>
         <button
           class="px-5 py-2.5 rounded-lg text-sm font-medium transition"
+          :class="appState.view === 'gallery' ? 'tab-active' : 'tab-inactive'"
+          @click="switchMainTab('gallery')"
+        >
+          {{ t('tabGallery') }}
+        </button>
+        <button
+          class="px-5 py-2.5 rounded-lg text-sm font-medium transition"
           :class="appState.view === 'simple' ? 'tab-active' : 'tab-inactive'"
           @click="switchMainTab('simple')"
         >
@@ -205,6 +224,11 @@ async function autoReconnectRunningTask() {
       <!-- List Panel -->
       <div v-show="appState.view === 'list'">
         <TaskListPanel />
+      </div>
+
+      <!-- Gallery Panel (P1, 只读) -->
+      <div v-show="appState.view === 'gallery'">
+        <GalleryPanel />
       </div>
 
       <!-- Footer -->

@@ -1,5 +1,6 @@
 // 统一 API 封装：与后端 21 个端点一一对应
 // 任务提交类用 FormData（含文件上传），其余用 JSON
+import type { GalleryItem, Preset } from '@/types'
 
 async function request<T = any>(url: string, options?: RequestInit): Promise<T> {
   const r = await fetch(url, options)
@@ -131,6 +132,29 @@ export function deleteTask(taskId: string) {
 // ── v6.1 问题反馈：任务诊断（二期）──
 export function getTaskDiagnostics(taskId: string) {
   return request('/api/tasks/' + taskId + '/diagnostics')
+}
+
+// ── 产物画廊（P1，纯只读）──
+export function getGallery(params?: { filter?: string; status?: string }) {
+  const qs = new URLSearchParams()
+  if (params?.filter) qs.set('filter', params.filter)
+  if (params?.status) qs.set('status', params.status)
+  const url = '/api/gallery' + (qs.toString() ? '?' + qs.toString() : '')
+  return request<{ ok: boolean; items: GalleryItem[]; total: number }>(url)
+}
+
+// ── 风格预设库（P0-1）──
+export function getPresets() {
+  return request<{ ok: boolean; system: Preset[]; user: Preset[] }>('/api/presets')
+}
+export function savePreset(name: string, prompt: string) {
+  const form = new FormData()
+  form.append('name', name)
+  form.append('prompt', prompt)
+  return fetch('/api/presets', { method: 'POST', body: form }).then((r) => r.json())
+}
+export function deletePreset(id: string) {
+  return fetch('/api/presets/' + encodeURIComponent(id), { method: 'DELETE' }).then((r) => r.json())
 }
 
 // ── 产物 ──
