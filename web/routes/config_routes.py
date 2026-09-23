@@ -653,6 +653,16 @@ async def save_text_provider_endpoint(
     if not base_url:
         raise HTTPException(status_code=422, detail="base_url 不能为空")
 
+    # 编辑场景：列表只回掩码，前端不会有明文 key。若本次未提供新 key（空），
+    # 则保留已存储的 key，避免把自定义供应商的凭据误清空。
+    if not api_key:
+        existing_raw = [
+            item for item in (load_config().get("text_providers", []) or [])
+            if isinstance(item, dict) and item.get("provider") == provider
+        ]
+        if existing_raw and existing_raw[0].get("api_key"):
+            api_key = existing_raw[0].get("api_key") or ""
+
     models = []
     if models_json and models_json.strip():
         try:
