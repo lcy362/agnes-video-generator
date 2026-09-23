@@ -698,5 +698,9 @@
   "presetName_anime_vivid": "Vivid Anime",
   "presetName_anime_retro": "Retro Anime",
   "presetName_cyberpunk": "Cyberpunk",
-  "presetName_epic_fantasy": "Epic Fantasy"
+  "presetName_epic_fantasy": "Epic Fantasy",
+  "modelAdd": "모델 추가",
+  "modelInputHint": "직접 입력하거나 «모델 가져오기»를 클릭해 목록에 추가할 수 있으며 저장 시 중복이 제거됩니다",
+  "modelInputPlaceholder": "모델 ID 입력…",
+  "modelListLabel": "모델 목록"
 }

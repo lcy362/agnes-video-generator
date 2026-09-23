@@ -698,5 +698,9 @@
   "presetName_anime_vivid": "Vivid Anime",
   "presetName_anime_retro": "Retro Anime",
   "presetName_cyberpunk": "Cyberpunk",
-  "presetName_epic_fantasy": "Epic Fantasy"
+  "presetName_epic_fantasy": "Epic Fantasy",
+  "modelAdd": "افزودن مدل",
+  "modelInputHint": "میتوانید مستقیم تایپ کنید یا با کلیک روی «دریافت مدلها» به فهرست اضافه کنید؛ هنگام ذخیره تکراریها حذف میشوند",
+  "modelInputPlaceholder": "شناسه مدل را وارد کنید…",
+  "modelListLabel": "فهرست مدلها"
 }

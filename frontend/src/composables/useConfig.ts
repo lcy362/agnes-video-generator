@@ -248,9 +248,7 @@ const providerName = ref('')
 const providerApi = ref('openai-completions')
 const providerBaseUrl = ref('')
 const providerApiKey = ref('')
-// 拉取到的候选模型（不落盘，仅预览）
-const providerTestModels = ref<string[]>([])
-const providerTestSelected = ref<string[]>([])
+// 拉取模型探测进行中（按钮禁用/文案）
 const providerTestBusy = ref(false)
 const providerSaveStatus = ref<'idle' | 'ok' | 'error'>('idle')
 const providerErrorMsg = ref('')
@@ -334,15 +332,11 @@ async function testTextProvider(payload: {
   api: string
   provider?: string
 }): Promise<string[]> {
-  providerTestModels.value = []
-  providerTestSelected.value = []
   providerTestBusy.value = true
   try {
     const d = await api.testTextProvider(payload)
     if (d && d.ok) {
       const list: string[] = d.models || []
-      providerTestModels.value = list
-      providerTestSelected.value = list.slice()
       showToast(t('providerModelFetched') + ': ' + list.length, 3000)
       return list
     }
@@ -496,8 +490,6 @@ export function useConfig() {
     providerApi,
     providerBaseUrl,
     providerApiKey,
-    providerTestModels,
-    providerTestSelected,
     providerTestBusy,
     providerSaveStatus,
     providerErrorMsg,

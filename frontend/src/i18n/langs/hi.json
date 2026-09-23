@@ -698,5 +698,9 @@
   "presetName_anime_vivid": "Vivid Anime",
   "presetName_anime_retro": "Retro Anime",
   "presetName_cyberpunk": "Cyberpunk",
-  "presetName_epic_fantasy": "Epic Fantasy"
+  "presetName_epic_fantasy": "Epic Fantasy",
+  "modelAdd": "मॉडल जोड़ें",
+  "modelInputHint": "सीधे टाइप करें या «मॉडल लाएँ» पर क्लिक करके सूची में जोड़ें; सेव करते समय डुप्लिकेट हट जाते हैं",
+  "modelInputPlaceholder": "मॉडल आईडी दर्ज करें…",
+  "modelListLabel": "मॉडल सूची"
 }

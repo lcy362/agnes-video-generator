@@ -41,8 +41,6 @@ const {
   providerApi,
   providerBaseUrl,
   providerApiKey,
-  providerTestModels,
-  providerTestSelected,
   providerTestBusy,
   providerSaveStatus,
   providerErrorMsg,
@@ -248,7 +246,8 @@ async function onFetchProviderModels() {
   // 编辑已配好 key 的供应商时，表单 api_key 可能为空（key 在其他会话存），
   // 传 provider 让后端回退用该供应商已存明文 key 探测，避免掩码/空 key 致 401。
   if (editingProviderId) payload.provider = editingProviderId
-  await testTextProvider(payload)
+  const models = await testTextProvider(payload)
+  models.forEach((m) => addModelItem(m))
 }
 // 由展示名生成唯一 route key（slug）；全非 ASCII（如中文名）时兜底时间戳
 function slugifyProvider(s: string): string {
@@ -273,11 +272,10 @@ async function onSaveProvider() {
     showToast(t('providerApiKeyRequired'), 3500)
     return
   }
-  const picked =
-    providerTestSelected.value.length > 0 ? providerTestSelected.value : providerTestModels.value
-  const manual = parseManualModels(manualModelsText.value)
-  // 合并拉取候选 + 手动填写模型，去重（候选在前、手动在后）
-  const models = Array.from(new Set([...picked, ...manual]))
+  const models = modelItems.value
+    .map((m) => m.trim())
+    .filter(Boolean)
+    .filter((m, i, arr) => arr.indexOf(m) === i)
   const provider = isEditCustom.value && editingProvider.value
     ? editingProvider.value
     : slugifyProvider(providerName.value.trim())
@@ -307,14 +305,20 @@ const editingProvider = ref<null | string>(null) // null=新增 | 'agnes'=编辑
 const lastKnownProviderKeys: Record<string, string> = {}
 const showProviderModal = ref(false)
 const { containerRef: providerModalRef } = useModalA11y(showProviderModal, () => (showProviderModal.value = false))
-// 手动填写模型（新增能力：逗号 / 换行分隔；保存时与拉取候选合并去重）
-const manualModelsText = ref('')
-// 将手动填写文本拆为去空模型 id 列表
-function parseManualModels(text: string): string[] {
-  return (text || '')
-    .split(/[\n,，,]/)
-    .map((s) => s.trim())
-    .filter(Boolean)
+// 可增删的模型列表（拉取并入 + 手动添加，唯一去重）
+const modelItems = ref<string[]>([])
+const modelInput = ref('')
+function addModelItem(value: string) {
+  const m = (value || '').trim()
+  if (!m) return
+  if (!modelItems.value.includes(m)) modelItems.value.push(m)
+}
+function onAddModel() {
+  addModelItem(modelInput.value)
+  modelInput.value = ''
+}
+function removeModelItem(idx: number) {
+  modelItems.value.splice(idx, 1)
 }
 
 function resetProviderForm() {
@@ -322,9 +326,8 @@ function resetProviderForm() {
   providerApi.value = 'openai-completions'
   providerBaseUrl.value = ''
   providerApiKey.value = ''
-  providerTestModels.value = []
-  providerTestSelected.value = []
-  manualModelsText.value = ''
+  modelItems.value = []
+  modelInput.value = ''
   providerSaveStatus.value = 'idle'
 }
 // 模型分节「添加供应商」：新增模式
@@ -345,10 +348,11 @@ function openEditProvider(p: any) {
   providerApi.value = p.api || 'openai-completions'
   providerBaseUrl.value = p.base_url || ''
   providerApiKey.value = lastKnownProviderKeys[p.provider] || ''
-  // 编辑：已有 models 预填进手动填写框，拉取候选清空，便于在此基础调整
-  providerTestModels.value = []
-  providerTestSelected.value = []
-  manualModelsText.value = (p.models && p.models.length ? p.models : []).join('\n')
+  // 编辑：已有 models 预填进列表，便于在此基础增删调整
+  modelItems.value = Array.from(
+    new Set((p.models && Array.isArray(p.models) ? p.models : []).map((m: string) => m.trim()).filter(Boolean)),
+  )
+  modelInput.value = ''
   showProviderModal.value = true
 }
 
@@ -561,26 +565,23 @@ initCollapse()
             </div>
           </div>
 
-          <!-- 候选模型：新增拉取预览 / 编辑既有 models -->
-          <div v-if="providerTestModels.length > 0" class="mt-3">
-            <p class="text-xs text-muted mb-1.5">{{ t('providerModelListHint') }}</p>
-            <div class="flex flex-wrap gap-2">
-              <label v-for="m in providerTestModels" :key="m" class="flex items-center gap-1.5 glass-input rounded px-2 py-1 text-xs text-ink cursor-pointer">
-                <input v-model="providerTestSelected" type="checkbox" :value="m" class="accent-green-500 w-3.5 h-3.5 cursor-pointer" />
-                <span class="font-mono">{{ m }}</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- 手动填写模型（分流：可拉取亦可直接键入，保存时合并） -->
+          <!-- 模型列表：可增删（拉取并入 + 手动添加），唯一去重 -->
           <div class="mt-3">
-            <label class="block text-xs text-muted mb-1">{{ t('providerManualModelsLabel') }}</label>
-            <textarea
-              v-model="manualModelsText"
-              rows="3"
-              :placeholder="t('providerManualModelsPlaceholder')"
-              class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink placeholder-muted resize-y font-mono"
-            ></textarea>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs text-muted">{{ t('modelListLabel') }}</label>
+              <span v-if="modelItems.length === 0" class="text-xs text-muted">{{ t('providerNoModels') }}</span>
+            </div>
+            <div v-if="modelItems.length > 0" class="space-y-1.5 mb-2">
+              <div v-for="(m, idx) in modelItems" :key="m + idx" class="flex items-center gap-2 glass-input rounded-lg px-3 py-1.5">
+                <span class="flex-1 min-w-0 font-mono text-xs text-ink truncate">{{ m }}</span>
+                <button class="text-red-300 hover:text-red-200 transition text-xs" :aria-label="t('delete')" @click="removeModelItem(idx)">✕</button>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <input v-model="modelInput" class="flex-1 glass-input rounded-lg px-3 py-2 text-sm text-ink placeholder-muted font-mono" :placeholder="t('modelInputPlaceholder')" @keyup.enter.prevent="onAddModel()" />
+              <button class="px-3 py-2 bg-blue-600/80 hover:bg-blue-500 rounded-lg text-sm font-medium transition whitespace-nowrap" @click="onAddModel()">{{ t('modelAdd') }}</button>
+            </div>
+            <p class="text-[10px] text-muted mt-1">{{ t('modelInputHint') }}</p>
           </div>
 
           <div class="flex items-center gap-3 justify-end mt-6">

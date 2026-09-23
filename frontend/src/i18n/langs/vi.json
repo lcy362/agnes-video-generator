@@ -698,5 +698,9 @@
   "presetName_anime_vivid": "Vivid Anime",
   "presetName_anime_retro": "Retro Anime",
   "presetName_cyberpunk": "Cyberpunk",
-  "presetName_epic_fantasy": "Epic Fantasy"
+  "presetName_epic_fantasy": "Epic Fantasy",
+  "modelAdd": "Thêm mô hình",
+  "modelInputHint": "Nhập trực tiếp hoặc bấm «Lấy mô hình» để thêm vào danh sách; loại bỏ trùng lặp khi lưu",
+  "modelInputPlaceholder": "Nhập ID mô hình…",
+  "modelListLabel": "Danh sách mô hình"
 }

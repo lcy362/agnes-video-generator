@@ -698,5 +698,9 @@
   "presetName_anime_vivid": "Vivid Anime",
   "presetName_anime_retro": "Retro Anime",
   "presetName_cyberpunk": "Cyberpunk",
-  "presetName_epic_fantasy": "Epic Fantasy"
+  "presetName_epic_fantasy": "Epic Fantasy",
+  "modelAdd": "Model toevoegen",
+  "modelInputHint": "Typ direct of klik op «Modellen ophalen» om ze aan de lijst toe te voegen; gedupliceerd bij opslaan",
+  "modelInputPlaceholder": "Voer een model-ID in…",
+  "modelListLabel": "Modellijst"
 }

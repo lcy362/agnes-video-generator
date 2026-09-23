@@ -698,5 +698,9 @@
   "presetName_anime_vivid": "Vivid Anime",
   "presetName_anime_retro": "Retro Anime",
   "presetName_cyberpunk": "Cyberpunk",
-  "presetName_epic_fantasy": "Epic Fantasy"
+  "presetName_epic_fantasy": "Epic Fantasy",
+  "modelAdd": "إضافة نموذج",
+  "modelInputHint": "يمكنك الإدخال مباشرة أو النقر على «جلب النماذج» لإضافتها تلقائيًا؛ إزالة التكرار عند الحفظ",
+  "modelInputPlaceholder": "أدخل معرف النموذج…",
+  "modelListLabel": "قائمة النماذج"
 }
