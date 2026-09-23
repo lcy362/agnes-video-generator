@@ -67,6 +67,7 @@
   "providerManageTitle": "Providerbeheer",
   "providerManageHint": "Beheer tekstproviders. Klik op «Bewerken» om te configureren; ingebouwde Agnes is vast.",
   "providerIntroTitle": "Over externe providers",
+  "providerIntroGuide": "📖 Handleiding: gratis API-sleutels verkrijgen en instellen",
   "providerIntroFree": "Je kunt nu gratis modellen van andere providers koppelen (betaalde modellen werken ook, maar zijn niet nodig).",
   "providerIntroText": "Voor tekstmodellen adviseren we momenteel AMD Radeon Cloud (de officiële gratis model-API van AMD).",
   "providerIntroAmdEntry": "Toegang: log in bij Token Factory → Public Free Model APIs om een sleutel te krijgen (telefoon / e-mail / GitHub volstaat, geen creditcard).",

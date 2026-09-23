@@ -68,6 +68,7 @@
   "providerManageTitle": "إدارة المزوّدين",
   "providerManageHint": "إدارة مزوّدي توليد النصوص. انقر «تحرير» لتهيئة المزوّد؛ Agnes المدمج ثابت ولا يمكن حذفه.",
   "providerIntroTitle": "حول المزوّدين الخارجيين",
+  "providerIntroGuide": "📖 دليل الحصول على مفاتيح API المجانية وإعدادها",
   "providerIntroFree": "أصبح بإمكانك الآن ربط نماذج مجانية من مزوّدين آخرين (النماذج المدفوعة تعمل أيضًا، لكنها غير ضرورية).",
   "providerIntroText": "للنماذج النصية نوصي حاليًا بـ AMD Radeon Cloud (واجهة النماذج المجانية الرسمية من AMD).",
   "providerIntroAmdEntry": "الوصول: سجّل الدخول إلى Token Factory ثم Public Free Model APIs للحصول على المفتاح (يكفي الهاتف / البريد / GitHub، دون بطاقة).",

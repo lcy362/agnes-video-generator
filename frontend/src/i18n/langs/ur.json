@@ -68,6 +68,7 @@
   "providerManageTitle": "فراہم کنندگان کا انتظام",
   "providerManageHint": "متن فراہم کنندگان کا انتظام کریں۔ ترتیب کے لیے «تدوین» پر کلک کریں؛ بلٹ ان Agnes مقرر ہے۔",
   "providerIntroTitle": "دیگر فراہم کنندگان کے بارے میں",
+  "providerIntroGuide": "📖 مفت API کیز حاصل کرنے اور ترتیب دینے کی رہنمائی",
   "providerIntroFree": "اب آپ دوسرے فراہم کنندگان کے مفت ماڈلز بھی شامل کر سکتے ہیں (ادائیگی والے ماڈلز بھی کام کرتے ہیں، مگر ضرورت نہیں)۔",
   "providerIntroText": "متن کے ماڈلز کے لیے اس وقت AMD Radeon Cloud تجویز کیا جاتا ہے (AMD کی سرکاری مفت ماڈل API)۔",
   "providerIntroAmdEntry": "رسائی: Token Factory میں لاگ اِن کر کے Public Free Model APIs سے کلید حاصل کریں (فون / ای میل / GitHub کافی ہے، کارڈ درکار نہیں)۔",

@@ -31,6 +31,8 @@ const ISSUE_BODY_MAX_RAW = 4000
 
 export const GITHUB_REPO = 'https://github.com/lcy362/agnes-video-generator'
 export const FAQ_URL = 'https://video.lichuanyang.top/faq'
+// 官网「免费 Token / 供应商配置」图文教程（第三方供应商介绍处导流）
+export const FREE_TOKENS_GUIDE_URL = 'https://video.lichuanyang.top/guides/free-tokens'
 
 // ── 重试计数（localStorage 持久化） ──
 

@@ -8,7 +8,7 @@ import { useGa } from '@/composables/useGa'
 import { useVideoModelCaps } from '@/composables/useVideoModelCaps'
 import { useToast } from '@/composables/useToast'
 import { useModalA11y } from '@/composables/useModalA11y'
-import { GITHUB_REPO } from '@/utils/feedback'
+import { FREE_TOKENS_GUIDE_URL, GITHUB_REPO } from '@/utils/feedback'
 
 const { trackEvent, isGaOptedOut, setGaOptOut } = useGa()
 const { showToast } = useToast()
@@ -397,6 +397,15 @@ initCollapse()
       <!-- 第三方供应商使用说明：免费模型支持范围 / AMD Radeon Cloud 推荐 / 图像视频暂不支持 -->
       <div class="rounded-lg bg-paper-3/60 p-4 text-xs leading-relaxed mb-4">
         <p class="font-medium text-ink-2 mb-2">{{ t('providerIntroTitle') }}</p>
+        <!-- 官网教程导流：免费 Token / 供应商配置图文教程 -->
+        <p class="mb-2">
+          <a
+            :href="FREE_TOKENS_GUIDE_URL"
+            target="_blank"
+            rel="noopener"
+            class="text-accent hover:text-ink transition-colors underline decoration-dotted underline-offset-2"
+          >{{ t('providerIntroGuide') }}</a>
+        </p>
         <ul class="list-disc pl-4 space-y-1.5 text-muted">
           <li>{{ t('providerIntroFree') }}</li>
           <li>

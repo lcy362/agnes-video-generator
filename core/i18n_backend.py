@@ -350,6 +350,14 @@ CATALOG: Dict[str, Dict[str, str]] = {
             "(chars {old_len} → {new_len})"
         ),
     },
+
+    # ── 文本供应商探测失败（web/routes/config_routes.py）──
+    # 不携带异常原文：异常信息可能含服务端 URL / 内部细节，外泄属信息暴露
+    # （CodeQL py/stack-trace-exposure）；详情只写服务端日志。
+    "provider.probe_failed": {
+        "zh": "模型探测失败：请检查 Base URL / API Key 与网络后重试",
+        "en": "Model probe failed. Check the Base URL, API Key, and your network, then retry.",
+    },
 }
 
 

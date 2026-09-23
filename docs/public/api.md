@@ -60,6 +60,9 @@
 
 **错误响应**：`400` = 删除/同步内置 `agnes`、`provider` 为空；`404` = 供应商不存在；`422` = `api` 非法、`base_url` 为空、`models_json` 不是合法 JSON 数组。
 
+> 探测端点（`…/test`）失败时返回的 `error` 为**固定提示文案**（不回传异常原文，避免
+> 泄露服务端 URL / 内部细节），具体失败原因记录在服务端日志中。
+
 ```bash
 # 1) 探测（不落盘）：用此刻输入的 key + base_url 拉模型列表
 curl -X POST http://localhost:8765/api/config/text-providers/test \

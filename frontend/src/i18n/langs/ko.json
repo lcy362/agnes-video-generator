@@ -67,6 +67,7 @@
   "providerManageTitle": "공급자 관리",
   "providerManageHint": "텍스트 생성 공급자를 관리합니다. «편집»을 클릭하여 구성하세요. 내장 Agnes는 고정되어 삭제할 수 없습니다.",
   "providerIntroTitle": "타사 공급자 안내",
+  "providerIntroGuide": "📖 무료 API 키 발급 및 설정 가이드",
   "providerIntroFree": "이제 다른 공급자의 무료 모델을 연결할 수 있습니다(유료 모델도 사용할 수 있지만 필요하지는 않습니다).",
   "providerIntroText": "텍스트 모델은 현재 AMD Radeon Cloud(AMD 공식 무료 모델 API)를 권장합니다.",
   "providerIntroAmdEntry": "발급: Token Factory → Public Free Model APIs에 로그인하면 키를 받을 수 있습니다(휴대폰 / 이메일 / GitHub 로그인 가능, 카드 등록 불필요).",

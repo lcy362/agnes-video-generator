@@ -68,6 +68,7 @@
   "providerManageTitle": "प्रदाता प्रबंधन",
   "providerManageHint": "टेक्स्ट प्रदाता प्रबंधित करें। कॉन्फ़िगर करने के लिए «संपादित करें» पर क्लिक करें; अंतर्निहित Agnes स्थिर है।",
   "providerIntroTitle": "अन्य प्रदाताओं के बारे में",
+  "providerIntroGuide": "📖 मुफ़्त API की प्राप्त करने और कॉन्फ़िगर करने की गाइड",
   "providerIntroFree": "अब आप अन्य प्रदाताओं के मुफ़्त मॉडल जोड़ सकते हैं (पेड मॉडल भी काम करते हैं, पर उनकी ज़रूरत नहीं)।",
   "providerIntroText": "टेक्स्ट मॉडल के लिए अभी AMD Radeon Cloud की सिफ़ारिश करते हैं (AMD की आधिकारिक मुफ़्त मॉडल API)।",
   "providerIntroAmdEntry": "कुंजी पाने का तरीका: Token Factory में लॉग इन करके Public Free Model APIs से कुंजी लें (फ़ोन / ईमेल / GitHub पर्याप्त है, कार्ड की ज़रूरत नहीं)।",

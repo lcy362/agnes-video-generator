@@ -68,6 +68,7 @@
   "providerManageTitle": "Pamamahala ng Tagapagbigay",
   "providerManageHint": "Pamahalaan ang mga tagapagbigay ng teksto. I-click ang «I-edit» para i-configure; ang built-in na Agnes ay nakapirmi.",
   "providerIntroTitle": "Tungkol sa mga third-party provider",
+  "providerIntroGuide": "📖 Gabay: paano makakuha at mag-configure ng libreng API key",
   "providerIntroFree": "Maaari ka nang magkonekta ng libreng modelo mula sa ibang provider (gumagana rin ang bayad na modelo, pero hindi kailangan).",
   "providerIntroText": "Para sa mga text model, inirerekomenda namin ngayon ang AMD Radeon Cloud (ang opisyal na libreng model API ng AMD).",
   "providerIntroAmdEntry": "Paraan: mag-log in sa Token Factory → Public Free Model APIs para kumuha ng key (sapat na ang telepono / email / GitHub, walang kailangang card).",
