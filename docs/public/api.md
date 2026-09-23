@@ -1,6 +1,9 @@
 # 📋 API Endpoints
 
 > Frontend polls task state via `GET /api/tasks/{id}` — there is **no WebSocket** endpoint.
+>
+> Backend-generated messages (task progress, `HTTPException` details, diagnostics) are localized
+> per request: `X-Agnes-UI-Lang` > `Accept-Language` > `zh`.
 
 ## 配置与工作区
 
@@ -11,14 +14,76 @@
 | POST | `/api/config` | Save API key |
 | DELETE | `/api/config` | Clear API key |
 | GET | `/api/models` | List available Agnes models (text/image/video groups, cached) |
-| POST | `/api/config/models` | Save selected models |
+| POST | `/api/config/models` | Save selected models (optional `text_provider` switches the text route) |
 | POST | `/api/config/watermark` | Save watermark toggle |
 | POST | `/api/config/domain` | Set Agnes API domain suffix (`com`/`cn`) |
+| GET | `/api/config/text-providers` | List text providers (built-in `agnes` first, keys masked) |
+| POST | `/api/config/text-providers` | Add / update a text provider (upsert by `provider`) |
+| DELETE | `/api/config/text-providers/{provider}` | Delete a text provider (built-in `agnes` → 400) |
+| POST | `/api/config/text-providers/test` | Probe a provider's model list — **not persisted** |
+| POST | `/api/config/text-providers/{provider}/sync` | Save that provider's model list (no probe) |
 | GET | `/api/workspaces` | List workspaces |
 | POST | `/api/workspaces` | Create workspace |
 | DELETE | `/api/workspaces` | Delete workspace |
 | POST | `/api/workspaces/active` | Activate workspace |
 | GET | `/api/workspaces/pick-directory` | Native directory picker |
+
+## 文本模型供应商 (Text Model Providers — v7.0)
+
+> 文本模型可插拔：除内置 Agnes 外，可配置任意 **OpenAI 兼容** / **Anthropic 兼容** 的 LLM
+> 端点（`base_url` + `api_key`），供编剧拆解 / 分镜 / 诗词拆分 / 图片 prompt 改写等全部文本调用。
+> 内置 `agnes` 恒在列表首位且不可删除；未选择自定义供应商时行为与旧版一致，旧 `config.json`
+> 无需迁移即可读取。
+>
+> ⚠️ 自定义供应商的 `api_key` 一期**落盘**在本地 `config.json`（文件权限 `0600`），接口一律只回掩码。
+
+**供应商字段**（`config.json` → `text_providers[]`）：
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `provider` | str | Unique route key (also the path param); `agnes` is reserved for the built-in |
+| `display_name` | str | Label shown in the UI |
+| `api` | str | Wire protocol: `openai-completions` \| `anthropic-messages` |
+| `base_url` | str | Endpoint base; `/chat/completions`, `/v1/messages` and `/models` are appended per protocol |
+| `api_key` | str | Credential (stored locally, always returned masked) |
+| `models` | list[str] | Candidate models in configured order (probe result or hand-written) |
+
+当前生效的文本供应商记录在 `models.text_provider`（空串 = 内置 Agnes），模型 id 记录在 `models.text`。
+
+| Method | Path | Form fields | Description |
+|--------|------|-------------|-------------|
+| POST | `/api/config/text-providers/test` | `base_url`, `api_key`, `api`, optional `provider` | Probe the endpoint's model list, **not persisted**; returns `{ok:true, models:[...]}` or `{ok:false, error}`. Passing `provider` reuses that provider's stored `base_url`/`api_key` |
+| GET | `/api/config/text-providers` | — | List providers — built-in `agnes` first with `builtin:true`, keys masked; also returns `selected` and `current_model` |
+| POST | `/api/config/text-providers` | `provider`, `display_name`, `api`, `base_url`, `api_key`, `models_json` | Add / update (upsert by `provider`); an empty `api_key` keeps the stored one |
+| DELETE | `/api/config/text-providers/{provider}` | — | Delete; deleting the currently selected one falls back to `agnes` |
+| POST | `/api/config/text-providers/{provider}/sync` | `models_json` | Replace that provider's model list without probing |
+
+**错误响应**：`400` = 删除/同步内置 `agnes`、`provider` 为空；`404` = 供应商不存在；`422` = `api` 非法、`base_url` 为空、`models_json` 不是合法 JSON 数组。
+
+```bash
+# 1) 探测（不落盘）：用此刻输入的 key + base_url 拉模型列表
+curl -X POST http://localhost:8765/api/config/text-providers/test \
+  -F "api=openai-completions" \
+  -F "base_url=https://api.deepseek.com/v1" \
+  -F "api_key=sk-你的Key"
+
+# 2) 保存供应商（models_json 可来自上一步，也可手写）
+curl -X POST http://localhost:8765/api/config/text-providers \
+  -F "provider=deepseek" \
+  -F "display_name=DeepSeek" \
+  -F "api=openai-completions" \
+  -F "base_url=https://api.deepseek.com/v1" \
+  -F "api_key=sk-你的Key" \
+  -F 'models_json=["deepseek-chat","deepseek-reasoner"]'
+
+# 3) 切换当前文本模型到该供应商（text 必填）
+curl -X POST http://localhost:8765/api/config/models \
+  -F "text=deepseek-chat" -F "text_provider=deepseek"
+
+# 4) 切回内置 Agnes
+curl -X POST http://localhost:8765/api/config/models \
+  -F "text=agnes-3.0-flash" -F "text_provider="
+```
 
 ## CORS 跨源白名单（供独立本地伴侣工具调用）
 
