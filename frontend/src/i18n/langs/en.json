@@ -69,7 +69,6 @@
   "providerInUse": "In use",
   "providerManageTitle": "Provider Management",
   "providerManageHint": "Manage text providers. Click Edit to configure; built-in Agnes is fixed.",
-  "providerManageActionHint": "To add a provider, click \"+ Add Provider\" in the Model section.",
   "providerEditLabel": "Edit",
   "providerEditTitle": "Edit Provider",
   "providerAgnesTitle": "Agnes Settings",

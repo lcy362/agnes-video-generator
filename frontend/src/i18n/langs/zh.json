@@ -93,7 +93,6 @@
   "providerInUse": "使用中",
   "providerManageTitle": "供应商管理",
   "providerManageHint": "管理文本生成供应商。点击「编辑」配置对应供应商；内置 Agnes 固定不可删。",
-  "providerManageActionHint": "新增供应商请到「模型选择」分节点击「+ 添加供应商」。",
   "providerEditLabel": "编辑",
   "providerEditTitle": "编辑供应商",
   "providerAgnesTitle": "Agnes 配置",

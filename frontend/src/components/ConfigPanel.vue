@@ -408,7 +408,6 @@ initCollapse()
           </div>
         </div>
       </div>
-      <div class="mt-4 text-xs text-muted">{{ t('providerManageActionHint') }}</div>
     </div>
   </div>
 
