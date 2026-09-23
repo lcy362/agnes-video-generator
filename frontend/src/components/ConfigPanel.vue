@@ -8,6 +8,7 @@ import { useGa } from '@/composables/useGa'
 import { useVideoModelCaps } from '@/composables/useVideoModelCaps'
 import { useToast } from '@/composables/useToast'
 import { useModalA11y } from '@/composables/useModalA11y'
+import { GITHUB_REPO } from '@/utils/feedback'
 
 const { trackEvent, isGaOptedOut, setGaOptOut } = useGa()
 const { showToast } = useToast()
@@ -392,6 +393,49 @@ initCollapse()
         </div>
       </div>
       <p class="text-xs text-muted mb-4">{{ t('providerManageHint') }}</p>
+
+      <!-- 第三方供应商使用说明：免费模型支持范围 / AMD Radeon Cloud 推荐 / 图像视频暂不支持 -->
+      <div class="rounded-lg bg-paper-3/60 p-4 text-xs leading-relaxed mb-4">
+        <p class="font-medium text-ink-2 mb-2">{{ t('providerIntroTitle') }}</p>
+        <ul class="list-disc pl-4 space-y-1.5 text-muted">
+          <li>{{ t('providerIntroFree') }}</li>
+          <li>
+            {{ t('providerIntroText') }}
+            <ul class="list-disc pl-4 mt-1.5 space-y-1">
+              <li>
+                <a
+                  href="https://developer.amd.com.cn/radeon/modelapis"
+                  target="_blank"
+                  rel="noopener"
+                  class="underline decoration-dotted underline-offset-2 hover:text-ink transition-colors"
+                >{{ t('providerIntroAmdEntry') }}</a>
+              </li>
+              <li>
+                {{ t('providerIntroAmdEndpoint') }}
+                <code class="font-mono text-ink-2 select-all">https://developer.amd.com.cn/radeon/api/v1</code>
+              </li>
+              <li>{{ t('providerIntroAmdModels') }}</li>
+              <li>{{ t('providerIntroAmdNote') }}</li>
+            </ul>
+          </li>
+          <li>
+            {{ t('providerIntroMedia') }}{{ t('providerIntroMediaRecommend') }}
+            <a
+              :href="GITHUB_REPO + '/issues/new'"
+              target="_blank"
+              rel="noopener"
+              class="text-accent hover:text-ink transition-colors"
+            >GitHub Issue</a>
+            <span class="mx-1">/</span>
+            <a
+              :href="GITHUB_REPO + '/discussions'"
+              target="_blank"
+              rel="noopener"
+              class="text-accent hover:text-ink transition-colors"
+            >GitHub Discussion</a>
+          </li>
+        </ul>
+      </div>
 
       <!-- 供应商列表：agnes（内置）+ 自定义 -->
       <div class="space-y-2">
