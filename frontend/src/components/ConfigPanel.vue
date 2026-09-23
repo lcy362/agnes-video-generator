@@ -103,19 +103,18 @@ async function onKeyDomainChange(item: any, domain: string) {
   await saveKeyDomain(item.id, domain)
 }
 
-// 折叠状态（6 个配置面板）
+// 折叠状态（5 个配置面板）
 const collapsed = reactive<Record<string, boolean>>({
   apikey: false,
   model: false,
   domain: false,
   workspace: false,
   privacy: true,
-  provider: false,
 })
 
 function initCollapse() {
   const prefs = getCollapsePrefs()
-  const keys = ['apikey', 'model', 'domain', 'workspace', 'privacy', 'provider']
+  const keys = ['apikey', 'model', 'domain', 'workspace', 'privacy']
   keys.forEach((k) => {
     const manual = prefs[k + '_manual']
     if (manual !== undefined) {
@@ -177,10 +176,6 @@ async function onAddWorkspace() {
 function providerDisplayName(p: any): string {
   return (p && (p.display_name || p.provider)) || p?.provider || ''
 }
-function providerApiLabel(p: any): string {
-  const api = p?.api || ''
-  return api === 'anthropic-messages' ? t('providerApiAnthropic') : api === 'openai-completions' ? t('providerApiOpenai') : api
-}
 // 第一级「供应商」下拉：agnes（内置）+ 自定义供应商
 const textProviderOptions = computed(() => {
   const opts: { key: string; label: string }[] = [{ key: 'agnes', label: t('providerBuiltinAgnes') }]
@@ -210,11 +205,6 @@ function textModelsForProvider(provider: string): string[] {
 }
 // 第二级「模型」下拉：依据所选供应商过滤
 const textModelOptions = computed(() => textModelsForProvider(textProviderComposite.value))
-// 当前所选文本模型的归属供应商（供下拉标题/提示展示）
-const selectedTextProviderName = computed(() => {
-  const p = (appState.textProviders || []).find((x: any) => x.provider === appState.models.text_provider)
-  return p ? (p.display_name || p.provider) : appState.models.text_provider ? appState.models.text_provider : t('providerBuiltinAgnes')
-})
 // 供应商新增表单：拉取候选模型（不落盘）
 async function onFetchProviderModels() {
   await testTextProvider({
@@ -408,75 +398,6 @@ initCollapse()
     </div>
   </div>
 
-  <!-- 文本模型供应商（v7.0 可插拔多供应商） -->
-  <div class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
-    <div
-      v-if="collapsed.provider"
-      class="flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-paper-3 transition"
-      role="button"
-      tabindex="0"
-      @click="toggleConfigPanel('provider')"
-    >
-      <div class="flex items-center gap-3">
-        <span class="text-sm">🔌</span>
-        <span class="text-sm text-muted">
-          <span class="text-ink-2 font-medium">{{ t('providerTitle') }}</span>
-          <span class="text-muted mx-2">·</span>
-          <span v-if="appState.textProviders.length > 0" class="text-muted">{{ t('providerCount') }}: {{ appState.textProviders.length }}</span>
-          <span v-else class="text-muted">—</span>
-        </span>
-      </div>
-      <span class="text-muted text-xs">▶</span>
-    </div>
-    <div v-else class="p-6 pt-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-lg font-semibold text-accent">{{ t('providerTitle') }}</h2>
-        <div class="flex items-center gap-2">
-          <span class="text-xs px-2 py-1 rounded-full bg-paper-2 text-muted">{{ t('providerCurrent') }}: {{ selectedTextProviderName }}</span>
-          <button class="text-xs text-muted hover:text-ink-2 transition px-2 py-1 rounded" @click="toggleConfigPanel('provider')">▲</button>
-        </div>
-      </div>
-      <p class="text-xs text-muted mb-4">{{ t('providerHint') }}</p>
-
-      <!-- 供应商列表 -->
-      <div class="space-y-2 mb-4">
-        <div
-          v-for="p in appState.textProviders"
-          :key="p.provider"
-          class="flex items-center justify-between glass-input rounded-lg px-4 py-2.5"
-        >
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <p class="text-sm text-ink font-medium truncate">{{ p.display_name || p.provider }}</p>
-              <span v-if="p.builtin" class="text-[10px] px-1.5 py-0.5 rounded bg-green-900 text-green-300">{{ t('providerBuiltin') }}</span>
-              <span class="text-[10px] px-1.5 py-0.5 rounded bg-paper-3 text-muted">{{ providerApiLabel(p) }}</span>
-            </div>
-            <p class="text-xs text-muted font-mono truncate mt-0.5">{{ p.base_url || '—' }}</p>
-            <p class="text-xs text-muted font-mono truncate">{{ p.api_key_mask || '' }}</p>
-          </div>
-          <div class="flex items-center gap-2 ml-3">
-            <span v-if="p.provider === (appState.models.text_provider || 'agnes')" class="text-[10px] px-2 py-1 rounded-full bg-blue-900 text-blue-300">{{ t('providerInUse') }}</span>
-            <button
-              v-if="!p.builtin"
-              class="px-3 py-1 bg-red-600/80 hover:bg-red-500 rounded-lg text-xs font-medium transition"
-              @click="onDeleteProvider(p.provider)"
-            >
-              {{ t('delete') }}
-            </button>
-            <span v-else class="text-xs text-muted/50" :title="t('providerBuiltinHint')">•</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 添加供应商按钮 -->
-      <button
-        class="w-full px-5 py-2.5 bg-paper-3 hover:bg-paper-2 border border-rule rounded-lg text-sm font-medium text-ink-2 transition"
-        @click="showProviderModal = true"
-      >
-        {{ t('providerAddBtn') }}
-      </button>
-    </div>
-  </div>
   <!-- 新增供应商弹窗（仿 ConfirmModal：遮罩 + role=dialog + @click.self/ESC 关闭） -->
   <teleport to="body">
     <div
@@ -497,6 +418,37 @@ initCollapse()
             @click="showProviderModal = false"
           >✕</button>
         </div>
+
+        <!-- 已有供应商（管理 / 删除） -->
+        <div class="mb-4">
+          <p class="text-xs font-medium text-ink-2 mb-1.5">{{ t('providerExistingTitle') }}</p>
+          <div v-if="(appState.textProviders || []).filter((x: any) => !x.builtin).length === 0" class="text-xs text-muted">
+            {{ t('providerExistingEmpty') }}
+          </div>
+          <div class="space-y-1">
+            <div
+              v-for="p in appState.textProviders"
+              :key="p.provider"
+              class="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-paper-3/60 text-xs"
+            >
+              <span v-if="p.builtin" class="px-1.5 py-0.5 rounded bg-green-900 text-green-300 text-[10px]">{{ t('providerBuiltin') }}</span>
+              <span class="font-medium text-ink-2 truncate flex-1">{{ p.display_name || p.provider }}</span>
+              <code class="font-mono text-muted text-[10px] truncate max-w-[8rem]">{{ p.provider }}</code>
+              <span
+                v-if="!p.builtin && p.provider === (appState.models.text_provider || 'agnes')"
+                class="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-900 text-blue-300"
+              >{{ t('providerInUse') }}</span>
+              <span v-if="p.builtin" class="text-muted/50" :title="t('providerBuiltinHint')">•</span>
+              <button
+                v-else
+                class="text-red-300 hover:text-red-200 transition"
+                :title="t('delete')"
+                @click="onDeleteProvider(p.provider)"
+              >✕</button>
+            </div>
+          </div>
+        </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs text-muted mb-1">{{ t('providerNameLabel') }}</label>
@@ -594,6 +546,12 @@ initCollapse()
       <div class="space-y-3">
         <div>
           <label class="block text-xs text-muted mb-1">{{ t('modelSupplier') }}</label>
+          <div class="flex justify-end mb-1">
+            <button
+              class="text-xs text-accent hover:text-ink transition whitespace-nowrap"
+              @click="showProviderModal = true"
+            >{{ t('providerAddBtn') }}</button>
+          </div>
           <div class="flex gap-3">
             <select
               v-model="textProviderComposite"
