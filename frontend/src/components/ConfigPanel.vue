@@ -360,7 +360,12 @@ initCollapse()
     <div v-else class="p-6 pt-4">
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-lg font-semibold text-accent">{{ t('providerManageTitle') }}</h2>
-        <button class="text-xs text-muted hover:text-ink-2 transition px-2 py-1 rounded" @click="toggleConfigPanel('apikey')">▲</button>
+        <div class="flex items-center gap-3">
+          <button class="text-xs text-accent hover:text-ink transition whitespace-nowrap" @click="openAddProvider()">
+            {{ t('providerAddBtn') }}
+          </button>
+          <button class="text-xs text-muted hover:text-ink-2 transition px-2 py-1 rounded" @click="toggleConfigPanel('apikey')">▲</button>
+        </div>
       </div>
       <p class="text-xs text-muted mb-4">{{ t('providerManageHint') }}</p>
 
