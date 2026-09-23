@@ -267,8 +267,11 @@ async function onSaveProvider() {
     showToast(t('providerApiKeyRequired'), 3500)
     return
   }
-  const models =
+  const picked =
     providerTestSelected.value.length > 0 ? providerTestSelected.value : providerTestModels.value
+  const manual = parseManualModels(manualModelsText.value)
+  // 合并拉取候选 + 手动填写模型，去重（候选在前、手动在后）
+  const models = Array.from(new Set([...picked, ...manual]))
   const provider = isEditCustom.value && editingProvider.value
     ? editingProvider.value
     : slugifyProvider(providerName.value.trim())
@@ -298,6 +301,15 @@ const editingProvider = ref<null | string>(null) // null=新增 | 'agnes'=编辑
 const lastKnownProviderKeys: Record<string, string> = {}
 const showProviderModal = ref(false)
 const { containerRef: providerModalRef } = useModalA11y(showProviderModal, () => (showProviderModal.value = false))
+// 手动填写模型（新增能力：逗号 / 换行分隔；保存时与拉取候选合并去重）
+const manualModelsText = ref('')
+// 将手动填写文本拆为去空模型 id 列表
+function parseManualModels(text: string): string[] {
+  return (text || '')
+    .split(/[\n,，,]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
 
 function resetProviderForm() {
   providerName.value = ''
@@ -306,6 +318,7 @@ function resetProviderForm() {
   providerApiKey.value = ''
   providerTestModels.value = []
   providerTestSelected.value = []
+  manualModelsText.value = ''
   providerSaveStatus.value = 'idle'
 }
 // 模型分节「添加供应商」：新增模式
@@ -326,9 +339,10 @@ function openEditProvider(p: any) {
   providerApi.value = p.api || 'openai-completions'
   providerBaseUrl.value = p.base_url || ''
   providerApiKey.value = lastKnownProviderKeys[p.provider] || ''
-  const cached = appState.providerModelCache[p.provider] || []
-  providerTestModels.value = (p.models && p.models.length ? p.models : cached)
-  providerTestSelected.value = (p.models && p.models.length ? p.models : cached)
+  // 编辑：已有 models 预填进手动填写框，拉取候选清空，便于在此基础调整
+  providerTestModels.value = []
+  providerTestSelected.value = []
+  manualModelsText.value = (p.models && p.models.length ? p.models : []).join('\n')
   showProviderModal.value = true
 }
 
@@ -550,6 +564,17 @@ initCollapse()
                 <span class="font-mono">{{ m }}</span>
               </label>
             </div>
+          </div>
+
+          <!-- 手动填写模型（分流：可拉取亦可直接键入，保存时合并） -->
+          <div class="mt-3">
+            <label class="block text-xs text-muted mb-1">{{ t('providerManualModelsLabel') }}</label>
+            <textarea
+              v-model="manualModelsText"
+              rows="3"
+              :placeholder="t('providerManualModelsPlaceholder')"
+              class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink placeholder-muted resize-y font-mono"
+            ></textarea>
           </div>
 
           <div class="flex items-center gap-3 justify-end mt-6">

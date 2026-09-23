@@ -102,6 +102,8 @@
   "providerExistingTitle": "已有供应商",
   "providerExistingEmpty": "暂无自定义供应商，可在此删除已有供应商",
   "providerNoModels": "该供应商暂无可选模型，请先同步或添加供应商",
+  "providerManualModelsLabel": "手动填写模型（逗号 / 换行分隔）",
+  "providerManualModelsPlaceholder": "如 deepseek-chat, deepseek-reasoner",
   "providerNameLabel": "名称",
   "providerNamePlaceholder": "如 DeepSeek / Claude",
   "providerNameRequired": "请输入供应商名称",

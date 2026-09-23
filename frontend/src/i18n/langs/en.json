@@ -78,6 +78,8 @@
   "providerExistingTitle": "Existing Providers",
   "providerExistingEmpty": "No custom providers. Manage/delete existing providers here.",
   "providerNoModels": "No selectable models for this provider; sync or add a provider first.",
+  "providerManualModelsLabel": "Manually enter models (comma / newline separated)",
+  "providerManualModelsPlaceholder": "e.g. deepseek-chat, deepseek-reasoner",
   "providerNameLabel": "Name",
   "providerNamePlaceholder": "e.g. DeepSeek / Claude",
   "providerNameRequired": "Provider name is required",
