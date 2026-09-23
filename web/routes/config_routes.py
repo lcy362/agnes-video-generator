@@ -54,6 +54,7 @@ from core.config import (
     set_selected_text_provider,
     set_watermark_config,
 )
+from core.i18n_backend import translate
 
 router = APIRouter(tags=["config"])
 
@@ -535,6 +536,12 @@ async def save_agnes_domain(domain: str = Form(...)):
 _VALID_TEXT_APIS = (API_OPENAI, API_ANTHROPIC)
 
 
+#: 探测失败统一提示 key（按 UI 语言本地化）。不回传异常原文：异常信息可能包含
+#: 服务端 URL、文件路径或堆栈内容，直接回给外部调用方构成信息暴露
+#: （CodeQL py/stack-trace-exposure），完整详情仅写入服务端日志。
+_PROBE_FAILED_KEY = "provider.probe_failed"
+
+
 @router.post("/api/config/text-providers/test")
 async def test_text_provider(
     base_url: str = Form(""),
@@ -585,8 +592,8 @@ async def test_text_provider(
     try:
         models = await asyncio.to_thread(_probe)
     except Exception as e:  # noqa: BLE001 — 探测失败返回 error 而非抛出
-        logger.warning(f"[ChatProvider] Probe text provider failed: {e}")
-        return {"ok": False, "error": str(e)}
+        logger.warning(f"[ChatProvider] Probe text provider failed: {e}", exc_info=True)
+        return {"ok": False, "error": translate(_PROBE_FAILED_KEY)}
     return {"ok": True, "models": models}
 
 

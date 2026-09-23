@@ -68,6 +68,7 @@
   "providerManageTitle": "จัดการผู้ให้บริการ",
   "providerManageHint": "จัดการผู้ให้บริการข้อความ คลิก «แก้ไข» เพื่อกำหนดค่า Agnes ในตัวถือว่าตายตัว",
   "providerIntroTitle": "เกี่ยวกับผู้ให้บริการรายอื่น",
+  "providerIntroGuide": "📖 คู่มือการขอและตั้งค่า API Key ฟรี",
   "providerIntroFree": "ตอนนี้สามารถเชื่อมต่อโมเดลฟรีจากผู้ให้บริการรายอื่นได้แล้ว (โมเดลแบบเสียค่าใช้จ่ายก็ใช้ได้ แต่ไม่จำเป็น)",
   "providerIntroText": "สำหรับโมเดลข้อความ ขณะนี้แนะนำ AMD Radeon Cloud (API โมเดลฟรีอย่างเป็นทางการของ AMD)",
   "providerIntroAmdEntry": "วิธีรับคีย์: เข้าสู่ระบบ Token Factory แล้วไปที่ Public Free Model APIs (ใช้เบอร์โทร / อีเมล / GitHub ก็ได้ ไม่ต้องผูกบัตร)",

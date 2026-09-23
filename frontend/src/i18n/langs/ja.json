@@ -67,6 +67,7 @@
   "providerManageTitle": "提供元の管理",
   "providerManageHint": "テキスト生成提供元を管理します。「編集」をクリックして設定してください。組み込みのAgnesは固定で削除できません。",
   "providerIntroTitle": "外部プロバイダーについて",
+  "providerIntroGuide": "📖 無料 API キーの取得と設定ガイド",
   "providerIntroFree": "他社の無料モデルを接続できるようになりました（有料モデルも利用できますが、必要ありません）。",
   "providerIntroText": "テキストモデルは現在 AMD Radeon Cloud（AMD 公式の無料モデル API）を推奨しています。",
   "providerIntroAmdEntry": "取得方法：Token Factory → Public Free Model APIs にログインするとキーを取得できます（電話番号 / メール / GitHub で可、カード登録不要）。",

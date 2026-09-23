@@ -70,6 +70,7 @@
   "providerManageTitle": "Provider Management",
   "providerManageHint": "Manage text providers. Click Edit to configure; built-in Agnes is fixed.",
   "providerIntroTitle": "About third-party providers",
+  "providerIntroGuide": "📖 Guide: getting and configuring free API keys",
   "providerIntroFree": "You can now connect free models from other vendors (paid models work too, but there is no need for them).",
   "providerIntroText": "For text models we currently recommend AMD Radeon Cloud — AMD's official free model API.",
   "providerIntroAmdEntry": "How to get a key: sign in to Token Factory and open Public Free Model APIs (phone / email / GitHub login is enough, no credit card needed).",

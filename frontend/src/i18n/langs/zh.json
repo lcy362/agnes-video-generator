@@ -94,6 +94,7 @@
   "providerManageTitle": "供应商管理",
   "providerManageHint": "管理文本生成供应商。点击「编辑」配置对应供应商；内置 Agnes 固定不可删。",
   "providerIntroTitle": "关于第三方供应商",
+  "providerIntroGuide": "📖 免费模型 API Key 获取与配置图文教程",
   "providerIntroFree": "现已支持接入其他厂商的免费模型（付费模型当然也可以使用，但没有必要）。",
   "providerIntroText": "文本模型当前推荐 AMD Radeon Cloud —— AMD 官方免费模型 API。",
   "providerIntroAmdEntry": "领取入口：登录 Token Factory 的 Public Free Model APIs 即可获取 Key（手机号 / 邮箱 / GitHub 登录均可，无需绑定银行卡）。",

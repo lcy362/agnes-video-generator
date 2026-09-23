@@ -67,6 +67,7 @@
   "providerManageTitle": "Kelola Penyedia",
   "providerManageHint": "Kelola penyedia teks. Klik «Edit» untuk mengonfigurasi; Agnes bawaan bersifat tetap.",
   "providerIntroTitle": "Tentang penyedia pihak ketiga",
+  "providerIntroGuide": "📖 Panduan: cara mendapatkan dan mengonfigurasi kunci API gratis",
   "providerIntroFree": "Kini Anda dapat menghubungkan model gratis dari penyedia lain (model berbayar juga bisa, tetapi tidak perlu).",
   "providerIntroText": "Untuk model teks, saat ini kami merekomendasikan AMD Radeon Cloud (API model gratis resmi dari AMD).",
   "providerIntroAmdEntry": "Akses: masuk ke Token Factory → Public Free Model APIs untuk mengambil kunci (cukup nomor telepon / email / GitHub, tanpa kartu kredit).",

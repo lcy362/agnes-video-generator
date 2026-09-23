@@ -67,6 +67,7 @@
   "providerManageTitle": "Anbieterverwaltung",
   "providerManageHint": "Verwalten Sie Textanbieter. Klicken Sie auf „Bearbeiten“, um den Anbieter zu konfigurieren; das integrierte Agnes ist fest.",
   "providerIntroTitle": "Hinweis zu Drittanbietern",
+  "providerIntroGuide": "📖 Anleitung: Kostenlose API-Schlüssel erhalten und einrichten",
   "providerIntroFree": "Es können jetzt kostenlose Modelle anderer Anbieter eingebunden werden (kostenpflichtige funktionieren ebenfalls, sind aber nicht nötig).",
   "providerIntroText": "Für Textmodelle empfehlen wir derzeit AMD Radeon Cloud (die offizielle kostenlose Modell-API von AMD).",
   "providerIntroAmdEntry": "Zugang: In Token Factory → Public Free Model APIs einloggen und den Key abholen (Telefon / E-Mail / GitHub genügt, keine Kreditkarte).",

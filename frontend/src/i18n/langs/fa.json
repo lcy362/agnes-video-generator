@@ -68,6 +68,7 @@
   "providerManageTitle": "مدیریت ارائهدهندگان",
   "providerManageHint": "ارائهدهندگان تولید متن را مدیریت کنید. برای پیکربندی روی «ویرایش» کلیک کنید؛ Agnes داخلی ثابت و غیرقابل حذف است.",
   "providerIntroTitle": "درباره ارائهدهندگان دیگر",
+  "providerIntroGuide": "📖 راهنمای دریافت و تنظیم کلیدهای API رایگان",
   "providerIntroFree": "اکنون میتوانید مدلهای رایگان ارائهدهندگان دیگر را متصل کنید (مدلهای پولی هم کار میکنند، اما ضروری نیستند).",
   "providerIntroText": "برای مدلهای متنی در حال حاضر AMD Radeon Cloud را پیشنهاد میکنیم (API رسمی مدلهای رایگان AMD).",
   "providerIntroAmdEntry": "دسترسی: وارد Token Factory شوید و از Public Free Model APIs کلید بگیرید (تلفن / ایمیل / GitHub کافی است، بدون کارت بانکی).",

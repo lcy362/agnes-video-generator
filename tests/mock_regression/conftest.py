@@ -21,9 +21,31 @@ from .mock_apis import (
     MockRateLimiter,
 )
 
-from core.config import REGRESSION_WORKING_DIR_ENV
+from core.config import DEFAULT_TEXT_MODEL, REGRESSION_WORKING_DIR_ENV
 
 logging.basicConfig(level=logging.WARNING)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 文本供应商路由的 mock 替换
+# ══════════════════════════════════════════════════════════════════════
+
+@pytest.fixture(autouse=True)
+def mock_text_provider_route(monkeypatch):
+    """强制文本调用走内置 agnes 分支，使回归只依赖 mock。
+
+    v7.0 起文本客户端由 ``core.api.chat_providers.get_or_build_text_chat_client()``
+    按 ``models.text_provider`` 分派：若开发机 config.json 里选中了第三方供应商
+    （如 AMD Radeon Cloud / DeepSeek），回归会**真的**去请求该外部端点而失败，
+    违背本 conftest「无外部网络调用」的约定。把 ``resolve_text_chat`` 固定为
+    agnes 后，工厂取 ``core.api.agnes_chat.AgnesChatAPI``（已被 mock）兜底。
+    """
+    from core.api import chat_providers
+
+    monkeypatch.setattr(
+        chat_providers, "resolve_text_chat",
+        lambda: {"kind": "agnes", "model": DEFAULT_TEXT_MODEL},
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════

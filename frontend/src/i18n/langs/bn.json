@@ -68,6 +68,7 @@
   "providerManageTitle": "প্রদাতা ব্যবস্থাপনা",
   "providerManageHint": "টেক্সট প্রদাতা পরিচালনা করুন। কনফিগার করতে «সম্পাদনা» এ ক্লিক করুন; বিল্ট-ইন Agnes স্থির।",
   "providerIntroTitle": "অন্য প্রদানকারী সম্পর্কে",
+  "providerIntroGuide": "📖 বিনামূল্যের API কী সংগ্রহ ও কনফিগার করার গাইড",
   "providerIntroFree": "এখন আপনি অন্য প্রদানকারীর বিনামূল্যের মডেল যুক্ত করতে পারবেন (পেইড মডেলও কাজ করে, তবে প্রয়োজন নেই)।",
   "providerIntroText": "টেক্সট মডেলের জন্য এখন AMD Radeon Cloud ব্যবহারের পরামর্শ দিচ্ছি (AMD-এর অফিসিয়াল বিনামূল্যের মডেল API)।",
   "providerIntroAmdEntry": "কী পাওয়ার উপায়: Token Factory-তে লগ ইন করে Public Free Model APIs থেকে কী নিন (ফোন / ইমেল / GitHub যথেষ্ট, কার্ড লাগবে না)।",

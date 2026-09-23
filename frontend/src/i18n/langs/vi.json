@@ -68,6 +68,7 @@
   "providerManageTitle": "Quản lý nhà cung cấp",
   "providerManageHint": "Quản lý nhà cung cấp văn bản. Nhấp «Chỉnh sửa» để cấu hình; Agnes tích hợp là cố định.",
   "providerIntroTitle": "Về nhà cung cấp bên thứ ba",
+  "providerIntroGuide": "📖 Hướng dẫn: cách lấy và cấu hình API key miễn phí",
   "providerIntroFree": "Giờ đây bạn có thể kết nối các mô hình miễn phí của nhà cung cấp khác (mô hình trả phí cũng dùng được, nhưng không cần thiết).",
   "providerIntroText": "Với mô hình văn bản, hiện chúng tôi khuyến nghị AMD Radeon Cloud (API mô hình miễn phí chính thức của AMD).",
   "providerIntroAmdEntry": "Cách lấy khóa: đăng nhập Token Factory → Public Free Model APIs để nhận khóa (chỉ cần số điện thoại / email / GitHub, không cần thẻ).",

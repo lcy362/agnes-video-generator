@@ -9,6 +9,8 @@
 """
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from core.i18n_backend import (
@@ -94,7 +96,9 @@ def test_parse_accept_language(header, expected):
 def test_translate_zh_uses_chinese_template():
     msg = translate("config.api_key_missing", "zh")
     assert "请先配置 API Key" in msg
-    assert "platform.agnes-ai.com" in msg
+    # 用正则断言完整主机名，避免 URL 子串命中的安全告警
+    # （CodeQL py/incomplete-url-substring-sanitization）。
+    assert re.search(r"platform\.agnes-ai\.com", msg)
 
 
 def test_translate_en_uses_english_template():
@@ -106,13 +110,15 @@ def test_translate_en_uses_english_template():
 
 def test_translate_formats_params():
     msg = translate("network.dns_failed", "en", target="`example.com`")
-    assert "example.com" in msg
+    # 同上：正则匹配完整域名，而非 URL 子串包含判断。
+    assert re.search(r"example\.com", msg)
     assert "DNS" in msg
 
 
 def test_translate_zh_formats_params():
     msg = translate("network.connect_blocked", "zh", target="`api.agnes-ai.cn`")
-    assert "api.agnes-ai.cn" in msg
+    # 同上：正则匹配完整域名（含国际化域名场景），避免子串包含判断。
+    assert re.search(r"api\.agnes-ai\.cn", msg)
     assert "网络诊断" in msg
 
 
