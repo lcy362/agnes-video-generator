@@ -178,8 +178,12 @@ function providerDisplayName(p: any): string {
 }
 // 第一级「供应商」下拉：agnes（内置）+ 自定义供应商
 const textProviderOptions = computed(() => {
-  const opts: { key: string; label: string }[] = [{ key: 'agnes', label: t('providerBuiltinAgnes') }]
-  ;(appState.textProviders || []).forEach((p: any) => {
+  const opts: { key: string; label: string }[] = []
+  const list = appState.textProviders || []
+  const hasAgnes = list.some((p: any) => p.provider === 'agnes')
+  // 后端列表通常已含内置 agnes（builtin）；缺失时才补一 front，避免重复
+  if (!hasAgnes) opts.push({ key: 'agnes', label: t('providerBuiltinAgnes') })
+  list.forEach((p: any) => {
     opts.push({ key: p.provider, label: providerDisplayName(p) || p.provider })
   })
   return opts
@@ -564,6 +568,7 @@ initCollapse()
               {{ t('modelSync') }}
             </button>
           </div>
+          <p class="text-xs text-muted/70 mt-1">{{ t('providerTextHint') }}</p>
           <label class="block text-xs text-muted mb-1 mt-3">{{ t('modelTextLabel') }}</label>
           <select
             v-model="appState.models.text"
