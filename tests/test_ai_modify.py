@@ -40,7 +40,7 @@ class StubTM:
         return os.path.join(WORKING_DIR, self.dir_name)
 
     def load(self):
-        return SimpleNamespace(task_id=self.task_id)
+        return SimpleNamespace(task_id=self.task_id, ui_language="zh")
 
 
 class FakeArtifact:
@@ -104,7 +104,9 @@ def env(monkeypatch, tmp_path):
 
     monkeypatch.setattr(video_routes, "resolve_artifact", _resolve)
 
-    monkeypatch.setattr(video_routes, "AgnesChatAPI", lambda **kw: FakeChat())
+    # v7.0：ai_modify 改用文本供应商工厂构造聊天客户端（可接入自定义供应商），
+    # 测试相应改为 patch 工厂而非削除的 AgnesChatAPI 模块属性。
+    monkeypatch.setattr(video_routes, "get_or_build_text_chat_client", lambda **kw: FakeChat())
     monkeypatch.setattr(video_routes, "AgnesImageAPI", lambda **kw: FakeImage())
 
     return client, resolved

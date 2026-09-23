@@ -9,6 +9,7 @@ import asyncio
 import logging
 
 from core.config import get_selected_models
+from core.i18n_backend import translate
 from core.pipelines import (
     AnchorPipeline,
     BasePipeline,
@@ -106,18 +107,22 @@ def _refresh_task_manifests(state: BaseTaskState, pipeline: BasePipeline) -> Non
         logger.warning(f"[Artifacts] manifest refresh failed for {pipeline.task_id}: {e}")
 
 
-def mark_task_queued(task_manager: TaskManager) -> None:
+def mark_task_queued(task_manager: TaskManager, lang: str = "zh") -> None:
     """创建任务后立即落盘为排队状态（status=queued + 排队消息）。
 
     创建端点同步落盘（而非等后台协程异步置位），保证前端在响应返回后
     打开任务详情页时能立即识别为「排队中」并启动轮询，避免进度卡在
     「0% / 待启动」。
+
+    Args:
+        task_manager: 目标任务管理器。
+        lang: 任务落盘的 UI 语言（v7.0，issue #64）；决定排队消息语种。
     """
     task_manager.update_state(
         status=StepStatus.QUEUED,
         current_step="init",
         current_status="running",
-        current_message="任务排队中...",
+        current_message=translate("task.queued", lang),
         current_progress=0.0,
     )
 
@@ -162,6 +167,8 @@ async def run_pipeline_with_concurrency(
     task_id = pipeline.task_id
     semaphore = app_state.get_semaphore()
     app_state._queued_tasks[task_id] = weight
+    # v7.0（issue #64）：任务级 UI 语言快照，保证异步执行期间消息语种稳定
+    ui_lang = getattr(state, "ui_language", "") or "zh"
 
     logger.info(
         f"[Concurrency] Task {task_id} queued (weight={weight}, "
@@ -174,17 +181,18 @@ async def run_pipeline_with_concurrency(
     # 排队时持久化进度消息（前端轮询可读取）
     task_manager.update_state(
         current_step="init", current_status="running",
-        current_message="任务排队中...", current_progress=0.0,
+        current_message=translate("task.queued", ui_lang), current_progress=0.0,
     )
 
     # 优化路线图 0.4：权重超过并发上限时直接落盘 FAILED 并给出可读原因。
     # 此前该场景由 semaphore.acquire 抛 ValueError，异常被后台任务静默吞掉，
     # 任务永远卡在 QUEUED 且无任何提示。
     if weight > semaphore.max_weight:
-        reason = (
-            f"任务权重 {weight} 超过并发上限 {semaphore.max_weight}"
-            f"（AGNES_RATE_LIMIT={app_state.get_rate_limit()}，"
-            f"请调高该值或配置多个 API Key）"
+        reason = translate(
+            "task.weight_exceeds_limit", ui_lang,
+            weight=weight,
+            max_weight=semaphore.max_weight,
+            rate_limit=app_state.get_rate_limit(),
         )
         logger.error(f"[Concurrency] Task {task_id} rejected: {reason}")
         app_state._queued_tasks.pop(task_id, None)
@@ -232,7 +240,7 @@ async def run_pipeline_with_concurrency(
             status=StepStatus.FAILED,
             current_step="init",
             current_status="failed",
-            current_message=f"任务启动失败：{e}",
+            current_message=translate("task.start_failed", ui_lang, reason=str(e)),
         )
     finally:
         # 0.4：仅当确实获取到槽位时才释放。此前 finally 无条件释放，若 acquire

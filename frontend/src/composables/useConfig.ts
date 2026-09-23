@@ -187,7 +187,13 @@ async function loadModels() {
   try {
     const cd = await api.getConfig()
     const sel = cd.models || {}
-    appState.models = { text: sel.text || '', image: sel.image || '', video: sel.video || '' }
+    appState.models = {
+      text: sel.text || '',
+      image: sel.image || '',
+      video: sel.video || '',
+      text_provider: sel.text_provider || '',
+    }
+    if (sel.text_provider) appState.textProviderSelected = sel.text_provider
   } catch (e) {
     console.error('load model config failed:', e)
   }
@@ -233,6 +239,131 @@ async function saveModels() {
   } catch (e) {
     modelErrorMsg.value = t('networkError')
     modelSaveStatus.value = 'error'
+  }
+}
+
+// ── 文本模型供应商（v7.0 可插拔多供应商）──
+// 表单态（display_name / api / base_url / api_key / 拉取候选模型）
+const providerName = ref('')
+const providerApi = ref('openai-completions')
+const providerBaseUrl = ref('')
+const providerApiKey = ref('')
+// 拉取模型探测进行中（按钮禁用/文案）
+const providerTestBusy = ref(false)
+const providerSaveStatus = ref<'idle' | 'ok' | 'error'>('idle')
+const providerErrorMsg = ref('')
+
+// 回填供应商列表 + 当前所选 + 各供应商候选模型缓存
+async function loadTextProviders() {
+  try {
+    const d = await api.fetchTextProviders()
+    appState.textProviders = d.providers || []
+    appState.textProviderSelected = d.selected || 'agnes'
+    if (appState.models.text_provider) appState.textProviderSelected = appState.models.text_provider
+    const cache: Record<string, string[]> = {}
+    ;(appState.textProviders || []).forEach((p: any) => {
+      if (Array.isArray(p.models)) cache[p.provider] = p.models
+      else cache[p.provider] = []
+    })
+    appState.providerModelCache = cache
+  } catch (e) {
+    console.error('load /api/config/text-providers failed:', e)
+  }
+}
+
+// 保存（落盘）供应商；成功后刷新列表
+async function saveTextProvider(payload: {
+  provider: string
+  display_name: string
+  api: string
+  base_url: string
+  api_key: string
+  models_json: string
+}): Promise<boolean> {
+  providerSaveStatus.value = 'idle'
+  try {
+    const r = await api.saveTextProvider(payload)
+    if (r && r.ok) {
+      trackEvent('config_action', { action: 'save_text_provider', provider: payload.display_name })
+      showToast(t('providerSaved'), 3000)
+      providerSaveStatus.value = 'ok'
+      setTimeout(() => (providerSaveStatus.value = 'idle'), 2000)
+      await loadTextProviders()
+      return true
+    }
+    providerErrorMsg.value = r?.detail || t('providerSaveFailed')
+    providerSaveStatus.value = 'error'
+    showToast(providerErrorMsg.value, 4500)
+    return false
+  } catch (e: any) {
+    providerErrorMsg.value = e?.message || t('providerSaveFailed')
+    providerSaveStatus.value = 'error'
+    return false
+  }
+}
+
+// 删除供应商；若删除的是当前所选则回退 agnes
+async function deleteTextProvider(id: string): Promise<boolean> {
+  if (!(await confirmAsync(t('providerDeleteConfirm')))) return false
+  try {
+    const r = await api.deleteTextProvider(id)
+    if (r && r.ok) {
+      showToast(t('providerDeleted'), 3000)
+      if (appState.textProviderSelected === id) {
+        appState.textProviderSelected = 'agnes'
+        appState.models.text_provider = ''
+      }
+      // 删除会影响其它供应商的模型下拉，刷新列表
+      await loadTextProviders()
+      return true
+    }
+    showToast(r?.detail || t('providerDeleteFailed'), 4500)
+    return false
+  } catch (e: any) {
+    showToast(e?.message || t('providerDeleteFailed'), 4500)
+    return false
+  }
+}
+
+// 用用户此刻输入探测拉模型列表（不落盘），返回 models 供下拉预览
+async function testTextProvider(payload: {
+  base_url: string
+  api_key: string
+  api: string
+  provider?: string
+}): Promise<string[]> {
+  providerTestBusy.value = true
+  try {
+    const d = await api.testTextProvider(payload)
+    if (d && d.ok) {
+      const list: string[] = d.models || []
+      showToast(t('providerModelFetched') + ': ' + list.length, 3000)
+      return list
+    }
+    showToast(d?.error || t('providerModelFetchFailed'), 4500)
+    return []
+  } catch (e: any) {
+    showToast(e?.message || t('providerModelFetchFailed'), 4500)
+    return []
+  } finally {
+    providerTestBusy.value = false
+  }
+}
+
+// 将候选模型正式写入该供应商并落盘
+async function syncTextProviderModels(providerId: string, models: string[]): Promise<boolean> {
+  try {
+    const r = await api.syncTextProviderModels(providerId, models)
+    if (r && r.ok) {
+      showToast(t('providerSaved'), 3000)
+      await loadTextProviders()
+      return true
+    }
+    showToast(r?.detail || t('providerSaveFailed'), 4500)
+    return false
+  } catch (e: any) {
+    showToast(e?.message || t('providerSaveFailed'), 4500)
+    return false
   }
 }
 
@@ -355,6 +486,18 @@ export function useConfig() {
     loadModels,
     syncModels,
     saveModels,
+    providerName,
+    providerApi,
+    providerBaseUrl,
+    providerApiKey,
+    providerTestBusy,
+    providerSaveStatus,
+    providerErrorMsg,
+    loadTextProviders,
+    saveTextProvider,
+    deleteTextProvider,
+    testTextProvider,
+    syncTextProviderModels,
     domainSaveStatus,
     domainErrorMsg,
     saveDomain,

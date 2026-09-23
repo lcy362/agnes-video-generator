@@ -27,6 +27,7 @@ _ENCODING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
 from core.async_io import read_text, write_text
 from core.compositor.watermark import add_watermark, detect_language
 from core.config import get_watermark_config
+from core.i18n_backend import translate
 from core.task_manager import TaskManager
 from models.task import AudioConfig, BaseTaskState, StepStatus, SubtitleConfig
 
@@ -334,12 +335,13 @@ class BasePipeline(ABC):
             progress = _PAUSE_PROGRESS_BY_STEP.get(step_name, 1.0)
         mc.current_checkpoint = checkpoint
         state.status = StepStatus.PENDING
+        # v7.0（issue #64）：等待确认提示按任务落盘的 ui_language 双语化
         self.task_manager.update_state(
             status=StepStatus.PENDING,
             manual_config=mc,
             current_step=checkpoint,
             current_status="awaiting_user",
-            current_message=f"等待你在检查点 '{checkpoint}' 确认或修改产物",
+            current_message=self._t("task.awaiting_checkpoint", checkpoint=checkpoint),
             current_progress=progress,
         )
         logger.info(
@@ -355,6 +357,25 @@ class BasePipeline(ABC):
     @property
     def working_dir(self) -> str:
         return self.task_manager.task_dir
+
+    def _ui_lang(self) -> str:
+        """读取当前任务落盘的 UI 语言（v7.0，issue #64）。
+
+        Pipeline 在后台协程里跑，HTTP 请求级 ContextVar 早已切走，因此不能
+        依赖 ``core.i18n_backend.get_current_lang()``；必须从 ``self._state``
+        上读任务创建时快照下来的 ``ui_language``。
+
+        Returns:
+            2 字母语言代码；``state`` 未就绪或字段缺失时回退 ``zh``。
+        """
+        state = self._state
+        if state is None:
+            return "zh"
+        return getattr(state, "ui_language", "") or "zh"
+
+    def _t(self, key: str, **params) -> str:
+        """``translate(key, self._ui_lang(), **params)`` 的快捷方式。"""
+        return translate(key, self._ui_lang(), **params)
 
     @abstractmethod
     async def run(self, state: BaseTaskState) -> str:

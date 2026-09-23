@@ -9,6 +9,7 @@
  */
 
 import { t } from '@/i18n'
+import { getUiLang } from '@/api/langHeader'
 
 // ── 常量 ──
 
@@ -139,7 +140,13 @@ const LOCAL_NETWORK_PATTERNS: RegExp[] = [
   /cannot connect to proxy/i,
   /tunnel connection failed/i,
   /connection refused/i,
+  // v7.0（issue #64）：后端网络诊断已双语化，匹配**后端翻译后的输出**而非原始
+  // socket 文本。注意：不直接匹配裸 "Connection reset by peer"——它可能是服务端
+  // 主动断连（误判会引导用户去查本地网络），归因交给后端 ``describe_network_error``
+  // （它能看到完整异常链，含 TLS handshake 上下文），前端只识别其产出的诊断文案。
   /无法解析域名|网络诊断|域名解析失败/,
+  /Network diagnosis/i,
+  /cannot resolve|cannot reach/i,
 ]
 
 /**
@@ -188,6 +195,9 @@ export function buildDiagnosticReport(d: DiagnosticInput): string {
   lines.push(`- ${t('fbRepFailedStep')}: ${d.failedStep || unk}`)
   lines.push(`- ${t('fbRepRetryCount')}: ${d.retryCount}`)
   if (d.configs.length) lines.push(`- ${t('fbRepConfigs')}: ${d.configs.join(' / ')}`)
+  // v7.0（issue #64）：把 UI 语言写进报告，让维护者一眼看出用户看到的
+  // 后端消息应该是什么语种；此前英文界面用户收到中文诊断，报告里却看不出来。
+  lines.push(`- ${t('fbRepUiLang')}: ${getUiLang()}`)
   lines.push(`- ${t('fbRepEnv')}: ${navigator.userAgent}`)
   lines.push('')
   lines.push(t('fbRepErrorTitle'))

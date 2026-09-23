@@ -1,4 +1,4 @@
-"""utils.network — 网络层异常的人话诊断（v6.4.8）
+"""utils.network — 网络层异常的人话诊断（v6.4.8；v7.0 双语化）
 
 把 ``requests`` / ``urllib3`` / ``socket`` 的底层网络异常（域名解析失败、连接被拒、
 代理不通）翻译成用户能自助排查的提示。
@@ -7,6 +7,11 @@
 ``cos-platform-outputs.agnes-ai.cn``（腾讯云 COS），视频在服务端**已经生成成功**，
 只差最后一步下载。此前这类失败只抛出 ``RetryError[<Future ... raised ConnectionError>]``，
 用户无从判断是自己机器的网络问题还是服务故障，于是反复点「重试任务」而无效。
+
+v7.0（GitHub issue #64）：翻译文案改走 ``core.i18n_backend.translate``，
+根据调用方传入的 ``lang`` 或请求上下文输出中文/英文，避免英文 UI 用户看到
+一段无法理解的中文诊断。其余 20 语言暂回退中文，见
+``docs/plans/v7.0/backend_i18n_plan.md``。
 
 设计约束：
 - 只翻译**能确定归因**的两类（DNS 解析失败 / 连接无法建立），其余返回空串由调用方
@@ -17,7 +22,13 @@
 
 import re
 import socket
-from typing import List
+from typing import List, Optional
+
+# 注意：``core.i18n_backend`` 的导入放在函数体内（惰性），不能在模块顶层。
+# 顶层导入会触发循环：utils.network → core.i18n_backend → core/__init__ →
+# core.pipelines → multi_scene → utils.network（此时本模块尚未定义
+# describe_network_error，ImportError）。core.i18n_backend 本身只依赖标准库，
+# 惰性导入没有性能顾虑。
 
 __all__ = ["describe_network_error", "is_network_infra_error"]
 
@@ -45,9 +56,14 @@ _DNS_MARKERS = (
 )
 
 # 连接被拒 / 无法建立连接（不含 timeout：超时多为服务端拥塞，不归因到本地环境）
+# v7.0 追加 ``connection reset`` / ``connection aborted``：issue #64 里 macOS
+# 到 Agnes 视频域名的 TLS 握手被对端 reset，之前只有 ``connection aborted``
+# 命中不稳定（urllib3 会包成 NewConnectionError 或 ProtocolError 两种形态），
+# 补上 reset 让归因更稳。
 _CONNECT_MARKERS = (
     "connection refused",
     "connection aborted",
+    "connection reset",
     "cannot connect to proxy",
     "tunnel connection failed",
     "newconnectionerror",
@@ -131,15 +147,22 @@ def is_network_infra_error(exc: BaseException) -> bool:
     return any(marker in text for marker in _DNS_MARKERS + _CONNECT_MARKERS)
 
 
-def describe_network_error(exc: BaseException) -> str:
-    """把网络层异常翻译成用户可自助排查的中文提示。
+def describe_network_error(exc: BaseException, lang: Optional[str] = None) -> str:
+    """把网络层异常翻译成用户可自助排查的提示（按 UI 语言）。
 
     Args:
         exc: 流水线捕获到的原始异常（可能是 tenacity ``RetryError`` 包装）。
+        lang: 目标 UI 语言（2 字母代码，如 ``"en"``）。``None`` 时走
+            ``core.i18n_backend.resolve_lang``：优先读请求级 ContextVar，
+            未设置则回退 ``zh``。异步 Pipeline 应显式传入
+            ``self._state.ui_language``，避免上下文丢失。
 
     Returns:
         用户可读提示；无法确定归因时返回空串，调用方应回退到原始异常文本。
     """
+    # 惰性导入，打破 utils.network ↔ core.pipelines 的模块级循环（见文件头注释）
+    from core.i18n_backend import translate
+
     text = _chain_text(exc)
     is_dns = _has_gaierror(exc) or any(marker in text for marker in _DNS_MARKERS)
     is_connect = any(marker in text for marker in _CONNECT_MARKERS)
@@ -147,18 +170,8 @@ def describe_network_error(exc: BaseException) -> str:
         return ""
 
     host = _extract_host(text)
-    target = f"`{host}`" if host else "Agnes 服务域名"
+    # 主机名提取失败时给一个本地化的兜底称呼（"Agnes 服务域名" / "the Agnes service domain"）
+    target = f"`{host}`" if host else translate("network.default_target", lang)
     if is_dns:
-        return (
-            f"网络诊断：本机无法解析域名 {target}（DNS 解析失败）。"
-            "服务端任务通常已经完成，只是本机取不回结果文件。"
-            "请依次检查：1) 换用能解析该域名的 DNS（国内推荐 223.5.5.5 或 119.29.29.29）；"
-            "2) 关闭代理/VPN 的 DNS 劫持，检查安全软件与 hosts 是否拦截了该域名；"
-            "3) Windows 执行 ipconfig /flushdns 后重新打开本页；"
-            "4) 恢复后点「重试任务」从失败环节续传，已生成的视频不会重复提交。"
-        )
-    return (
-        f"网络诊断：本机无法连接到 {target}（连接被拒绝或被拦截）。"
-        "请检查代理、VPN、防火墙或安全软件是否拦截了该地址，"
-        "放行后点「重试任务」从失败环节续传，已生成的视频不会重复提交。"
-    )
+        return translate("network.dns_failed", lang, target=target)
+    return translate("network.connect_blocked", lang, target=target)

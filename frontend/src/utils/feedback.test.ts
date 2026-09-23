@@ -48,6 +48,19 @@ describe('isLocalNetworkError（本机网络 / DNS 故障识别，v6.4.8）', ()
     expect(isLocalNetworkError('网络诊断：本机无法解析域名 `cos-platform-outputs.agnes-ai.cn`（DNS 解析失败）')).toBe(true)
   })
 
+  it('识别后端英文 "Network diagnosis" 提示（v7.0 issue #64 双语化）', () => {
+    expect(
+      isLocalNetworkError(
+        'Network diagnosis: this machine cannot resolve `cos-platform-outputs.agnes-ai.cn` (DNS failure).',
+      ),
+    ).toBe(true)
+    expect(
+      isLocalNetworkError(
+        'Network diagnosis: this machine cannot reach `api.agnes-ai.cn` (connection refused, reset, or intercepted).',
+      ),
+    ).toBe(true)
+  })
+
   it('识别代理 / 连接被拒', () => {
     expect(isLocalNetworkError('Cannot connect to proxy 10.16.2.80:80')).toBe(true)
     expect(isLocalNetworkError('Failed to establish a new connection: [Errno 111] Connection refused')).toBe(true)

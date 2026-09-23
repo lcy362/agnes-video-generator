@@ -18,13 +18,37 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 # ═══════════════════════════════════════════════════
 # 应用版本号（v6.1 新增：发版时同步更新，见 docs/dev/release_process.md）
 # ═══════════════════════════════════════════════════
-APP_VERSION = "6.5.2"
+APP_VERSION = "7.0.0"
 
 # 未配置 API Key 时的统一报错文案（含免费获取与在线体验兜底，全站路由共用）
+#
+# v7.0（issue #64）：改为按 UI 语言返回中文/英文。原常量 ``API_KEY_MISSING_MSG``
+# 保留为**中文默认值**，兼容仍按字符串引用的旧代码路径与单测；新代码请一律走
+# ``api_key_missing_msg(lang)`` 或 ``api_key_missing_detail()``（后者自动读
+# 请求上下文）。翻译正文见 ``core.i18n_backend.CATALOG["config.api_key_missing"]``。
 API_KEY_MISSING_MSG = (
     "请先配置 API Key。免费获取：https://platform.agnes-ai.com ｜ "
     "不想配置？在线体验：https://video.lichuanyang.top/demo"
 )
+
+
+def api_key_missing_msg(lang: str | None = None) -> str:
+    """返回按 UI 语言本地化的「未配置 API Key」提示。
+
+    Args:
+        lang: 目标语言（2 字母代码）；``None`` 时读请求上下文，回退中文。
+
+    Returns:
+        本地化字符串。中文分支与 ``API_KEY_MISSING_MSG`` 常量等价。
+    """
+    # 就地导入避免 core.config ↔ core.i18n_backend 的循环依赖风险
+    from core.i18n_backend import translate
+    return translate("config.api_key_missing", lang)
+
+
+def api_key_missing_detail(lang: str | None = None) -> str:
+    """``api_key_missing_msg`` 的别名，语义上更贴近 ``HTTPException(detail=...)``。"""
+    return api_key_missing_msg(lang)
 
 # 项目根目录
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -127,6 +151,31 @@ class WatermarkSettings(BaseModel):
     language: str = "auto"
 
 
+# 文本模型供应商（v7.0 多文本模型）：参考 deepseek-harness ProviderSpec 结构
+class TextProvider(BaseModel):
+    """文本模型供应商（route key 唯一）。
+
+    provider 为路由 key（唯一）；api 为线协议；base_url 为覆盖端点；
+    api_key 一期落盘（回传前端一律掩码）；models 为配置顺序的候选模型列表。
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    provider: str                # route key，唯一
+    display_name: str = ""
+    api: str = "openai-completions"   # "openai-completions" | "anthropic-messages"
+    base_url: str = ""
+    api_key: str = ""            # 一期落盘
+    models: list[str] = Field(default_factory=list)
+
+
+# 文本供应商相关常量
+PROVIDER_AGNES = "agnes"
+API_OPENAI = "openai-completions"
+API_ANTHROPIC = "anthropic-messages"
+_ALLOWED_TEXT_PROVIDER_APIS = (API_OPENAI, API_ANTHROPIC)
+
+
 class AppSettings(BaseModel):
     """config.json 的类型化视图（Pydantic 构造期强制类型校验）。
 
@@ -144,6 +193,7 @@ class AppSettings(BaseModel):
     watermark: WatermarkSettings = Field(default_factory=WatermarkSettings)
     models: dict[str, str] = Field(default_factory=dict)
     agnes_domain: str = "com"
+    text_providers: list[TextProvider] = Field(default_factory=list)
 
 
 def load_settings() -> AppSettings:
@@ -921,6 +971,102 @@ def set_selected_models(text: str = None, image: str = None, video: str = None) 
     config["models"] = m
     save_config(config)
     return get_selected_models()
+
+
+# ═══════════════════════════════════════════════════
+# 文本模型供应商（v7.0 多文本模型）
+# ═══════════════════════════════════════════════════
+
+def get_text_providers() -> list[TextProvider]:
+    """读取 config.json 的 ``text_providers``（容错空/缺省，返回 TextProvider 列表）。"""
+    settings = load_settings()
+    return list(settings.text_providers)
+
+
+def _text_provider_raw_dicts() -> list[dict]:
+    """返回 config 中 text_providers 的原始 dict 列表（供 upsert/删除时保留未建模字段）。"""
+    config = load_config()
+    return config.get("text_providers", []) or []
+
+
+def save_text_provider(p: TextProvider) -> None:
+    """按 ``provider`` upsert 文本供应商后写回 config.json。"""
+    config = load_config()
+    existing = config.get("text_providers", []) or []
+    providers = []
+    replaced = False
+    for item in existing:
+        if isinstance(item, dict) and item.get("provider") == p.provider:
+            providers.append(p.model_dump())
+            replaced = True
+        else:
+            providers.append(item)
+    if not replaced:
+        providers.append(p.model_dump())
+    config["text_providers"] = providers
+    save_config(config)
+
+
+def delete_text_provider(provider: str) -> bool:
+    """删除文本供应商；返回是否删除成功。"""
+    config = load_config()
+    existing = config.get("text_providers", []) or []
+    new_list = [
+        item for item in existing
+        if not (isinstance(item, dict) and item.get("provider") == provider)
+    ]
+    if len(new_list) == len(existing):
+        return False
+    config["text_providers"] = new_list
+    save_config(config)
+    return True
+
+
+def get_selected_text_provider() -> str:
+    """返回当前所选文本供应商 route key（``models.text_provider``）；缺省空串表示 agnes。"""
+    settings = load_settings()
+    m = settings.models or {}
+    return str(m.get("text_provider") or "")
+
+
+def set_selected_text_provider(provider: str) -> None:
+    """写 ``models.text_provider``；空串 = 回退 agnes。"""
+    config = load_config()
+    m = config.get("models", {}) or {}
+    m["text_provider"] = provider or ""
+    config["models"] = m
+    save_config(config)
+
+
+def resolve_text_chat() -> dict:
+    """返回当前所选文本模型的解析结果。
+
+    Returns:
+        agnes:   ``{"kind":"agnes","model": <models.text 或 DEFAULT_TEXT_MODEL>}``
+        custom:  ``{"kind":"custom","provider":..,"api":..,"base_url":..,"api_key":..,"model":..}``
+    """
+    provider = get_selected_text_provider()
+    settings = load_settings()
+    m = settings.models or {}
+    text_model = m.get("text") or DEFAULT_TEXT_MODEL
+    if not provider or provider == PROVIDER_AGNES:
+        return {"kind": "agnes", "model": text_model}
+    for p in settings.text_providers:
+        if p.provider == provider:
+            model = text_model if text_model.lower() != DEFAULT_TEXT_MODEL else (p.models[0] if p.models else DEFAULT_TEXT_MODEL)
+            return {
+                "kind": "custom",
+                "provider": p.provider,
+                "api": p.api or API_OPENAI,
+                "base_url": p.base_url,
+                "api_key": p.api_key,
+                "model": model if model != DEFAULT_TEXT_MODEL else (p.models[0] if p.models else DEFAULT_TEXT_MODEL),
+            }
+    # 未找到匹配供应商 → 回退 agnes 并告警
+    logger.warning(
+        f"Selected text provider '{provider}' not found, falling back to agnes"
+    )
+    return {"kind": "agnes", "model": text_model}
 
 
 # ═══════════════════════════════════════════════════

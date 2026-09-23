@@ -29,6 +29,7 @@ from fastapi.staticfiles import StaticFiles
 from core.audio.voices import load_voice_catalog
 from web import app_state  # noqa: F401 兼容 re-export：旧代码 from server import app_state
 from web.app_state import init_runtime_state
+from web.middleware import LangContextMiddleware
 from web.routes import (
     config_routes,
     gallery_routes,
@@ -136,6 +137,14 @@ app = FastAPI(
     ),
     lifespan=lifespan,
 )
+
+
+# v7.0（issue #64）：请求级 UI 语言上下文中间件。
+# 前端在每次 fetch 上注入 ``X-Agnes-UI-Lang`` 头（未注入时回退 ``Accept-Language``），
+# 中间件把归一化后的语言写入 ``core.i18n_backend.current_lang`` ContextVar，
+# 供同请求生命周期内的 ``HTTPException(detail=translate(...))`` 读取。
+# 异步 Pipeline 通过 ``BaseTaskState.ui_language`` 拿语言快照，不依赖此上下文。
+app.add_middleware(LangContextMiddleware)
 
 
 # Phase 2（PR #33 吸收）：可配置 CORS 白名单——取代原 PR 硬编码的 :8787。

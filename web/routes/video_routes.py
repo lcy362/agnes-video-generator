@@ -13,8 +13,8 @@ import tempfile
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from core.api.agnes_chat import AgnesChatAPI
 from core.api.agnes_image import AgnesImageAPI
+from core.api.chat_providers import get_or_build_text_chat_client
 from core.artifacts import (
     apply_cascade_plan,
     build_checkpoint_manifest,
@@ -24,8 +24,9 @@ from core.artifacts import (
     write_checkpoint_manifest,
 )
 from core.async_io import read_text, write_bytes
-from core.config import API_KEY_MISSING_MSG, get_api_key, get_working_dir
+from core.config import api_key_missing_msg, get_api_key, get_working_dir
 from core.dependency_graph import get_dependency_graph
+from core.i18n_backend import translate
 from core.path_security import UnsafePathError, safe_join
 from core.task_manager import TaskManager
 from models.task import StepStatus
@@ -590,17 +591,29 @@ _TEXT_CATEGORIES = {"json", "subtitle", "text"}
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 
 
-def _text_diff_summary(old: str, new: str) -> str:
-    """轻量文本改动摘要（行级差量 + 字符数变化），不依赖外部 diff 库。"""
+def _text_diff_summary(old: str, new: str, lang: str = "zh") -> str:
+    """轻量文本改动摘要（行级差量 + 字符数变化），不依赖外部 diff 库。
+
+    Args:
+        old: 原文本。
+        new: 新文本。
+        lang: UI 语言（v7.0，issue #64），决定摘要文案语种。
+    """
     old_lines = [line for line in old.splitlines() if line.strip()]
     new_lines = [line for line in new.splitlines() if line.strip()]
     if old_lines == new_lines:
         if old != new:
-            return f"内容有变化（字符数 {len(old)} → {len(new)}）"
-        return "未检测到内容变化"
+            return translate(
+                "ai_modify.diff_char_only", lang,
+                old_len=len(old), new_len=len(new),
+            )
+        return translate("ai_modify.diff_no_change", lang)
     added = sum(1 for line in new_lines if line not in set(old_lines))
     removed = sum(1 for line in old_lines if line not in set(new_lines))
-    return f"改动摘要：新增 {added} 行，删除 {removed} 行（字符数 {len(old)} → {len(new)}）"
+    return translate(
+        "ai_modify.diff_summary", lang,
+        added=added, removed=removed, old_len=len(old), new_len=len(new),
+    )
 
 
 def _read_file_b64(path: str) -> str:
@@ -677,13 +690,15 @@ async def ai_modify_artifact(
 
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
+        # v7.0（issue #64）：按任务落盘 ui_language 本地化，避免英文界面看到中文报错
+        raise HTTPException(status_code=400, detail=api_key_missing_msg(state.ui_language))
 
+    ui_lang = getattr(state, "ui_language", "") or "zh"
     category = artifact.category
     try:
         if category in _TEXT_CATEGORIES:
             raw = await read_text(real_abs_path)
-            chat_api = AgnesChatAPI(api_key=api_key)
+            chat_api = get_or_build_text_chat_client(api_key=api_key)
             if category == "json":
                 parsed = await asyncio.to_thread(
                     chat_api.chat_json,
@@ -699,9 +714,9 @@ async def ai_modify_artifact(
                     "文本分段不变），只按用户要求修改内容，输出完整改写结果。",
                     f"以下是现有内容：\n{raw}\n\n用户要求：{user_request}\n请直接输出修改后的完整内容。",
                 )
-            diff_summary = _text_diff_summary(raw, new_content)
+            diff_summary = _text_diff_summary(raw, new_content, lang=ui_lang)
         elif os.path.splitext(artifact.file_relpath)[1].lower() in _IMAGE_EXTS:
-            chat_api = AgnesChatAPI(api_key=api_key)
+            chat_api = get_or_build_text_chat_client(api_key=api_key)
             edit_prompt = await asyncio.to_thread(
                 chat_api.chat_multimodal,
                 "你是资深图像编辑。基于用户意见，输出一条简洁的中文改写要求，"
@@ -715,16 +730,24 @@ async def ai_modify_artifact(
                 reference_image_paths=[real_abs_path],
             )
             new_content = await _image_output_to_data_url(output)
-            diff_summary = f"AI 已基于原图生成新版：{edit_prompt.strip()[:120]}"
+            diff_summary = translate(
+                "ai_modify.image_regenerated", ui_lang,
+                prompt=edit_prompt.strip()[:120],
+            )
         else:
             raise HTTPException(
                 status_code=400,
-                detail=f"该产物类型（{category}）暂不支持 AI 修改，请使用「在线编辑」或「自行处理」通道",
+                detail=translate(
+                    "ai_modify.unsupported_category", ui_lang, category=category,
+                ),
             )
     except HTTPException:
         raise
     except Exception as e:
-        message = describe_network_error(e) or f"AI 修改失败：{e}"
+        # v7.0（issue #64）：网络诊断按 ui_language 输出中/英文
+        message = describe_network_error(e, lang=ui_lang) or translate(
+            "ai_modify.failed", ui_lang, reason=str(e),
+        )
         raise HTTPException(status_code=502, detail=message)
 
     logger.info("[AiModify] %s task %s checkpoint '%s' (category=%s)",

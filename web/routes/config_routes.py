@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import re
@@ -13,14 +14,21 @@ logger = logging.getLogger(__name__)
 
 from core.api.agnes_models import fetch_available_models
 from core.api.key_manager import reset_key_ring
+from core.api.providers.base import probe_text_models
 from core.api.rate_limiter import reset_rate_limiter
 from core.config import (
     AGNES_DOMAIN_MAP,
+    API_ANTHROPIC,
+    API_OPENAI,
     APP_VERSION,
+    DEFAULT_TEXT_MODEL,
+    PROVIDER_AGNES,
     REGRESSION_WORKING_DIR_ENV,
     WATERMARK_PROMO_TEXT_EN,
     WATERMARK_PROMO_TEXT_ZH,
+    TextProvider,
     delete_api_key,
+    delete_text_provider,
     get_active_workspace,
     get_agnes_domain,
     get_api_key,
@@ -30,16 +38,20 @@ from core.config import (
     get_api_keys_source,
     get_api_keys_with_sources,
     get_selected_models,
+    get_selected_text_provider,
+    get_text_providers,
     get_video_model_capabilities,
     get_watermark_config,
     get_workspaces,
     load_config,
     remove_api_key_single,
+    save_text_provider,
     set_agnes_domain,
     set_api_key,
     set_api_key_domains,
     set_api_keys,
     set_selected_models,
+    set_selected_text_provider,
     set_watermark_config,
 )
 
@@ -470,11 +482,14 @@ async def save_models(
     text: str = Form(None),
     image: str = Form(None),
     video: str = Form(None),
+    text_provider: str = Form(None),
 ):
     """保存选中的模型配置。
 
     text 为必填（目前仅文本模型开放选择）；image/video 接受但不强制，
     置灰时前端仍会随配置保存其值（缺省回退到当前默认值）。
+
+    ``text_provider`` 可选：非空时一并写入 ``models.text_provider``（空串 = 回退 agnes）。
     """
     if text is None or text.strip() == "":
         raise HTTPException(status_code=400, detail="文本模型不能为空")
@@ -483,6 +498,9 @@ async def save_models(
         image=image,
         video=video,
     )
+    if text_provider is not None:
+        set_selected_text_provider(text_provider.strip() or "")
+        result = get_selected_models()
     return {"ok": True, "models": result}
 
 
@@ -508,3 +526,233 @@ async def save_agnes_domain(domain: str = Form(...)):
         )
     set_agnes_domain(domain)
     return {"ok": True, "agnes_domain": domain}
+
+
+# ═══════════════════════════════════════════════════
+# 文本模型供应商（v7.0 多文本模型）
+# ═══════════════════════════════════════════════════
+
+_VALID_TEXT_APIS = (API_OPENAI, API_ANTHROPIC)
+
+
+@router.post("/api/config/text-providers/test")
+async def test_text_provider(
+    base_url: str = Form(""),
+    api_key: str = Form(""),
+    api: str = Form(API_OPENAI),
+    provider: str = Form(""),
+):
+    """用此刻输入（或已存供应商）的 key+base_url 探测模型列表（不落盘）。
+
+    编辑已配好 key 的供应商时，前端只有掩码 key，无法直接用其探测。
+    此时可传 ``provider``：当表单未另行提供 base_url/api_key 时，回退用该
+    供应商**已存储的** base_url+api_key 探测（config 中存的是明文）。
+
+    api 必须为 openai-completions / anthropic-messages 之一。
+
+    Returns:
+        成功 ``{"ok":true,"models":[id,...]}``；
+        失败 ``{"ok":false,"error":str}``。
+    """
+    base_url = (base_url or "").strip()
+    api_key = (api_key or "").strip()
+    api = (api or "").strip()
+    # 编辑场景：表单未给有效 base_url/key、且指明了 provider，则用已存凭据探测
+    stored = None
+    for p in get_text_providers():
+        if p.provider == (provider or "").strip():
+            stored = p
+            break
+    if stored is not None:
+        if not base_url:
+            base_url = (stored.base_url or "").strip()
+        if not api_key:
+            api_key = (stored.api_key or "").strip()
+        if not api or api not in _VALID_TEXT_APIS:
+            api = stored.api or API_OPENAI
+    if api not in _VALID_TEXT_APIS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"协议(api)必须为 {list(_VALID_TEXT_APIS)} 之一",
+        )
+    if not base_url:
+        raise HTTPException(status_code=422, detail="base_url 不能为空")
+    import asyncio
+
+    def _probe():
+        return probe_text_models(base_url=base_url, api_key=api_key, api=api)
+
+    try:
+        models = await asyncio.to_thread(_probe)
+    except Exception as e:  # noqa: BLE001 — 探测失败返回 error 而非抛出
+        logger.warning(f"[ChatProvider] Probe text provider failed: {e}")
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "models": models}
+
+
+@router.get("/api/config/text-providers")
+async def list_text_providers():
+    """列出文本模型供应商。
+
+    内置 agnes 恒在首位并标 ``builtin=True``；自定义供应商 api_key 只回掩码。
+    每个条目带 ``selected`` 标记；顶层 ``current_model`` 为当前文本模型。
+
+    Returns:
+        {
+          "ok": true,
+          "providers": [{...}],
+          "selected": "<provider 或 'agnes'>",
+          "current_model": "<models.text>",
+        }
+    """
+    selected = get_selected_text_provider()
+    providers = get_text_providers()
+    result = []
+    # 内置 agnes（不可配置、不可删）
+    result.append({
+        "provider": PROVIDER_AGNES,
+        "display_name": "Agnes",
+        "api": API_OPENAI,
+        "base_url": "",
+        "api_key": "",
+        "models": [],
+        "builtin": True,
+        "selected": selected in ("", PROVIDER_AGNES),
+    })
+    for p in providers:
+        result.append({
+            "provider": p.provider,
+            "display_name": p.display_name,
+            "api": p.api,
+            "base_url": p.base_url,
+            "api_key": _mask_key(p.api_key),
+            "models": list(p.models),
+            "builtin": False,
+            "selected": selected == p.provider,
+        })
+    return {
+        "ok": True,
+        "providers": result,
+        "selected": selected or PROVIDER_AGNES,
+        "current_model": get_selected_models().get("text"),
+    }
+
+
+@router.post("/api/config/text-providers")
+async def save_text_provider_endpoint(
+    provider: str = Form(...),
+    display_name: str = Form(""),
+    api: str = Form(API_OPENAI),
+    base_url: str = Form(""),
+    api_key: str = Form(""),
+    models_json: str = Form(""),
+):
+    """新增 / 更新文本模型供应商（upsert 按 provider）。
+
+    Args:
+        provider: route key（唯一，非空）。
+        display_name: 展示名（可选）。
+        api: 线协议（openai-completions / anthropic-messages）。
+        base_url: 覆盖端点（非空）。
+        api_key: 凭据（一期落盘）。
+        models_json: 可选 JSON 数组字符串（候选模型）。
+    """
+    provider = (provider or "").strip()
+    display_name = (display_name or "").strip()
+    api = (api or "").strip()
+    base_url = (base_url or "").strip()
+    api_key = (api_key or "").strip()
+    if not provider:
+        raise HTTPException(status_code=400, detail="provider 不能为空")
+    if api not in _VALID_TEXT_APIS:
+        raise HTTPException(status_code=422, detail=f"协议(api)必须为 {list(_VALID_TEXT_APIS)} 之一")
+    if not base_url:
+        raise HTTPException(status_code=422, detail="base_url 不能为空")
+
+    # 编辑场景：列表只回掩码，前端不会有明文 key。若本次未提供新 key（空），
+    # 则保留已存储的 key，避免把自定义供应商的凭据误清空。
+    if not api_key:
+        existing_raw = [
+            item for item in (load_config().get("text_providers", []) or [])
+            if isinstance(item, dict) and item.get("provider") == provider
+        ]
+        if existing_raw and existing_raw[0].get("api_key"):
+            api_key = existing_raw[0].get("api_key") or ""
+
+    models = []
+    if models_json and models_json.strip():
+        try:
+            parsed = json.loads(models_json)
+            models = [str(m).strip() for m in parsed if str(m).strip()]
+        except ValueError:
+            raise HTTPException(status_code=422, detail="models_json 必须为合法 JSON 数组")
+
+    p = TextProvider(
+        provider=provider,
+        display_name=display_name,
+        api=api,
+        base_url=base_url,
+        api_key=api_key,
+        models=models,
+    )
+    save_text_provider(p)
+    # 若这是首个自定义供应商且尚未选任何 text_provider，可选不设（保持现状）
+    return {"ok": True}
+
+
+@router.delete("/api/config/text-providers/{provider}")
+async def delete_text_provider_endpoint(provider: str = ""):
+    """删除文本供应商。
+
+    Raises:
+        400: 内置 agnes 不可删。
+        404: 供应商不存在。
+    """
+    provider = (provider or "").strip()
+    if provider == PROVIDER_AGNES:
+        raise HTTPException(status_code=400, detail="内置 Agnes 供应商不可删除")
+    deleted = delete_text_provider(provider)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"供应商不存在: {provider}")
+    # 若删除的是当前所选 → 回退 agnes，并把 models.text 归默认，避免遗留
+    # 已删除供应商的模型 id 被路由到 Agnes（resolve_text_chat 会当作 agnes 模型用）。
+    if get_selected_text_provider() == provider:
+        set_selected_text_provider("")
+        set_selected_models(text=DEFAULT_TEXT_MODEL)
+    return {"ok": True, "deleted": True}
+
+
+@router.post("/api/config/text-providers/{provider}/sync")
+async def sync_text_provider_models(provider: str = "", models_json: str = Form("")):
+    """将候选模型写入指定供应商并落盘（不做探测，仅登记）。
+
+    Raises:
+        404: 供应商不存在。
+        422: models_json 非法。
+    """
+    provider = (provider or "").strip()
+    if provider == PROVIDER_AGNES:
+        raise HTTPException(status_code=400, detail="内置 Agnes 供应商无需同步模型")
+    if not models_json or not models_json.strip():
+        raise HTTPException(status_code=422, detail="models_json 不能为空")
+    try:
+        parsed = json.loads(models_json)
+        models = [str(m).strip() for m in parsed if str(m).strip()]
+    except ValueError:
+        raise HTTPException(status_code=422, detail="models_json 必须为合法 JSON 数组")
+
+    providers = get_text_providers()
+    target = next((p for p in providers if p.provider == provider), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail=f"供应商不存在: {provider}")
+    # 保留原 key/信息，仅更新 models 列表
+    updated = TextProvider(
+        provider=target.provider,
+        display_name=target.display_name,
+        api=target.api,
+        base_url=target.base_url,
+        api_key=target.api_key,
+        models=models,
+    )
+    save_text_provider(updated)
+    return {"ok": True}

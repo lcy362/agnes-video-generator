@@ -204,6 +204,16 @@ class BaseTaskState(BaseModel):
     created_at: str = ""
     updated_at: str = ""
 
+    # ── v7.0：任务创建时的前端 UI 语言（后端 i18n 用）──
+    # 背景（GitHub issue #64）：``utils/network.py::describe_network_error`` 等
+    # 后端生成的用户可见消息此前硬编码中文，英文/日文等 UI 用户也照看不误，
+    # 引发误判。此字段在任务创建端点里从 ``X-Agnes-UI-Lang`` 请求头（或
+    # ``ui_language`` 表单字段）提取并归一到 ``core.i18n_backend.SUPPORTED_UI_LANGS``
+    # 里的 2 字母代码；异步 Pipeline 里通过 ``self._state.ui_language`` 读取，
+    # 保证任务全生命周期用同一语言发消息（即便用户中途切了 UI 语言）。
+    # 旧 task_state.json 缺此字段时 Pydantic 自动补默认 ``zh``，向后兼容。
+    ui_language: str = "zh"
+
 
 class SimpleVideoTask(BaseTaskState):
     """简单视频任务（类型 1）
