@@ -238,11 +238,17 @@ function textModelsForProvider(provider: string): string[] {
 const textModelOptions = computed(() => textModelsForProvider(textProviderComposite.value))
 // 供应商新增表单：拉取候选模型（不落盘）
 async function onFetchProviderModels() {
-  await testTextProvider({
+  const editingProviderId =
+    editingProvider.value && editingProvider.value !== 'agnes' ? editingProvider.value : ''
+  const payload: any = {
     base_url: providerBaseUrl.value.trim(),
     api_key: providerApiKey.value.trim(),
     api: providerApi.value,
-  })
+  }
+  // 编辑已配好 key 的供应商时，表单 api_key 可能为空（key 在其他会话存），
+  // 传 provider 让后端回退用该供应商已存明文 key 探测，避免掩码/空 key 致 401。
+  if (editingProviderId) payload.provider = editingProviderId
+  await testTextProvider(payload)
 }
 // 由展示名生成唯一 route key（slug）；全非 ASCII（如中文名）时兜底时间戳
 function slugifyProvider(s: string): string {

@@ -332,6 +332,7 @@ async function testTextProvider(payload: {
   base_url: string
   api_key: string
   api: string
+  provider?: string
 }): Promise<string[]> {
   providerTestModels.value = []
   providerTestSelected.value = []

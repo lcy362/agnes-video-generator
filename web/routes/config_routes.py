@@ -540,11 +540,16 @@ _VALID_TEXT_APIS = (API_OPENAI, API_ANTHROPIC)
 
 @router.post("/api/config/text-providers/test")
 async def test_text_provider(
-    base_url: str = Form(...),
+    base_url: str = Form(""),
     api_key: str = Form(""),
     api: str = Form(API_OPENAI),
+    provider: str = Form(""),
 ):
-    """用用户此刻输入的 key+base_url 探测模型列表（不落盘）。
+    """用此刻输入（或已存供应商）的 key+base_url 探测模型列表（不落盘）。
+
+    编辑已配好 key 的供应商时，前端只有掩码 key，无法直接用其探测。
+    此时可传 ``provider``：当表单未另行提供 base_url/api_key 时，回退用该
+    供应商**已存储的** base_url+api_key 探测（config 中存的是明文）。
 
     api 必须为 openai-completions / anthropic-messages 之一。
 
@@ -553,7 +558,21 @@ async def test_text_provider(
         失败 ``{"ok":false,"error":str}``。
     """
     base_url = (base_url or "").strip()
+    api_key = (api_key or "").strip()
     api = (api or "").strip()
+    # 编辑场景：表单未给有效 base_url/key、且指明了 provider，则用已存凭据探测
+    stored = None
+    for p in get_text_providers():
+        if p.provider == (provider or "").strip():
+            stored = p
+            break
+    if stored is not None:
+        if not base_url:
+            base_url = (stored.base_url or "").strip()
+        if not api_key:
+            api_key = (stored.api_key or "").strip()
+        if not api or api not in _VALID_TEXT_APIS:
+            api = stored.api or API_OPENAI
     if api not in _VALID_TEXT_APIS:
         raise HTTPException(
             status_code=422,

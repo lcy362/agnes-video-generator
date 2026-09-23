@@ -116,11 +116,12 @@ export function deleteTextProvider(id: string) {
   return apiFetch('/api/config/text-providers/' + encodeURIComponent(id), { method: 'DELETE' }).then((r) => r.json())
 }
 // 用用户此刻输入的 key+base_url 探测拉模型列表（不落盘）
-export function testTextProvider(payload: { base_url: string; api_key: string; api: string }) {
+export function testTextProvider(payload: { base_url: string; api_key: string; api: string; provider?: string }) {
   const form = new FormData()
   form.append('base_url', payload.base_url)
   form.append('api_key', payload.api_key)
   form.append('api', payload.api)
+  if (payload.provider) form.append('provider', payload.provider)
   return apiFetch('/api/config/text-providers/test', { method: 'POST', body: form }).then((r) => r.json())
 }
 // 将候选模型正式写入该供应商并落盘
