@@ -25,7 +25,7 @@ import logging
 from fastapi import APIRouter, Form, HTTPException
 
 from core.audio.voices import duration_len, estimate_chars_per_sec
-from core.config import API_KEY_MISSING_MSG, get_api_key, get_selected_models
+from core.config import API_KEY_MISSING_MSG, api_key_missing_msg, get_api_key, get_selected_models
 from core.pipelines.manuscript_video import split_manuscript_text
 from core.screenwriter import Screenwriter, is_prompt_language_explicit
 
@@ -183,7 +183,8 @@ async def preview_creative_script(
     try:
         api_key = get_api_key()
         if not api_key:
-            raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
+            # v7.0（issue #64）：按请求 UI 语言返回中/英文提示
+            raise HTTPException(status_code=400, detail=api_key_missing_msg())
 
         if not idea.strip():
             raise HTTPException(status_code=422, detail="idea 不能为空")

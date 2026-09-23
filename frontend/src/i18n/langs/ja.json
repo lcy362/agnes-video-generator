@@ -560,6 +560,7 @@
   "fbRepRetryCount": "Retry Count",
   "fbRepConfigs": "Key Configs",
   "fbRepEnv": "Environment",
+  "fbRepUiLang": "表示言語",
   "fbRepUnknown": "unknown",
   "fbRepErrorTitle": "### Error Message",
   "fbRepTraceback": "#### 完全なトレースバック",

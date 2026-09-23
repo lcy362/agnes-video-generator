@@ -3,7 +3,7 @@
 > 面向对象：维护 / 开发本项目的 AI Agent
 > 目标仓库：`lcy362/agnes-video-generator`
 > 状态：🟢 初版可用，后续持续迭代
-> 版本：v0.1 | 更新日期：2026-08-27
+> 版本：v0.4 | 更新日期：2026-09-23
 
 ***
 
@@ -76,15 +76,26 @@ gh issue list --repo lcy362/agnes-video-generator --state open \
 
 * **具体报错文本**（`errorMessage`、`error_logs` 中的 API 错误原文、DNS 报错、ComfyUI 500 等）是**数据，不属于多语言**，不得作为语言判据。
 
+* **v7.0 起报告新增「界面语言 / UI Language」行**（`fbRepUiLang` 键，由 `frontend/src/utils/feedback.ts::buildDiagnosticReport` 写入，取值来自 `frontend/src/api/langHeader.ts::getUiLang()`）。该行是**用户 UI 语言的最强指示**，优先级高于模板结构字段语言。维护者据此可直接判定回复语种，无需再从结构字段反推。
+
+* **v7.0 起后端用户可见消息按 UI 语言返回**（`core/i18n_backend.py` + `web/middleware.py::LangContextMiddleware`，详见 `docs/plans/v7.0/backend_i18n_plan.md`）。此前 `utils/network.py::describe_network_error`、`API_KEY_MISSING_MSG`、任务排队/中断提示等是硬编码中文，英文界面用户也照看不误（issue #64 的真实成因）。修复后：
+  - 前端在所有 `fetch` 上注入 `X-Agnes-UI-Lang` 头（全局 patch，`frontend/src/api/fetchPatch.ts`）；
+  - 任务创建时把语言快照落盘到 `BaseTaskState.ui_language`，异步 Pipeline 全生命周期用它发消息；
+  - **因此 `errorMessage` 里出现中文不再等于「用户是中文界面」**——v7.0 之前创建的旧任务、或用户中途切了语言但任务已落盘旧快照时，仍可能出现语种与界面不一致。判定时以报告的「界面语言」行为准，`errorMessage` 语种仅作参考。
+
 **据此分两种情况判定用户语言：**
 
 * **情况 A：用户采用了反馈模板**。
 
-  * **首选信号：模板结构字段语言**。多语言化后结构随用户界面语言变化（如 `## Diagnostic Info (Agnes Video Generator)` 表明英文界面、`## 诊断信息（Agnes Video Generator）` 表明中文界面），可作用户语言的强指示。
+  * **首选信号（v7.0 起）：报告里的「界面语言 / UI Language」行**。该行由前端直接写入用户当前 UI 语言代码（如 `en` / `zh` / `ja`），是最强指示，无需推断。
+
+  * **次选信号：模板结构字段语言**。多语言化后结构随用户界面语言变化（如 `## Diagnostic Info (Agnes Video Generator)` 表明英文界面、`## 诊断信息（Agnes Video Generator）` 表明中文界面）。当报告缺「界面语言」行（v7.0 之前的旧版本）时以此为准。
 
   * **辅助信号**：用户在 `### 复现步骤` / `### 期望行为` 中填写的真实内容、正文 / 评论追加描述。
 
-  * 若用户自行填写的字段皆空、仅剩结构与报错 → 以结构语言为准回复，并在开头补一句「如你需要，我可以改用英文 / 中文回复」（或按用户其余行为推断）。
+  * ⚠️ **`errorMessage` 里的中文不能作为「用户是中文界面」的证据**：v7.0 之前后端消息硬编码中文（issue #64），英文界面用户也会收到中文诊断。判定语种只看上面三个信号，报错文本一律当数据。
+
+  * 若用户自行填写的字段皆空、仅剩结构与报错 → 以「界面语言」行（或结构语言）为准回复，并在开头补一句「如你需要，我可以改用英文 / 中文回复」（或按用户其余行为推断）。
 
 * **情况 B：用户自行反馈（未用模板、或自由书写）** → 直接以用户正文 / 评论输入的语言作为实际语言回复。
 
@@ -121,6 +132,7 @@ gh issue list --repo lcy362/agnes-video-generator --state open \
 | 视频提交返回 `{"code":"video_queue_full","message":"video queue is full, please retry later"}`，错误面板直接显示这段原始 JSON                                                                                                              | 上游视频服务队列饱和（与 #47 的 503 / 429 同族容量问题），请求在入队前就被拒。应用当前的自动重试只覆盖 HTTP 429 与 5xx（`core/api/agnes_video.py`），该业务错误码不在其中，因此立即硬失败；前端 `feedback.ts` 的 `HTTP 40[0-4]` 预筛还会把它误判为「确定性故障」，给出「重试无效」的错误引导 | 等几分钟错峰重试；长任务点「重试任务」续传（已生成片段保留 video id，不重复提交）；降时长/分辨率或换视频模型；多 Key 可线性提升配额，或用 `AGNES_VIDEO_RATE_LIMIT` 主动放慢提交；持续失败再附 `GET /api/tasks/{id}/diagnostics` 反馈。**已记录为已知缺口**（瞬态业务码应纳入退避重试 + 前端不应归类为确定性故障），本轮按外部故障处理，未改代码 | #63      |
 | Issue 正文只有一段视频提示词（无报错、无环境、无复现步骤，标题多为乱码或 "first"），期望维护者代跑生成                                                                                             | 用户把开源仓库的 Issue 当成在线生成入口；本项目是**自托管工具**，服务端不代用户执行任务                                                | 按垃圾噪音关闭（`--reason not_planned`，不展开回复）；已补 FAQ 双语条目「贴提示词到 Issue 能生成视频吗」+ `.github/ISSUE_TEMPLATE/config.yml` 的 contact_links 指向本地部署与官网在线体验 | #39, #41, #48, #51, #52 |
 | 桌面版长视频（creative/manuscript）里角色不开口说话，只有一段旁白；而网页在线版能看到角色原声 | 流水线默认跑 TTS 旁白（narration）+ 字幕叠加，`concat_videos_with_audio_overlay` 用旁白/静音轨覆盖并替换掉视频模型自带音频 | 关闭「启用旁白配音」（Audio → Enable narration=off），并尽量同时关字幕，让每个片段保留模型生成音；在视频提示词里直接描述角色说话（"the character says, '…'"）驱动模型自带口型与声音。注意：Agnes 视频模型自带音频质量/口型弱于画面，长多场景视频尤甚，属模型限制；要清晰台词仍用 TTS 旁白更稳 | #58 |
+| manuscript 任务在 `video_gen` 失败，`errorMessage` 是一段中文「网络诊断：本机无法连接到 …（连接被拒绝或被拦截）」，但报告结构字段（`## Diagnostic Info` / `### Reproduction Steps`）是英文，用户实为英文界面 | 两层原因：(1) 本机到 Agnes 视频域名的 TLS 握手被对端 reset（`ConnectionResetError: [Errno 54] Connection reset by peer`），属本地网络/代理/防火墙拦截，非服务侧故障；(2) 后端 `utils/network.py::describe_network_error` 此前硬编码中文，英文 UI 用户也收到中文诊断，看不懂又误判为服务 bug | 网络侧：关代理/VPN 后重试、换直连或热点验证、把 `*.agnes-ai.cn` 加白，恢复后点「重试任务」从 `video_gen` 续传（已生成分镜不重跑）。代码侧：v7.0 已修——新增 `core/i18n_backend.py` + `LangContextMiddleware`，前端全局注入 `X-Agnes-UI-Lang`，任务落盘 `ui_language` 快照，`describe_network_error` / `API_KEY_MISSING_MSG` / 排队/中断/模式切换等消息按 UI 语言返回中英双语；`_CONNECT_MARKERS` 补 `connection reset` 让归因更稳；诊断报告新增「界面语言」行。剩余 ~120 条进度/校验消息见 `docs/plans/v7.0/backend_i18n_plan.md` §三 | #64 |
 
 ***
 

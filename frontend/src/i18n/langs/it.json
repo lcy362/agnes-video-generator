@@ -560,6 +560,7 @@
   "fbRepRetryCount": "Retry Count",
   "fbRepConfigs": "Key Configs",
   "fbRepEnv": "Environment",
+  "fbRepUiLang": "Lingua dell'interfaccia",
   "fbRepUnknown": "unknown",
   "fbRepErrorTitle": "### Error Message",
   "fbRepTraceback": "#### Traceback completo",

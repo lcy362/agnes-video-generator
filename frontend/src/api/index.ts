@@ -1,9 +1,24 @@
 // 统一 API 封装：与后端 21 个端点一一对应
 // 任务提交类用 FormData（含文件上传），其余用 JSON
+//
+// v7.0（issue #64）：所有请求统一注入 ``X-Agnes-UI-Lang`` 头，让后端把用户
+// 可见的错误/进度消息按当前 UI 语言返回，避免英文/日文界面看到中文报错。
+// 语言来源与 ``useI18n().lang`` 同源（localStorage ``lang``），切语言后新
+// 请求立即生效；已创建的异步任务通过 ``BaseTaskState.ui_language`` 快照保持
+// 整个生命周期语种一致。
 import type { GalleryItem, Preset } from '@/types'
+import { withUiLangHeader } from './langHeader'
+
+/**
+ * 内部 fetch 包装：统一注入 UI 语言头。所有后端调用（含 FormData 上传）
+ * 都必须走这里，别再直接 ``fetch(url, options)``。
+ */
+function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  return fetch(url, { ...options, headers: withUiLangHeader(options.headers) })
+}
 
 async function request<T = any>(url: string, options?: RequestInit): Promise<T> {
-  const r = await fetch(url, options)
+  const r = await apiFetch(url, options)
   // 3.1：统一检查 r.ok——此前 5xx / 错误页（HTML）会被误解析成 JSON 抛出
   // 误导性错误；现在抛带后端 detail 的可读错误
   if (!r.ok) {
@@ -26,10 +41,10 @@ export function getConfig() {
 export function saveApiKey(apiKey: string) {
   const form = new FormData()
   form.append('api_key', apiKey)
-  return fetch('/api/config', { method: 'POST', body: form })
+  return apiFetch('/api/config', { method: 'POST', body: form })
 }
 export function clearApiKey() {
-  return fetch('/api/config', { method: 'DELETE' })
+  return apiFetch('/api/config', { method: 'DELETE' })
 }
 // 多 API Key（v5.0 优化：多 Key 轮询 + 限流整合）
 export function getConfigKeys() {
@@ -39,31 +54,31 @@ export function saveConfigKeys(keys: string[], append = false) {
   const form = new FormData()
   form.append('keys_json', JSON.stringify(keys))
   if (append) form.append('append', 'true')
-  return fetch('/api/config/keys', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/config/keys', { method: 'POST', body: form }).then((r) => r.json())
 }
 export function removeConfigKey(id: string) {
   // 用掩码接口返回的稳定 id 定位删除，不回传 Key 明文
   const form = new FormData()
   form.append('id', id)
-  return fetch('/api/config/keys', { method: 'DELETE', body: form }).then((r) => r.json())
+  return apiFetch('/api/config/keys', { method: 'DELETE', body: form }).then((r) => r.json())
 }
 export function saveDomain(domain: string) {
   const form = new FormData()
   form.append('domain', domain)
-  return fetch('/api/config/domain', { method: 'POST', body: form })
+  return apiFetch('/api/config/domain', { method: 'POST', body: form })
 }
 // per-key 域名绑定（v2.3）：为单个 config Key 保存其绑定的域名后缀
 export function saveConfigKeyDomain(id: string, domain: string) {
   const form = new FormData()
   form.append('id', id)
   form.append('domain', domain)
-  return fetch('/api/config/keys/domain', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/config/keys/domain', { method: 'POST', body: form }).then((r) => r.json())
 }
 // per-key 域名自动探测：逐 key 按候选域名探测，返回每个 key 的探测结果
 export function detectConfigKeyDomains(force = false) {
   const form = new FormData()
   if (force) form.append('force', 'true')
-  return fetch('/api/config/keys/detect', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/config/keys/detect', { method: 'POST', body: form }).then((r) => r.json())
 }
 export function saveModels(models: { text?: string; image?: string; video?: string; text_provider?: string }) {
   const form = new FormData()
@@ -71,7 +86,7 @@ export function saveModels(models: { text?: string; image?: string; video?: stri
   if (models.image) form.append('image', models.image)
   if (models.video) form.append('video', models.video)
   if (models.text_provider) form.append('text_provider', models.text_provider)
-  return fetch('/api/config/models', { method: 'POST', body: form })
+  return apiFetch('/api/config/models', { method: 'POST', body: form })
 }
 // ── 文本模型供应商（v7.0 可插拔多供应商）──
 // 列出供应商（api_key 只回掩码；内置 agnes 标 builtin 不可删）
@@ -94,11 +109,11 @@ export function saveTextProvider(payload: {
   form.append('base_url', payload.base_url)
   form.append('api_key', payload.api_key)
   form.append('models_json', payload.models_json)
-  return fetch('/api/config/text-providers', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/config/text-providers', { method: 'POST', body: form }).then((r) => r.json())
 }
 // 删除供应商（内置 agnes 返回 400）
 export function deleteTextProvider(id: string) {
-  return fetch('/api/config/text-providers/' + encodeURIComponent(id), { method: 'DELETE' }).then((r) => r.json())
+  return apiFetch('/api/config/text-providers/' + encodeURIComponent(id), { method: 'DELETE' }).then((r) => r.json())
 }
 // 用用户此刻输入的 key+base_url 探测拉模型列表（不落盘）
 export function testTextProvider(payload: { base_url: string; api_key: string; api: string }) {
@@ -106,13 +121,13 @@ export function testTextProvider(payload: { base_url: string; api_key: string; a
   form.append('base_url', payload.base_url)
   form.append('api_key', payload.api_key)
   form.append('api', payload.api)
-  return fetch('/api/config/text-providers/test', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/config/text-providers/test', { method: 'POST', body: form }).then((r) => r.json())
 }
 // 将候选模型正式写入该供应商并落盘
 export function syncTextProviderModels(providerId: string, models: string[]) {
   const form = new FormData()
   form.append('models_json', JSON.stringify(models))
-  return fetch('/api/config/text-providers/' + encodeURIComponent(providerId) + '/sync', {
+  return apiFetch('/api/config/text-providers/' + encodeURIComponent(providerId) + '/sync', {
     method: 'POST',
     body: form,
   }).then((r) => r.json())
@@ -120,7 +135,7 @@ export function syncTextProviderModels(providerId: string, models: string[]) {
 export function setWatermark(enabled: boolean) {
   const form = new FormData()
   form.append('enabled', String(enabled))
-  return fetch('/api/config/watermark', { method: 'POST', body: form })
+  return apiFetch('/api/config/watermark', { method: 'POST', body: form })
 }
 
 // ── 模型 ──
@@ -140,18 +155,18 @@ export function getWorkspaces() {
 export function activateWorkspace(path: string) {
   const form = new FormData()
   form.append('path', path)
-  return fetch('/api/workspaces/active', { method: 'POST', body: form })
+  return apiFetch('/api/workspaces/active', { method: 'POST', body: form })
 }
 export function addWorkspace(path: string, name: string) {
   const form = new FormData()
   form.append('path', path)
   form.append('name', name)
-  return fetch('/api/workspaces', { method: 'POST', body: form })
+  return apiFetch('/api/workspaces', { method: 'POST', body: form })
 }
 export function removeWorkspace(path: string) {
   const form = new FormData()
   form.append('path', path)
-  return fetch('/api/workspaces', { method: 'DELETE', body: form })
+  return apiFetch('/api/workspaces', { method: 'DELETE', body: form })
 }
 export function pickDirectory() {
   return request('/api/workspaces/pick-directory')
@@ -165,13 +180,13 @@ export function getTask(taskId: string) {
   return request('/api/tasks/' + taskId)
 }
 export function resumeTask(taskId: string) {
-  return fetch('/api/tasks/' + taskId + '/resume', { method: 'POST' }).then((r) => r.json())
+  return apiFetch('/api/tasks/' + taskId + '/resume', { method: 'POST' }).then((r) => r.json())
 }
 export function stopTask(taskId: string) {
-  return fetch('/api/tasks/' + taskId + '/stop', { method: 'POST' }).then((r) => r.json())
+  return apiFetch('/api/tasks/' + taskId + '/stop', { method: 'POST' }).then((r) => r.json())
 }
 export function deleteTask(taskId: string) {
-  return fetch('/api/tasks/' + taskId, { method: 'DELETE' }).then((r) => r.json())
+  return apiFetch('/api/tasks/' + taskId, { method: 'DELETE' }).then((r) => r.json())
 }
 
 // ── v6.1 问题反馈：任务诊断（二期）──
@@ -196,10 +211,10 @@ export function savePreset(name: string, prompt: string) {
   const form = new FormData()
   form.append('name', name)
   form.append('prompt', prompt)
-  return fetch('/api/presets', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/presets', { method: 'POST', body: form }).then((r) => r.json())
 }
 export function deletePreset(id: string) {
-  return fetch('/api/presets/' + encodeURIComponent(id), { method: 'DELETE' }).then((r) => r.json())
+  return apiFetch('/api/presets/' + encodeURIComponent(id), { method: 'DELETE' }).then((r) => r.json())
 }
 
 // ── 产物 ──
@@ -213,7 +228,7 @@ export function getArtifactCascadePreview(taskId: string, artifactId: string) {
   return request('/api/tasks/' + taskId + '/artifacts/' + encodeURIComponent(artifactId) + '/cascade-preview')
 }
 export function deleteArtifact(taskId: string, artifactId: string) {
-  return fetch('/api/tasks/' + taskId + '/artifacts/' + encodeURIComponent(artifactId), { method: 'DELETE' }).then(
+  return apiFetch('/api/tasks/' + taskId + '/artifacts/' + encodeURIComponent(artifactId), { method: 'DELETE' }).then(
     (r) => r.json(),
   )
 }
@@ -226,10 +241,10 @@ export function getPoetryScenePrompt(params: Record<string, string>) {
 
 // ── 任务提交（FormData 多文件上传）──
 export function submitSimple(form: FormData) {
-  return fetch('/api/tasks/simple', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/tasks/simple', { method: 'POST', body: form }).then((r) => r.json())
 }
 export function submitCreative(form: FormData) {
-  return fetch('/api/tasks/creative', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/tasks/creative', { method: 'POST', body: form }).then((r) => r.json())
 }
 // ── 创意脚本预览（简易模式：输入主题 → 出分镜）──
 export function creativePreview(idea: string, contentLang: string, sceneCount: number) {
@@ -241,23 +256,23 @@ export function creativePreview(idea: string, contentLang: string, sceneCount: n
   return request('/api/creative/preview-script', { method: 'POST', body: form })
 }
 export function submitManuscript(form: FormData) {
-  return fetch('/api/tasks/manuscript', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/tasks/manuscript', { method: 'POST', body: form }).then((r) => r.json())
 }
 export function submitAnchor(form: FormData) {
-  return fetch('/api/tasks/anchor', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/tasks/anchor', { method: 'POST', body: form }).then((r) => r.json())
 }
 export function submitPoetry(form: FormData) {
-  return fetch('/api/tasks/poetry', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/tasks/poetry', { method: 'POST', body: form }).then((r) => r.json())
 }
 export function submitImage(form: FormData) {
-  return fetch('/api/image/generate', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/image/generate', { method: 'POST', body: form }).then((r) => r.json())
 }
 
 // ── v6.0 手动模式 ──
 export function switchTaskMode(taskId: string, mode: 'auto' | 'manual') {
   const form = new FormData()
   form.append('mode', mode)
-  return fetch('/api/tasks/' + taskId + '/mode', { method: 'POST', body: form }).then((r) => r.json())
+  return apiFetch('/api/tasks/' + taskId + '/mode', { method: 'POST', body: form }).then((r) => r.json())
 }
 export function getCheckpoints(taskId: string) {
   return request('/api/tasks/' + taskId + '/checkpoints')
@@ -290,13 +305,13 @@ export function approveCheckpoint(
   form.append('modified_artifact_ids', JSON.stringify(modifiedArtifactIds))
   form.append('param_updates', JSON.stringify(paramUpdates))
   form.append('confirmed', String(confirmed))
-  return fetch('/api/tasks/' + taskId + '/checkpoints/' + encodeURIComponent(checkpoint) + '/approve', {
+  return apiFetch('/api/tasks/' + taskId + '/checkpoints/' + encodeURIComponent(checkpoint) + '/approve', {
     method: 'POST',
     body: form,
   }).then((r) => r.json())
 }
 export function regenCheckpoint(taskId: string, checkpoint: string) {
-  return fetch('/api/tasks/' + taskId + '/checkpoints/' + encodeURIComponent(checkpoint) + '/regen', {
+  return apiFetch('/api/tasks/' + taskId + '/checkpoints/' + encodeURIComponent(checkpoint) + '/regen', {
     method: 'POST',
   }).then((r) => r.json())
 }
@@ -312,7 +327,7 @@ export function aiModify(taskId: string, checkpoint: string, artifactId: string,
 export function uploadArtifact(taskId: string, artifactId: string, file: File) {
   const form = new FormData()
   form.append('file', file)
-  return fetch('/api/tasks/' + taskId + '/artifacts/' + encodeURIComponent(artifactId) + '/upload', {
+  return apiFetch('/api/tasks/' + taskId + '/artifacts/' + encodeURIComponent(artifactId) + '/upload', {
     method: 'POST',
     body: form,
   }).then((r) => r.json())

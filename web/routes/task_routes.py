@@ -8,7 +8,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException
 
-from core.config import API_KEY_MISSING_MSG, get_api_key
+from core.config import API_KEY_MISSING_MSG, api_key_missing_msg, get_api_key
+from core.i18n_backend import translate
 from core.pipelines import ALL_CHECKPOINTS, compute_current_checkpoint
 from core.task_manager import TaskManager
 from models.task import (
@@ -245,7 +246,8 @@ def _in_window(ts_value: str, start: datetime | None, end: datetime | None) -> b
 async def resume_task(task_id: str):
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
+        # v7.0（issue #64）：按请求 UI 语言返回中/英文提示
+        raise HTTPException(status_code=400, detail=api_key_missing_msg())
 
     # 关键段串行化：check 与 insert 之间存在多个 await 让出点，快速重复 resume
     # 会让两次请求都通过 "task not in active_pipelines" 检查并各自启动 pipeline，
@@ -320,7 +322,10 @@ async def switch_task_mode(task_id: str, mode: str = Form(...)):
         mode: "auto" | "manual"。
     """
     if mode not in ("auto", "manual"):
-        raise HTTPException(status_code=422, detail="mode 必须为 auto 或 manual")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("mode.invalid", None),
+        )
 
     dir_name = helpers.find_dir_name(task_id)
     tm = TaskManager(task_id, dir_name=dir_name)
@@ -329,11 +334,16 @@ async def switch_task_mode(task_id: str, mode: str = Form(...)):
         raise HTTPException(status_code=404, detail="Task not found")
 
     mc = state.manual_config
+    # v7.0（issue #64）：任务级 UI 语言，供本次切换的落盘消息使用
+    ui_lang = getattr(state, "ui_language", "") or "zh"
 
     if mode == "manual":
         # simple / simple_image 无检查点，不支持手动模式（PRD §4.3）
         if state.task_type in (TaskType.SIMPLE, TaskType.IMAGE):
-            raise HTTPException(status_code=400, detail="该任务类型不支持手动模式")
+            raise HTTPException(
+                status_code=400,
+                detail=translate("mode.manual_unsupported_task_type", ui_lang),
+            )
 
         # 幂等：已是手动模式且处于暂停态 → 直接返回
         if mc.enabled and state.status == StepStatus.PENDING and mc.current_checkpoint:
@@ -362,8 +372,9 @@ async def switch_task_mode(task_id: str, mode: str = Form(...)):
             current_step=checkpoint or state.current_step,
             current_status="awaiting_user",
             current_message=(
-                f"已切换为手动模式，等待你在检查点 '{checkpoint}' 确认或修改产物"
-                if checkpoint else "已切换为手动模式"
+                translate("mode.switched_to_manual_at", ui_lang, checkpoint=checkpoint)
+                if checkpoint
+                else translate("mode.switched_to_manual", ui_lang)
             ),
         )
         logger.info("[Mode] Task %s switched to manual (checkpoint=%s)",
@@ -378,7 +389,7 @@ async def switch_task_mode(task_id: str, mode: str = Form(...)):
     tm.update_state(
         manual_config=mc,
         current_status="resumed",
-        current_message="已切换为自动模式",
+        current_message=translate("mode.switched_to_auto", ui_lang),
     )
     logger.info("[Mode] Task %s switched to auto (was_paused=%s)",
                 safe_log(task_id), was_paused)

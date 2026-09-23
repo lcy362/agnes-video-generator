@@ -15,10 +15,12 @@ from core.config import (
     API_KEY_MISSING_MSG,
     DURATION_FRAME_MAP,
     VIDEO_25_DURATIONS,
+    api_key_missing_msg,
     get_api_key,
     get_selected_models,
     is_v25_video_model,
 )
+from core.i18n_backend import get_current_lang
 from core.path_security import safe_join
 from core.pipelines import ALL_CHECKPOINTS
 from core.pipelines.poetry_video import POETRY_SUBTITLE_STYLE
@@ -157,7 +159,7 @@ async def create_simple_task(
     """创建简单视频任务（类型 1）。"""
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
+        raise HTTPException(status_code=400, detail=api_key_missing_msg())
 
     # P7: 参数校验
     _VALID_MODES = {"t2v", "i2v", "ti2vid", "keyframes"}
@@ -199,6 +201,8 @@ async def create_simple_task(
         seed=seed,
         negative_prompt=negative_prompt,
         system_prompt=system_prompt,
+        # v7.0（issue #64）：任务级 UI 语言快照，供异步流水线本地化消息
+        ui_language=get_current_lang(),
     )
 
     upload_dir = helpers.get_upload_dir()
@@ -214,7 +218,7 @@ async def create_simple_task(
 
     tm = TaskManager(task_id, dir_name=dir_name)
     tm.create(state)
-    deps.mark_task_queued(tm)
+    deps.mark_task_queued(tm, lang=state.ui_language)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info(f"[Simple] Task created: {task_id}, mode={mode}, duration={duration}s (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
@@ -262,7 +266,7 @@ async def create_creative_task(
     """创建创意长视频任务（类型 2）。"""
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
+        raise HTTPException(status_code=400, detail=api_key_missing_msg())
 
     # v4.0: 音色与目标语言兼容性校验
     if audio_enabled:
@@ -316,6 +320,8 @@ async def create_creative_task(
         audio_config=audio_config,
         subtitle_config=subtitle_config,
         manual_config=_build_manual_config(execution_mode, pause_points),
+        # v7.0（issue #64）：任务级 UI 语言快照
+        ui_language=get_current_lang(),
     )
 
     logger.info(
@@ -354,7 +360,7 @@ async def create_creative_task(
 
     tm = TaskManager(task_id, dir_name=dir_name)
     tm.create(state)
-    deps.mark_task_queued(tm)
+    deps.mark_task_queued(tm, lang=state.ui_language)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info("[Creative] Task created: %s, idea=%s... (queued)",
                 safe_log(task_id), safe_log(idea[:40]))
@@ -397,7 +403,7 @@ async def create_manuscript_task(
     """创建稿件长视频任务（类型 3）。"""
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
+        raise HTTPException(status_code=400, detail=api_key_missing_msg())
 
     if not manuscript_text.strip():
         raise HTTPException(status_code=400, detail="稿件内容不能为空")
@@ -471,6 +477,8 @@ async def create_manuscript_task(
         audio_config=audio_config,
         subtitle_config=subtitle_config,
         manual_config=_build_manual_config(execution_mode, pause_points),
+        # v7.0（issue #64）：任务级 UI 语言快照
+        ui_language=get_current_lang(),
     )
 
     pipeline = deps.create_pipeline_for_type(TaskType.MANUSCRIPT, api_key, task_id, dir_name)
@@ -478,7 +486,7 @@ async def create_manuscript_task(
 
     tm = TaskManager(task_id, dir_name=dir_name)
     tm.create(state)
-    deps.mark_task_queued(tm)
+    deps.mark_task_queued(tm, lang=state.ui_language)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info(f"[Manuscript] Task created: {task_id}, text_len={len(manuscript_text)} (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
@@ -512,7 +520,7 @@ async def create_poetry_task(
     """创建诗词视频任务（类型 6）。"""
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
+        raise HTTPException(status_code=400, detail=api_key_missing_msg())
 
     # v4.0: 音色与目标语言兼容性校验
     if audio_enabled:
@@ -573,6 +581,8 @@ async def create_poetry_task(
         audio_config=audio_config,
         subtitle_config=subtitle_config,
         manual_config=_build_manual_config(execution_mode, pause_points),
+        # v7.0（issue #64）：任务级 UI 语言快照
+        ui_language=get_current_lang(),
     )
 
     pipeline = deps.create_pipeline_for_type(TaskType.POETRY, api_key, task_id, dir_name)
@@ -580,7 +590,7 @@ async def create_poetry_task(
 
     tm = TaskManager(task_id, dir_name=dir_name)
     tm.create(state)
-    deps.mark_task_queued(tm)
+    deps.mark_task_queued(tm, lang=state.ui_language)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info("[Poetry] Task created: %s, poem=%r (queued)",
                 safe_log(task_id), safe_log(poem_text[:20]))
@@ -616,7 +626,7 @@ async def create_anchor_task(
     """创建数字人口播任务（类型 4 / Phase 3）。"""
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
+        raise HTTPException(status_code=400, detail=api_key_missing_msg())
 
     # v4.0: 音色与稿件文本兼容性校验
     # 数字人口播的稿件由用户直接输入，应以「稿件文本的实际文字体系」为准做脚本级
@@ -656,6 +666,8 @@ async def create_anchor_task(
         audio_config=audio_config,
         subtitle_config=subtitle_config,
         manual_config=_build_manual_config(execution_mode, pause_points),
+        # v7.0（issue #64）：任务级 UI 语言快照
+        ui_language=get_current_lang(),
     )
 
     pipeline = deps.create_pipeline_for_type(TaskType.ANCHOR, api_key, task_id, dir_name)
@@ -663,7 +675,7 @@ async def create_anchor_task(
 
     tm = TaskManager(task_id, dir_name=dir_name)
     tm.create(state)
-    deps.mark_task_queued(tm)
+    deps.mark_task_queued(tm, lang=state.ui_language)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info(f"[Anchor] Task created: {task_id}, script_len={len(script_text)} (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}

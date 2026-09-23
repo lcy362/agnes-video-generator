@@ -1,10 +1,11 @@
-"""v6.4.8 网络异常诊断（utils.network）测试。
+"""v6.4.8 网络异常诊断（utils.network）测试；v7.0（issue #64）追加双语断言。
 
 覆盖 GitHub issue #56 / #57 的真实异常形态：本机 DNS 解析不了 Agnes 输出文件域名
 `cos-platform-outputs.agnes-ai.cn`，tenacity RetryError 包着 requests ConnectionError
 包着 socket.gaierror(11004)。要求：
 - 这类故障翻译成人话（含域名 + DNS 自助步骤），不再只抛 RetryError[...]；
-- 429 / 5xx / 超时等偶发故障**不得**被误判成本地网络问题（否则引导文案会误导用户）。
+- 429 / 5xx / 超时等偶发故障**不得**被误判成本地网络问题（否则引导文案会误导用户）；
+- v7.0：翻译文案必须按 ``lang`` 参数输出中/英文，英文界面用户不再看到中文诊断。
 """
 
 import socket
@@ -90,3 +91,84 @@ def test_host_extraction_falls_back_to_url():
     )
     message = describe_network_error(exc)
     assert "platform-outputs.agnes-ai.space" in message
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v7.0（issue #64）：双语断言 —— 英文 UI 用户必须拿到英文诊断
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_dns_failure_message_english_when_lang_en():
+    """lang='en' 时返回英文诊断，且不含任何中文关键词。"""
+    message = describe_network_error(_dns_retry_error(), lang="en")
+    assert message, "DNS failure must produce a readable message"
+    assert "cos-platform-outputs.agnes-ai.cn" in message
+    assert "DNS" in message
+    # 英文分支的核心引导词
+    assert "cannot resolve" in message.lower()
+    assert "Retry task" in message
+    # 绝不能混入中文（此前硬编码中文会让英文界面用户看不懂）
+    for zh_marker in ("网络诊断", "无法解析", "重试任务", "请依次检查"):
+        assert zh_marker not in message, f"English branch leaked Chinese: {zh_marker}"
+
+
+def test_connection_refused_message_english_when_lang_en():
+    exc = requests.exceptions.ConnectionError(
+        "HTTPSConnectionPool(host='api.agnes-ai.cn', port=443): "
+        "Max retries exceeded with url: /v1/videos (Caused by "
+        "NewConnectionError('<urllib3.connection.HTTPSConnection object>: "
+        "Failed to establish a new connection: [Errno 111] Connection refused'))"
+    )
+    message = describe_network_error(exc, lang="en")
+    assert "cannot reach" in message.lower()
+    assert "api.agnes-ai.cn" in message
+    for zh_marker in ("网络诊断", "无法连接", "重试任务"):
+        assert zh_marker not in message
+
+
+def test_connection_reset_by_peer_is_recognized_as_connect_error():
+    """issue #64 的真实形态：TLS 握手阶段被对端 reset。
+
+    此前 ``_CONNECT_MARKERS`` 只有 ``connection aborted``，macOS 上 urllib3
+    会把 ``ConnectionResetError`` 包成 ``NewConnectionError`` 或 ``ProtocolError``，
+    文案里出现 ``connection reset``；v7.0 补上该 marker，保证归因稳定。
+    """
+    exc = requests.exceptions.ConnectionError(
+        "HTTPSConnectionPool(host='api.agnes-ai.cn', port=443): "
+        "Max retries exceeded with url: /v1/videos (Caused by "
+        "SSLError(SSLError(1, '[SSL: WRONG_VERSION_NUMBER]'),))"
+    )
+    # 直接构造一个带 "connection reset" 文本的异常，验证 marker 命中
+    exc2 = requests.exceptions.ConnectionError(
+        "HTTPSConnectionPool(host='api.agnes-ai.cn', port=443): "
+        "Connection reset by peer during TLS handshake"
+    )
+    assert is_network_infra_error(exc2) is True
+    msg_zh = describe_network_error(exc2, lang="zh")
+    assert "无法连接" in msg_zh
+    msg_en = describe_network_error(exc2, lang="en")
+    assert "cannot reach" in msg_en.lower()
+
+
+def test_lang_zh_returns_chinese_message():
+    """显式 lang='zh' 与不传 lang（默认上下文 zh）行为一致。"""
+    msg_explicit = describe_network_error(_dns_retry_error(), lang="zh")
+    msg_default = describe_network_error(_dns_retry_error())
+    assert "网络诊断" in msg_explicit
+    assert msg_explicit == msg_default
+
+
+def test_unknown_lang_falls_back_to_zh():
+    """未知语言归一化到 zh（与前端 t() 回退策略一致）。"""
+    message = describe_network_error(_dns_retry_error(), lang="klingon")
+    assert "网络诊断" in message
+
+
+def test_default_target_label_is_localized():
+    """主机名提取失败时，兜底称呼也要按语言走。"""
+    # 构造一个不含 host 信息的连接异常
+    exc = requests.exceptions.ConnectionError("connection refused")
+    msg_zh = describe_network_error(exc, lang="zh")
+    msg_en = describe_network_error(exc, lang="en")
+    assert "Agnes 服务域名" in msg_zh
+    assert "Agnes service domain" in msg_en

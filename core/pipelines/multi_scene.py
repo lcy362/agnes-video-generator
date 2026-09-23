@@ -152,15 +152,18 @@ class MultiScenePipeline(BasePipeline):
             logger.info("[MultiScene] Task %s paused: %s", self.task_id, e.message)
             return ""
         except PipelineShutdown:
+            # v7.0（issue #64）：中断提示按任务落盘的 ui_language 双语化
             await self._emit(
-                "error", "failed", "任务已被中断，可从任务列表续传", _PROGRESS_FAILED,
+                "error", "failed", self._t("task.interrupted_resumable"),
+                _PROGRESS_FAILED,
                 preserve_step=True,
             )
             raise
         except Exception as e:
             # 网络 / 域名解析类故障翻译成可自助排查的提示（issue #56/#57：此前只抛
             # RetryError[...]，用户看不出是本机 DNS 问题，反复点「重试任务」无效）
-            message = describe_network_error(e) or str(e)
+            # v7.0（issue #64）：按 state.ui_language 输出中/英文，避免英文界面看到中文诊断
+            message = describe_network_error(e, lang=self._ui_lang()) or str(e)
             failed_step = self._state.current_step if self._state else ""
             # 持久化完整 traceback，供诊断端点/前端反馈报告暴露（定位环境级异常如 [WinError 2]）
             self._state.status = StepStatus.FAILED

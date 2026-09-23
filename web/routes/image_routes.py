@@ -12,7 +12,8 @@ from fastapi.responses import FileResponse
 
 from core.api.agnes_image import AgnesImageAPI
 from core.async_io import write_bytes
-from core.config import API_KEY_MISSING_MSG, get_api_key
+from core.config import API_KEY_MISSING_MSG, api_key_missing_msg, get_api_key
+from core.i18n_backend import get_current_lang, translate
 from core.path_security import safe_join
 from core.task_manager import TaskManager
 from models.task import SimpleImageTask, StepStatus
@@ -44,7 +45,8 @@ async def generate_image(
     """简单图片生成：创建任务 → 直调 Agnes Image API → 保存到任务目录。"""
     api_key = get_api_key()
     if not api_key:
-        raise HTTPException(status_code=400, detail=API_KEY_MISSING_MSG)
+        # v7.0（issue #64）：按请求 UI 语言返回中/英文提示，避免英文界面看到中文报错
+        raise HTTPException(status_code=400, detail=api_key_missing_msg())
 
     if len(prompt) > 5000:
         raise HTTPException(status_code=422, detail="prompt 最多 5000 字符")
@@ -64,6 +66,9 @@ async def generate_image(
         size=size,
         negative_prompt=negative_prompt or "",
         system_prompt=system_prompt,
+        # v7.0：从 LangContextMiddleware 写入的 ContextVar 里取用户 UI 语言，
+        # 落盘到任务状态，保证后续异步失败消息与用户界面语言一致
+        ui_language=get_current_lang(),
     )
 
     # 先用 PENDING 创建任务目录和状态文件
@@ -96,7 +101,8 @@ async def generate_image(
             negative_prompt=negative_prompt,
         )
     except Exception as e:
-        message = describe_network_error(e) or str(e)
+        # v7.0（issue #64）：按任务落盘的 ui_language 生成双语网络诊断
+        message = describe_network_error(e, lang=state.ui_language) or str(e)
         state.status = StepStatus.FAILED
         tm.update_state(
             status=StepStatus.FAILED,
@@ -112,16 +118,18 @@ async def generate_image(
     try:
         await output.save(img_path)
     except Exception as e:
-        message = describe_network_error(e) or str(e)
+        message = describe_network_error(e, lang=state.ui_language) or str(e)
+        # 图片保存失败提示按 ui_language 本地化
+        save_failed = translate("image.save_failed", state.ui_language, reason=message)
         state.status = StepStatus.FAILED
         tm.update_state(
             status=StepStatus.FAILED,
             current_step="save",
             current_status="failed",
-            current_message=f"图片保存失败: {message}",
+            current_message=save_failed,
         )
         logger.error(f"[Image] Task {task_id} save failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"图片保存失败: {message}")
+        raise HTTPException(status_code=500, detail=save_failed)
 
     state.status = StepStatus.COMPLETED
     state.final_video_file = img_path

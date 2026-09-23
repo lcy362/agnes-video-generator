@@ -21,10 +21,34 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 APP_VERSION = "6.5.1"
 
 # 未配置 API Key 时的统一报错文案（含免费获取与在线体验兜底，全站路由共用）
+#
+# v7.0（issue #64）：改为按 UI 语言返回中文/英文。原常量 ``API_KEY_MISSING_MSG``
+# 保留为**中文默认值**，兼容仍按字符串引用的旧代码路径与单测；新代码请一律走
+# ``api_key_missing_msg(lang)`` 或 ``api_key_missing_detail()``（后者自动读
+# 请求上下文）。翻译正文见 ``core.i18n_backend.CATALOG["config.api_key_missing"]``。
 API_KEY_MISSING_MSG = (
     "请先配置 API Key。免费获取：https://platform.agnes-ai.com ｜ "
     "不想配置？在线体验：https://video.lichuanyang.top/demo"
 )
+
+
+def api_key_missing_msg(lang: str | None = None) -> str:
+    """返回按 UI 语言本地化的「未配置 API Key」提示。
+
+    Args:
+        lang: 目标语言（2 字母代码）；``None`` 时读请求上下文，回退中文。
+
+    Returns:
+        本地化字符串。中文分支与 ``API_KEY_MISSING_MSG`` 常量等价。
+    """
+    # 就地导入避免 core.config ↔ core.i18n_backend 的循环依赖风险
+    from core.i18n_backend import translate
+    return translate("config.api_key_missing", lang)
+
+
+def api_key_missing_detail(lang: str | None = None) -> str:
+    """``api_key_missing_msg`` 的别名，语义上更贴近 ``HTTPException(detail=...)``。"""
+    return api_key_missing_msg(lang)
 
 # 项目根目录
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
