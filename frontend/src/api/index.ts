@@ -80,7 +80,7 @@ export function fetchTextProviders() {
 }
 // 新增/更新供应商（Form；models_json 为候选模型 JSON 数组）
 export function saveTextProvider(payload: {
-  provider?: string
+  provider: string
   display_name: string
   api: string
   base_url: string
@@ -88,7 +88,7 @@ export function saveTextProvider(payload: {
   models_json: string
 }) {
   const form = new FormData()
-  if (payload.provider) form.append('provider', payload.provider)
+  form.append('provider', payload.provider)
   form.append('display_name', payload.display_name)
   form.append('api', payload.api)
   form.append('base_url', payload.base_url)

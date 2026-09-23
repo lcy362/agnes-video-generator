@@ -223,6 +223,15 @@ async function onFetchProviderModels() {
     api: providerApi.value,
   })
 }
+// 由展示名生成唯一 route key（slug）；全非 ASCII（如中文名）时兜底时间戳
+function slugifyProvider(s: string): string {
+  const slug = (s || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return slug || 'provider-' + Date.now()
+}
 // 保存新增供应商（携带所选候选模型）
 async function onSaveProvider() {
   if (!providerName.value.trim()) {
@@ -240,6 +249,7 @@ async function onSaveProvider() {
   const models =
     providerTestSelected.value.length > 0 ? providerTestSelected.value : providerTestModels.value
   const ok = await saveTextProvider({
+    provider: slugifyProvider(providerName.value.trim()),
     display_name: providerName.value.trim(),
     api: providerApi.value,
     base_url: providerBaseUrl.value.trim(),

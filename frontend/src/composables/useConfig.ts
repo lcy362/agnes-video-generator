@@ -275,7 +275,7 @@ async function loadTextProviders() {
 
 // 保存（落盘）供应商；成功后刷新列表
 async function saveTextProvider(payload: {
-  provider?: string
+  provider: string
   display_name: string
   api: string
   base_url: string
