@@ -7,6 +7,7 @@ import { useVoice } from '@/composables/useVoice'
 import { useGa } from '@/composables/useGa'
 import { useVideoModelCaps } from '@/composables/useVideoModelCaps'
 import { useToast } from '@/composables/useToast'
+import { useModalA11y } from '@/composables/useModalA11y'
 
 const { trackEvent, isGaOptedOut, setGaOptOut } = useGa()
 const { showToast } = useToast()
@@ -180,36 +181,35 @@ function providerApiLabel(p: any): string {
   const api = p?.api || ''
   return api === 'anthropic-messages' ? t('providerApiAnthropic') : api === 'openai-completions' ? t('providerApiOpenai') : api
 }
-// 复合值：`<provider>|<model>`，实现选中值反查归属供应商
-const combinedTextModels = computed(() => {
-  const items: { key: string; provider: string; model: string; label: string }[] = []
-  ;(appState.modelListCache.text || []).forEach((m: string) => {
-    items.push({ key: 'agnes::' + m, provider: 'agnes', model: m, label: modelDisplayLabel(m) })
-  })
+// 第一级「供应商」下拉：agnes（内置）+ 自定义供应商
+const textProviderOptions = computed(() => {
+  const opts: { key: string; label: string }[] = [{ key: 'agnes', label: t('providerBuiltinAgnes') }]
   ;(appState.textProviders || []).forEach((p: any) => {
-    const models = Array.isArray(p.models) ? p.models : []
-    const prefix = providerDisplayName(p) || p.provider
-    models.forEach((m: string) => {
-      items.push({ key: p.provider + '::' + m, provider: p.provider, model: m, label: prefix + ' / ' + m })
-    })
+    opts.push({ key: p.provider, label: providerDisplayName(p) || p.provider })
   })
-  return items
+  return opts
 })
-const textModelComposite = computed<string>({
+// 当前所选供应商（'' = agnes）；切换时自动选中该供应商第一个模型
+const textProviderComposite = computed<string>({
   get() {
-    const provider = appState.models.text_provider || 'agnes'
-    return provider + '::' + appState.models.text
+    return appState.models.text_provider || 'agnes'
   },
   set(val: string) {
-    const idx = val.lastIndexOf('::')
-    if (idx < 0) return
-    const provider = val.slice(0, idx)
-    const model = val.slice(idx + 2)
-    appState.models.text = model
-    appState.models.text_provider = provider === 'agnes' ? '' : provider
-    appState.textProviderSelected = provider === 'agnes' ? 'agnes' : provider
+    const cur = appState.models.text_provider || 'agnes'
+    if (val === cur) return
+    appState.models.text_provider = val === 'agnes' ? '' : val
+    appState.textProviderSelected = val
+    const models = textModelsForProvider(val)
+    if (models.length > 0) appState.models.text = models[0]
   },
 })
+// 某供应商的模型列表（agnes → 内置列表；自定义 → providerModelCache）
+function textModelsForProvider(provider: string): string[] {
+  if (provider === 'agnes') return appState.modelListCache.text || []
+  return appState.providerModelCache[provider] || []
+}
+// 第二级「模型」下拉：依据所选供应商过滤
+const textModelOptions = computed(() => textModelsForProvider(textProviderComposite.value))
 // 当前所选文本模型的归属供应商（供下拉标题/提示展示）
 const selectedTextProviderName = computed(() => {
   const p = (appState.textProviders || []).find((x: any) => x.provider === appState.models.text_provider)
@@ -262,12 +262,16 @@ async function onSaveProvider() {
     providerApiKey.value = ''
     providerTestModels.value = []
     providerTestSelected.value = []
+    showProviderModal.value = false
   }
 }
 // 删除供应商
 async function onDeleteProvider(id: string) {
   await deleteTextProvider(id)
 }
+// 新增供应商弹窗开关
+const showProviderModal = ref(false)
+const { containerRef: providerModalRef } = useModalA11y(showProviderModal, () => (showProviderModal.value = false))
 
 loadTextProviders()
 initCollapse()
@@ -464,9 +468,35 @@ initCollapse()
         </div>
       </div>
 
-      <!-- 新增供应商表单 -->
-      <div class="rounded-lg bg-paper-3/60 p-4">
-        <p class="text-sm font-medium text-ink-2 mb-3">{{ t('providerAddTitle') }}</p>
+      <!-- 添加供应商按钮 -->
+      <button
+        class="w-full px-5 py-2.5 bg-paper-3 hover:bg-paper-2 border border-rule rounded-lg text-sm font-medium text-ink-2 transition"
+        @click="showProviderModal = true"
+      >
+        {{ t('providerAddBtn') }}
+      </button>
+    </div>
+  </div>
+  <!-- 新增供应商弹窗（仿 ConfirmModal：遮罩 + role=dialog + @click.self/ESC 关闭） -->
+  <teleport to="body">
+    <div
+      v-if="showProviderModal"
+      ref="providerModalRef"
+      class="fixed inset-0 z-[60] flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('providerAddTitle')"
+    >
+      <div class="absolute inset-0 bg-black/40" @click="showProviderModal = false"></div>
+      <div class="relative bg-paper rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl border border-rule max-h-[85vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-base font-semibold text-ink">{{ t('providerAddTitle') }}</h3>
+          <button
+            class="text-muted hover:text-ink-2 transition text-xl leading-none"
+            :aria-label="t('cancel')"
+            @click="showProviderModal = false"
+          >✕</button>
+        </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs text-muted mb-1">{{ t('providerNameLabel') }}</label>
@@ -518,14 +548,18 @@ initCollapse()
           </div>
         </div>
 
-        <div class="flex gap-3 mt-4">
-          <button class="px-5 py-2.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition" @click="onSaveProvider">{{ t('save') }}</button>
+        <div class="flex items-center gap-3 justify-end mt-6">
           <span v-if="providerSaveStatus === 'ok'" class="self-center text-xs text-green-400">{{ t('providerSaved') }}</span>
           <span v-if="providerSaveStatus === 'error'" class="self-center text-xs text-red-400">{{ providerErrorMsg }}</span>
+          <button
+            class="px-4 py-2 rounded-lg text-sm text-ink-2 bg-paper-3 hover:bg-paper-2 border border-rule transition"
+            @click="showProviderModal = false"
+          >{{ t('cancel') }}</button>
+          <button class="px-5 py-2.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition" @click="onSaveProvider">{{ t('save') }}</button>
         </div>
       </div>
     </div>
-  </div>
+  </teleport>
   <!-- 模型选择 -->
   <div class="glass-card rounded-2xl mb-6 overflow-hidden transition-all duration-300">
     <div
@@ -559,15 +593,29 @@ initCollapse()
       <p class="text-xs text-muted mb-4">{{ t('modelHint') }}</p>
       <div class="space-y-3">
         <div>
-          <label class="block text-xs text-muted mb-1">{{ t('modelTextLabel') }}（{{ selectedTextProviderName }}）</label>
+          <label class="block text-xs text-muted mb-1">{{ t('modelSupplier') }}</label>
           <div class="flex gap-3">
-            <select v-model="textModelComposite" class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
-              <option v-for="item in combinedTextModels" :key="item.key" :value="item.key">{{ item.label }}</option>
+            <select
+              v-model="textProviderComposite"
+              class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-ink"
+              :aria-label="t('modelSupplier')"
+            >
+              <option v-for="opt in textProviderOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
             </select>
             <button class="px-4 py-2.5 bg-paper-3 hover:bg-paper-3 rounded-lg text-sm font-medium transition whitespace-nowrap" @click="syncModels">
               {{ t('modelSync') }}
             </button>
           </div>
+          <label class="block text-xs text-muted mb-1 mt-3">{{ t('modelTextLabel') }}</label>
+          <select
+            v-model="appState.models.text"
+            class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-ink"
+            :aria-label="t('modelTextLabel')"
+          >
+            <option v-if="textModelOptions.length === 0" value="">{{ t('providerNoModels') }}</option>
+            <option v-for="m in textModelOptions" :key="m" :value="m">{{ modelDisplayLabel(m) }}</option>
+          </select>
+          <p v-if="textModelOptions.length === 0" class="text-xs text-muted mt-1.5">{{ t('providerNoModels') }}</p>
           <p v-if="betaHintVisible" class="text-xs text-accent mt-1.5">{{ t('modelBetaHint') }}</p>
           <p v-if="isPaidModel(appState.models.text)" class="text-xs text-amber-400 mt-1.5">{{ t('modelPaidHint') }}</p>
         </div>
