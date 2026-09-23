@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 
 from core.api.agnes_image import AgnesImageAPI
 from core.async_io import write_bytes
-from core.config import API_KEY_MISSING_MSG, api_key_missing_msg, get_api_key
+from core.config import api_key_missing_msg, get_api_key
 from core.i18n_backend import get_current_lang, translate
 from core.path_security import safe_join
 from core.task_manager import TaskManager

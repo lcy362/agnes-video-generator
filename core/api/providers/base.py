@@ -23,8 +23,8 @@ from core.api.agnes_chat import (
     strip_code_fence,
 )
 from core.api.error_collector import collect_error, collect_error_from_exception
-from core.config import API_OPENAI
 from core.api.rate_limiter import get_rate_limiter
+from core.config import API_OPENAI
 
 logger = logging.getLogger(__name__)
 

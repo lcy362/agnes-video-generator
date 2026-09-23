@@ -12,7 +12,6 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from core.async_io import write_bytes
 from core.config import (
-    API_KEY_MISSING_MSG,
     DURATION_FRAME_MAP,
     VIDEO_25_DURATIONS,
     api_key_missing_msg,

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 
-from core.config import API_ANTHROPIC, PROVIDER_AGNES, resolve_text_chat
+from core.config import API_ANTHROPIC, resolve_text_chat
 
 logger = logging.getLogger(__name__)
 

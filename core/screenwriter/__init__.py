@@ -271,6 +271,7 @@ def build_poetry_scene_prompt(
 
 __all__ = [
     "Screenwriter",
+    "AgnesChatAPI",
     "clean_narration_text",
     "build_poetry_scene_prompt",
     "_xml_escape",

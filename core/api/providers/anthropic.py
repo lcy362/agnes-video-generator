@@ -15,7 +15,6 @@ import requests
 
 from core.api.providers.base import (
     BaseProviderClient,
-    get_chat_endpoint,
     request_with_retry,
 )
 

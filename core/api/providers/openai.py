@@ -12,14 +12,7 @@ import logging
 import mimetypes
 import os
 
-import requests
-
-from core.api.providers.base import (
-    BaseProviderClient,
-    get_chat_endpoint,
-    get_models_endpoint,
-    request_with_retry,
-)
+from core.api.providers.base import BaseProviderClient
 
 logger = logging.getLogger(__name__)
 

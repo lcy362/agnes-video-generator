@@ -14,14 +14,21 @@ logger = logging.getLogger(__name__)
 
 from core.api.agnes_models import fetch_available_models
 from core.api.key_manager import reset_key_ring
+from core.api.providers.base import probe_text_models
 from core.api.rate_limiter import reset_rate_limiter
 from core.config import (
     AGNES_DOMAIN_MAP,
+    API_ANTHROPIC,
+    API_OPENAI,
     APP_VERSION,
+    DEFAULT_TEXT_MODEL,
+    PROVIDER_AGNES,
     REGRESSION_WORKING_DIR_ENV,
     WATERMARK_PROMO_TEXT_EN,
     WATERMARK_PROMO_TEXT_ZH,
+    TextProvider,
     delete_api_key,
+    delete_text_provider,
     get_active_workspace,
     get_agnes_domain,
     get_api_key,
@@ -31,31 +38,21 @@ from core.config import (
     get_api_keys_source,
     get_api_keys_with_sources,
     get_selected_models,
+    get_selected_text_provider,
+    get_text_providers,
     get_video_model_capabilities,
     get_watermark_config,
     get_workspaces,
     load_config,
     remove_api_key_single,
+    save_text_provider,
     set_agnes_domain,
     set_api_key,
     set_api_key_domains,
     set_api_keys,
     set_selected_models,
-    set_watermark_config,
-    delete_text_provider,
-    get_selected_text_provider,
-    get_text_providers,
-    save_text_provider,
     set_selected_text_provider,
-)
-
-from core.api.providers.base import probe_text_models
-from core.config import (
-    API_ANTHROPIC,
-    API_OPENAI,
-    DEFAULT_TEXT_MODEL,
-    PROVIDER_AGNES,
-    TextProvider,
+    set_watermark_config,
 )
 
 router = APIRouter(tags=["config"])
