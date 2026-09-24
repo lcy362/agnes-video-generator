@@ -49,11 +49,14 @@ async def generate_image(
         raise HTTPException(status_code=400, detail=api_key_missing_msg())
 
     if len(prompt) > 5000:
-        raise HTTPException(status_code=422, detail="prompt 最多 5000 字符")
+        # validation.prompt_too_long 由另一分片定义（跨分片复用，仅调用）
+        raise HTTPException(status_code=422, detail=translate("validation.prompt_too_long"))
     if not prompt.strip():
-        raise HTTPException(status_code=422, detail="prompt 不能为空")
+        raise HTTPException(status_code=422, detail=translate("validation.prompt_empty"))
     if size not in _VALID_SIZES:
-        raise HTTPException(status_code=422, detail=f"size 必须为 {_VALID_SIZES} 之一")
+        raise HTTPException(
+            status_code=422, detail=translate("image.size_invalid", opts=_VALID_SIZES),
+        )
 
     task_id = uuid.uuid4().hex[:12]
     name = f"image_{task_id}"

@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 from core.gallery_cache import ensure_thumb
+from core.i18n_backend import translate
 from core.task_manager import TaskManager
 
 logger = logging.getLogger(__name__)
@@ -153,13 +154,13 @@ def gallery_thumbnail(task_id: str):
             break
         final_file = getattr(state, "final_video_file", None)
         if not final_file or not os.path.isfile(final_file):
-            raise HTTPException(status_code=404, detail="成片不存在")
+            raise HTTPException(status_code=404, detail=translate("gallery.video_not_found"))
         thumb = ensure_thumb(meta["task_id"], final_file)
         if not thumb:
-            raise HTTPException(status_code=404, detail="缩略图生成失败")
+            raise HTTPException(status_code=404, detail=translate("gallery.thumbnail_failed"))
         return FileResponse(
             thumb,
             media_type="image/jpeg",
             headers={"Cache-Control": "public, max-age=31536000, immutable"},
         )
-    raise HTTPException(status_code=404, detail="任务不存在")
+    raise HTTPException(status_code=404, detail=translate("gallery.task_not_found"))

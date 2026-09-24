@@ -1,6 +1,7 @@
 # v7.0 后端用户可见消息多语言化（Backend i18n）
 
-> 状态：🟡 **部分落地**（issue #64 修复批次）
+> 状态：🟢 **已全部落地**（issue #64 修复批次 + 2026-09-24 收尾批次清除 P1~P4 剩余消息；
+> issue #65 暴露的 screenwriter「图片分析失败」也在收尾批次内完成）
 > 触发：GitHub issue #64 —— 英文 UI 用户在 `video_gen` 失败时收到一段硬编码中文的
 > 「网络诊断」提示，看不懂又误以为是服务侧故障。
 > 关联：`docs/dev/issue_handling_process.md` §4.1（回复语言判定）、
@@ -106,55 +107,35 @@
 
 ---
 
-## 三、未覆盖的剩余缺口（后续批次）
+## 三、收尾批次：P1~P4 剩余消息（2026-09-24 已落地）
 
-本轮只处理了**高影响面 + 与 issue #64 直接相关**的消息。以下仍是硬编码中文，
-按优先级排列：
+issue #64 修复批次后剩余的硬编码中文已在收尾批次全部清除（AST 复扫 `_emit` /
+`HTTPException.detail` / `update_state(current_message=)` / 用户可见 `raise` 中文字面量为 0）。
+新增 179 个 CATALOG key（zh/en 齐备，`test_catalog_zh_en_parity` 守护），按域分组：
 
-### P1 — 流水线进度消息（~70 条，`_emit` 的 `message` 参数）
+| 组 | 范围 | key 前缀 | 数量 |
+|----|------|----------|------|
+| P1 | 6 个流水线 `_emit` 进度消息 + 步骤 raise（simple / multi_scene / creative 四步 / manuscript / anchor / poetry） | `progress.<域>.*` | 92 |
+| P1+ | screenwriter 图片分析失败（issue #65 暴露；`describe_images(..., ui_lang=...)` 由 Pipeline 传 `self._ui_lang()`） | `screenwriter.*` | 1 |
+| P2 | 路由参数校验（task_creation / preview / config / workspace / preset / gallery / image / video-checkpoint / voice / utility 含 cleanup errors） | `validation.*` `preview.*` `config.*` `checkpoint.*` `gallery.*` `image.*` `preset.*` `voice.*` `utility.*` `ai_modify.user_request_empty` | 59 |
+| P3 | 音色兼容性两条长文案 + 22 个语言自名标签（渲染层 `voice_compat.label.<code>`，不动 `voices.py` 静态表） | `voice_compat.*` | 24 |
 
-分布在 `core/pipelines/` 下 6 个文件：
+改造要点与约束：
 
-- `simple_video.py`：8 条（开始/提交/等待/完成/恢复轮询）
-- `multi_scene.py`：10 条（构建分镜/生成参考图/生成视频/配音/字幕/合成 + 等待 N 个视频）
-- `creative/pipeline.py` + `steps_script.py` + `steps_frames.py` + `steps_audio.py` + `steps_video.py`：~35 条
-- `manuscript_video.py`：7 条
-- `anchor_video.py`：12 条（含 `raise RuntimeError("主播形象生成失败: ...")`）
-- `poetry_video.py`：5 条（含 `raise RuntimeError("[Poetry] LLM 未返回有效场景，请重试")`）
+1. **zh 模板逐字节不变**：所有 zh 模板渲染结果与改造前完全一致（空格 / `...` / 全角括号 /
+   `{set}` repr 等原样），因此断言中文原文的既有测试与前端 `LOCAL_NETWORK_PATTERNS`
+   中文匹配逻辑均不受影响；en 为新增能力。
+2. **语言取值路径不变**：Pipeline 用 `self._t(key, **params)`（`state.ui_language` 快照），
+   同步路由用 `translate(key, None, **params)`（ContextVar）。
+3. **占位符注意**：`translate(key, lang=None, **params)` 的 `lang` 是保留参数名，
+   模板占位符禁止用 `{lang}`（`voice_compat.lang_unsupported` 用 `{lang_name}`）。
+4. **仍不翻译**（维持原排除项）：`logger.*`、LLM prompt、`models/task.py` 的
+   `style` 默认值（内容语言）、Swagger description、路由 `responses=` OpenAPI 描述。
+5. 已知遗留（非本方案范围）：video/image 路由中少量**英文硬编码** detail
+   （`Task not found` 等）对中文 UI 用户仍是英文，方向与本次相反，后续可反转双语化。
 
-**改造方案**：这些消息已经统一走 `BasePipeline._emit`，且 `_t()` 快捷方法已就位。
-逐条把中文字面量换成 `self._t("progress.xxx", ...)` 即可，无需改架构。
-建议按 Pipeline 分 6 个小 PR，每个 PR 配对应的 CATALOG key 与单测。
-
-### P2 — 路由参数校验消息（~50 条，`HTTPException(detail=...)`）
-
-- `task_creation_routes.py`：~20 条（`prompt 最多 5000 字符`、`scene_count 范围 1-30` 等）
-- `config_routes.py`：~18 条（Key / 域名 / 供应商校验）
-- `preview_routes.py`：~8 条
-- `workspace_routes.py` / `preset_routes.py` / `gallery_routes.py` / `voice_routes.py` /
-  `utility_routes.py`：各 2~6 条
-
-**改造方案**：这些是同步请求路径，ContextVar 已就位，直接
-`translate("validation.xxx", None, ...)` 即可。建议按路由文件分批。
-
-### P3 — 音色兼容性校验（`web/helpers.py::_validate_voice_compat`）
-
-两条长文案（跨文字体系不支持 / 语言不支持），带动态参数（音色名、语言标签、
-支持列表）。需要把 `supported_labels` 的拼接也本地化。
-
-### P4 — `utility_routes.py::cleanup-regression` 的 `errors` 数组
-
-5 条中文错误塞进 JSON 响应体的 `errors: [...]` 字段。属于开发者向的回归清理
-工具，用户可见度低，最后处理。
-
-### 不在范围内（明确排除）
-
-- `logger.*` 输出：给开发者看的，语言固定即可（`AGENTS.md` §6.1 日志前缀规范）；
-- LLM prompt（`video_routes.py:690-709` 的系统提示词、`steps_frames.py::_fallback_end_frame`
-  的兜底描述）：发给模型的内容，与用户 UI 语言解耦；
-- `models/task.py` 的 `style` 默认值（`"电影质感写实风格"`）：进入 LLM prompt
-  与任务状态，属于「内容语言」而非「UI 语言」，跟随 `content_lang` 而非 `ui_language`；
-- Swagger `description`（`server.py`）：开发者向。
+验证：`py_compile` 全改动文件 + `import server` + 全量 `pytest tests/` **1394 passed** +
+`./scripts/run_mock_regression.sh` 全绿。
 
 ---
 
@@ -193,8 +174,8 @@
 - [x] `LOCAL_NETWORK_PATTERNS` 补英文关键词
 - [x] 单测：`test_backend_i18n.py`（38）+ `test_network_diagnosis.py` 追加（7）
 - [x] 全量回归 1293 passed（排除 pre-existing `test_ai_modify.py`）
-- [ ] P1~P4 剩余消息（后续批次，见 §三）
+- [x] P1~P4 剩余消息：2026-09-24 收尾批次完成（179 key，AST 复扫 0 残留，1394 passed + mock 回归全绿，见 §三）
 
 ---
 
-*文档版本：v1.0 | 创建日期：2026-09-23 | 触发：GitHub issue #64*
+*文档版本：v1.1 | 创建日期：2026-09-23 | 更新：2026-09-24 收尾批次清除 P1~P4 | 触发：GitHub issue #64*

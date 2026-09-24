@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 
 from core.async_io import read_text
 from core.config import get_working_dir
+from core.i18n_backend import translate
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +39,14 @@ async def cleanup_regression():
     if not os.path.exists(manifest_path):
         raise HTTPException(
             status_code=404,
-            detail="未找到回归测试产物清单，可能没有执行过回归测试")
+            detail=translate("utility.regression_manifest_missing"))
 
     try:
         manifest = json.loads(await read_text(manifest_path))
     except (json.JSONDecodeError, OSError) as e:
         raise HTTPException(
             status_code=500,
-            detail=f"读取清单失败: {e}")
+            detail=translate("utility.manifest_read_failed", reason=str(e)))
 
     removed_dirs = 0
     removed_files = 0
@@ -63,7 +64,7 @@ async def cleanup_regression():
                 removed_dirs += 1
             except OSError as e:
                 logger.warning(f"[Cleanup] 删除目录失败 {dir_name}: {e}")
-                errors.append(f"删除目录失败: {dir_name}")
+                errors.append(translate("utility.cleanup_dir_failed", name=dir_name))
 
     # 2. 清理上传文件
     for fname in manifest.get("uploads", []):
@@ -74,7 +75,7 @@ async def cleanup_regression():
                 removed_files += 1
             except OSError as e:
                 logger.warning(f"[Cleanup] 删除上传文件失败 {fname}: {e}")
-                errors.append(f"删除上传文件失败: {fname}")
+                errors.append(translate("utility.cleanup_upload_failed", name=fname))
 
     # 3. 清理报告文件
     for rel_path in manifest.get("reports", []):
@@ -85,7 +86,7 @@ async def cleanup_regression():
                 removed_files += 1
             except OSError as e:
                 logger.warning(f"[Cleanup] 删除报告失败 {rel_path}: {e}")
-                errors.append(f"删除报告失败: {rel_path}")
+                errors.append(translate("utility.cleanup_report_failed", name=rel_path))
 
     # 4. 清理服务器日志
     log_rel = manifest.get("server_log", "")
@@ -97,7 +98,7 @@ async def cleanup_regression():
                 removed_files += 1
             except OSError as e:
                 logger.warning(f"[Cleanup] 删除日志失败: {e}")
-                errors.append("删除日志失败")
+                errors.append(translate("utility.cleanup_log_failed"))
 
     # 5. 清理清单本身
     try:
@@ -105,7 +106,7 @@ async def cleanup_regression():
         removed_files += 1
     except OSError as e:
         logger.warning(f"[Cleanup] 删除清单失败: {e}")
-        errors.append("删除清单失败")
+        errors.append(translate("utility.cleanup_manifest_failed"))
 
     scenarios_cleaned = len(manifest.get("scenarios", {}))
     logger.info(

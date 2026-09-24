@@ -208,7 +208,10 @@ class FramesStepsMixin:
             if user_ef:
                 await self._emit(
                     "end_frame_gen", "running",
-                    f"场景 {scene_idx+1}/{len(scenes)}: 使用自定义尾帧",
+                    self._t(
+                        "progress.creative_frames.using_user_end_frame",
+                        i=scene_idx + 1, total=len(scenes),
+                    ),
                     0.25 + 0.05 * scene_idx / len(scenes),
                 )
                 if os.path.exists(user_ef):
@@ -232,7 +235,10 @@ class FramesStepsMixin:
             if self._state.generate_end_frames_from_ref and character_ref_path:
                 await self._emit(
                     "end_frame_gen", "running",
-                    f"场景 {scene_idx+1}/{len(scenes)}: 基于参考图生成尾帧 (i2i)",
+                    self._t(
+                        "progress.creative_frames.end_frame_from_ref",
+                        i=scene_idx + 1, total=len(scenes),
+                    ),
                     0.25 + 0.05 * scene_idx / len(scenes),
                 )
                 end_frame_prompt = (
@@ -294,7 +300,10 @@ class FramesStepsMixin:
                 )
                 await self._emit(
                     "end_frame_gen", "running",
-                    f"场景 {scene_idx+1}/{len(scenes)}: 自动生成尾帧 (t2i)",
+                    self._t(
+                        "progress.creative_frames.end_frame_auto",
+                        i=scene_idx + 1, total=len(scenes),
+                    ),
                     0.25 + 0.05 * scene_idx / len(scenes),
                 )
                 img_output = await self.image_generator.generate_single_image(
@@ -319,7 +328,10 @@ class FramesStepsMixin:
         )
         await self._emit(
             "end_frame_gen", "completed",
-            f"尾帧预生成全部完成 ({len(pregenerated)}/{len(scenes)})",
+            self._t(
+                "progress.creative_frames.end_frame_pregen_done",
+                done=len(pregenerated), total=len(scenes),
+            ),
             _PROGRESS_END_FRAME_PREGEN_DONE,
         )
         return pregenerated

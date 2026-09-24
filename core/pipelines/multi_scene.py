@@ -96,38 +96,44 @@ class MultiScenePipeline(BasePipeline):
             # Phase 1: 分镜/拆段 → List[SceneTask]
             await self._execute_step(
                 "step_build_scenes", self._build_scenes,
-                _PROGRESS.build_start, _PROGRESS.build_end, "构建分镜", "分镜构建完成",
+                _PROGRESS.build_start, _PROGRESS.build_end,
+                self._t("progress.multi_scene.scenes_running"), self._t("progress.multi_scene.scenes_done"),
             )
 
             # Phase 2: 参考图（可选，子类可空实现跳过）
             await self._execute_step(
                 "step_reference_images", self._build_reference_images,
-                _PROGRESS.build_end, _PROGRESS.reference_end, "生成参考图", "参考图生成完成",
+                _PROGRESS.build_end, _PROGRESS.reference_end,
+                self._t("progress.multi_scene.reference_running"), self._t("progress.multi_scene.reference_done"),
             )
 
             # Phase 3: 视频生成（通用，子类可覆写保留链式/循环逻辑）
             await self._execute_step(
                 "step_video_generation", self._generate_videos,
-                _PROGRESS.reference_end, _PROGRESS.video_end, "生成视频", "视频生成完成",
+                _PROGRESS.reference_end, _PROGRESS.video_end,
+                self._t("progress.multi_scene.videos_running"), self._t("progress.multi_scene.videos_done"),
             )
 
             # Phase 4: 配音（通用，子类可覆写）
             sub_maker = await self._execute_step(
                 "step_audio", self._generate_audio,
-                _PROGRESS.video_end, _PROGRESS.audio_end, "生成配音", "配音完成",
+                _PROGRESS.video_end, _PROGRESS.audio_end,
+                self._t("progress.multi_scene.audio_running"), self._t("progress.multi_scene.audio_done"),
             )
 
             # Phase 5: 字幕（通用，子类可覆写）
             await self._execute_step(
                 "step_subtitle",
                 lambda: self._generate_subtitles(sub_maker),
-                _PROGRESS.audio_end, _PROGRESS.subtitle_end, "生成字幕", "字幕完成",
+                _PROGRESS.audio_end, _PROGRESS.subtitle_end,
+                self._t("progress.multi_scene.subtitles_running"), self._t("progress.multi_scene.subtitles_done"),
             )
 
             # Phase 6: 合成
             final_video = await self._execute_step(
                 "step_concatenation", self._composite_final,
-                _PROGRESS.subtitle_end, _PROGRESS.composite_end, "合成视频", "合成完成",
+                _PROGRESS.subtitle_end, _PROGRESS.composite_end,
+                self._t("progress.multi_scene.composite_running"), self._t("progress.multi_scene.composite_done"),
             )
 
             # 后处理：水印（继承自 BasePipeline；异步，避免阻塞事件循环）
@@ -141,7 +147,7 @@ class MultiScenePipeline(BasePipeline):
                 final_video_file=final_video,
             )
             await self._emit(
-                "done", "completed", "视频生成完成!", _PROGRESS.done,
+                "done", "completed", self._t("progress.multi_scene.done"), _PROGRESS.done,
                 {"final_video": final_video},
             )
             return final_video
@@ -291,7 +297,7 @@ class MultiScenePipeline(BasePipeline):
         if pending:
             await self._emit(
                 "video_gen", "running",
-                f"等待 {len(pending)} 个视频生成...",
+                self._t("progress.multi_scene.wait_videos", n=len(pending)),
                 0.40,
             )
 
@@ -318,7 +324,7 @@ class MultiScenePipeline(BasePipeline):
             self.task_manager.update_state(scenes=[s.model_dump() for s in self._state.scenes])
             await self._emit(
                 "video_gen", "running",
-                f"保存视频 {j + 1}/{len(pending)}...",
+                self._t("progress.multi_scene.save_video", cur=j + 1, total=len(pending)),
                 0.40 + 0.35 * (j + 1) / max(len(pending), 1),
             )
 
@@ -381,7 +387,7 @@ class MultiScenePipeline(BasePipeline):
         audio_config = self._state.audio_config
         subtitle_config = self._state.subtitle_config
 
-        await self._emit("audio", "running", f"生成配音 ({len(text)} 字)...", _PROGRESS.audio_end)
+        await self._emit("audio", "running", self._t("progress.multi_scene.gen_audio", chars=len(text)), _PROGRESS.audio_end)
 
         sub_maker = await self._generate_audio_with_fallback(
             output_path=audio_path,
@@ -418,7 +424,7 @@ class MultiScenePipeline(BasePipeline):
     # ==================================================================
 
     def _get_init_message(self) -> str:
-        return "开始视频生成..."
+        return self._t("progress.multi_scene.init")
 
     def _get_narration_text(self) -> str:
         """配音文本。默认拼接各场景 narration_text。"""

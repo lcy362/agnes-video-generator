@@ -126,7 +126,8 @@ class AnchorPipeline(MultiScenePipeline):
 
         await self._emit(
             "generate_anchor", "running",
-            "生成主播形象图..." if not ref_image else "基于参考图生成主播形象...",
+            self._t("progress.anchor.image_running") if not ref_image
+            else self._t("progress.anchor.image_running_ref"),
             _PROGRESS_ANCHOR_IMAGE,
         )
 
@@ -145,11 +146,11 @@ class AnchorPipeline(MultiScenePipeline):
             await img_output.save(output_path)
         except Exception as e:
             logger.error(f"[Anchor] Anchor image generation failed: {e}")
-            raise RuntimeError(f"主播形象生成失败: {e}")
+            raise RuntimeError(self._t("progress.anchor.image_failed", reason=str(e)))
 
         self._state.anchor_image_path = output_path
         self.task_manager.update_state(anchor_image_path=output_path)
-        await self._emit("generate_anchor", "completed", "主播形象生成完成", _PROGRESS_ANCHOR_IMAGE_DONE)
+        await self._emit("generate_anchor", "completed", self._t("progress.anchor.image_done"), _PROGRESS_ANCHOR_IMAGE_DONE)
 
     # ------------------------------------------------------------------
     # 数据来源：分镜（单段 clip 的 prompt）
@@ -169,8 +170,10 @@ class AnchorPipeline(MultiScenePipeline):
 
         await self._emit(
             "clip_prompts", "running",
-            "生成循环优化动态描述..." if audio_source == "post_stitch"
-            else "生成含口播的视频描述...", _PROGRESS_CLIP_PROMPTS_START,
+            self._t("progress.anchor.prompts_running_loop")
+            if audio_source == "post_stitch"
+            else self._t("progress.anchor.prompts_running_model_audio"),
+            _PROGRESS_CLIP_PROMPTS_START,
         )
 
         if audio_source == "post_stitch":
@@ -199,7 +202,7 @@ class AnchorPipeline(MultiScenePipeline):
         logger.info("[Anchor] clip_prompt: %s...", prompt[:80])
         self._state.scenes = [SceneTask(index=0, scene_prompt=prompt, duration=5)]
         self.task_manager.update_state(scenes=[s.model_dump() for s in self._state.scenes])
-        await self._emit("clip_prompts", "completed", "动态描述生成完成", _PROGRESS_CLIP_PROMPTS_DONE)
+        await self._emit("clip_prompts", "completed", self._t("progress.anchor.prompts_done"), _PROGRESS_CLIP_PROMPTS_DONE)
 
     # ------------------------------------------------------------------
     # 视频生成（单段 i2v 循环，覆写通用实现）
@@ -221,7 +224,7 @@ class AnchorPipeline(MultiScenePipeline):
             return
 
         self.task_manager.update_step("step_clip_generation", StepStatus.RUNNING)
-        await self._emit("clip_gen", "running", "生成单段循环视频...", _PROGRESS_CLIP_GEN_START)
+        await self._emit("clip_gen", "running", self._t("progress.anchor.clip_running"), _PROGRESS_CLIP_GEN_START)
 
         vw = self._state.video_width
         vh = self._state.video_height
@@ -259,7 +262,7 @@ class AnchorPipeline(MultiScenePipeline):
 
         scene.video_file = clip_path
         self.task_manager.update_step("step_clip_generation", StepStatus.COMPLETED)
-        await self._emit("clip_gen", "completed", "单段循环视频生成完成", _PROGRESS_CLIP_GEN_DONE)
+        await self._emit("clip_gen", "completed", self._t("progress.anchor.clip_done"), _PROGRESS_CLIP_GEN_DONE)
 
     # ------------------------------------------------------------------
     # 音频生成（覆写通用实现）
@@ -302,7 +305,7 @@ class AnchorPipeline(MultiScenePipeline):
             )
 
         audio_config = self._state.audio_config
-        await self._emit("audio", "running", f"生成整段读稿 ({len(full_text)} 字)...", _PROGRESS_AUDIO_START)
+        await self._emit("audio", "running", self._t("progress.anchor.audio_running", n=len(full_text)), _PROGRESS_AUDIO_START)
 
         sub_maker = await self._generate_audio_with_fallback(
             output_path=audio_path,
@@ -315,7 +318,7 @@ class AnchorPipeline(MultiScenePipeline):
 
         self._state.combined_audio = audio_path
         self.task_manager.update_state(combined_audio=audio_path)
-        await self._emit("audio", "completed", "读稿音频生成完成", _PROGRESS_AUDIO_DONE)
+        await self._emit("audio", "completed", self._t("progress.anchor.audio_done"), _PROGRESS_AUDIO_DONE)
         return sub_maker
 
     # ------------------------------------------------------------------
@@ -339,7 +342,7 @@ class AnchorPipeline(MultiScenePipeline):
         segment_texts = [full_text]
         segment_durations = [audio_duration]
 
-        await self._emit("subtitle", "running", f"生成整段字幕 ({len(full_text)} 字)...", _PROGRESS_SUBTITLE_START)
+        await self._emit("subtitle", "running", self._t("progress.anchor.subtitle_running", n=len(full_text)), _PROGRESS_SUBTITLE_START)
 
         srt_path, styles_path = await self.generate_subtitles_common(
             segment_texts=segment_texts,
@@ -359,7 +362,7 @@ class AnchorPipeline(MultiScenePipeline):
 
         self._state.combined_subtitle = srt_path
         self.task_manager.update_state(combined_subtitle=srt_path)
-        await self._emit("subtitle", "completed", "字幕生成完成", _PROGRESS_SUBTITLE_DONE)
+        await self._emit("subtitle", "completed", self._t("progress.anchor.subtitle_done"), _PROGRESS_SUBTITLE_DONE)
 
     # ------------------------------------------------------------------
     # 合成（覆写通用实现）
@@ -389,7 +392,7 @@ class AnchorPipeline(MultiScenePipeline):
             and bool(self._state.combined_subtitle)
         )
 
-        await self._emit("concatenate", "running", "循环拼接视频+音频+字幕...", _PROGRESS_CONCAT_START)
+        await self._emit("concatenate", "running", self._t("progress.anchor.concat_running"), _PROGRESS_CONCAT_START)
 
         await asyncio.to_thread(
             VideoConcatenator.composite_anchor_video,

@@ -19,7 +19,7 @@ from core.config import (
     get_selected_models,
     is_v25_video_model,
 )
-from core.i18n_backend import get_current_lang
+from core.i18n_backend import get_current_lang, translate
 from core.path_security import safe_join
 from core.pipelines import ALL_CHECKPOINTS
 from core.pipelines.poetry_video import POETRY_SUBTITLE_STYLE
@@ -56,10 +56,16 @@ def _parse_scene_durations_json(scene_durations_json: str) -> list:
         if not isinstance(scene_durations, list):
             raise ValueError("not a list")
     except Exception:
-        raise HTTPException(status_code=422, detail="scene_durations_json 必须为 JSON 数组")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.scene_durations_not_list", None),
+        )
     for i, d in enumerate(scene_durations):
         if not isinstance(d, (int, float)) or d < 2 or d > 30:
-            raise HTTPException(status_code=422, detail=f"场景 {i+1} 时长范围 2-30 秒")
+            raise HTTPException(
+                status_code=422,
+                detail=translate("validation.scene_duration_range", None, scene_index=i + 1),
+            )
     return scene_durations
 
 
@@ -74,23 +80,37 @@ def _build_manual_config(execution_mode: str, pause_points: str) -> ManualConfig
         HTTPException: execution_mode 非法或 pause_points 含非法值。
     """
     if execution_mode not in ("auto", "manual"):
-        raise HTTPException(status_code=422, detail="execution_mode 必须为 auto 或 manual")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.execution_mode_invalid", None),
+        )
     if execution_mode == "auto":
         return ManualConfig()
 
     try:
         points = json.loads(pause_points) if pause_points else []
     except Exception:
-        raise HTTPException(status_code=422, detail="pause_points 必须为 JSON 数组")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.pause_points_not_list", None),
+        )
     if not isinstance(points, list):
-        raise HTTPException(status_code=422, detail="pause_points 必须为 JSON 数组")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.pause_points_not_list", None),
+        )
 
     valid = set(ALL_CHECKPOINTS)
     invalid = [p for p in points if p not in valid]
     if invalid:
         raise HTTPException(
             status_code=422,
-            detail=f"非法暂停点: {invalid}，可选: {ALL_CHECKPOINTS}",
+            detail=translate(
+                "validation.pause_point_invalid",
+                None,
+                invalid=invalid,
+                options=ALL_CHECKPOINTS,
+            ),
         )
     # 空 = 全部检查点暂停（PRD §4.3）
     return ManualConfig(enabled=True, pause_points=points or list(ALL_CHECKPOINTS))
@@ -165,7 +185,7 @@ async def create_simple_task(
     if mode not in _VALID_MODES:
         raise HTTPException(
             status_code=422,
-            detail=f"mode 必须为 {_VALID_MODES} 之一，当前: {mode}",
+            detail=translate("validation.mode_invalid", None, options=_VALID_MODES, current=mode),
         )
     # v6.2：2.5 系列模型时长档位为 4–12 秒；v2.0 仍用 DURATION_FRAME_MAP 档位
     video_model = get_selected_models().get("video") or ""
@@ -173,10 +193,18 @@ async def create_simple_task(
     if duration not in valid_durations:
         raise HTTPException(
             status_code=422,
-            detail=f"duration 必须为 {sorted(valid_durations)} 之一，当前: {duration}",
+            detail=translate(
+                "validation.duration_invalid",
+                None,
+                options=sorted(valid_durations),
+                current=duration,
+            ),
         )
     if len(prompt) > 5000:
-        raise HTTPException(status_code=422, detail="prompt 最多 5000 字符")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.prompt_too_long", None),
+        )
 
     task_id = uuid.uuid4().hex[:12]
     dir_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_id}"
@@ -273,12 +301,21 @@ async def create_creative_task(
 
     # P7: 参数校验
     if len(idea) > 10000:
-        raise HTTPException(status_code=422, detail="idea 最多 10000 字符")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.idea_too_long", None),
+        )
     if duration_source not in ("manual", "prompt"):
-        raise HTTPException(status_code=422, detail="duration_source 必须为 manual 或 prompt")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.duration_source_invalid", None),
+        )
     if duration_source == "manual":
         if scene_count < 1 or scene_count > 30:
-            raise HTTPException(status_code=422, detail="scene_count 范围 1-30")
+            raise HTTPException(
+                status_code=422,
+                detail=translate("validation.scene_count_range", None, min=1, max=30),
+            )
         scene_durations = _parse_scene_durations_json(scene_durations_json)
     else:
         scene_durations = []
@@ -405,10 +442,16 @@ async def create_manuscript_task(
         raise HTTPException(status_code=400, detail=api_key_missing_msg())
 
     if not manuscript_text.strip():
-        raise HTTPException(status_code=400, detail="稿件内容不能为空")
+        raise HTTPException(
+            status_code=400,
+            detail=translate("validation.manuscript_empty", None),
+        )
     # P7: 文本长度上限
     if len(manuscript_text) > 50000:
-        raise HTTPException(status_code=422, detail="稿件文本最多 50000 字符")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.manuscript_too_long", None),
+        )
 
     # v4.0: 稿件正文已知，做脚本级音色兼容性校验（最准确）
     if audio_enabled:
@@ -433,7 +476,7 @@ async def create_manuscript_task(
         except Exception:
             raise HTTPException(
                 status_code=422,
-                detail="reference_images_map 必须为 JSON 数组，元素为段落 index 的整数数组",
+                detail=translate("validation.reference_images_map_not_list", None),
             )
         upload_dir = helpers.get_upload_dir()
         for i, up in enumerate(reference_images):
@@ -526,16 +569,31 @@ async def create_poetry_task(
         helpers._validate_voice_compat(audio_voice, audio_lang or "zh")
 
     if not poem_text.strip():
-        raise HTTPException(status_code=400, detail="古诗原文不能为空")
+        raise HTTPException(
+            status_code=400,
+            detail=translate("validation.poem_empty", None),
+        )
     if len(poem_text) > 2000:
-        raise HTTPException(status_code=422, detail="古诗原文最多 2000 字符")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.poem_too_long", None),
+        )
     if video_duration < 5 or video_duration > 300:
-        raise HTTPException(status_code=422, detail="video_duration 范围 5-300 秒")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.video_duration_range", None, min=5, max=300),
+        )
     if duration_source not in ("manual", "prompt"):
-        raise HTTPException(status_code=422, detail="duration_source 必须为 manual 或 prompt")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.duration_source_invalid", None),
+        )
     if duration_source == "manual":
         if scene_count < 1 or scene_count > 30:
-            raise HTTPException(status_code=422, detail="scene_count 范围 1-30")
+            raise HTTPException(
+                status_code=422,
+                detail=translate("validation.scene_count_range", None, min=1, max=30),
+            )
         scene_durations = _parse_scene_durations_json(scene_durations_json)
     else:
         scene_durations = []
@@ -547,7 +605,10 @@ async def create_poetry_task(
             raise ValueError("not a list")
         user_scene_prompts = [str(p) for p in user_scene_prompts]
     except Exception:
-        raise HTTPException(status_code=422, detail="user_scene_prompts_json 必须为 JSON 数组")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.user_scene_prompts_not_list", None),
+        )
 
     task_id = uuid.uuid4().hex[:12]
     name = creative_name.strip() if creative_name else f"poetry_{task_id}"
@@ -634,9 +695,15 @@ async def create_anchor_task(
         helpers._validate_voice_compat(audio_voice, audio_lang or "zh", text=script_text)
 
     if not script_text.strip():
-        raise HTTPException(status_code=400, detail="口播稿件不能为空")
+        raise HTTPException(
+            status_code=400,
+            detail=translate("validation.anchor_script_empty", None),
+        )
     if len(script_text) > 50000:
-        raise HTTPException(status_code=422, detail="口播稿件最多 50000 字符")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.anchor_script_too_long", None),
+        )
 
     task_id = uuid.uuid4().hex[:12]
     name = f"anchor_{task_id}"

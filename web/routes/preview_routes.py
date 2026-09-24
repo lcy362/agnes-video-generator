@@ -26,6 +26,7 @@ from fastapi import APIRouter, Form, HTTPException
 
 from core.audio.voices import duration_len, estimate_chars_per_sec
 from core.config import api_key_missing_msg, get_api_key, get_selected_models
+from core.i18n_backend import translate
 from core.pipelines.manuscript_video import split_manuscript_text
 from core.screenwriter import Screenwriter, is_prompt_language_explicit
 
@@ -82,9 +83,10 @@ async def _acquire_preview_slot() -> None:
     if not await _PREVIEW_GATE.try_acquire():
         raise HTTPException(
             status_code=429,
-            detail=(
-                f"预览请求过于频繁，请稍后重试"
-                f"（同时最多 {_PREVIEW_CONCURRENCY_LIMIT} 个预览）"
+            detail=translate(
+                "preview.rate_limited",
+                None,
+                limit=_PREVIEW_CONCURRENCY_LIMIT,
             ),
             headers={"Retry-After": "5"},
         )
@@ -155,10 +157,16 @@ def _parse_scene_durations(scene_durations_json: str) -> list:
         if not isinstance(durations, list):
             raise ValueError("not a list")
     except Exception:
-        raise HTTPException(status_code=422, detail="scene_durations_json 必须为 JSON 数组")
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.scene_durations_not_list", None),
+        )
     for i, d in enumerate(durations):
         if not isinstance(d, (int, float)) or d < 2 or d > 30:
-            raise HTTPException(status_code=422, detail=f"场景 {i + 1} 时长范围 2-30 秒")
+            raise HTTPException(
+                status_code=422,
+                detail=translate("validation.scene_duration_range", None, scene_index=i + 1),
+            )
     return durations
 
 
@@ -187,16 +195,29 @@ async def preview_creative_script(
             raise HTTPException(status_code=400, detail=api_key_missing_msg())
 
         if not idea.strip():
-            raise HTTPException(status_code=422, detail="idea 不能为空")
+            raise HTTPException(
+                status_code=422,
+                detail=translate("validation.idea_empty", None),
+            )
         if len(idea) > 10000:
-            raise HTTPException(status_code=422, detail="idea 最多 10000 字符")
+            raise HTTPException(
+                status_code=422,
+                detail=translate("validation.idea_too_long", None),
+            )
         if scene_count < 1 or scene_count > 30:
-            raise HTTPException(status_code=422, detail="scene_count 范围 1-30")
+            raise HTTPException(
+                status_code=422,
+                detail=translate("validation.scene_count_range", None, min=1, max=30),
+            )
         # v0.2 修订 #5：content_lang 白名单校验，越界 422，不再静默默认阿拉伯语
         if content_lang not in _CONTENT_LANG_LABELS:
             raise HTTPException(
                 status_code=422,
-                detail=f"content_lang 必须为 {sorted(_CONTENT_LANG_LABELS)} 之一",
+                detail=translate(
+                    "preview.content_lang_invalid",
+                    None,
+                    options=sorted(_CONTENT_LANG_LABELS),
+                ),
             )
         scene_durations = _parse_scene_durations(scene_durations_json)
         style = _language_directive(content_lang) + style
@@ -254,9 +275,15 @@ async def preview_manuscript_split(
     await _acquire_preview_slot()
     try:
         if not manuscript_text.strip():
-            raise HTTPException(status_code=400, detail="稿件内容不能为空")
+            raise HTTPException(
+                status_code=400,
+                detail=translate("validation.manuscript_empty", None),
+            )
         if len(manuscript_text) > 50000:
-            raise HTTPException(status_code=422, detail="稿件文本最多 50000 字符")
+            raise HTTPException(
+                status_code=422,
+                detail=translate("validation.manuscript_too_long", None),
+            )
 
         texts = split_manuscript_text(manuscript_text)
         chars_per_sec = estimate_chars_per_sec(manuscript_text)

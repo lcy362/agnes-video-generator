@@ -11,6 +11,7 @@ from typing import List, Optional
 
 from core.api.agnes_chat import AgnesChatAPI
 from core.api.chat_providers import get_or_build_text_chat_client
+from core.i18n_backend import translate
 
 from .characters import ScreenwriterCharactersMixin
 from .scenes import ScreenwriterScenesMixin
@@ -140,7 +141,17 @@ class Screenwriter(
     def _chat_multimodal(self, system_prompt: str, text_prompt: str, image_paths: List[str]) -> str:
         return self.chat_api.chat_multimodal(system_prompt, text_prompt, image_paths)
 
-    def describe_images(self, image_paths: List[str], cache_dir: str = "", language_hint: str = "") -> str:
+    def describe_images(self, image_paths: List[str], cache_dir: str = "", language_hint: str = "", ui_lang: str = "zh") -> str:
+        """逐张描述图片并拼接为上下文文本。
+
+        Args:
+            image_paths: 图片路径列表。
+            cache_dir: 描述结果缓存目录（空则不缓存）。
+            language_hint: 语言提示（保留原接口）。
+            ui_lang: 用户界面语言（v7.0 后端 i18n），仅用于失败时渲染用户可见
+                的错误消息；Screenwriter 不是 BasePipeline 子类，无 ``self._t``，
+                由调用方（流水线）传 ``self._ui_lang()``。
+        """
         if not image_paths:
             return ""
 
@@ -213,7 +224,7 @@ otherwise.
                 descriptions.append(f"[{label}] {desc.strip()}")
                 continue
 
-            desc = self._describe_with_retry(single_prompt, img_path, label, describe_text)
+            desc = self._describe_with_retry(single_prompt, img_path, label, describe_text, ui_lang=ui_lang)
             descriptions.append(f"[{label}] {desc.strip()}")
 
             if cache_file:
@@ -231,7 +242,7 @@ otherwise.
         logger.info(f"[Screenwriter] All {total} images described: {len(combined)} chars")
         return combined
 
-    def _describe_with_retry(self, prompt: str, img_path: str, label: str, text_prompt: str = None, max_retries: int = 3) -> str:
+    def _describe_with_retry(self, prompt: str, img_path: str, label: str, text_prompt: str = None, max_retries: int = 3, ui_lang: str = "zh") -> str:
         if text_prompt is None:
             text_prompt = self._prompt(zh_text="请描述这张图片。", en_text="Describe this image.")
         for attempt in range(max_retries):
@@ -247,8 +258,9 @@ otherwise.
                     _time.sleep(delay)
                 else:
                     logger.error(f"[Screenwriter] {label} failed after {max_retries} attempts: {e}")
+                    # 用户可见错误消息按调用方传入的 UI 语言渲染（v7.0 后端 i18n）
                     raise RuntimeError(
-                        f"图片分析失败（{label}）: {e}"
+                        translate("screenwriter.image_analyze_failed", ui_lang, label=label, reason=e)
                     ) from e
 
 def build_poetry_scene_prompt(

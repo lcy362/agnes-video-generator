@@ -12,6 +12,7 @@ from core.config import (
     remove_workspace,
     set_active_workspace,
 )
+from core.i18n_backend import translate
 from core.path_security import UnsafePathError, safe_workspace_path
 from web import helpers
 
@@ -31,13 +32,13 @@ async def list_workspaces():
 async def create_workspace(path: str = Form(...), name: str = Form("")):
     """添加一个工作目录。"""
     if not path.strip():
-        raise HTTPException(status_code=422, detail="path 不能为空")
+        raise HTTPException(status_code=422, detail=translate("workspace.path_empty"))
     try:
         safe_path = safe_workspace_path(path.strip())
     except UnsafePathError:
         raise HTTPException(
             status_code=422,
-            detail="工作目录路径不合法或超出允许范围（可由 AGNES_WORKSPACE_ROOT 环境变量放宽）",
+            detail=translate("workspace.path_invalid"),
         )
     entry = add_workspace(safe_path, name.strip())
     # safe_path 已是 safe_workspace_path 净化后的受信任值（受信任根 containment 检查），
@@ -51,10 +52,10 @@ async def create_workspace(path: str = Form(...), name: str = Form("")):
 async def delete_workspace(path: str = Form(...)):
     """移除一个工作目录（仅从配置中移除，不删除磁盘文件）。"""
     if not path.strip():
-        raise HTTPException(status_code=422, detail="path 不能为空")
+        raise HTTPException(status_code=422, detail=translate("workspace.path_empty"))
     removed = remove_workspace(path.strip())
     if not removed:
-        raise HTTPException(status_code=404, detail="工作目录不存在")
+        raise HTTPException(status_code=404, detail=translate("workspace.dir_not_found"))
     return {"ok": True, "active_workspace": get_active_workspace()}
 
 
@@ -62,14 +63,14 @@ async def delete_workspace(path: str = Form(...)):
 async def activate_workspace(path: str = Form(...)):
     """设置当前激活的工作目录。"""
     if not path.strip():
-        raise HTTPException(status_code=422, detail="path 不能为空")
+        raise HTTPException(status_code=422, detail=translate("workspace.path_empty"))
     try:
         safe_path = safe_workspace_path(path.strip())
         active = set_active_workspace(safe_path)
     except UnsafePathError:
         raise HTTPException(
             status_code=422,
-            detail="工作目录路径不合法或超出允许范围（可由 AGNES_WORKSPACE_ROOT 环境变量放宽）",
+            detail=translate("workspace.path_invalid"),
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

@@ -13,6 +13,7 @@ import logging
 
 from fastapi import APIRouter, Form, HTTPException
 
+from core.i18n_backend import translate
 from core.presets import (
     create_user_preset,
     delete_user_preset,
@@ -50,7 +51,7 @@ async def save_preset(name: str = Form(...), prompt: str = Form(...)):
         prompt: 预设 prompt 本体。
     """
     if not prompt.strip():
-        raise HTTPException(status_code=422, detail="prompt 不能为空")
+        raise HTTPException(status_code=422, detail=translate("validation.prompt_empty"))
     preset = create_user_preset(name, prompt)
     return {"ok": True, **preset}
 
@@ -59,7 +60,7 @@ async def save_preset(name: str = Form(...), prompt: str = Form(...)):
 async def delete_preset(preset_id: str):
     """删除用户自定义预设（系统预设只读，拒绝删除）。"""
     if preset_id in get_system_preset_ids():
-        raise HTTPException(status_code=400, detail="系统预设为只读，不可删除")
+        raise HTTPException(status_code=400, detail=translate("preset.system_readonly"))
     if not delete_user_preset(preset_id):
-        raise HTTPException(status_code=404, detail="预设不存在")
+        raise HTTPException(status_code=404, detail=translate("preset.not_found"))
     return {"ok": True, "preset_id": preset_id}

@@ -215,7 +215,7 @@ class PoetryVideoPipeline(MultiScenePipeline):
             self._state.style,
         )
         if not raw_scenes:
-            raise RuntimeError("[Poetry] LLM 未返回有效场景，请重试")
+            raise RuntimeError(self._t("progress.poetry.no_valid_scenes"))
 
         n = len(raw_scenes)
         durations = self._resolve_durations_for_count(n, duration_source, scene_durations)
@@ -312,7 +312,8 @@ class PoetryVideoPipeline(MultiScenePipeline):
 
             await self._emit(
                 "audio", "running",
-                f"生成朗诵配音 {idx+1}/{len(scenes)}...", _PROGRESS_AUDIO_SCENE,
+                self._t("progress.poetry.generate_audio", i=idx + 1, total=len(scenes)),
+                _PROGRESS_AUDIO_SCENE,
             )
 
             # 场景间延迟（除第一个）：避免 edge_tts 流截断
@@ -419,7 +420,8 @@ class PoetryVideoPipeline(MultiScenePipeline):
             dur = max(audio_dur, 1.0)
             await self._emit(
                 "subtitle", "running",
-                f"生成字幕 {idx+1}/{len(scenes)}...", _PROGRESS_SUBTITLE_SCENE,
+                self._t("progress.poetry.generate_subtitle", i=idx + 1, total=len(scenes)),
+                _PROGRESS_SUBTITLE_SCENE,
             )
             # v2.0：优先用该场景 cues 生成精确字幕；cues 缺失则回退纯文本估算
             scene_sub_maker = getattr(self, "_scene_sub_makers", {}).get(idx)
@@ -498,7 +500,8 @@ class PoetryVideoPipeline(MultiScenePipeline):
         ):
             await self._emit(
                 "concatenate", "running",
-                f"合并合成 {len(scenes)} 个场景（单链）...", _PROGRESS_COMPOSITE_SCENE,
+                self._t("progress.poetry.composite_single_pass", n=len(scenes)),
+                _PROGRESS_COMPOSITE_SCENE,
             )
             result = await asyncio.to_thread(
                 VideoConcatenator.concat_scenes_single_pass,
@@ -527,7 +530,8 @@ class PoetryVideoPipeline(MultiScenePipeline):
 
             await self._emit(
                 "concatenate", "running",
-                f"合成场景 {idx+1}/{len(scenes)}...", _PROGRESS_COMPOSITE_SCENE,
+                self._t("progress.poetry.composite_scene", i=idx + 1, total=len(scenes)),
+                _PROGRESS_COMPOSITE_SCENE,
             )
             await asyncio.to_thread(
                 VideoConcatenator.concat_videos_with_audio_overlay,
