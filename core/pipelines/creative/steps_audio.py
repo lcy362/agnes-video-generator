@@ -198,7 +198,7 @@ class AudioStepsMixin:
             return
 
         logger.info("[Pipeline] Step generate_narrations: RUNNING (single narration for entire video)")
-        await self._emit("narrations", "running", "正在生成旁白文案...", _PROGRESS_NARRATIONS_START)
+        await self._emit("narrations", "running", self._t("progress.creative_audio.narration_generating"), _PROGRESS_NARRATIONS_START)
 
         narration = await asyncio.to_thread(
             self.screenwriter.generate_narration_for_video,
@@ -294,7 +294,8 @@ class AudioStepsMixin:
         )
         await self._emit(
             "audio", "running",
-            "生成旁白音频..." if audio_enabled else "生成静音时间轴...",
+            self._t("progress.creative_audio.tts_generating") if audio_enabled
+            else self._t("progress.creative_audio.silent_timeline"),
             _PROGRESS_AUDIO_START,
         )
 
@@ -315,7 +316,7 @@ class AudioStepsMixin:
 
         self._state.step_audio = StepStatus.COMPLETED
         self.task_manager.update_state(step_audio=StepStatus.COMPLETED)
-        await self._emit("audio", "completed", "音频生成完成", _PROGRESS_AUDIO_DONE)
+        await self._emit("audio", "completed", self._t("progress.creative_audio.audio_done"), _PROGRESS_AUDIO_DONE)
         return sub_maker
 
     # ==================================================================
@@ -358,7 +359,8 @@ class AudioStepsMixin:
         )
         await self._emit(
             "subtitle", "running",
-            "生成字幕..." if subtitle_enabled else "跳过字幕生成",
+            self._t("progress.creative_audio.subtitle_generating") if subtitle_enabled
+            else self._t("progress.creative_audio.subtitle_skipped"),
             _PROGRESS_SUBTITLE_START,
         )
 
@@ -415,7 +417,7 @@ class AudioStepsMixin:
 
         self._state.step_subtitle = StepStatus.COMPLETED
         self.task_manager.update_state(step_subtitle=StepStatus.COMPLETED)
-        await self._emit("subtitle", "completed", "字幕生成完成", _PROGRESS_SUBTITLE_DONE)
+        await self._emit("subtitle", "completed", self._t("progress.creative_audio.subtitle_done"), _PROGRESS_SUBTITLE_DONE)
 
     # ==================================================================
     # Step 6: Concatenation (MODIFIED in v2.0)
@@ -450,7 +452,7 @@ class AudioStepsMixin:
             )
             return final_video_path
 
-        await self._emit("concatenate", "running", "正在拼接视频...", _PROGRESS_CONCAT_START)
+        await self._emit("concatenate", "running", self._t("progress.creative_audio.concat_running"), _PROGRESS_CONCAT_START)
 
         has_audio = self._state.audio_config.enabled
         has_subtitle = self._state.subtitle_config.enabled
@@ -491,5 +493,5 @@ class AudioStepsMixin:
             step_concatenation=StepStatus.COMPLETED,
             final_video_file=final_video_path,
         )
-        await self._emit("concatenate", "completed", "视频拼接完成", _PROGRESS_CONCAT_DONE)
+        await self._emit("concatenate", "completed", self._t("progress.creative_audio.concat_done"), _PROGRESS_CONCAT_DONE)
         return final_video_path

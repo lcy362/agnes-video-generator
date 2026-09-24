@@ -55,7 +55,7 @@ class SimpleVideoPipeline(BasePipeline):
         self._state.status = StepStatus.RUNNING
         self.task_manager.create(self._state)
 
-        await self._emit("init", "running", "开始简单视频生成...", _PROGRESS_INIT)
+        await self._emit("init", "running", self._t("progress.simple.start"), _PROGRESS_INIT)
 
         try:
             video_path = await self._submit_and_wait()
@@ -69,7 +69,7 @@ class SimpleVideoPipeline(BasePipeline):
                 status=StepStatus.COMPLETED,
                 final_video_file=video_path,
             )
-            await self._emit("done", "completed", "视频生成完成!", _PROGRESS_COMPLETED, {"final_video": video_path})
+            await self._emit("done", "completed", self._t("progress.simple.done"), _PROGRESS_COMPLETED, {"final_video": video_path})
             return video_path
 
         except PipelineShutdown as e:
@@ -124,7 +124,7 @@ class SimpleVideoPipeline(BasePipeline):
             logger.info(f"[Simple] Resuming from saved task.json video_id: {saved_video_id}")
             self._state.video_id = saved_video_id
             self.task_manager.update_state(video_id=saved_video_id)
-            await self._emit("video_gen", "running", f"恢复轮询视频任务 {saved_video_id[:16]}...", _PROGRESS_WAIT)
+            await self._emit("video_gen", "running", self._t("progress.simple.resume_polling", vid=saved_video_id[:16]), _PROGRESS_WAIT)
             video_output = await self.video_api.wait_for_video(saved_video_id)
             await video_output.save(video_path)
             return video_path
@@ -133,7 +133,7 @@ class SimpleVideoPipeline(BasePipeline):
         if self._state.video_id:
             logger.info(f"[Simple] Resuming from state video_id: {self._state.video_id}")
             self._save_task_json(self.working_dir, {"video_id": self._state.video_id})
-            await self._emit("video_gen", "running", f"恢复轮询视频任务 {self._state.video_id[:16]}...", _PROGRESS_WAIT)
+            await self._emit("video_gen", "running", self._t("progress.simple.resume_polling", vid=self._state.video_id[:16]), _PROGRESS_WAIT)
             video_output = await self.video_api.wait_for_video(self._state.video_id)
             await video_output.save(video_path)
             return video_path
@@ -145,7 +145,7 @@ class SimpleVideoPipeline(BasePipeline):
         if self._state.end_frame_image:
             ref_images.append(self._state.end_frame_image)
 
-        await self._emit("video_gen", "running", f"提交视频任务 (mode={self._state.mode})...", _PROGRESS_SUBMIT)
+        await self._emit("video_gen", "running", self._t("progress.simple.submitting", mode=self._state.mode), _PROGRESS_SUBMIT)
 
         # 分隔符跟随用户 prompt 语言
         _has_chinese = bool(re.search(r'[\u4e00-\u9fff]', self._state.prompt))
@@ -167,10 +167,10 @@ class SimpleVideoPipeline(BasePipeline):
         self._save_task_json(self.working_dir, {"video_id": video_id})
         self.task_manager.update_state(video_id=video_id)
 
-        await self._emit("video_gen", "running", f"等待视频生成 {video_id[:16]}...", _PROGRESS_WAIT)
+        await self._emit("video_gen", "running", self._t("progress.simple.waiting", vid=video_id[:16]), _PROGRESS_WAIT)
 
         video_output = await self.video_api.wait_for_video(video_id)
         await video_output.save(video_path)
 
-        await self._emit("video_gen", "completed", "视频生成完成", _PROGRESS_DONE)
+        await self._emit("video_gen", "completed", self._t("progress.simple.completed"), _PROGRESS_DONE)
         return video_path

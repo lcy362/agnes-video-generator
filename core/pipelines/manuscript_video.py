@@ -292,7 +292,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         if pending:
             await self._emit(
                 "scene_prompts", "running",
-                f"生成 {len(pending)} 个场景描述...",
+                self._t("progress.manuscript.build_scenes", n=len(pending)),
                 _PROGRESS_SCENE_PROMPTS_START,
             )
             sem = asyncio.Semaphore(3)
@@ -330,13 +330,19 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                     first = failures[0]
                     # 全段失败：显式 raise（不静默产出空片），异常信息含首个失败段落 index 与原因
                     raise RuntimeError(
-                        f"稿件场景描述生成全部失败 {len(pending)} 段，"
-                        f"首个失败段落 index={first[0].index}，原因: {str(first[1])[:200]}"
+                        self._t(
+                            "progress.manuscript.scenes_all_failed",
+                            n=len(pending),
+                            index=first[0].index,
+                            reason=str(first[1])[:200],
+                        )
                     ) from first[1]
                 # 部分失败：任务继续
-                msg = (
-                    f"场景描述生成完成 ({len(pending) - len(failures)}/{len(pending)} 段)"
-                    f"，{len(failures)} 段失败可 resume 重试"
+                msg = self._t(
+                    "progress.manuscript.scene_prompts_done_partial",
+                    ok=len(pending) - len(failures),
+                    total=len(pending),
+                    failed=len(failures),
                 )
                 logger.warning(
                     "[Manuscript] scene_prompt: %d/%d 段生成失败，失败段落 index=%s，"
@@ -346,7 +352,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                     str(failures[0][1])[:200],
                 )
             else:
-                msg = f"场景描述生成完成 ({len(pending)} 段)"
+                msg = self._t("progress.manuscript.scene_prompts_done", n=len(pending))
 
             await self._emit(
                 "scene_prompts", "completed",
@@ -413,7 +419,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             )
             await self._emit(
                 "video_gen", "running",
-                f"提交视频 {i + 1}/{total}",
+                self._t("progress.manuscript.submit_video", i=i + 1, total=total),
                 _PROGRESS_SUBMIT_START + _PROGRESS_SUBMIT_SPAN * (i / max(total, 1)),
             )
 
@@ -455,7 +461,12 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             para = paragraphs[para_idx]
             await self._emit(
                 "video_gen", "running",
-                f"等待视频 {j + 1}/{len(pending)} ({video_id[:16]}...)",
+                self._t(
+                    "progress.manuscript.wait_video",
+                    i=j + 1,
+                    total=len(pending),
+                    vid=video_id[:16],
+                ),
                 _PROGRESS_WAIT_START + _PROGRESS_WAIT_SPAN * (j / max(len(pending), 1)),
             )
 
@@ -524,7 +535,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
 
         await self._emit(
             "audio", "running",
-            f"生成整段旁白 ({len(narration_tts)} 字)...",
+            self._t("progress.manuscript.generate_audio", n=len(narration_tts)),
             _PROGRESS_AUDIO_START,
         )
 
@@ -558,7 +569,11 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
 
         await self._emit(
             "subtitle", "running",
-            f"生成整段字幕 ({sum(len(t) for t in segment_texts)} 字, {len(paragraphs)} 段)...",
+            self._t(
+                "progress.manuscript.generate_subtitles",
+                n=sum(len(t) for t in segment_texts),
+                m=len(paragraphs),
+            ),
             _PROGRESS_SUBTITLE_START,
         )
 
@@ -623,7 +638,8 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         if has_audio or has_subtitle:
             await self._emit(
                 "concatenate", "running",
-                f"拼接 {len(video_paths)} 段视频+音频+字幕...", _PROGRESS_CONCAT_START,
+                self._t("progress.manuscript.concat_av", n=len(video_paths)),
+                _PROGRESS_CONCAT_START,
             )
             await asyncio.to_thread(
                 VideoConcatenator.concat_videos_with_audio_overlay,
@@ -637,7 +653,8 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         else:
             await self._emit(
                 "concatenate", "running",
-                f"拼接 {len(video_paths)} 段视频（无音频字幕）...", _PROGRESS_CONCAT_START,
+                self._t("progress.manuscript.concat_no_av", n=len(video_paths)),
+                _PROGRESS_CONCAT_START,
             )
             await asyncio.to_thread(
                 VideoConcatenator.concat_videos, video_paths, output_path

@@ -409,10 +409,10 @@ async def preview_checkpoint_impact(
         modified = json.loads(modified_artifact_ids) if modified_artifact_ids else []
         params = json.loads(param_updates) if param_updates else None
     except ValueError:
-        raise HTTPException(status_code=422, detail="modified_artifact_ids / param_updates 必须为 JSON")
+        raise HTTPException(status_code=422, detail=translate("checkpoint.json_required"))
 
     if not isinstance(modified, list):
-        raise HTTPException(status_code=422, detail="modified_artifact_ids 必须为 JSON 数组")
+        raise HTTPException(status_code=422, detail=translate("checkpoint.artifact_ids_not_array"))
 
     graph = get_dependency_graph(state.task_type)
     plan = graph.compute_impact(state, modified, params)
@@ -495,7 +495,7 @@ async def approve_checkpoint(task_id: str, checkpoint: str,
         modified = json.loads(modified_artifact_ids) if modified_artifact_ids else []
         params = json.loads(param_updates) if param_updates else None
     except ValueError:
-        raise HTTPException(status_code=422, detail="modified_artifact_ids / param_updates 必须为 JSON")
+        raise HTTPException(status_code=422, detail=translate("checkpoint.json_required"))
 
     graph = get_dependency_graph(state.task_type)
     plan = graph.compute_impact(state, modified, params)
@@ -659,7 +659,7 @@ async def ai_modify_artifact(
     视频 / 音频产物暂不支持，返回 400。
     """
     if not user_request.strip():
-        raise HTTPException(status_code=422, detail="user_request 不能为空")
+        raise HTTPException(status_code=422, detail=translate("ai_modify.user_request_empty"))
 
     # 运行中保护
     if task_id in app_state.active_pipelines:

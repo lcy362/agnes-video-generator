@@ -182,7 +182,7 @@ class VideoStepsMixin:
 
             await self._emit(
                 "video_gen", "running",
-                f"场景 {scene_idx+1}/{total}: 提交任务 (ti2vid)...",
+                self._t("progress.creative_video.scene_submit_ti2vid", i=scene_idx + 1, total=total),
                 _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * scene_idx / total,
             )
             # 优化 5：该场景有用户上传参考图时以用户图为参考
@@ -204,7 +204,7 @@ class VideoStepsMixin:
         if pending:
             await self._emit(
                 "video_gen", "running",
-                f"等待 {len(pending)} 个视频生成完成 (independent)...",
+                self._t("progress.creative_video.wait_independent", n=len(pending)),
                 _PROGRESS_WAIT_START,
             )
 
@@ -213,7 +213,7 @@ class VideoStepsMixin:
             scene_idx = info["scene_idx"]
             await self._emit(
                 "video_gen", "running",
-                f"场景 {scene_idx+1}/{total}: 等待生成中...",
+                self._t("progress.creative_video.scene_waiting", i=scene_idx + 1, total=total),
                 _PROGRESS_WAIT_START + _PROGRESS_WAIT_SPAN * pending.index(info) / len(pending),
             )
             try:
@@ -221,7 +221,7 @@ class VideoStepsMixin:
                 await video_output.save(info["video_path"])
                 await self._emit(
                     "video_gen", "running",
-                    f"场景 {scene_idx+1}/{total}: 完成",
+                    self._t("progress.creative_video.scene_done", i=scene_idx + 1, total=total),
                     _PROGRESS_WAIT_START + _PROGRESS_WAIT_SPAN * (pending.index(info) + 1) / len(pending),
                 )
             except Exception as e:
@@ -280,7 +280,7 @@ class VideoStepsMixin:
                     current_image = last_frame_path
                 await self._emit(
                     "video_gen", "running",
-                    f"场景 {scene_idx+1}/{total}: 已缓存",
+                    self._t("progress.creative_video.scene_cached", i=scene_idx + 1, total=total),
                     _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * (scene_idx + 1) / total,
                 )
                 continue
@@ -295,13 +295,13 @@ class VideoStepsMixin:
                 )
                 await self._emit(
                     "video_gen", "running",
-                    f"场景 {scene_idx+1}/{total}: 续传视频 (ti2vid)...",
+                    self._t("progress.creative_video.scene_resume_ti2vid", i=scene_idx + 1, total=total),
                     _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * scene_idx / total,
                 )
             else:
                 await self._emit(
                     "video_gen", "running",
-                    f"场景 {scene_idx+1}/{total}: 提交任务 (ti2vid)...",
+                    self._t("progress.creative_video.scene_submit_ti2vid", i=scene_idx + 1, total=total),
                     _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * scene_idx / total,
                 )
                 # 优化路线图 3.6：双参考图——尾帧（时序连贯）+ 角色参考图
@@ -326,7 +326,7 @@ class VideoStepsMixin:
 
             await self._emit(
                 "video_gen", "running",
-                f"场景 {scene_idx+1}/{total}: 等待生成中...",
+                self._t("progress.creative_video.scene_waiting", i=scene_idx + 1, total=total),
                 _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * scene_idx / total,
             )
             try:
@@ -374,7 +374,7 @@ class VideoStepsMixin:
 
             await self._emit(
                 "video_gen", "running",
-                f"场景 {scene_idx+1}/{total}: 完成",
+                self._t("progress.creative_video.scene_done", i=scene_idx + 1, total=total),
                 _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * (scene_idx + 1) / total,
             )
 
@@ -522,7 +522,7 @@ class VideoStepsMixin:
         if new_submissions:
             await self._emit(
                 "video_gen", "running",
-                f"提交 {len(new_submissions)} 个视频任务 (keyframes)...",
+                self._t("progress.creative_video.submit_batch_keyframes", n=len(new_submissions)),
                 _PROGRESS_KEYFRAME_SUBMIT_START,
             )
         else:
@@ -535,7 +535,7 @@ class VideoStepsMixin:
             scene_idx = info["scene_idx"]
             await self._emit(
                 "video_gen", "running",
-                f"场景 {scene_idx+1}/{total}: 提交任务...",
+                self._t("progress.creative_video.scene_submit", i=scene_idx + 1, total=total),
                 _PROGRESS_KEYFRAME_SUBMIT_START + _PROGRESS_KEYFRAME_SUBMIT_SPAN * scene_idx / total,
             )
             video_id = await self.video_generator.submit_video(
@@ -552,7 +552,7 @@ class VideoStepsMixin:
         if pending:
             await self._emit(
                 "video_gen", "running",
-                f"等待 {len(pending)} 个视频生成完成...",
+                self._t("progress.creative_video.wait_batch", n=len(pending)),
                 _PROGRESS_KEYFRAME_WAIT_START,
             )
 
@@ -560,7 +560,7 @@ class VideoStepsMixin:
             scene_idx = info["scene_idx"]
             await self._emit(
                 "video_gen", "running",
-                f"场景 {scene_idx+1}/{total}: 等待生成中...",
+                self._t("progress.creative_video.scene_waiting", i=scene_idx + 1, total=total),
                 _PROGRESS_KEYFRAME_WAIT_START + _PROGRESS_KEYFRAME_WAIT_SPAN * pending.index(info) / len(pending),
             )
             try:
@@ -568,7 +568,7 @@ class VideoStepsMixin:
                 await video_output.save(info["video_path"])
                 await self._emit(
                     "video_gen", "running",
-                    f"场景 {scene_idx+1}/{total}: 完成",
+                    self._t("progress.creative_video.scene_done", i=scene_idx + 1, total=total),
                     _PROGRESS_KEYFRAME_WAIT_START + _PROGRESS_KEYFRAME_WAIT_SPAN * (pending.index(info) + 1) / len(pending),
                 )
             except Exception as e:

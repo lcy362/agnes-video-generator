@@ -63,7 +63,7 @@ router = APIRouter(tags=["config"])
 _MODEL_CACHE = {"models": None, "ts": 0.0, "ttl": 300}
 
 # 通用错误消息（复用点 > 1，提取常量避免重复字面量）
-_MSG_KEY_NOT_FOUND = "Key 不存在"
+_MSG_KEY_NOT_FOUND = "config.key_not_found"
 
 
 @router.get("/api/config")
@@ -103,7 +103,7 @@ async def clear_config():
     if source == "env":
         raise HTTPException(
             status_code=400,
-            detail="API Key 来自环境变量，无法从界面清除",
+            detail=translate("config.key_from_env_no_clear"),
         )
     delete_api_key()
     # 清除后重建 KeyRing 与限速器（回退到 env 采集 / 空）
@@ -202,7 +202,7 @@ async def remove_config_key(key_id: str = Form("", alias="id"), key: str = Form(
     key_id = (key_id or "").strip()
     key = (key or "").strip()
     if not key and not key_id:
-        raise HTTPException(status_code=400, detail="Key 参数缺失")
+        raise HTTPException(status_code=400, detail=translate("config.missing_key_param"))
 
     items = get_api_keys_with_sources()
     if key:
@@ -210,12 +210,12 @@ async def remove_config_key(key_id: str = Form("", alias="id"), key: str = Form(
         env_has = any(it["source"] == "env" and it["key"] == key for it in items)
         config_has = any(it["source"] == "config" and it["key"] == key for it in items)
         if not env_has and not config_has:
-            raise HTTPException(status_code=404, detail=_MSG_KEY_NOT_FOUND)
+            raise HTTPException(status_code=404, detail=translate(_MSG_KEY_NOT_FOUND))
     else:
         # 掩码接口：按稳定 id 定位明文 Key
         matched = [it for it in items if _key_id(it["key"]) == key_id]
         if not matched:
-            raise HTTPException(status_code=404, detail=_MSG_KEY_NOT_FOUND)
+            raise HTTPException(status_code=404, detail=translate(_MSG_KEY_NOT_FOUND))
         key = matched[0]["key"]
         env_has = matched[0]["source"] == "env"
         config_has = not env_has
@@ -225,7 +225,7 @@ async def remove_config_key(key_id: str = Form("", alias="id"), key: str = Form(
         # 该 Key 只来自 env（含与 config 重复但 env 优先去重的情况）
         raise HTTPException(
             status_code=400,
-            detail="该 Key 来自环境变量（含 .env），请在启动环境 / .env 中移除",
+            detail=translate("config.env_key_remove_elsewhere"),
         )
     # 重建 KeyRing 与限速器，使移除即时生效
     reset_key_ring()
@@ -337,15 +337,17 @@ async def save_config_key_domain(key_id: str = Form("", alias="id"), domain: str
     if domain and domain not in AGNES_DOMAIN_MAP:
         raise HTTPException(
             status_code=422,
-            detail=f"域名后缀必须为 {list(AGNES_DOMAIN_MAP.keys())} 之一（或空以清除）",
+            detail=translate(
+                "config.domain_suffix_invalid_clear", opts=list(AGNES_DOMAIN_MAP.keys())
+            ),
         )
     items = get_api_keys_with_sources()
     matched = [it for it in items if _key_id(it["key"]) == key_id]
     if not matched:
-        raise HTTPException(status_code=404, detail=_MSG_KEY_NOT_FOUND)
+        raise HTTPException(status_code=404, detail=translate(_MSG_KEY_NOT_FOUND))
     entry = matched[0]
     if entry["source"] == "env":
-        raise HTTPException(status_code=400, detail="该 Key 来自环境变量，无法为它保存域名")
+        raise HTTPException(status_code=400, detail=translate("config.env_key_no_domain"))
     set_api_key_domains({entry["key"]: domain})
     return {"ok": True, "mask": _mask_key(entry["key"]), "domain": domain}
 
@@ -454,7 +456,7 @@ async def list_models(refresh: bool = False):
     """
     key = get_api_key()
     if not key:
-        raise HTTPException(status_code=400, detail="未配置 API Key")
+        raise HTTPException(status_code=400, detail=translate("config.api_key_not_configured"))
     now = time.time()
     if (
         not refresh
@@ -493,7 +495,7 @@ async def save_models(
     ``text_provider`` 可选：非空时一并写入 ``models.text_provider``（空串 = 回退 agnes）。
     """
     if text is None or text.strip() == "":
-        raise HTTPException(status_code=400, detail="文本模型不能为空")
+        raise HTTPException(status_code=400, detail=translate("config.text_model_empty"))
     result = set_selected_models(
         text=text or None,
         image=image,
@@ -523,7 +525,7 @@ async def save_agnes_domain(domain: str = Form(...)):
     if domain not in AGNES_DOMAIN_MAP:
         raise HTTPException(
             status_code=422,
-            detail=f"域名后缀必须为 {list(AGNES_DOMAIN_MAP.keys())} 之一",
+            detail=translate("config.domain_suffix_invalid", opts=list(AGNES_DOMAIN_MAP.keys())),
         )
     set_agnes_domain(domain)
     return {"ok": True, "agnes_domain": domain}
@@ -580,10 +582,10 @@ async def test_text_provider(
     if api not in _VALID_TEXT_APIS:
         raise HTTPException(
             status_code=422,
-            detail=f"协议(api)必须为 {list(_VALID_TEXT_APIS)} 之一",
+            detail=translate("config.api_scheme_invalid", opts=list(_VALID_TEXT_APIS)),
         )
     if not base_url:
-        raise HTTPException(status_code=422, detail="base_url 不能为空")
+        raise HTTPException(status_code=422, detail=translate("config.base_url_empty"))
     import asyncio
 
     def _probe():
@@ -670,11 +672,13 @@ async def save_text_provider_endpoint(
     base_url = (base_url or "").strip()
     api_key = (api_key or "").strip()
     if not provider:
-        raise HTTPException(status_code=400, detail="provider 不能为空")
+        raise HTTPException(status_code=400, detail=translate("config.provider_empty"))
     if api not in _VALID_TEXT_APIS:
-        raise HTTPException(status_code=422, detail=f"协议(api)必须为 {list(_VALID_TEXT_APIS)} 之一")
+        raise HTTPException(
+            status_code=422, detail=translate("config.api_scheme_invalid", opts=list(_VALID_TEXT_APIS))
+        )
     if not base_url:
-        raise HTTPException(status_code=422, detail="base_url 不能为空")
+        raise HTTPException(status_code=422, detail=translate("config.base_url_empty"))
 
     # 编辑场景：列表只回掩码，前端不会有明文 key。若本次未提供新 key（空），
     # 则保留已存储的 key，避免把自定义供应商的凭据误清空。
@@ -692,7 +696,7 @@ async def save_text_provider_endpoint(
             parsed = json.loads(models_json)
             models = [str(m).strip() for m in parsed if str(m).strip()]
         except ValueError:
-            raise HTTPException(status_code=422, detail="models_json 必须为合法 JSON 数组")
+            raise HTTPException(status_code=422, detail=translate("config.models_json_invalid"))
 
     p = TextProvider(
         provider=provider,
@@ -717,10 +721,10 @@ async def delete_text_provider_endpoint(provider: str = ""):
     """
     provider = (provider or "").strip()
     if provider == PROVIDER_AGNES:
-        raise HTTPException(status_code=400, detail="内置 Agnes 供应商不可删除")
+        raise HTTPException(status_code=400, detail=translate("config.builtin_provider_no_delete"))
     deleted = delete_text_provider(provider)
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"供应商不存在: {provider}")
+        raise HTTPException(status_code=404, detail=translate("config.provider_not_found", name=provider))
     # 若删除的是当前所选 → 回退 agnes，并把 models.text 归默认，避免遗留
     # 已删除供应商的模型 id 被路由到 Agnes（resolve_text_chat 会当作 agnes 模型用）。
     if get_selected_text_provider() == provider:
@@ -739,19 +743,19 @@ async def sync_text_provider_models(provider: str = "", models_json: str = Form(
     """
     provider = (provider or "").strip()
     if provider == PROVIDER_AGNES:
-        raise HTTPException(status_code=400, detail="内置 Agnes 供应商无需同步模型")
+        raise HTTPException(status_code=400, detail=translate("config.builtin_provider_no_sync"))
     if not models_json or not models_json.strip():
-        raise HTTPException(status_code=422, detail="models_json 不能为空")
+        raise HTTPException(status_code=422, detail=translate("config.models_json_empty"))
     try:
         parsed = json.loads(models_json)
         models = [str(m).strip() for m in parsed if str(m).strip()]
     except ValueError:
-        raise HTTPException(status_code=422, detail="models_json 必须为合法 JSON 数组")
+        raise HTTPException(status_code=422, detail=translate("config.models_json_invalid"))
 
     providers = get_text_providers()
     target = next((p for p in providers if p.provider == provider), None)
     if target is None:
-        raise HTTPException(status_code=404, detail=f"供应商不存在: {provider}")
+        raise HTTPException(status_code=404, detail=translate("config.provider_not_found", name=provider))
     # 保留原 key/信息，仅更新 models 列表
     updated = TextProvider(
         provider=target.provider,

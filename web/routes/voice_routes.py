@@ -12,6 +12,7 @@ from core.audio.voices import (
     get_voice_lang,
     is_voice_compatible,
 )
+from core.i18n_backend import translate
 from web import helpers
 from web.log_safe import safe_log
 
@@ -45,7 +46,7 @@ async def preview_voice(voice: str, text: str = ""):
     - 跨语言不兼容时 edge_tts 抛异常，返回 400 + 明确错误信息
     """
     if not voice:
-        raise HTTPException(status_code=400, detail="缺少 voice 参数")
+        raise HTTPException(status_code=400, detail=translate("voice.param_missing"))
     preview_text = helpers._resolve_preview_text(voice, text)
     try:
         cache_path = await helpers._get_or_generate_preview(voice, preview_text)
@@ -53,7 +54,7 @@ async def preview_voice(voice: str, text: str = ""):
         logger.warning("[Preview] voice=%s failed: %s", safe_log(voice), e)
         raise HTTPException(
             status_code=400,
-            detail=f"该音色不支持此语言的试听文本（跨文字体系无法朗读）：{e}",
+            detail=translate("voice.preview_unsupported", reason=str(e)),
         )
     return FileResponse(
         cache_path,

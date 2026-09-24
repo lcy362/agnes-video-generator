@@ -26,6 +26,7 @@ from core.audio.voices import (
     is_voice_compatible_with_text,
 )
 from core.config import get_working_dir
+from core.i18n_backend import translate
 from core.task_manager import TaskManager
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,20 @@ def _resolve_preview_text(voice_id: str, text: str) -> str:
     return VOICE_PREVIEW_TEXTS.get(vlang, VOICE_PREVIEW_TEXTS["zh"]).format(name=name)
 
 
+def _lang_label(code: str, lang: str = None) -> str:
+    """按 UI 语言渲染语言标签（``voice_compat.label.<code>`` 目录）。
+
+    标签来源是 ``core/audio/voices.py::PROJECT_LANGUAGES`` 静态表（语言自名），
+    该表不动；仅在渲染层经 ``translate`` 转换。目录缺该 code 时回退静态表
+    原名（未知代码回退代码本身），保证 zh 输出与改造前逐字节一致。
+    """
+    key = f"voice_compat.label.{code}"
+    rendered = translate(key, lang)
+    if rendered != key:
+        return rendered
+    return PROJECT_LANGUAGES.get(code, {}).get("label", code)
+
+
 def _validate_voice_compat(audio_voice: str, target_lang: str, text: str = None):
     """校验 voice 与目标任务语言的兼容性，不兼容时抛出 422。
 
@@ -123,21 +138,20 @@ def _validate_voice_compat(audio_voice: str, target_lang: str, text: str = None)
         if not is_voice_compatible_with_text(audio_voice, text):
             raise HTTPException(
                 status_code=422,
-                detail=(
-                    f"所选音色 {audio_voice} 不支持当前稿件语言的朗读"
-                    f"（跨文字体系无法朗读，任务将失败）。请更换为匹配语言的音色。"
-                ),
+                detail=translate("voice_compat.cross_script", voice=audio_voice),
             )
         return
     if target_lang and not is_voice_compatible(audio_voice, target_lang):
-        lang_label = PROJECT_LANGUAGES.get(target_lang, {}).get("label", target_lang)
+        lang_label = _lang_label(target_lang)
         supported = LANG_COMPAT.get(get_voice_lang(audio_voice) or "", [])
-        supported_labels = [PROJECT_LANGUAGES.get(c, {}).get("label", c) for c in supported]
+        supported_labels = [_lang_label(c) for c in supported]
         raise HTTPException(
             status_code=422,
-            detail=(
-                f"所选音色 {audio_voice} 不支持「{lang_label}」语言的视频生成"
-                f"（仅支持：{', '.join(supported_labels)}）。请更换音色或语言。"
+            detail=translate(
+                "voice_compat.lang_unsupported",
+                voice=audio_voice,
+                lang_name=lang_label,
+                supported=", ".join(supported_labels),
             ),
         )
 

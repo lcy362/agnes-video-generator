@@ -3,7 +3,7 @@
 > 面向对象：维护 / 开发本项目的 AI Agent
 > 目标仓库：`lcy362/agnes-video-generator`
 > 状态：🟢 初版可用，后续持续迭代
-> 版本：v0.4 | 更新日期：2026-09-23
+> 版本：v0.5 | 更新日期：2026-09-24
 
 ***
 
@@ -89,7 +89,7 @@ gh issue list --repo lcy362/agnes-video-generator --state open \
 
   * **首选信号（v7.0 起）：报告里的「界面语言 / UI Language」行**。该行由前端直接写入用户当前 UI 语言代码（如 `en` / `zh` / `ja`），是最强指示，无需推断。
 
-  * **次选信号：模板结构字段语言**。多语言化后结构随用户界面语言变化（如 `## Diagnostic Info (Agnes Video Generator)` 表明英文界面、`## 诊断信息（Agnes Video Generator）` 表明中文界面）。当报告缺「界面语言」行（v7.0 之前的旧版本）时以此为准。
+  * **次选信号：模板结构字段语言**。多语言化后结构随用户界面语言变化（如 `## Diagnostic Info (Agnes Video Generator)` 表明英文界面、`## 诊断信息（Agnes Video Generator）` 表明中文界面）。当报告缺「界面语言」行（v7.0 之前的旧版本）时以此为准。**⚠️ 但结构字段语言不可单独采信**：部分语言包把 `fbRep*` 键的值直接复制了英文未译（v6.4.7 / v7.0 的 `ar.json` 即如此，`fbRepTitle` / `fbRepConfigs` / `fbRetryBtn` 全为英文，而 `tiWidth` 等内容键是真阿语），此时英文结构 ≠ 英文界面（issue #65 实为阿语界面）。必须用 Key Configs 条目里来自 `ti*` 等**真翻译键**的内容标签交叉验证——这类键通常已本地化，其语言才是界面语言的可靠证据；两者冲突时以内容标签语言为准。
 
   * **辅助信号**：用户在 `### 复现步骤` / `### 期望行为` 中填写的真实内容、正文 / 评论追加描述。
 
@@ -132,7 +132,8 @@ gh issue list --repo lcy362/agnes-video-generator --state open \
 | 视频提交返回 `{"code":"video_queue_full","message":"video queue is full, please retry later"}`，错误面板直接显示这段原始 JSON                                                                                                              | 上游视频服务队列饱和（与 #47 的 503 / 429 同族容量问题），请求在入队前就被拒。应用当前的自动重试只覆盖 HTTP 429 与 5xx（`core/api/agnes_video.py`），该业务错误码不在其中，因此立即硬失败；前端 `feedback.ts` 的 `HTTP 40[0-4]` 预筛还会把它误判为「确定性故障」，给出「重试无效」的错误引导 | 等几分钟错峰重试；长任务点「重试任务」续传（已生成片段保留 video id，不重复提交）；降时长/分辨率或换视频模型；多 Key 可线性提升配额，或用 `AGNES_VIDEO_RATE_LIMIT` 主动放慢提交；持续失败再附 `GET /api/tasks/{id}/diagnostics` 反馈。**已记录为已知缺口**（瞬态业务码应纳入退避重试 + 前端不应归类为确定性故障），本轮按外部故障处理，未改代码 | #63      |
 | Issue 正文只有一段视频提示词（无报错、无环境、无复现步骤，标题多为乱码或 "first"），期望维护者代跑生成                                                                                             | 用户把开源仓库的 Issue 当成在线生成入口；本项目是**自托管工具**，服务端不代用户执行任务                                                | 按垃圾噪音关闭（`--reason not_planned`，不展开回复）；已补 FAQ 双语条目「贴提示词到 Issue 能生成视频吗」+ `.github/ISSUE_TEMPLATE/config.yml` 的 contact_links 指向本地部署与官网在线体验 | #39, #41, #48, #51, #52 |
 | 桌面版长视频（creative/manuscript）里角色不开口说话，只有一段旁白；而网页在线版能看到角色原声 | 流水线默认跑 TTS 旁白（narration）+ 字幕叠加，`concat_videos_with_audio_overlay` 用旁白/静音轨覆盖并替换掉视频模型自带音频 | 关闭「启用旁白配音」（Audio → Enable narration=off），并尽量同时关字幕，让每个片段保留模型生成音；在视频提示词里直接描述角色说话（"the character says, '…'"）驱动模型自带口型与声音。注意：Agnes 视频模型自带音频质量/口型弱于画面，长多场景视频尤甚，属模型限制；要清晰台词仍用 TTS 旁白更稳 | #58 |
-| manuscript 任务在 `video_gen` 失败，`errorMessage` 是一段中文「网络诊断：本机无法连接到 …（连接被拒绝或被拦截）」，但报告结构字段（`## Diagnostic Info` / `### Reproduction Steps`）是英文，用户实为英文界面 | 两层原因：(1) 本机到 Agnes 视频域名的 TLS 握手被对端 reset（`ConnectionResetError: [Errno 54] Connection reset by peer`），属本地网络/代理/防火墙拦截，非服务侧故障；(2) 后端 `utils/network.py::describe_network_error` 此前硬编码中文，英文 UI 用户也收到中文诊断，看不懂又误判为服务 bug | 网络侧：关代理/VPN 后重试、换直连或热点验证、把 `*.agnes-ai.cn` 加白，恢复后点「重试任务」从 `video_gen` 续传（已生成分镜不重跑）。代码侧：v7.0 已修——新增 `core/i18n_backend.py` + `LangContextMiddleware`，前端全局注入 `X-Agnes-UI-Lang`，任务落盘 `ui_language` 快照，`describe_network_error` / `API_KEY_MISSING_MSG` / 排队/中断/模式切换等消息按 UI 语言返回中英双语；`_CONNECT_MARKERS` 补 `connection reset` 让归因更稳；诊断报告新增「界面语言」行。剩余 ~120 条进度/校验消息见 `docs/plans/v7.0/backend_i18n_plan.md` §三 | #64 |
+| manuscript 任务在 `video_gen` 失败，`errorMessage` 是一段中文「网络诊断：本机无法连接到 …（连接被拒绝或被拦截）」，但报告结构字段（`## Diagnostic Info` / `### Reproduction Steps`）是英文，用户实为英文界面 | 两层原因：(1) 本机到 Agnes 视频域名的 TLS 握手被对端 reset（`ConnectionResetError: [Errno 54] Connection reset by peer`），属本地网络/代理/防火墙拦截，非服务侧故障；(2) 后端 `utils/network.py::describe_network_error` 此前硬编码中文，英文 UI 用户也收到中文诊断，看不懂又误判为服务 bug | 网络侧：关代理/VPN 后重试、换直连或热点验证、把 `*.agnes-ai.cn` 加白，恢复后点「重试任务」从 `video_gen` 续传（已生成分镜不重跑）。代码侧：v7.0 已修——新增 `core/i18n_backend.py` + `LangContextMiddleware`，前端全局注入 `X-Agnes-UI-Lang`，任务落盘 `ui_language` 快照，`describe_network_error` / `API_KEY_MISSING_MSG` / 排队/中断/模式切换等消息按 UI 语言返回中英双语；`_CONNECT_MARKERS` 补 `connection reset` 让归因更稳；诊断报告新增「界面语言」行。剩余进度/校验消息已于 2026-09-24 收尾批次全部清除（见 `docs/plans/v7.0/backend_i18n_plan.md` §三） | #64 |
+| creative 任务在 `scene_config` 失败（v6.4.7），`errorMessage` 为中文「图片分析失败（Start Frame）: … SSLError … certificate is not yet valid」，请求 `apihub.agnes-ai.com/v1/chat/completions` 多次重试均败 | 客户端证书时间校验失败：`apihub.agnes-ai.com` 证书当日刚轮换（notBefore=2026-09-23 10:35 UTC），用户 Windows 时钟落后/时区错或 HTTPS 拦截类安全软件给出无效日期证书，即报 `CERTIFICATE_VERIFY_FAILED: not yet valid`。失败发生在 Start Frame 图片多模态分析（`core/screenwriter/__init__.py::_describe_with_retry`），视频未提交、无消耗。另注：该中文前缀是后端硬编码消息（v7.0 未覆盖，属 §三 剩余消息），且报告结构字段为英文而用户实为阿语界面（`ar.json` 的 `fbRep*` 值未译），印证 §4.1 语言判定新陷阱 | 引导：开启系统时间自动同步（`w32tm /resync`）+ 校准时区；关代理/VPN/杀软 HTTPS 扫描或加白 `*.agnes-ai.*`；恢复后点 Retry Task 从失败步骤续传。已按环境故障阿语+英语双语回复（标注 agent）。代码侧：`_describe_with_retry` 的「图片分析失败」等 screenwriter 消息与其余 ~120 条后端硬编码中文已于 2026-09-24 收尾批次全部纳入 backend i18n（见 `docs/plans/v7.0/backend_i18n_plan.md` §三）；仍待办：`ar.json` 等语言包 `fbRep*` 需真正翻译（i18n_check 只查键存在，查不出英文占位值） | #65 |
 
 ***
 
