@@ -23,7 +23,7 @@ git pull
 ./start.sh
 ```
 
-Docker users: `docker pull ghcr.io/lcy362/agnes-video-generator/free-short-video:7.0.0`.
+Docker users: `docker pull ghcr.io/lcy362/free-short-video:7.0.0`.
 
 npm users: `npx free-short-video`.
 

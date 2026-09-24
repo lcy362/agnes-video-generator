@@ -16,7 +16,7 @@ git pull
 ./start.sh
 ```
 
-Docker users: `docker pull ghcr.io/lcy362/agnes-video-generator/free-short-video:6.4.4`.
+Docker users: `docker pull ghcr.io/lcy362/free-short-video:6.4.4`.
 
 No breaking changes or data migration required. After upgrading, hard-refresh the web UI once (or clear the browser cache) so the rebuilt frontend bundle (with the newly opened model selector) is loaded.
 
