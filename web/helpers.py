@@ -26,7 +26,7 @@ from core.audio.voices import (
     is_voice_compatible_with_text,
 )
 from core.config import get_working_dir
-from core.i18n_backend import translate
+from core.i18n_backend import get_current_lang, normalize_lang, translate
 from core.task_manager import TaskManager
 
 logger = logging.getLogger(__name__)
@@ -112,17 +112,33 @@ def _resolve_preview_text(voice_id: str, text: str) -> str:
     return VOICE_PREVIEW_TEXTS.get(vlang, VOICE_PREVIEW_TEXTS["zh"]).format(name=name)
 
 
-def _lang_label(code: str, lang: str = None) -> str:
-    """按 UI 语言渲染语言标签（``voice_compat.label.<code>`` 目录）。
+#: 英文 UI 下的语言显示名静态表。
+#: **禁止**用 ``voice_compat.label.<code>`` 这类由用户输入拼接的 key 调
+#: ``translate()``：未知语言代码会走到 ``translate`` 的
+#: ``logger.warning("... %s", key)``，把不可信输入写进日志（Sonar
+#: pythonsecurity:S5145 日志注入，v7.0.1 门禁红灯）。语言代码只允许作为
+#: 下方静态表的查表键（结果不进任何日志 sink）。
+_LANG_LABELS_EN: dict[str, str] = {
+    "zh": "Chinese", "en": "English", "ru": "Russian", "ja": "Japanese",
+    "ko": "Korean", "ms": "Malay", "id": "Indonesian", "de": "German",
+    "fr": "French", "nl": "Dutch", "es": "Spanish", "pt": "Portuguese",
+    "it": "Italian", "tr": "Turkish", "vi": "Vietnamese", "th": "Thai",
+    "hi": "Hindi", "bn": "Bengali", "tl": "Tagalog", "ar": "Arabic",
+    "fa": "Persian", "ur": "Urdu",
+}
 
-    标签来源是 ``core/audio/voices.py::PROJECT_LANGUAGES`` 静态表（语言自名），
-    该表不动；仅在渲染层经 ``translate`` 转换。目录缺该 code 时回退静态表
-    原名（未知代码回退代码本身），保证 zh 输出与改造前逐字节一致。
+
+def _lang_label(code: str, lang: str = None) -> str:
+    """返回语言显示名（不参与动态 key 构造，见 ``_LANG_LABELS_EN`` 注释）。
+
+    - 英文 UI：英文通名（静态表查表）；
+    - 其余 UI 语言：``core/audio/voices.py::PROJECT_LANGUAGES`` 的语言自名，
+      与 i18n 改造前的中文消息输出逐字节一致；未知代码回退代码本身。
     """
-    key = f"voice_compat.label.{code}"
-    rendered = translate(key, lang)
-    if rendered != key:
-        return rendered
+    if normalize_lang(lang if lang is not None else get_current_lang()) == "en":
+        en_label = _LANG_LABELS_EN.get(code)
+        if en_label:
+            return en_label
     return PROJECT_LANGUAGES.get(code, {}).get("label", code)
 
 
