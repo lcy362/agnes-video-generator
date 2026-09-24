@@ -156,6 +156,48 @@ class TestValidateVoiceCompat:
         assert ei.value.status_code == 422
 
 
+class TestLangLabel:
+    """_lang_label 不得经用户输入拼接动态 translate key（Sonar S5145 修复）。"""
+
+    def test_en_ui_uses_english_names(self):
+        assert helpers._lang_label("zh", "en") == "Chinese"
+        assert helpers._lang_label("ar", "en-US") == "Arabic"
+
+    def test_zh_ui_uses_native_self_labels(self):
+        from core.audio.voices import PROJECT_LANGUAGES
+        assert helpers._lang_label("ja", "zh") == PROJECT_LANGUAGES["ja"]["label"]
+
+    def test_reads_context_lang_when_param_omitted(self):
+        from core.i18n_backend import current_lang
+        token = current_lang.set("en")
+        try:
+            assert helpers._lang_label("fr") == "French"
+        finally:
+            current_lang.reset(token)
+
+    def test_unknown_code_falls_back_to_code(self):
+        assert helpers._lang_label("xx", "en") == "xx"
+        assert helpers._lang_label("xx", "zh") == "xx"
+
+    def test_dynamic_label_keys_removed_from_catalog(self):
+        from core.i18n_backend import CATALOG
+        assert not [k for k in CATALOG if k.startswith("voice_compat.label.")]
+
+    def test_english_detail_uses_english_labels(self, monkeypatch):
+        from core.i18n_backend import current_lang
+        monkeypatch.setattr(helpers, "is_voice_compatible", lambda v, t: False)
+        monkeypatch.setattr(helpers, "get_voice_lang", lambda v: "zh")
+        token = current_lang.set("en")
+        try:
+            with pytest.raises(Exception) as ei:
+                helpers._validate_voice_compat("v", "en")
+        finally:
+            current_lang.reset(token)
+        assert ei.value.status_code == 422
+        assert "does not support" in ei.value.detail
+        assert "English" in ei.value.detail and "Chinese" in ei.value.detail
+
+
 def test_get_upload_dir(monkeypatch):
     monkeypatch.setattr(helpers, "get_working_dir", lambda: "/work")
     assert helpers.get_upload_dir() == os.path.join("/work", "uploads")
