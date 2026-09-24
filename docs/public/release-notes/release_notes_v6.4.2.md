@@ -16,7 +16,7 @@ git pull
 ./start.sh
 ```
 
-Docker users: `docker pull ghcr.io/lcy362/agnes-video-generator/free-short-video:6.4.2`.
+Docker users: `docker pull ghcr.io/lcy362/free-short-video:6.4.2`.
 
 No breaking changes or data migration required. Existing keys keep working; keys without a bound domain simply fall back to the global domain setting.
 

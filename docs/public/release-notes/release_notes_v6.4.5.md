@@ -16,7 +16,7 @@ git pull
 ./start.sh
 ```
 
-Docker users: `docker pull ghcr.io/lcy362/agnes-video-generator/free-short-video:6.4.5`.
+Docker users: `docker pull ghcr.io/lcy362/free-short-video:6.4.5`.
 
 No breaking changes or data migration required. The upgrade is transparent — existing tasks and configurations remain valid. If you have manually selected `agnes-2.5-flash` in the Settings panel, that selection is preserved; the new default only applies to fresh installations or when no explicit model is configured.
 

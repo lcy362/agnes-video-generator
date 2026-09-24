@@ -16,7 +16,7 @@ git pull
 ./start.sh
 ```
 
-Docker users: `docker pull ghcr.io/lcy362/agnes-video-generator/free-short-video:6.5.0`.
+Docker users: `docker pull ghcr.io/lcy362/free-short-video:6.5.0`.
 
 No breaking changes and no data migration are required. Existing tasks, checkpoints and configurations remain valid.
 

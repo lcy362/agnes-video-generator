@@ -3,7 +3,7 @@
 > 面向对象：维护 / 开发本项目的 AI Agent
 > 目标仓库：`lcy362/agnes-video-generator`
 > 状态：🟢 初版可用，后续持续迭代
-> 版本：v0.5 | 更新日期：2026-09-24
+> 版本：v0.6 | 更新日期：2026-09-24
 
 ***
 
@@ -134,6 +134,7 @@ gh issue list --repo lcy362/agnes-video-generator --state open \
 | 桌面版长视频（creative/manuscript）里角色不开口说话，只有一段旁白；而网页在线版能看到角色原声 | 流水线默认跑 TTS 旁白（narration）+ 字幕叠加，`concat_videos_with_audio_overlay` 用旁白/静音轨覆盖并替换掉视频模型自带音频 | 关闭「启用旁白配音」（Audio → Enable narration=off），并尽量同时关字幕，让每个片段保留模型生成音；在视频提示词里直接描述角色说话（"the character says, '…'"）驱动模型自带口型与声音。注意：Agnes 视频模型自带音频质量/口型弱于画面，长多场景视频尤甚，属模型限制；要清晰台词仍用 TTS 旁白更稳 | #58 |
 | manuscript 任务在 `video_gen` 失败，`errorMessage` 是一段中文「网络诊断：本机无法连接到 …（连接被拒绝或被拦截）」，但报告结构字段（`## Diagnostic Info` / `### Reproduction Steps`）是英文，用户实为英文界面 | 两层原因：(1) 本机到 Agnes 视频域名的 TLS 握手被对端 reset（`ConnectionResetError: [Errno 54] Connection reset by peer`），属本地网络/代理/防火墙拦截，非服务侧故障；(2) 后端 `utils/network.py::describe_network_error` 此前硬编码中文，英文 UI 用户也收到中文诊断，看不懂又误判为服务 bug | 网络侧：关代理/VPN 后重试、换直连或热点验证、把 `*.agnes-ai.cn` 加白，恢复后点「重试任务」从 `video_gen` 续传（已生成分镜不重跑）。代码侧：v7.0 已修——新增 `core/i18n_backend.py` + `LangContextMiddleware`，前端全局注入 `X-Agnes-UI-Lang`，任务落盘 `ui_language` 快照，`describe_network_error` / `API_KEY_MISSING_MSG` / 排队/中断/模式切换等消息按 UI 语言返回中英双语；`_CONNECT_MARKERS` 补 `connection reset` 让归因更稳；诊断报告新增「界面语言」行。剩余进度/校验消息已于 2026-09-24 收尾批次全部清除（见 `docs/plans/v7.0/backend_i18n_plan.md` §三） | #64 |
 | creative 任务在 `scene_config` 失败（v6.4.7），`errorMessage` 为中文「图片分析失败（Start Frame）: … SSLError … certificate is not yet valid」，请求 `apihub.agnes-ai.com/v1/chat/completions` 多次重试均败 | 客户端证书时间校验失败：`apihub.agnes-ai.com` 证书当日刚轮换（notBefore=2026-09-23 10:35 UTC），用户 Windows 时钟落后/时区错或 HTTPS 拦截类安全软件给出无效日期证书，即报 `CERTIFICATE_VERIFY_FAILED: not yet valid`。失败发生在 Start Frame 图片多模态分析（`core/screenwriter/__init__.py::_describe_with_retry`），视频未提交、无消耗。另注：该中文前缀是后端硬编码消息（v7.0 未覆盖，属 §三 剩余消息），且报告结构字段为英文而用户实为阿语界面（`ar.json` 的 `fbRep*` 值未译），印证 §4.1 语言判定新陷阱 | 引导：开启系统时间自动同步（`w32tm /resync`）+ 校准时区；关代理/VPN/杀软 HTTPS 扫描或加白 `*.agnes-ai.*`；恢复后点 Retry Task 从失败步骤续传。已按环境故障阿语+英语双语回复（标注 agent）。代码侧：`_describe_with_retry` 的「图片分析失败」等 screenwriter 消息与其余 ~120 条后端硬编码中文已于 2026-09-24 收尾批次全部纳入 backend i18n（见 `docs/plans/v7.0/backend_i18n_plan.md` §三）；仍待办：`ar.json` 等语言包 `fbRep*` 需真正翻译（i18n_check 只查键存在，查不出英文占位值） | #65 |
+| manuscript 任务 `scene_prompts` 失败，App 7.0.0 / **UI Language: en**，`errorMessage` 却是中文「稿件场景描述生成全部失败 48 段…原因: 401 Client Error: Unauthorized」（48 段 LLM 调用全部 401） | 两层：(1) **401 本体**＝Key 未通过认证，属既有关联条目同族（跨站 Key 与域名不匹配：国际站域名 `apihub.agnes-ai.com` 配国内站 Key 或反之；env/`.env` 来源 Key 不参与 per-key 域名绑定只走全局默认域名；Key 过期/抄写不完整），任务未产出、无消耗；(2) **中文消息**＝v7.0.0 该消息仍硬编码中文（P1 收尾批次修复项），随 v7.0.1 发布——本条即 §4.1 新机制的首个实战验证：报告「界面语言」行（v7.0.0 起有）为判定依据，中文 `errorMessage` 仅作数据，据此以**英文**回复 | 引导：升级到 v7.0.1（同错误在英文界面渲染为 "All 48 manuscript scene descriptions failed…"）；Web 配置页重加 Key 用「自动探测域名」或把全局默认域名切到与 Key 站点一致；恢复后 Retry Task 从 `scene_prompts` 续传。已英文回复（标注 agent）。顺带修正：仓库内 GHCR 嵌套路径 `ghcr.io/lcy362/agnes-video-generator/free-short-video` 从未存在（registry 403），已全部改为实际平铺路径 `ghcr.io/lcy362/free-short-video`（GitHub Release body 由 CI 模板生成、本就正确） | #66 |
 
 ***
 

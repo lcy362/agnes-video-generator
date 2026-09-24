@@ -18,7 +18,7 @@ git pull
 
 Windows users: `start.bat` now falls back to the `py` launcher when `python` is not on `PATH` and auto-opens the browser only after the service is ready, matching `start.sh`.
 
-Docker users: `docker pull ghcr.io/lcy362/agnes-video-generator/free-short-video:6.5.1`.
+Docker users: `docker pull ghcr.io/lcy362/free-short-video:6.5.1`.
 
 No breaking changes and no data migration are required. Existing tasks, checkpoints and configurations remain valid.
 
