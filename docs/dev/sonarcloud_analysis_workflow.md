@@ -139,6 +139,15 @@
 > 链路：URL 路径参数 `task_id` → 缓存文件名/成片路径。修复方式见 §7；
 > 覆盖率经 `tests/test_gallery_routes.py` + `tests/test_presets.py` 补测后
 > 由 75.9% → 91.7%。
+>
+> **2026-09-24 修复记录**（i18n 收尾批次引入）：门禁 `new_security_rating = 2`
+> 判红，2 个 `pythonsecurity:S5145`（日志注入，MINOR）。链路：用户表单语言代码 →
+> `web/helpers.py::_lang_label` 拼接 `translate(f"voice_compat.label.{code}")` →
+> 未知 code 命中 `translate()` 的 `logger.warning("Missing catalog key: %s", key)`
+> sink。教训：**后端 i18n 的 key 必须是模块级常量**，动态拼接用户输入的 key 会把
+> 不可信值送进 i18n 运行时的诊断日志。修复：语言标签改走静态英文表 +
+> `PROJECT_LANGUAGES` 自名表（用户输入只作查表键、不进任何 sink），删除 22 个
+> `voice_compat.label.*` 动态 key，补 6 条回归测试（commit `7461a41`）。
 
 ---
 

@@ -111,14 +111,15 @@
 
 issue #64 修复批次后剩余的硬编码中文已在收尾批次全部清除（AST 复扫 `_emit` /
 `HTTPException.detail` / `update_state(current_message=)` / 用户可见 `raise` 中文字面量为 0）。
-新增 179 个 CATALOG key（zh/en 齐备，`test_catalog_zh_en_parity` 守护），按域分组：
+新增 CATALOG key（zh/en 齐备，`test_catalog_zh_en_parity` 守护），按域分组
+（2026-09-24 安全修复后净计 **157 个**，目录共 179 key，见 §四.7）：
 
 | 组 | 范围 | key 前缀 | 数量 |
 |----|------|----------|------|
 | P1 | 6 个流水线 `_emit` 进度消息 + 步骤 raise（simple / multi_scene / creative 四步 / manuscript / anchor / poetry） | `progress.<域>.*` | 92 |
 | P1+ | screenwriter 图片分析失败（issue #65 暴露；`describe_images(..., ui_lang=...)` 由 Pipeline 传 `self._ui_lang()`） | `screenwriter.*` | 1 |
 | P2 | 路由参数校验（task_creation / preview / config / workspace / preset / gallery / image / video-checkpoint / voice / utility 含 cleanup errors） | `validation.*` `preview.*` `config.*` `checkpoint.*` `gallery.*` `image.*` `preset.*` `voice.*` `utility.*` `ai_modify.user_request_empty` | 59 |
-| P3 | 音色兼容性两条长文案 + 22 个语言自名标签（渲染层 `voice_compat.label.<code>`，不动 `voices.py` 静态表） | `voice_compat.*` | 24 |
+| P3 | 音色兼容性两条长文案（语言标签渲染层初版用 `voice_compat.label.<code>` 动态 key，因 S5145 日志注入改为静态映射表，见 §四.7） | `voice_compat.*` | 2 |
 
 改造要点与约束：
 
@@ -156,6 +157,12 @@ issue #64 修复批次后剩余的硬编码中文已在收尾批次全部清除�
 6. **前端配合**：新增的 fetch 调用自动带语言头（全局 patch），无需手动处理；
    若绕过 `window.fetch`（如 `XMLHttpRequest`、`EventSource`），需自行注入
    `X-Agnes-UI-Lang`。
+7. **key 必须是模块级常量**：**禁止**把用户输入拼进 `translate()` 的 key
+   （如 `f"voice_compat.label.{code}"`）——未知 key 会命中 `translate()` 内部的
+   `logger.warning(..., key)`，构成 Sonar `pythonsecurity:S5145` 日志注入
+   （2026-09-24 门禁红灯实录，见 `docs/dev/sonarcloud_analysis_workflow.md` §五）。
+   按数据选择文案时用静态映射表（如 `web/helpers.py::_LANG_LABELS_EN`），
+   用户输入只作查表键、不进日志。
 
 ---
 
