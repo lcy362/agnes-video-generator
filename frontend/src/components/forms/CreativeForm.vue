@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { t, currentLang } from '@/i18n'
 import { appState } from '@/store'
 import { useVoice } from '@/composables/useVoice'
 import { useTaskSubmit, collectAudioSubtitleFields } from '@/composables/useTaskSubmit'
 import { useDraft } from '@/composables/useDraft'
+import { usePresets } from '@/composables/usePresets'
 import { normalizeResolution } from '@/composables/useVideoModelCaps'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
@@ -12,6 +13,7 @@ import PresetPicker from '@/components/presets/PresetPicker.vue'
 
 const { voiceSelections } = useVoice()
 const { submitting, runSubmit } = useTaskSubmit()
+const { defaultStylePrompt, loadPresets } = usePresets()
 
 const subtitleRef = ref<InstanceType<typeof SubtitleConfig>>()
 
@@ -62,6 +64,16 @@ draft.autoSave(form, (v) => ({
   independentDurations: v.independentDurations, style: v.style, chaining: v.chaining,
   resolution: v.resolution,
 }))
+
+// 打开表单且草稿未恢复风格时，用默认预设预填风格框（语言中性，取代旧的硬编码中文默认值）；
+// 后台加载预设列表，加载后若用户未改动则对齐到真实默认预设的 prompt。
+onMounted(async () => {
+  if (form.style.trim()) return
+  const prefill = defaultStylePrompt.value
+  form.style = prefill
+  await loadPresets()
+  if (form.style === prefill) form.style = defaultStylePrompt.value
+})
 
 function onRefImageChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0] || null
@@ -243,6 +255,10 @@ async function submitCreative() {
           <input v-model="form.style" class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted" />
           <PresetPicker v-model="form.style" />
         </div>
+        <p class="mt-1.5 text-xs text-muted flex items-center gap-1">
+          <span class="inline-block w-1 h-1 rounded-full bg-accent/70 shrink-0" aria-hidden="true"></span>
+          {{ t('stylePresetHint') }}
+        </p>
       </div>
     </div>
 
