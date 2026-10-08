@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { t, currentLang } from '@/i18n'
 import { appState } from '@/store'
 import { useVoice } from '@/composables/useVoice'
 import { useTaskSubmit } from '@/composables/useTaskSubmit'
+import { usePresets } from '@/composables/usePresets'
 import { copyText } from '@/utils/clipboard'
 import * as api from '@/api'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
@@ -12,6 +13,7 @@ import PresetPicker from '@/components/presets/PresetPicker.vue'
 
 const { voiceSelections } = useVoice()
 const { submitting, runSubmit } = useTaskSubmit()
+const { defaultStylePrompt, loadPresets } = usePresets()
 
 const subtitleRef = ref<InstanceType<typeof SubtitleConfig>>()
 
@@ -31,6 +33,15 @@ const promptPanelVisible = ref(false)
 const promptSystem = ref('')
 const promptUser = ref('')
 const copyBtnText = ref('')
+
+// 打开表单时用默认预设预填风格框（语言中性，取代旧的硬编码中文默认值），后台加载预设列表用于高亮当前项。
+onMounted(async () => {
+  if (form.style.trim()) return
+  const prefill = defaultStylePrompt.value
+  form.style = prefill
+  await loadPresets()
+  if (form.style === prefill) form.style = defaultStylePrompt.value
+})
 
 function parseResolution(val: string) {
   const [w, h] = val.split('x').map(Number)
@@ -216,6 +227,10 @@ async function submitPoetry() {
           <input v-model="form.style" class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted" />
           <PresetPicker v-model="form.style" />
         </div>
+        <p class="mt-1.5 text-xs text-muted flex items-center gap-1">
+          <span class="inline-block w-1 h-1 rounded-full bg-accent/70 shrink-0" aria-hidden="true"></span>
+          {{ t('stylePresetHint') }}
+        </p>
       </div>
     </div>
 

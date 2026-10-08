@@ -99,6 +99,33 @@
 > `video_queue_full` / `fail_to_fetch_task` 走独立退避轨道（默认预算 900s，`AGNES_VIDEO_QUEUE_RETRY_SECONDS`），
 > 错误文案透出 `message` + `code`。
 
+### 4.0.1 已知缺口：body 无 `code` 的裸 503 走普通 5xx 配额（Issue #80 / #81 / #83，2026-10-02）
+
+**实测证据**（用户反馈的 `Model call error` 序列，#81，App 6.4.5 / Windows）：
+
+| 时间 | 错误 |
+|------|------|
+| 20:09:08 | `HTTP 503: server error` |
+| 20:09:38 | `HTTP 503: server error`（+30s） |
+| 20:10:39 | `HTTP 503: server error`（+60s） |
+| 20:12:09 | `HTTP 503: server error`（+90s） |
+| 20:14:10 | `HTTP 503: server error`（+120s） |
+| 20:16:40 | `RetriesExhausted: reference (2 images, keyframe fallback): max retries (5) exceeded`（+150s） |
+
+间隔精确等于 `retry_base_delay(30s) × (attempt+1)`，**证明这些 503 的 body 里没有可识别的 `code`**
+（否则会进 U1 队列轨道，表现为 30–60s 抖动、总预算 900s，而非 5 次线性退避）。
+
+**问题**：`_QUEUE_FULL_CODES` 只覆盖 `video_queue_full` / `fail_to_fetch_task` 两个已知码。上游在过载期
+也会返回**无 code 的裸 503**，此时应用只享 5 次普通配额（约 5.5 分钟），而本节实测队列饱和**可持续 12 分钟以上**
+——应用会在「再等一分钟就能排上」时提前放弃，用户侧表现为无端失败。
+
+**待办（v7.1 候选，未实施）**：对 `HTTP 503` 且 `code` 为空/未知的响应，比照队列满纳入长预算轨道
+（复用 `AGNES_VIDEO_QUEUE_RETRY_SECONDS`），或至少把普通 503 的配额与 5xx 其他状态码区分开。
+需补单测：mock 连续裸 503 → 断言总时长受控且不与普通 5xx 混用配额。
+
+> 本轮（2026-10-02）按外部故障处理，仅回复用户 + 记档，未改代码。#80 与 #83 为同一用户（App 7.0.0，
+> 无 traceback），#81 为 6.4.5 且附完整 traceback，三例错误文案与路径一致（`reference` / keyframes）。
+
 ### 4.1 待实测：`video_queue_full` 是否按 Key 分池（U7，未验证）
 
 **已知**：单 Key 连续 25 次被拒（跨约 12 分钟）期间，同一 Key 的 v2.0 提交**正常通过** → 队列**按模型分池**。

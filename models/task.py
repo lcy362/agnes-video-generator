@@ -431,8 +431,8 @@ class PoetryVideoTask(BaseTaskState):
     # 可选：用户手动输入的分镜 prompt，按场景顺序每项一个；
     # 留空或某场景缺省时由 LLM 根据古诗生成。
     user_scene_prompts: List[str] = Field(default_factory=list)
-    # 视觉风格（与创意视频保持一致，传入 LLM 分镜拆分）
-    style: str = "电影质感写实风格"
+    # 视觉风格（与创意视频保持一致，传入 LLM 分镜拆分）；留空时由编剧层给中性默认
+    style: str = ""
 
     # 配置（分辨率等参数与创意视频保持一致）
     video_width: int = 768
@@ -528,7 +528,7 @@ class CreateCreativeTaskRequest(BaseModel):
     """创建创意长视频任务的请求体"""
 
     idea: str
-    style: str = "电影质感写实风格"
+    style: str = ""
     chaining_mode: str = "keyframes"
     video_width: int = 768
     video_height: int = 1152

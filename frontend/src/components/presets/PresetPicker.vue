@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 风格预设选择器（P0-1）：一键填入 / 最近置前 / tooltip 预览 / 保存当前风格 / 用户预设可删
+// 风格预设选择器（P0-1）：下拉选择一键填入 / 高亮当前 / 最近置前 / tooltip 预览 / 保存当前风格 / 用户预设可删
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { t } from '@/i18n'
 import { useToast } from '@/composables/useToast'
@@ -65,6 +65,14 @@ function displayName(p: Preset): string {
   return t('presetName_' + p.id) || p.id || ''
 }
 
+// 当前风格命中的预设：用于在触发按钮上显示名称、并在面板里打勾高亮。
+const activePreset = computed<Preset | null>(() => {
+  const v = (props.modelValue || '').trim()
+  if (!v) return null
+  return [...system.value, ...user.value].find((p) => (p.prompt || '').trim() === v) || null
+})
+const activeName = computed(() => (activePreset.value ? displayName(activePreset.value) : ''))
+
 function toggle() {
   open.value = !open.value
   if (open.value && system.value.length === 0 && user.value.length === 0) loadPresets()
@@ -108,24 +116,40 @@ function onDocClick(e: MouseEvent) {
   if (el && !el.contains(e.target as Node)) open.value = false
 }
 const rootEl = ref<HTMLElement | null>(null)
-onMounted(() => document.addEventListener('click', onDocClick))
+onMounted(() => {
+  document.addEventListener('click', onDocClick)
+  // 挂载即加载预设，使触发按钮能立即显示当前命中的预设名称
+  if (system.value.length === 0 && user.value.length === 0) loadPresets()
+})
 onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 </script>
 
 <template>
   <div ref="rootEl" class="relative">
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-1.5">
+      <!-- 下拉选择触发器：仿原生 select，显示当前预设或占位提示，chevron 展开时翻转 -->
       <button
         type="button"
-        class="glass-input rounded-lg px-3 py-2 text-sm text-ink cursor-pointer hover:border-accent/40 transition"
+        class="inline-flex items-center gap-2 rounded-lg glass-input px-3 py-2.5 text-sm cursor-pointer transition
+               hover:border-accent/50"
+        :class="open ? 'border-accent/60 ring-2 ring-accent/25' : ''"
+        :title="t('presetSelectHint')"
         @click="toggle"
       >
-        {{ t('presetOpen') }} <span class="text-muted">▾</span>
+        <span class="text-xs text-muted shrink-0">{{ t('presetTriggerLabel') }}</span>
+        <span v-if="activeName" class="font-medium text-ink truncate max-w-[9rem]">{{ activeName }}</span>
+        <span v-else class="text-muted truncate max-w-[9rem]">{{ t('presetPlaceholder') }}</span>
+        <svg
+          class="w-3.5 h-3.5 text-muted shrink-0 transition-transform duration-200"
+          :class="open ? 'rotate-180' : ''"
+          viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"
+          stroke-linecap="round" stroke-linejoin="round"
+        ><path d="M5.5 8 10 12.5 14.5 8" /></svg>
       </button>
       <button
         type="button"
-        class="glass-input rounded-full w-7 h-7 text-sm text-ink cursor-pointer leading-none hover:border-accent/40 transition"
-        title="+"
+        class="glass-input rounded-lg w-8 h-9 text-base text-ink cursor-pointer leading-none shrink-0 hover:border-accent/40 transition"
+        :title="t('presetSaveAs')"
         @click="saving = !saving"
       >
         +
@@ -151,7 +175,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
     <!-- 预设下拉面板 -->
     <div
       v-if="open"
-      class="absolute z-20 mt-1 w-72 max-h-72 overflow-y-auto glass-card rounded-xl p-2 shadow-xl"
+      class="absolute right-0 z-20 mt-1 w-72 max-h-72 overflow-y-auto glass-card rounded-xl p-2 shadow-xl"
     >
       <template v-if="groups.length">
         <div v-for="g in groups" :key="g.category" class="mb-1">
@@ -160,11 +184,19 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             v-for="p in g.items"
             :key="p.id"
             type="button"
-            class="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-sm text-left text-ink hover:bg-paper-3 transition"
+            class="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-sm text-left hover:bg-paper-3 transition"
+            :class="activePreset && activePreset.id === p.id ? 'text-accent font-medium' : 'text-ink'"
             :title="p.prompt"
             @click="choose(p)"
           >
-            <span class="truncate">{{ displayName(p) }}</span>
+            <span class="flex items-center gap-1.5 truncate">
+              <span
+                v-if="activePreset && activePreset.id === p.id"
+                class="shrink-0"
+                aria-hidden="true"
+              >✓</span>
+              <span class="truncate">{{ displayName(p) }}</span>
+            </span>
             <span
               v-if="p.kind === 'user'"
               class="text-muted hover:text-red-400 px-1 shrink-0"
