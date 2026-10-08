@@ -3,7 +3,7 @@
 > 面向对象：维护 / 开发本项目的 AI Agent
 > 目标仓库：`lcy362/agnes-video-generator`
 > 状态：🟢 初版可用，后续持续迭代
-> 版本：v0.7 | 更新日期：2026-09-29
+> 版本：v0.8 | 更新日期：2026-10-08
 
 ***
 
@@ -101,6 +101,21 @@ gh issue list --repo lcy362/agnes-video-generator --state open \
 
 > 例外：Issue 正文或评论若为纯广告 / 灌水（垃圾噪音），不适用语言规则，按第 4 节直接关闭。
 
+> 例外：Issue 正文或评论若为纯广告 / 灌水（垃圾噪音），不适用语言规则，按第 4 节直接关闭。
+
+#### 4.2 回复行文规范（简短，不讲逻辑）
+
+面向用户的回复**只写结论与操作**，不写内部机制。硬约束：
+
+* **推测直接说**：一句话说清「我们怀疑是什么」+「最可能的两三种成因」，并明确请用户确认，不铺陈推理链。
+* **不向用户讲代码逻辑**：不出现文件路径、函数名、行号、调用链、异常继承关系、重试预算算法等实现细节（诊断数据里已有的报错原文可原样引用，但不解释其成因链）。
+* **不确定就问**：把需要用户提供的信息列成**可复制执行的命令或具体问题**（如打印文件大小与前若干字节、能否用图片查看器打开、文件来源与原始文件名），一次问全，避免多轮拉扯。
+* **先给解法**：即使用户还没回信息，也要给出当下可用的出路（换文件重建任务 / 关闭该功能走替代路径）。
+* **可消耗的资源和进度要说清**：是否产生费用、是否已生成内容、重试是否有效——用户最关心，一句话即可。
+* **承诺**：若用户反馈与推测相反（即确为应用 bug），说明会修复，避免用户觉得被推诿。
+
+内部机制、根因链、代码位置、待办缺口一律写进本文件 §三 归档表，**不进 issue 回复**。
+
 ### 5. 定期整理常见问题 → 完善官网 FAQ
 
 * 每次处理后，把**有复用价值的常见问题**沉淀到归档列表（见下节）。
@@ -143,6 +158,7 @@ gh issue list --repo lcy362/agnes-video-generator --state open \
 | creative 任务在 `video_gen` 失败（**7.0.1** / Windows），`errorMessage` 为 `[AgnesVideo] reference (2 images, keyframe fallback): max retries (5) exceeded`；报告 **UI Language: en**，11 场景 / 1152×768 / keyframes，`Retry Count: 2`，18 条 `Model call error` **全部为 `HTTP 503` 且 body 无 `code`**（22:10:24→22:11:26→22:12:27→22:13:58→22:15:58，间隔 62/61/91/120s），并出现 3 次 `RetriesExhausted`（原始 + 用户两次手动重试，每次重开约 5.5 分钟配额） | 与 #80/#81/#83 **同一条已记录缺口**（裸 503 落入普通 `>= 500` 分支，仅 5 次退避 ≈5.5 分钟；实测队列饱和可持续 12 分钟以上），本轮仍按外部故障处理。用户版本 7.0.1 已含 v7.0 U1 队列轨道，但该轨道只在 body `code` ∈ `_QUEUE_FULL_CODES` 时启用，**裸 503 不受益**——即「升级到 7.0」不足以覆盖本例，回复中未再承诺升级可解 | 英文回复（UI Language: en）：确认上游容量问题＋未创建任务/未消耗配额＋设置有效；显式说明「裸 503 走标准 5 次预算、约 5.5 分钟即放弃，属已知缺口、正在跟踪」；引导错峰重试、Retry Task 续传、降载（更少场景/更短时长/更小分辨率）、换视频模型、多 Key。**代码侧仍未改**：裸 503 应比照队列满纳入长预算轨道（`AGNES_VIDEO_QUEUE_RETRY_SECONDS`，默认 900s）——待办缺口持续累积（#80/#81/#83/#84 已 4 例） | #84 |
 | creative 任务在 `video_gen` 失败（**7.0.5** / Windows），`errorMessage` 为 `Agnes video submit failed (HTTP 401): {"error":{"code":"","message":"Invalid token (request id: ...)","type":"AgnesAI_error"}}`；报告 **UI Language: en**，5 场景 / 768×1152 / keyframes，`Retry Count: 0`。同任务前序 `Model call error` 为**图片侧** `apihub.agnes-ai.com` 的 `ReadTimeout`(120s) + 2 次 `HTTP 503 server error` | 既有 401 同族（#38/#44/#58/#61/#62/#72/#73/#82）的**视频提交新变体**，且首次出现「同任务图片能过、视频 401」的混合指纹：**关键证据**是图片侧拿到的是 503/超时（服务繁忙，**认证已通过**），说明 Key 池中至少一把 Key 在国际站 `apihub.agnes-ai.com` 可用；紧接着的视频提交却 401。代码核查确认根因：`core/api/key_manager.py::KeyRing.next()` 对**所有已配置 Key 做 round-robin**，图片与视频共用同一 KeyRing；`core/config.py::get_base_url_for_key()` 对**未绑定域名的 Key（含 env / `.env` 来源，`_collect_env_keys` 优先级高于 `.env`）回退全局 `agnes_domain`**。因此在「池内含国内站 Key + 全局域名为国际站」时，国内站 Key 被发往国际站域名 → `Invalid token`，而另一把 Key 继续服务图片调用 → 正是本例「一次服务繁忙、下一次硬 401」的交错现象。另注：`_submit_with_retry` 对 **401 不做换 Key 重试**（仅 429 走 `ring.rotate()`），直接落入通用分支 `raise RuntimeError`（`agnes_video.py:794-805`），故一把坏 Key 即可打死健康任务 | 英文回复（UI Language: en）：401 = 请求所带 Key 未被该域名接受、未生成未消耗；解释两站独立 Key 空间 + env/.env Key 不参与 per-key 域名绑定 + round-robin 混池是「图片能过、视频 401」的成因。引导：排查期**只留一把 Key**；Web 配置页用「自动探测域名」重绑；排查 `AGNES_API_KEY`（优先级最高）；自查 `GET {root}/v1/models` 带 Bearer（200 即匹配站点，三站全 401 = Key 失效/带头尾空格）；修复后 Retry Task 从 `video_gen` 续传（分镜与已生成图片保留）。**新增待办（未落代码）**：401 应比照 429 尝试换 Key 重试（或至少逐 Key 探测后剔除失效 Key），否则混池中一把 stale Key 会随机打死任务 | #86 |
 | creative 任务在 `video_gen` 失败（**7.0.5** / Windows / Opera），`errorMessage` 为 `Agnes video queue is full (HTTP 503 · video_queue_full); after retrying for 15 min the job never entered the queue, so nothing was generated (no quota used)…`；报告 **UI Language: en**，1280×720 / 7 场景 / keyframes，`Retry Count: 0` | 上游视频队列饱和，与 #47/#63 同族；但**本次 body 带 `video_queue_full` code**，命中 v7.0 U1 队列长预算轨道（`AGNES_VIDEO_QUEUE_RETRY_SECONDS` 默认 900s），因此**正确重试满 15 分钟**仍未入队后放弃——这是队列轨道**按设计工作**的正向对照，区别于 #80/#81/#83/#84 的**裸 503**（无 code、只走普通 `>=500` 分支、约 5.5 分钟即弃）。被拒发生在入队前，未创建任务、未消耗配额 | 英文回复（UI Language: en，标注 agent）：确认外部容量问题＋未生成未消耗＋错峰重试（免费队列高峰在欧美/亚洲工作时段）＋Retry Task 从 `video_gen` 续传（分镜/参考图保留不重提交）＋降载（更少场景/更短时长/更小分辨率）＋换视频模型（队列按模型分池）＋多 Key 线性提配额。**本轮无代码改动，非缺口**（与裸 503 待办对照，本例证明带 code 的队列轨道已生效）。附带：报告中 `Style: 电影质感写实风格` 是后端硬编码中文默认值泄漏到 en 界面任务（`task_creation_routes.py` Form 默认 + FastAPI 把空串视作缺省重填、`models/task.py` pydantic 默认、`scenes.py` screenwriter 兜底），属数据非语言判据，另列改进 | #87 |
+| creative 任务在 `end_frame_gen` 失败（**7.0.5** / Windows），`errorMessage` 为 `PIL.UnidentifiedImageError: cannot identify image file '…\\.working_dir\\uploads\\{task_id}_end_1.png'`，`Retry Count: 4`（四次重试同一环节同一错误），报告 **Idioma de la interfaz: es** | **用户上传的自定义尾帧文件本身不是可解码图片**（机制已核实到行，字节级成因待用户补数据）。链路：`use_custom_end_frames` 时逐段尾帧由 `web/routes/task_creation_routes.py:379` 经 `_save_upload_file`（同文件 149–161）落盘为 `uploads/{task_id}_end_{idx}.png`——**只校验扩展名白名单、不校验内容**，且非白名单后缀一律静默改写为 `.png`（`.heic` / `.avif` / `.tif` 会变成「后缀撒谎」的 png）；流水线 `core/pipelines/creative/steps_frames.py:222` 调 `normalize_image_async` → `utils/image_normalizer.py:83` 的 `Image.open` 抛 `UnidentifiedImageError`（`OSError` 子类）直接冒到 `multi_scene.py:108` 打死任务。对照：同模块 126 行的安全封装 `normalize_reference_path` 才吞 `OSError`，此处用的是会抛的裸版本。失败在任何视频提交之前，**未生成、未消耗配额**。**坏路径持久化在 `state.end_frame_images`，所以「重试任务」每次都读同一个坏文件 → `Retry Count: 4` 是必然，不换文件不可能通过**。字节级三种可能未定：(a) 真格式为 HEIC/AVIF/TIFF 被改名（PIL 需 `pillow-heif` 才能解，本项目未装）；(b) 文件截断/0 字节——注意前端 `CreativeForm.vue:148` 有 `f.size > 0` 过滤，0 字节理论上不该进来，若确认 0 字节说明走了别的入口或旧版本；该过滤还有个副作用：**跳过空文件但不补位，多张图时造成 idx 与场景错位**（另一潜在缺口）；(c) 落盘后被杀软/图像优化工具改写 | 按 §4.1 以**西班牙语**回复（`Idioma de la interfaz: es` 行为最强信号；报告结构字段是英文但不采信，再次印证 §4.1 陷阱）。回复口径（用户明确要求，已固化进本节 §4.2）：**只给推测 + 请用户确认，不向用户讲代码逻辑与因果推导**。实际发出三段：① 一句推测（「场景 2 上传的尾帧不是可读图片，最可能原文件本非真 PNG（HEIC/AVIF/TIFF）或截断/空文件」）+ 未消耗配额 + 「重试无效，要换文件新建任务」；② 两条即时出路（Paint 另存为真 PNG 后重建任务；或关「Fotogramas finales personalizados」改用 i2i 生成尾帧）；③ 索取确认信息（PowerShell 打印 `.Length` 与前 16 字节签名、Paint/Fotos 能否打开、图片来源与原文件名），并承诺「若文件确为完整 PNG 则是我们 bug，会修」。**本轮不改代码，等信息回来再定**。待办缺口已记录：① 上传时即校验图片可解码，报错按 UI 语言并带场景序号，不要拖到 `end_frame_gen`；② `steps_frames.py` 两处裸 `normalize_image_async` 应给可读错误（`error.image_unreadable` 类）或降级为「该场景改用 i2i 生成尾帧」+ warning，避免一个坏文件锁死整任务；③ 非白名单后缀静默改写 `.png` 应改为拒绝；④ 前端 `size > 0` 过滤造成的场景/图错位。FAQ 候选条目：「上传的尾帧/参考图报 `cannot identify image file`」 | #88 |
 
 ***
 
