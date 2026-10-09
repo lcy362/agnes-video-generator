@@ -1,0 +1,138 @@
+# 作品投稿表单 / Showcase submission form
+#
+# 文件名必须与 Discussions 分类 slug 完全一致：Show and tell → show-and-tell.yml
+# （放在 .github/DISCUSSION_TEMPLATE/，需提交到默认分支后生效）
+#
+# 注意：讨论类别表单只支持 3 个顶层键 —— body / labels / title（不支持 name / description）。
+# 且 body 中必须至少有 1 个非 markdown 字段。
+#
+# 投稿被收录后的去向见仓库根目录 CONTRIBUTING.md 的「作品投稿（Showcase）」一节。
+
+title: '[Showcase] '
+labels: 'showcase'
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        用 **Agnes Video Generator** 做出了作品？欢迎在这里分享视频 + 提示词。
+
+        **投稿须知（请先读，30 秒）**
+        1. 视频请**留在你自己的账号**（YouTube / Bilibili / 其他平台均可）。我们**不会**把投稿视频上传到官方频道。
+        2. 被精选后，作品可能出现在官网 Showcase 页（带你的署名与主页链接，展示视频 + 提示词），并可能被收进官方 YouTube 播放列表 **Community Showcase**。
+        3. 投稿**不等于**一定被收录；维护者会按「成片完整、提示词可复现、无版权与肖像风险」的标准人工筛选。
+        4. 提示词请**原样粘贴**（不要翻译、不要精简），我们会原样展示，并配一份英文含义说明。
+        5. 想要下架？在投稿帖下留言即可，我们会在下次部署时移除。
+
+        ---
+        *Made something with Agnes Video Generator? Share the video and the prompt here. Your video stays on your own channel — we never re-upload it. Selected works may be featured on the official website (credited, with a link back) and added to the **Community Showcase** playlist.*
+  - type: input
+    id: video-url
+    attributes:
+      label: 视频链接 / Video URL
+      description: YouTube / Bilibili / 其他平台的公开可访问链接。/ A public link to your video.
+      placeholder: https://www.youtube.com/watch?v=...
+    validations:
+      required: true
+  - type: input
+    id: title-original
+    attributes:
+      label: 作品标题（原文）/ Title (original language)
+      placeholder: 例如：机器人在废弃城市里给小花浇水
+    validations:
+      required: true
+  - type: input
+    id: title-en
+    attributes:
+      label: 作品标题（英文）/ Title (English)
+      description: 官网会把标题翻译成 22 种语言，这里请给一个准确的英文版本。/ Used as the source for 22-language titles.
+      placeholder: e.g. A robot watering a flower in an abandoned city
+    validations:
+      required: true
+  - type: textarea
+    id: prompt-original
+    attributes:
+      label: 提示词原文 / Original prompt
+      description: 原样粘贴（不要翻译、不要精简）。这就是我们要展示的内容。/ Paste verbatim — do not translate or shorten.
+      placeholder: 一个机器人在废弃城市里给小花浇水…
+    validations:
+      required: true
+  - type: dropdown
+    id: prompt-lang
+    attributes:
+      label: 提示词原文语言 / Prompt language
+      options:
+        - zh — 中文
+        - en — English
+        - ru — Русский
+        - ja — 日本語
+        - ko — 한국어
+        - ms — Bahasa Melayu
+        - id — Bahasa Indonesia
+        - de — Deutsch
+        - fr — Français
+        - nl — Nederlands
+        - es — Español
+        - pt — Português
+        - it — Italiano
+        - hi — हिन्दी
+        - tr — Türkçe
+        - vi — Tiếng Việt
+        - bn — বাংলা
+        - th — ไทย
+        - tl — Filipino
+        - ar — العربية
+        - ur — اردو
+        - fa — فارسی
+    validations:
+      required: true
+  - type: textarea
+    id: prompt-english
+    attributes:
+      label: 英文含义说明（可选）/ English meaning (optional)
+      description: 提示词的英文翻译或含义解释，会作为跨语言读者的统一说明展示。/ An English translation or explanation shown to readers of all languages.
+      placeholder: A cinematic shot of a robot watering a small flower in an abandoned city…
+    validations:
+      required: false
+  - type: dropdown
+    id: task-type
+    attributes:
+      label: 任务类型 / Task type
+      options:
+        - simple — 简单视频 / single video
+        - creative — 创意长视频 / creative multi-scene
+        - manuscript — 稿件长视频 / manuscript
+        - anchor — 数字人口播 / AI presenter
+        - poetry — 诗词视频 / poetry
+        - simple_image — 简单图片 / image
+    validations:
+      required: true
+  - type: input
+    id: generation-params
+    attributes:
+      label: 生成参数（可选）/ Generation params (optional)
+      description: 模型 / 时长 / 分辨率 / 分镜数等，用于官网作品页的参数表。/ Model, duration, resolution, scene count…
+      placeholder: agnes-video-2.5-flash · 30s · 768×1152 · 6 scenes
+    validations:
+      required: false
+  - type: textarea
+    id: extra-notes
+    attributes:
+      label: 其他说明（可选）/ Anything else (optional)
+      description: 风格、音色、字幕设置、遇到的坑，或你想补充给读者的信息。/ Style, voice, subtitles, tips…
+    validations:
+      required: false
+  - type: checkboxes
+    id: declarations
+    attributes:
+      label: 声明与授权 / Declaration & permission
+      description: 两项都必须勾选才能提交。/ Both boxes are required to submit.
+      options:
+        - label: |
+            我确认该作品为本人原创，或已获得全部必要授权；视频中使用的音频（TTS / 音乐）与出现的肖像，相关责任由我承担。
+            *I confirm this work is my own or fully licensed; I am responsible for any audio (TTS/music) and likeness used in it.*
+          required: true
+        - label: |
+            我同意 Agnes Video Generator 项目在官网（含提示词原文与英文含义说明）与官方 YouTube 播放列表 *Community Showcase* 中展示该作品，并署名我的账号；我可随时要求移除。
+            *I allow this project to feature the work on its official website (with the prompt) and in the official **Community Showcase** playlist, credited to my account. I may request removal at any time.*
+          required: true
