@@ -98,7 +98,7 @@ This project is in early stage — corner cases may not be fully handled. Recomm
 
 ### Upstream limits you should know (v7.0)
 
-- **Free queue saturation**: Agnes can reject submissions for 10+ minutes with `video_queue_full`. The app keeps retrying on a dedicated track (default 900s, `AGNES_VIDEO_QUEUE_RETRY_SECONDS`) and shows in the progress panel: `Agnes 视频队列已满（HTTP 503 · video_queue_full），正在排队重试（第 N 次 / 已等 X 分钟）。建议错峰重试或稍后再试。` Nothing is consumed by a rejected submit — just retry off-peak, or switch to another video model.
+- **Free queue saturation**: Agnes can reject submissions for 10+ minutes with `video_queue_full`. The app keeps retrying on a dedicated track (up to 15 retries by default, `AGNES_VIDEO_BUSY_RETRY_ATTEMPTS`; the first retry fires immediately and later ones every 30–60s) and shows in the progress panel: `Agnes 视频队列已满（HTTP 503 · video_queue_full），正在排队重试（第 N 次 / 已等 X 分钟）。建议错峰重试或稍后再试。` Nothing is consumed by a rejected submit — just retry off-peak, or switch to another video model.
 - **~15-minute inference hard cut-off**: if upstream aborts a job, the failure message contains the upstream wording (e.g. `inference not finished after 15 minutes (code=500)`) — waiting longer will not produce a video.
 - **Video 2.5 Flash portrait (9:16) rotation defect**: upstream returns sideways frames for this one combination. The UI warns you when you pick it; use `16:9` / `3:4` / Video 2.0 portrait, or opt into automatic correction with `AGNES_FIX_V25_PORTRAIT_ROTATION=1`.
 - **Model capabilities ship with releases**: a model listed in the dropdown but marked `⚠` is not adapted by your current version — upgrade to use it. The running version is shown in the page footer.

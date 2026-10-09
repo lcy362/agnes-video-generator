@@ -96,7 +96,8 @@
 **关键区分**：`video_queue_full` 是「没排进队」，§3.2 的 `stuck_inference` 是「排进去了但渲染卡死」。两者用户侧表现完全不同，文案与重试策略也应不同。当前代码把 503 一律并入 `status_code >= 500` 分支（`core/api/agnes_video.py` `_submit_with_retry`），只记 `HTTP 503: server error`，**丢掉了 body 里的 `code`**。
 
 > **v7.0 已落地**（`docs/plans/v7.0/upstream_error_handling_plan.md` U1/U2）：503 分支解析 body `code`，命中
-> `video_queue_full` / `fail_to_fetch_task` 走独立退避轨道（默认预算 900s，`AGNES_VIDEO_QUEUE_RETRY_SECONDS`），
+> `video_queue_full` / `fail_to_fetch_task` 走独立退避轨道（v7.2 起＝默认 15 次重试，
+> `AGNES_VIDEO_BUSY_RETRY_ATTEMPTS`：**首跳 0s 贴着限流** + 之后固定间隔 + **次数**封顶），
 > 错误文案透出 `message` + `code`。
 
 ### 4.0.1 已知缺口：body 无 `code` 的裸 503 走普通 5xx 配额（Issue #80 / #81 / #83，2026-10-02）
@@ -119,9 +120,9 @@
 也会返回**无 code 的裸 503**，此时应用只享 5 次普通配额（约 5.5 分钟），而本节实测队列饱和**可持续 12 分钟以上**
 ——应用会在「再等一分钟就能排上」时提前放弃，用户侧表现为无端失败。
 
-**待办（v7.1 候选，未实施）**：对 `HTTP 503` 且 `code` 为空/未知的响应，比照队列满纳入长预算轨道
-（复用 `AGNES_VIDEO_QUEUE_RETRY_SECONDS`），或至少把普通 503 的配额与 5xx 其他状态码区分开。
-需补单测：mock 连续裸 503 → 断言总时长受控且不与普通 5xx 混用配额。
+**已实施（v7.1）**：`HTTP 503` 且 `code` 为空/未知的响应已并入忙轨，与队列满共用同一轨道
+（v7.2 起＝次数封顶 `AGNES_VIDEO_BUSY_RETRY_ATTEMPTS`，默认 15；不再与普通 5xx 混用配额）。
+需补单测：mock 连续裸 503 → 断言受次数封顶约束且不与普通 5xx 混用配额。
 
 > 本轮（2026-10-02）按外部故障处理，仅回复用户 + 记档，未改代码。#80 与 #83 为同一用户（App 7.0.0，
 > 无 traceback），#81 为 6.4.5 且附完整 traceback，三例错误文案与路径一致（`reference` / keyframes）。

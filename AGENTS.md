@@ -14,7 +14,9 @@
 > - SonarCloud 分析工作流：`docs/dev/sonarcloud_analysis_workflow.md`（提交代码 → Sonar 分析的完整链路、触发条件、配置项、故障排查）
 > - **上游接口实测行为**：`docs/dev/agnes_video_upstream_behavior.md`（apihub 视频接口的端点可用性、任务 id 语义、失败以 HTTP 200 返回、队列饱和与 15 分钟推理硬闸、分辨率吸附与 2.5-flash 竖屏画面躺倒；改重试策略 / 错误透出 / 回归判定前必读）
 > - 上游可靠性加固（v7.0）：`docs/plans/v7.0/upstream_error_handling_plan.md`（Issue #75 实测发现的 U1–U8 优化点 + 用户诉求对照，🟢 已实施；U7 多 Key 分池实测待补，见该文 §六实施记录与回归计划 §十一）
->   - 相关开关：`AGNES_VIDEO_QUEUE_RETRY_SECONDS`（队列满独立重试预算，默认 900s）、`AGNES_FIX_V25_PORTRAIT_ROTATION`（2.5 竖屏躺倒探测校正，默认关闭）
+>   - 相关开关：`AGNES_VIDEO_BUSY_RETRY_ATTEMPTS`（视频忙轨重试次数上限，默认 15；单 Key 15×60s ≈ 旧 900s 窗口）、`AGNES_BUSY_RETRY_ATTEMPTS`（非视频忙轨＝图片/上传/Chat 重试次数上限，默认 None＝各 provider 默认：图片 15 / 上传 10 / Chat 20）、`AGNES_FIX_V25_PORTRAIT_ROTATION`（2.5 竖屏躺倒探测校正，默认关闭）
+>   - v7.1 归拢：所有上游重试统一收敛到 `core/api/retry_policy.py` 的「忙轨 / 故障轨」两轨模型（判定 + 间隔计算唯一出处），见 §6.2
+>   - v7.2：忙轨封顶由「总时长预算（秒）」改为「重试次数」，且**首跳 0s 贴着限流**（节奏交给令牌桶，不叠加人工等待）——旧的 `AGNES_VIDEO_QUEUE_RETRY_SECONDS` / `AGNES_BUSY_RETRY_SECONDS` 已更名并改语义（总时长 → 次数）
 > - 优化路线图：`docs/plans/v6.0/optimization_roadmap.md`（合并版，现行唯一路线图，计划 v6 版本线内完成；已取代并废弃 `docs/plans/v5.0/optimization_roadmap.md`）
 > - 待调研存档：`docs/plans/optimization-research/README.md`
 > - 发版规范：`docs/dev/release_process.md`（版本号规则 + 新增内容规范 + 发布流程）
@@ -259,10 +261,13 @@ agnes-video-generator/
 | 场景 | 策略 |
 |------|------|
 | 全局限速 | `core/api/rate_limiter.py` 双令牌桶：**共享桶** `get_rate_limiter()`（Chat / Image / 上传 / 轮询，速率 = 20 × Key 数 × 0.8 次/分钟，`AGNES_RATE_LIMIT` 可覆盖）+ **视频提交独立桶** `get_video_submit_limiter()`（1 × Key 数 次/分钟，`AGNES_VIDEO_RATE_LIMIT` 可覆盖）；配额随 `KeyRing` Key 数缩放，`set_api_keys()` 后经 `reset_rate_limiter()` 即时生效 |
-| LLM Chat | 重试 3 次，间隔 15s 递增；5xx 和 429 均重试 |
-| 图片生成 | 重试 4 次，间隔 20s 递增；5xx 和 429 均重试 |
-| 视频提交 | 重试 5 次，间隔 30s 递增；5xx、429、超时均重试（走视频提交独立桶） |
-| 视频轮询 | 间隔 60s，每 10 次输出日志；连续 10 次失败放弃；整体超时 1800s |
+| LLM Chat | 走共享重试封装（下方「上游重试两轨模型」），间隔基数 15s |
+| 图片生成 | 走共享重试封装，间隔基数 20s |
+| 图片上传 | 走共享重试封装，间隔基数 30s |
+| 视频提交 | 走共享重试封装，间隔基数 30s，走视频提交独立桶 |
+| 上游重试（两轨模型） | 所有上游调用的重试统一收敛到 `core/api/retry_policy.py` 的**两条轨道**：<br>• **忙轨**＝429 / **所有 503**（含 body 无 code 的裸 503）/ 队列类 code（`video_queue_full`、`fail_to_fetch_task`）→ **首跳 0s 贴着限流**（每轮先 `acquire` 再发请求，人工等待与令牌桶等待是接力守恒，首跳不叠人工退避＝真实间隔就是桶配额下限）+ 之后**固定间隔**（不逐级加长，"勤敲"）+ **次数**封顶（v7.2 由总时长预算改为次数）。次数：视频 `AGNES_VIDEO_BUSY_RETRY_ATTEMPTS`（默认 15，单 Key 15×60s ≈ 旧 900s 窗口）、图片/上传/Chat `AGNES_BUSY_RETRY_ATTEMPTS`（默认 None＝各 provider 默认：图片 15、上传 10、Chat 20）。固定间隔＝各 provider 基数（视频 30s＋0–30s 抖动、上传 30s、图片 20s、Chat 15s）。<br>• **故障轨**＝非忙 5xx / 超时 / 连接错误 → 间隔 `base×(n+1)` **逐级加长**（"少敲"）+ **次数**封顶（视频 5、图片 4、Chat 3、上传 3）。<br>• 多 Key 下 429 先换 Key 立即重试（不 sleep、不计入退避）；忙轨耗尽时，队列类 code 抛 `AgnesQueueFullError`（结构化，供 UI 22 语言渲染），429/裸 503 抛通用技术报错。 |
+| 401（Invalid token） | **只登记归因**（`[KeyAuth]`，收口在 `key_manager.py`），**不换 Key、不重试、不改池**；该 Key 是否删除由用户在配置页自行决定，用户不处理则保持原有报错 |
+| 视频轮询 | 保持「探测循环」语义，**不套两轨**：自适应间隔 20s 起步、每 5 次 +5s、上限 60s；404 视为「任务未就绪」中间态（不消耗连续失败配额）；连续 10 次请求失败放弃；整体超时 1800s |
 | 报错收集 | `error_collector.py` 记录失败调用的 prompt/错误类型/详情至工作目录 `error_logs/` |
 | GA 埋点（接口报错趋势） | `error_collector.py` 将带 `status_code` 的报错按 task_id **内存聚合**（`get_task_upstream_errors`，故意不写 task_state.json——流水线 TaskManager 缓存快照会整份覆盖落盘）；`GET /api/tasks/{id}` 合并下发 `upstream_errors`，前端 `useProgress.ts` 轮询增量上报 GA `api_error` 事件（按 status_code/model_type/api_method 做趋势）；`task_failed` / `create_task_failed` 附带从消息提取的 `status_code`；新维度经 `scripts/setup_ga4.py` 注册。注意：内存聚合重启清零，完整离线趋势以 `error_logs/` 为准。<br>GA4 侧对应报表：**探索 →「接口报错趋势（api_error）」**（媒体资源 video，行＝HTTP 状态码/模型类型/API 方法/日期，值＝事件数，过滤器＝事件名称 完全匹配 `api_error`）。探索报表 Admin API 不支持创建，只能在 GA4 UI 手工建（可用 CDP 驱动已登录 Chrome 完成） |
 | PipelineShutdown | 所有流水线统一处理，落盘当前状态 |

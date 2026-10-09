@@ -104,6 +104,7 @@
 | 2026-09-28 | U6 FAQ / usage 补齐 | `docs/public/faq.md`（4 条新增）、`docs/public/usage.md`（上游限制小节 + 日志前缀） | 文档审阅；Issue 回复可直接引用 |
 | 2026-09-28 | U7 多 Key 分池实测 | `docs/dev/agnes_video_upstream_behavior.md` §4.1 | **待实测**（需 ≥2 Key + 饱和时段；已给出 curl 步骤与记录位） |
 | 2026-09-28 | U8 版本可见性 + 未适配显式提示 | `web/routes/config_routes.py`（`/api/models` 返回 `app_version`）、`useVideoModelCaps.ts`（`isAdapted`）、`SimpleForm.vue` / `ConfigPanel.vue`（`⚠` + `vmUnadaptedHint`）、`App.vue` 页脚版本、22 语言 i18n | 前端 `vue-tsc --noEmit` 通过；22 个语言包 JSON 校验通过；`/api/config` 与 `/api/models` 均暴露版本 |
+| 2026-10-09 | v7.1 归拢 + v7.2 节奏改造：所有上游重试收敛到 `core/api/retry_policy.py` 的两轨模型（判定 + 间隔唯一出处，裸 503 并入忙轨）；忙轨封顶由「总时长预算（秒）」改为「**重试次数**」，并改为「**首跳 0s 贴着限流**（人工退避不叠加在令牌桶之上）+ 之后固定间隔 + 次数封顶」，多 Key 下可打满突发额度以缩短总重试耗时 | `core/api/retry_policy.py`（`BusyBudget`→`BusyTracker`、`busy_delay(..., attempt)` 首跳 0）、`core/config.py`（`AGNES_VIDEO_BUSY_RETRY_ATTEMPTS` 默认 15 / `AGNES_BUSY_RETRY_ATTEMPTS` 默认 None）、`core/api/agnes_video.py`（提交 15 / 上传 10）、`core/api/agnes_image.py`（15）、`core/api/rate_limiter.py`（`busy_max_retries` 默认 20） | 全量 `pytest tests/` 通过；`scripts/i18n_check.py` 退出码 0；断言首跳 0s、固定间隔、次数封顶、上传忙轨用尽回退 base64、Chat 忙轨次数封顶。**开关更名并改语义**：`AGNES_VIDEO_QUEUE_RETRY_SECONDS` → `AGNES_VIDEO_BUSY_RETRY_ATTEMPTS`、`AGNES_BUSY_RETRY_SECONDS` → `AGNES_BUSY_RETRY_ATTEMPTS` |
 
 ---
 

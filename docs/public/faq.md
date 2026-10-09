@@ -44,9 +44,9 @@ Usually not. For free video models such as **Video 2.5 Flash, Agnes keeps a shar
 
 As of **v7.0**, the app handles this explicitly:
 
-- A queue-full rejection no longer counts against the normal retry budget. It moves to a **dedicated retry track** (default budget 900s, configurable via `AGNES_VIDEO_QUEUE_RETRY_SECONDS`), retrying every 30–60s.
+- A queue-full rejection no longer counts against the normal retry budget. It moves to a **dedicated retry track** (up to 15 retries by default, configurable via `AGNES_VIDEO_BUSY_RETRY_ATTEMPTS`). The first retry fires immediately ("hug the rate limit": timing is handed to the token bucket, so the real interval is the bucket's own quota), and subsequent retries are spaced 30–60s apart.
 - The progress panel names the cause and keeps the raw error visible, e.g. `Agnes 视频队列已满（HTTP 503 · video_queue_full），正在排队重试（第 3 次 / 已等 5 分钟）。建议错峰重试或稍后再试。` / `Agnes video queue is full (HTTP 503 · video_queue_full), retrying (attempt 3 / waited 5 min). Please retry later, ideally off-peak.`
-- Only when that budget is exhausted do you get a failure — and the message names Agnes, quotes the raw `HTTP 503 · video_queue_full`, and tells you to **retry later / off-peak or switch model**, instead of a generic `HTTP 503: server error`.
+- Only when those retries are exhausted do you get a failure — and the message names Agnes, quotes the raw `HTTP 503 · video_queue_full`, and tells you to **retry later / off-peak or switch model**, instead of a generic `HTTP 503: server error`.
 
 **What you can do:** retry during off-peak hours, switch to another video model (Video 2.0 uses a separate queue and often still accepts jobs), or add more API keys (each key has its own quota).
 
