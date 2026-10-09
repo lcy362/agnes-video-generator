@@ -664,6 +664,8 @@
   "keyDomainSelectTitle": "为该 Key 选择绑定域名（空=跟随全局）",
   "keyDomainAuto": "跟随全局",
   "keyDomainSaved": "Key 域名已保存",
+  "keyAuthFailed": "প্রমাণীকরণ ব্যর্থ ×{count}",
+  "keyAuthFailedHint": "এই Key আপস্ট্রিম প্রমাণীকরণে (401) {count} বার ব্যর্থ হয়েছে, সর্বশেষ {time}। এটি মুছবেন কি না তা আপনি ঠিক করুন।",
   "failSaveKeyDomain": "保存 Key 域名失败",
   "detectKeysBtn": "自动探测域名",
   "detectKeysRunning": "探测中…",

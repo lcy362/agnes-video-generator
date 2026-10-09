@@ -56,6 +56,8 @@ class FakeRing:
         self._keys = list(keys)
         self._i = -1
         self._force = None
+        self.rotations = []           # 记录 rotate 调用（断言 401 不换 Key）
+        self.auth_failures_log = []   # 记录 401 归因上报（v7.1）
 
     def next(self):
         if self._force is not None:
@@ -67,7 +69,14 @@ class FakeRing:
     def rotate(self):
         self._i = (self._i + 1) % len(self._keys)
         self._force = self._i
+        self.rotations.append(self._keys[self._i])
         return self._keys[self._i]
+
+    def mark_auth_failed(self, key, *, status=401, domain="", message=""):
+        """401 归因登记桩：只记录上报内容，与真实实现一样不参与选 Key。"""
+        rec = {"key": key, "status": status, "domain": domain, "message": message}
+        self.auth_failures_log.append(rec)
+        return rec
 
     def has_multiple(self):
         return len(self._keys) > 1
@@ -96,6 +105,37 @@ def _queue_full_response():
         json_data={"code": "video_queue_full",
                    "message": "video queue is full, please retry later (request id: abc)"},
     )
+
+
+# ── 401 归因登记（v7.1）：只上报，不换 Key / 不重试 ────────────────────
+
+
+async def test_401_reports_auth_failure_and_keeps_failure_path(api, monkeypatch):
+    """401：归因上报给 KeyRing 后仍按原逻辑失败——不换 Key、不重试、文案不变。
+
+    依据：判定与归因收口在 ``core/api/key_manager.py``（KeyRing 只记录、不剔除），
+    是否移除该 Key 由用户在前端配置页决定；用户不处理时保持原有报错行为。
+    """
+    ring = FakeRing(["k1", "k2"])
+    calls = []
+    monkeypatch.setattr(av, "get_key_ring", lambda: ring)
+    monkeypatch.setattr(av, "get_api_key_domains", lambda: {"k1": "cn"})
+    monkeypatch.setattr(
+        av.requests, "post",
+        lambda *a, **k: (calls.append(1), FakeResponse(
+            status_code=401, json_data={"message": "Invalid token"}))[1],
+    )
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await api._submit_with_retry({"prompt": "x"}, "t2v")
+
+    assert len(calls) == 1                      # 未重试（保持 max_retries 无关）
+    assert "HTTP 401" in str(exc_info.value)    # 错误文案与行为保持原样
+    assert ring.rotations == []                 # 未换 Key
+    # 归因已上报，域名取自该 Key 的绑定配置（供配置页提示「Key 与域名不匹配」）
+    assert ring.auth_failures_log == [
+        {"key": "k1", "status": 401, "domain": "cn", "message": "Invalid token"},
+    ]
 
 
 # ── U2：统一错误提取 ────────────────────────────────────────────────

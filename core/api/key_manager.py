@@ -5,6 +5,15 @@
 2. next(): 普通请求轮转（round-robin，原子计数，均匀分摊配额）
 3. rotate(): 429 时强制切到下一个 Key（供换 Key 重试）
 4. has_multiple() / __len__: 供限速器配额与重试策略判断
+5. mark_auth_failed() / auth_failures(): 401 认证失败的**归因登记**（只记录）
+
+关于 401 归因登记（v7.1）：
+    上游 401（Invalid token）的**判定与归因收口在本模块**，流水线只负责上报事实。
+    登记表是纯粹的观测数据：``next()`` / ``rotate()`` / ``_keys`` 一律不读它，
+    因此**不剔除 Key、不降权、不改变轮转顺序**——Key 池的唯一写入口仍是
+    ``set_api_keys`` / ``delete_api_key``（用户在前端配置页自行决定删除）。
+    记录随 ``reset_key_ring()``（保存/删除 Key 后）与进程重启清零，与
+    ``core/api/error_collector.py`` 的内存聚合语义一致。
 
 用法::
 
@@ -16,6 +25,7 @@
 import itertools
 import logging
 import threading
+import time
 from typing import Optional
 
 from core.config import get_api_keys
@@ -34,6 +44,9 @@ class KeyRing:
         # （此前 rotate 与 next 共享递增计数，rotate 消费一个序号后 next 取模
         #  又回到原 Key，导致 429 换 Key 重试实际仍用旧 Key）
         self._force_next: Optional[int] = None
+        # 401 归因登记：{Key 明文: {"count", "status", "domain", "first_at", "last_at", "message"}}
+        # 仅供观测/前端展示，不参与任何选 Key 决策
+        self._auth_failures: dict = {}
 
     def next(self) -> str:
         """轮转取下一个 Key（普通请求调用，均匀分摊）。"""
@@ -69,6 +82,69 @@ class KeyRing:
     def describe(self) -> str:
         """日志用：key#2/3 等。"""
         return f"key#{next(self._count) % len(self._keys) + 1}/{len(self._keys)}"
+
+    # ── 401 归因登记（v7.1）：只记录事实，不影响选 Key ──────────────
+
+    def mark_auth_failed(self, key: str, *, status: int = 401,
+                         domain: str = "", message: str = "") -> dict:
+        """登记一次上游认证失败（401）。**不改变 Key 池与轮转。**
+
+        Args:
+            key: 触发失败的 Key（调用方从 ``next()`` / ``rotate()`` 取得）。
+            status: 上游 HTTP 状态码（当前仅 401）。
+            domain: 该次请求实际使用的域名后缀（''=全局域名），用于归因
+                「Key 与域名不匹配」。
+            message: 上游返回的可读描述（来自 ``_upstream_error``）。
+
+        Returns:
+            该 Key 的累计登记记录（含 count / first_at / last_at）。
+        """
+        now = time.time()
+        with self._lock:
+            rec = self._auth_failures.get(key)
+            if rec is None:
+                rec = {
+                    "count": 0, "status": status, "domain": domain,
+                    "first_at": now, "last_at": now, "message": message,
+                }
+                self._auth_failures[key] = rec
+            rec["count"] += 1
+            rec["status"] = status
+            rec["domain"] = domain or rec.get("domain", "")
+            rec["last_at"] = now
+            if message:
+                rec["message"] = message
+            snapshot = dict(rec)
+            # 日志标签按位置只读计算：不能用 describe()——它会推进轮转计数，
+            # 那样 401 上报就间接改变了后续选 Key，违背「执行中不调整」
+            label = (
+                f"key#{self._keys.index(key) + 1}/{len(self._keys)}"
+                if key in self._keys else "key#(不在池内)"
+            )
+        # 只打日志，不触发任何池调整；用户据配置页提示自行决定是否删除该 Key
+        logger.warning(
+            f"[KeyAuth] {label} 认证失败 (HTTP {status}"
+            f"{f' · {domain}' if domain else ''}): {message or 'invalid token'} "
+            f"— 已登记第 {snapshot['count']} 次，请在配置页确认是否移除该 Key"
+        )
+        return snapshot
+
+    def auth_failures(self) -> dict:
+        """返回全部 401 归因登记（Key 明文 → 记录副本）。
+
+        调用方（配置路由）负责按 ``_key_id`` 映射到掩码列表；本方法不泄露
+        Key 明文给前端。
+        """
+        with self._lock:
+            return {k: dict(v) for k, v in self._auth_failures.items()}
+
+    def clear_auth_failures(self, key: Optional[str] = None) -> None:
+        """清空归因登记（``key=None`` 时清全部）。供 Key 变更/单测复位调用。"""
+        with self._lock:
+            if key is None:
+                self._auth_failures.clear()
+            else:
+                self._auth_failures.pop(key, None)
 
 
 _instance: KeyRing | None = None

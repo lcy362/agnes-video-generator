@@ -279,6 +279,30 @@ def test_keyring_single_key_rotate_keeps_same_key():
     assert ring.next() == "k1"
 
 
+# ── v7.1：401 归因登记不参与选 Key（不剔除 / 不降权 / 不改轮转） ──────
+
+
+def test_keyring_auth_failure_registry_keeps_rotation_untouched():
+    """登记 401 归因不得改变轮转序列（否则等于执行中偷偷调整了选 Key）。"""
+    from core.api.key_manager import KeyRing
+
+    ring = KeyRing(["k1", "k2"])
+    baseline = [ring.next() for _ in range(4)]        # k1,k2,k1,k2
+    ring.mark_auth_failed("k1", domain="cn", message="Invalid token")
+    ring.mark_auth_failed("k1", domain="cn", message="Invalid token")
+
+    # 若 mark_auth_failed 消费了轮转计数（如误用 describe()），此处序列会整体错位
+    assert [ring.next() for _ in range(4)] == baseline
+    rec = ring.auth_failures()["k1"]
+    assert rec["count"] == 2 and rec["status"] == 401
+    assert rec["domain"] == "cn" and rec["message"] == "Invalid token"
+    assert rec["last_at"] >= rec["first_at"]
+    assert "k2" not in ring.auth_failures()           # 未命中 401 的 Key 不被标记
+
+    ring.clear_auth_failures("k1")
+    assert ring.auth_failures() == {}
+
+
 # ── 1.3 自适应轮询间隔 ─────────────────────────────────────────────
 
 

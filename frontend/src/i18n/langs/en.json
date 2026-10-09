@@ -576,6 +576,8 @@
   "keyDomainSelectTitle": "Bind a domain to this Key (empty = follow global)",
   "keyDomainAuto": "Follow global",
   "keyDomainSaved": "Key domain saved",
+  "keyAuthFailed": "Auth failed ×{count}",
+  "keyAuthFailedHint": "This key failed upstream authentication (401) {count} time(s), last at {time}. Whether to remove it is up to you.",
   "failSaveKeyDomain": "Failed to save Key domain",
   "detectKeysBtn": "Auto-detect domains",
   "detectKeysRunning": "Detecting…",

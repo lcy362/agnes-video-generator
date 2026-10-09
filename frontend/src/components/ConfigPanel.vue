@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
-import { t } from '@/i18n'
+import { t, tf } from '@/i18n'
 import { appState, getCollapsePrefs, setCollapsePref } from '@/store'
 import { useConfig } from '@/composables/useConfig'
 import { useVoice } from '@/composables/useVoice'
@@ -100,6 +100,15 @@ function keyDomainUrl(root?: string): string {
 // 保存某 Key 的域名（下拉 change 触发；空值清除绑定 → 回退全局域名）
 async function onKeyDomainChange(item: any, domain: string) {
   await saveKeyDomain(item.id, domain)
+}
+// 401 归因提示：后端 KeyRing 只登记事实（不剔除该 Key），是否删除由用户自行决定
+function authFailedHint(item: { auth_failed?: { count: number; last_at: number } | null }): string {
+  const f = item.auth_failed
+  if (!f) return ''
+  return tf('keyAuthFailedHint', {
+    count: f.count,
+    time: f.last_at ? new Date(f.last_at * 1000).toLocaleString() : '-',
+  })
 }
 
 // 折叠状态（4 个配置面板）：默认全部折叠——供应商管理 / 模型选择 / 工作目录 /
@@ -566,6 +575,8 @@ initCollapse()
                 <span v-if="item.domain && keyDomainUrl(item.domain)" class="px-1.5 py-0.5 rounded text-[10px] font-mono" :class="item.domain === 'cn' ? 'bg-green-900/60 text-green-300' : 'bg-blue-900/60 text-blue-300'">{{ keyDomainUrl(item.domain) }}</span>
                 <span v-else-if="item.source === 'env'" class="px-1.5 py-0.5 rounded text-[10px] font-mono text-muted bg-paper-3" :title="t('keySrcEnvHint')">{{ t('keyDomainEnvFollow') }}（{{ displayDomain() }}）</span>
                 <span v-else class="px-1.5 py-0.5 rounded text-[10px] text-amber-300/80 bg-amber-900/30" :title="t('keyDomainNotSetHint')">{{ t('keyDomainNotSet') }}</span>
+                <!-- 401 归因：后端只登记不剔除，是否移除该 Key 由用户决定（✕ 按钮） -->
+                <span v-if="item.auth_failed" class="px-1.5 py-0.5 rounded text-[10px] bg-red-900/60 text-red-300 cursor-help" :title="authFailedHint(item)">{{ tf('keyAuthFailed', { count: item.auth_failed.count }) }}</span>
                 <label v-if="item.persistable" :for="'key-domain-select-' + item.id" class="sr-only">{{ t('keyDomainSelectTitle') }}</label>
                 <select :id="'key-domain-select-' + item.id" v-if="item.persistable" :value="item.domain || ''" class="glass-input rounded px-1.5 py-0.5 text-[10px] text-ink cursor-pointer" :title="t('keyDomainSelectTitle')" :aria-label="t('keyDomainSelectTitle')" @change="onKeyDomainChange(item, ($event.target as HTMLSelectElement).value)">
                   <option value="">{{ t('keyDomainAuto') }}（{{ displayDomain() }}）</option>

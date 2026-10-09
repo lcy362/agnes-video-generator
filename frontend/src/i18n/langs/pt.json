@@ -664,6 +664,8 @@
   "keyDomainSelectTitle": "为该 Key 选择绑定域名（空=跟随全局）",
   "keyDomainAuto": "跟随全局",
   "keyDomainSaved": "Key 域名已保存",
+  "keyAuthFailed": "Falha de autenticação ×{count}",
+  "keyAuthFailedHint": "Esta chave falhou na autenticação do upstream (401) {count} vezes, a última em {time}. Você decide se deve removê-la.",
   "failSaveKeyDomain": "保存 Key 域名失败",
   "detectKeysBtn": "自动探测域名",
   "detectKeysRunning": "探测中…",

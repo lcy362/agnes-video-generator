@@ -21,6 +21,7 @@ config/keys 与 config/keys/domain 路由单测 — tests/test_config_keys_route
     .venv/bin/python -m pytest tests/test_config_keys_routes.py -v
 """
 
+import json
 import os
 import sys
 
@@ -47,6 +48,52 @@ def _make_items(*entries):
     entry: ("key", "env"|"config")
     """
     return [{"key": k, "source": s} for k, s in entries]
+
+
+class TestGetConfigKeysAuthFailure:
+    """GET /api/config/keys：401 归因登记（v7.1）随 Key 列表下发，供用户自行决定删除。"""
+
+    def test_auth_failed_reported_per_key(self, client, monkeypatch):
+        from core.api.key_manager import KeyRing
+
+        bad, good = "sk-bad-1234567890", "sk-good-1234567890"
+        ring = KeyRing([bad, good])
+        ring.mark_auth_failed(bad, status=401, domain="cn", message="Invalid token")
+        monkeypatch.setattr(config_routes, "get_key_ring", lambda: ring)
+        monkeypatch.setattr(
+            config_routes, "get_api_keys_with_sources",
+            lambda: _make_items((bad, "config"), (good, "env")),
+        )
+        monkeypatch.setattr(
+            config_routes, "get_api_key_domains",
+            lambda: {bad: "cn", good: ""},
+        )
+        monkeypatch.setattr(config_routes, "get_api_keys_source", lambda: "mixed:1|1")
+
+        data = client.get("/api/config/keys").json()
+        assert data["key_count"] == 2
+        by_id = {k["id"]: k for k in data["keys"]}
+        rec = by_id[config_routes._key_id(bad)]["auth_failed"]
+        assert rec["count"] == 1 and rec["status"] == 401
+        assert rec["domain"] == "cn" and rec["message"] == "Invalid token"
+        assert rec["last_at"] > 0
+        # 未命中 401 的 Key 不带标记；响应仍不含任何 Key 明文
+        assert by_id[config_routes._key_id(good)]["auth_failed"] is None
+        assert bad not in json.dumps(data, ensure_ascii=False)
+
+    def test_no_keys_does_not_init_key_ring(self, client, monkeypatch):
+        """未配置任何 Key 时不初始化 KeyRing（get_key_ring 会抛错）→ 仍返回空列表。"""
+        def _boom():
+            raise RuntimeError("No Agnes API Key configured")
+
+        monkeypatch.setattr(config_routes, "get_api_keys_with_sources", lambda: [])
+        monkeypatch.setattr(config_routes, "get_api_key_domains", lambda: {})
+        monkeypatch.setattr(config_routes, "get_api_keys_source", lambda: "none")
+        monkeypatch.setattr(config_routes, "get_key_ring", _boom)
+
+        resp = client.get("/api/config/keys")
+        assert resp.status_code == 200
+        assert resp.json()["keys"] == []
 
 
 class TestRemoveConfigKey:

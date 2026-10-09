@@ -16,7 +16,9 @@ const apiKeyStatus = ref<'none' | 'configured' | 'env'>('none')
 const keyCount = ref(0)
 const keySource = ref('')
 // domain: 该 Key 绑定的域名后缀（''=未绑定，回退全局域名）；persistable: 是否可持久化（仅 config 来源）
-const keyList = ref<{ id: string; mask: string; source: string; domain: string; persistable: boolean }[]>([])
+// auth_failed: 401 归因登记（后端 KeyRing 只记录事实，是否删除该 Key 由用户在前端决定）
+type KeyAuthFailure = { count: number; status: number; domain: string; message: string; last_at: number }
+const keyList = ref<{ id: string; mask: string; source: string; domain: string; persistable: boolean; auth_failed?: KeyAuthFailure | null }[]>([])
 
 function isApiKeyConfigured() {
   return apiKeyStatus.value !== 'none'

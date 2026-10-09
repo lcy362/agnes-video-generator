@@ -13,7 +13,7 @@ from fastapi import APIRouter, Form, HTTPException
 logger = logging.getLogger(__name__)
 
 from core.api.agnes_models import fetch_available_models
-from core.api.key_manager import reset_key_ring
+from core.api.key_manager import get_key_ring, reset_key_ring
 from core.api.providers.base import probe_text_models
 from core.api.rate_limiter import reset_rate_limiter
 from core.config import (
@@ -150,31 +150,54 @@ async def get_config_keys():
     **不回传 Key 明文**：keys 数组仅含掩码（mask）与稳定标识（id）。
     env 与 config 中重复的 Key 只返回一次（标记 env，env 优先）。
 
+    ``auth_failed`` 为 401 归因登记（v7.1，见 core/api/key_manager.py）：该 Key
+    曾在上游认证失败时给出 ``{count, status, domain, message, last_at}``（``last_at``
+    为 epoch 秒），否则为 ``None``。登记只记录事实，不代表该 Key 已被剔除——
+    **是否移除由用户在此页面决定**（DELETE /api/config/keys）。
+
     Returns:
         {
           "ok": true,
           "key_count": int,            # 去重后总数
           "source": "env:N|config:N|mixed:...|none",
-          "keys": [{"id": "sha256[:12]", "mask": "sk-xxx...xxxx", "source": "env"|"config"}, ...],
+          "keys": [{"id": "sha256[:12]", "mask": "sk-xxx...xxxx", "source": "env"|"config",
+                    "domain": "com"|"cn"|"cn_bak"|"", "persistable": bool,
+                    "auth_failed": {"count": int, "status": int, "domain": str,
+                                    "message": str, "last_at": int} | None}, ...],
         }
     """
     items = get_api_keys_with_sources()
     domains = get_api_key_domains()
+    # 401 归因登记（KeyRing 内的观测数据，不参与选 Key）；按稳定 id 映射到掩码项
+    auth_by_id: dict = {}
+    if items:
+        auth_by_id = {
+            _key_id(k): v for k, v in get_key_ring().auth_failures().items()
+        }
+    keys = []
+    for it in items:
+        key_id = _key_id(it["key"])
+        failure = auth_by_id.get(key_id)
+        keys.append({
+            "id": key_id,
+            "mask": _mask_key(it["key"]),
+            "source": it["source"],
+            # 每个 Key 绑定的域名；config 来源可持久化，env 来源无法落盘（回退全局域名）
+            "domain": domains.get(it["key"], ""),
+            "persistable": it["source"] == "config",
+            "auth_failed": None if not failure else {
+                "count": failure["count"],
+                "status": failure["status"],
+                "domain": failure["domain"],
+                "message": failure["message"],
+                "last_at": int(failure["last_at"]),
+            },
+        })
     return {
         "ok": True,
         "key_count": len(items),
         "source": get_api_keys_source(),
-        "keys": [
-            {
-                "id": _key_id(it["key"]),
-                "mask": _mask_key(it["key"]),
-                "source": it["source"],
-                # 每个 Key 绑定的域名；config 来源可持久化，env 来源无法落盘（回退全局域名）
-                "domain": domains.get(it["key"], ""),
-                "persistable": it["source"] == "config",
-            }
-            for it in items
-        ],
+        "keys": keys,
     }
 
 

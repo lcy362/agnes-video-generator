@@ -664,6 +664,8 @@
   "keyDomainSelectTitle": "为该 Key 选择绑定域名（空=跟随全局）",
   "keyDomainAuto": "跟随全局",
   "keyDomainSaved": "Key 域名已保存",
+  "keyAuthFailed": "인증 실패 ×{count}",
+  "keyAuthFailedHint": "이 Key는 업스트림 인증에 실패했습니다(401) {count}회, 최근 {time}. 삭제 여부는 직접 결정하세요.",
   "failSaveKeyDomain": "保存 Key 域名失败",
   "detectKeysBtn": "自动探测域名",
   "detectKeysRunning": "探测中…",

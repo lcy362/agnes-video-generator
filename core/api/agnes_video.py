@@ -18,6 +18,7 @@ from core.api.key_manager import get_key_ring
 from core.api.rate_limiter import get_rate_limiter, get_video_submit_limiter
 from core.config import (
     get_agnes_api_root,
+    get_api_key_domains,
     get_base_url_for_key,
     is_v25_video_model,
     width_height_to_aspect_ratio,
@@ -91,6 +92,22 @@ def _upstream_error(body) -> tuple:
     if data is None:
         return "", ""
     return "", str(data)[:200]
+
+
+def _register_auth_failure(ring, key: str, resp) -> None:
+    """把一次 401（Invalid token）上报给 KeyRing 做归因登记（v7.1）。
+
+    判定与归因收口在 ``core/api/key_manager.py``；此处只上报事实，**不换 Key、
+    不重试、不改池**——该 Key 是否删除由用户在配置页自行决定。域名后缀取自
+    Key 的绑定配置（''=未绑定，走全局域名），用于归因「Key 与域名不匹配」。
+    """
+    _, message = _upstream_error(resp)
+    ring.mark_auth_failed(
+        key,
+        status=resp.status_code,
+        domain=get_api_key_domains().get(key, ""),
+        message=message,
+    )
 
 
 def _needs_portrait_rotation_fix(perf_w, perf_h, cont_w, cont_h) -> bool:
@@ -401,6 +418,10 @@ class AgnesVideoAPI:
                     await asyncio.sleep(delay)
                     attempt += 1
                     continue
+                # 401：上报归因（不换 Key、不改退避节奏，随后的 raise_for_status
+                # 仍按原逻辑进入重试/降级路径）
+                if resp.status_code == 401:
+                    _register_auth_failure(ring, key, resp)
                 resp.raise_for_status()
                 result = resp.json()
                 data_list = result.get("data", [])
@@ -790,6 +811,11 @@ class AgnesVideoAPI:
                     payload["num_frames"] = new_nf
                     frame_reductions_left -= 1
                     continue
+
+                # 401：认证失败只做归因登记（收口在 KeyRing），失败行为保持不变
+                # —— 不换 Key、不重试，Key 是否删除由用户在配置页决定
+                if resp.status_code == 401:
+                    _register_auth_failure(ring, key, resp)
 
                 logger.error(f"[AgnesVideo] HTTP {resp.status_code}: {error_text}")
                 collect_error(

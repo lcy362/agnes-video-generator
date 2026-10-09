@@ -249,6 +249,7 @@ agnes-video-generator/
 | `[Watermark]` | watermark.py |
 | `[Image]` / `[AgnesImage]` / `[AgnesVideo]` / `[AgnesChat]` | 图片流程 / 各 API 模块 |
 | `[RateLimiter]` / `[ErrorCollector]` / `[Diagnostics]` | rate_limiter.py / error_collector.py / task_routes.py 诊断端点 |
+| `[KeyAuth]` | key_manager.py 401 归因登记（只记录，不剔除 Key） |
 | `[Artifacts]` | artifacts.py |
 | `[TaskManager]` | task_manager.py |
 | `[Screenwriter]` | screenwriter.py |
