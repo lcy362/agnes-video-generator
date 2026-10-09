@@ -1,12 +1,14 @@
-# 作品投稿表单 / Showcase submission form
+# Showcase submission form
 #
-# 文件名必须与 Discussions 分类 slug 完全一致：Show and tell → show-and-tell.yml
-# （放在 .github/DISCUSSION_TEMPLATE/，需提交到默认分支后生效）
+# The file name must match the discussion category slug exactly:
+#   "Show and tell" → .github/DISCUSSION_TEMPLATE/show-and-tell.yml
+# It takes effect once committed to the repository's default branch.
 #
-# 注意：讨论类别表单只支持 3 个顶层键 —— body / labels / title（不支持 name / description）。
-# 且 body 中必须至少有 1 个非 markdown 字段。
+# Note: discussion category forms accept only three top-level keys — body / labels / title
+# (unlike issue forms, `name` and `description` are not supported), and the body must
+# contain at least one non-markdown field.
 #
-# 投稿被收录后的去向见仓库根目录 CONTRIBUTING.md 的「作品投稿（Showcase）」一节。
+# What happens to submissions is documented in CONTRIBUTING.md → "3. Showcase".
 
 title: '[Showcase] '
 labels: 'showcase'
@@ -15,124 +17,119 @@ body:
   - type: markdown
     attributes:
       value: |
-        用 **Agnes Video Generator** 做出了作品？欢迎在这里分享视频 + 提示词。
+        Built something with **Agnes Video Generator**? Share your video and the prompt behind it here.
 
-        **投稿须知（请先读，30 秒）**
-        1. 视频请**留在你自己的账号**（YouTube / Bilibili / 其他平台均可）。我们**不会**把投稿视频上传到官方频道。
-        2. 被精选后，作品可能出现在官网 Showcase 页（带你的署名与主页链接，展示视频 + 提示词），并可能被收进官方 YouTube 播放列表 **Community Showcase**。
-        3. 投稿**不等于**一定被收录；维护者会按「成片完整、提示词可复现、无版权与肖像风险」的标准人工筛选。
-        4. 提示词请**原样粘贴**（不要翻译、不要精简），我们会原样展示，并配一份英文含义说明。
-        5. 想要下架？在投稿帖下留言即可，我们会在下次部署时移除。
-
-        ---
-        *Made something with Agnes Video Generator? Share the video and the prompt here. Your video stays on your own channel — we never re-upload it. Selected works may be featured on the official website (credited, with a link back) and added to the **Community Showcase** playlist.*
+        **Before you post (30-second read)**
+        1. Keep your video on **your own account** — YouTube, Bilibili or any other platform. We never re-upload submissions to the official channel.
+        2. If selected, the work may be featured on the official website's showcase (credited, with a link back to you, showing the video together with its prompt) and may be added to the official YouTube playlist **Community Showcase**.
+        3. Posting does not guarantee being featured. Every submission is curated by hand against three criteria: complete render, reproducible prompt, no copyright or likeness issues.
+        4. Paste the prompt **verbatim** — do not translate, shorten or tidy it up. It is displayed exactly as you post it, next to an English meaning note.
+        5. Want it removed later? Leave a comment on your post and we take it down at the next deployment.
   - type: input
     id: video-url
     attributes:
-      label: 视频链接 / Video URL
-      description: YouTube / Bilibili / 其他平台的公开可访问链接。/ A public link to your video.
+      label: Video URL
+      description: A publicly accessible link to your video (YouTube, Bilibili, or any other platform).
       placeholder: https://www.youtube.com/watch?v=...
     validations:
       required: true
   - type: input
     id: title-original
     attributes:
-      label: 作品标题（原文）/ Title (original language)
-      placeholder: 例如：机器人在废弃城市里给小花浇水
+      label: Title (original language)
+      placeholder: e.g. A robot watering a flower in an abandoned city
     validations:
       required: true
   - type: input
     id: title-en
     attributes:
-      label: 作品标题（英文）/ Title (English)
-      description: 官网会把标题翻译成 22 种语言，这里请给一个准确的英文版本。/ Used as the source for 22-language titles.
+      label: Title (English)
+      description: The website translates titles into 22 languages — please give an accurate English version here.
       placeholder: e.g. A robot watering a flower in an abandoned city
     validations:
       required: true
   - type: textarea
     id: prompt-original
     attributes:
-      label: 提示词原文 / Original prompt
-      description: 原样粘贴（不要翻译、不要精简）。这就是我们要展示的内容。/ Paste verbatim — do not translate or shorten.
-      placeholder: 一个机器人在废弃城市里给小花浇水…
+      label: Original prompt
+      description: Paste it verbatim — do not translate or shorten it. This text is what we display.
+      placeholder: A robot watering a small flower in an abandoned city, cinematic lighting...
     validations:
       required: true
   - type: dropdown
     id: prompt-lang
     attributes:
-      label: 提示词原文语言 / Prompt language
+      label: Prompt language
       options:
-        - zh — 中文
         - en — English
-        - ru — Русский
-        - ja — 日本語
-        - ko — 한국어
-        - ms — Bahasa Melayu
-        - id — Bahasa Indonesia
-        - de — Deutsch
-        - fr — Français
-        - nl — Nederlands
-        - es — Español
-        - pt — Português
-        - it — Italiano
-        - hi — हिन्दी
-        - tr — Türkçe
-        - vi — Tiếng Việt
-        - bn — বাংলা
-        - th — ไทย
+        - zh — Chinese (中文)
+        - ru — Russian (Русский)
+        - ja — Japanese (日本語)
+        - ko — Korean (한국어)
+        - ms — Malay (Bahasa Melayu)
+        - id — Indonesian (Bahasa Indonesia)
+        - de — German (Deutsch)
+        - fr — French (Français)
+        - nl — Dutch (Nederlands)
+        - es — Spanish (Español)
+        - pt — Portuguese (Português)
+        - it — Italian (Italiano)
+        - hi — Hindi (हिन्दी)
+        - tr — Turkish (Türkçe)
+        - vi — Vietnamese (Tiếng Việt)
+        - bn — Bengali (বাংলা)
+        - th — Thai (ไทย)
         - tl — Filipino
-        - ar — العربية
-        - ur — اردو
-        - fa — فارسی
+        - ar — Arabic (العربية)
+        - ur — Urdu (اردو)
+        - fa — Persian (فارسی)
     validations:
       required: true
   - type: textarea
     id: prompt-english
     attributes:
-      label: 英文含义说明（可选）/ English meaning (optional)
-      description: 提示词的英文翻译或含义解释，会作为跨语言读者的统一说明展示。/ An English translation or explanation shown to readers of all languages.
-      placeholder: A cinematic shot of a robot watering a small flower in an abandoned city…
+      label: English meaning (optional)
+      description: An English translation or explanation of the prompt. It is shown to readers of every language, so keep it faithful to the original.
+      placeholder: A cinematic shot of a robot watering a small flower in an abandoned city...
     validations:
       required: false
   - type: dropdown
     id: task-type
     attributes:
-      label: 任务类型 / Task type
+      label: Task type
       options:
-        - simple — 简单视频 / single video
-        - creative — 创意长视频 / creative multi-scene
-        - manuscript — 稿件长视频 / manuscript
-        - anchor — 数字人口播 / AI presenter
-        - poetry — 诗词视频 / poetry
-        - simple_image — 简单图片 / image
+        - simple — single video
+        - creative — creative multi-scene
+        - manuscript — manuscript / long script
+        - anchor — AI presenter
+        - poetry — poetry
+        - simple_image — image
     validations:
       required: true
   - type: input
     id: generation-params
     attributes:
-      label: 生成参数（可选）/ Generation params (optional)
-      description: 模型 / 时长 / 分辨率 / 分镜数等，用于官网作品页的参数表。/ Model, duration, resolution, scene count…
-      placeholder: agnes-video-2.5-flash · 30s · 768×1152 · 6 scenes
+      label: Generation settings (optional)
+      description: Model, duration, resolution, scene count, chaining mode — shown in the settings table on the website.
+      placeholder: agnes-video-2.5-flash · 10s · 768x1152 · 2 scenes · keyframes
     validations:
       required: false
   - type: textarea
     id: extra-notes
     attributes:
-      label: 其他说明（可选）/ Anything else (optional)
-      description: 风格、音色、字幕设置、遇到的坑，或你想补充给读者的信息。/ Style, voice, subtitles, tips…
+      label: Anything else (optional)
+      description: Style, voice, subtitle settings, tips, or anything you want readers to know.
     validations:
       required: false
   - type: checkboxes
     id: declarations
     attributes:
-      label: 声明与授权 / Declaration & permission
-      description: 两项都必须勾选才能提交。/ Both boxes are required to submit.
+      label: Declaration and permission
+      description: Both boxes are required before this discussion can be posted.
       options:
         - label: |
-            我确认该作品为本人原创，或已获得全部必要授权；视频中使用的音频（TTS / 音乐）与出现的肖像，相关责任由我承担。
-            *I confirm this work is my own or fully licensed; I am responsible for any audio (TTS/music) and likeness used in it.*
+            I confirm this work is my own or fully licensed, and I am responsible for any audio (TTS or music) and any real person's likeness it contains.
           required: true
         - label: |
-            我同意 Agnes Video Generator 项目在官网（含提示词原文与英文含义说明）与官方 YouTube 播放列表 *Community Showcase* 中展示该作品，并署名我的账号；我可随时要求移除。
-            *I allow this project to feature the work on its official website (with the prompt) and in the official **Community Showcase** playlist, credited to my account. I may request removal at any time.*
+            I allow the Agnes Video Generator project to feature this work and its prompt on the official website and in the official YouTube playlist *Community Showcase*, credited to my account. I may request removal at any time.
           required: true
