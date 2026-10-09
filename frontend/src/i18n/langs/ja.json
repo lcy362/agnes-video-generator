@@ -50,6 +50,7 @@
   "vmPortraitRotateHint": "上流の 2.5 シリーズ縦画面（9:16）は画像が回転する不具合があります。16:9 か Video 2.0 の縦画面をご利用ください。",
   "progress.video.queue_full": "Agnes の動画キューが満杯です（HTTP {status} · {code}）。再試行中（{n} 回目 / 待機 {waited} 分）。時間をずらすか、後ほど再試行してください。",
   "error.video.queue_full": "Agnes の動画キューが満杯です（HTTP {status} · {code}）。{waited} 分再試行しましたがキューに入らず、タスクは作成されませんでした（クォータ消費なし）。時間をずらして再試行するか、別の動画モデルに切り替えてください。",
+  "error.video.queue_full.window_hint": "経験上、この時間帯は上流が比較的スムーズです（{tz}）：{windows}。この時間帯での再試行がおすすめです。",
   "footerVersion": "バージョン",
   "modelSync": "リストを更新",
   "modelSyncIdle": "未同期",

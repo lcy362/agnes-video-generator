@@ -54,6 +54,7 @@
   "vmPortraitRotateHint": "Upstream 2.5 series portrait (9:16) currently returns rotated frames; prefer 16:9 or Video 2.0 portrait.",
   "progress.video.queue_full": "Agnes video queue is full (HTTP {status} · {code}), retrying (attempt {n} / waited {waited} min). Please retry later, ideally off-peak.",
   "error.video.queue_full": "Agnes video queue is full (HTTP {status} · {code}); after retrying for {waited} min the job never entered the queue, so nothing was generated (no quota used). Please retry later, ideally off-peak, or switch to another video model.",
+  "error.video.queue_full.window_hint": "These windows are usually smoother upstream ({tz}): {windows}. Retrying then tends to work better.",
   "footerVersion": "Version",
   "modelSync": "Refresh List",
   "modelSyncIdle": "Not synced",

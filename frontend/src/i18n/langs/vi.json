@@ -45,6 +45,7 @@
   "vmPortraitRotateHint": "Chế độ dọc (9:16) của dòng 2.5 bị lỗi xoay hình; hãy dùng 16:9 hoặc Video 2.0.",
   "progress.video.queue_full": "Hàng đợi video Agnes đã đầy (HTTP {status} · {code}), đang thử lại (lần {n} / đã chờ {waited} phút). Vui lòng thử lại sau, tốt nhất là ngoài giờ cao điểm.",
   "error.video.queue_full": "Hàng đợi video Agnes đã đầy (HTTP {status} · {code}); sau {waited} phút thử lại, tác vụ vẫn không vào được hàng đợi và không có gì được tạo (không tốn hạn ngạch). Hãy thử lại ngoài giờ cao điểm hoặc đổi sang mô hình video khác.",
+  "error.video.queue_full.window_hint": "Theo kinh nghiệm, máy chủ thượng nguồn thường thông suốt hơn vào các khung giờ này ({tz}): {windows}. Nên thử lại vào các khung giờ đó.",
   "footerVersion": "Phiên bản",
   "modelSync": "Làm mới danh sách",
   "modelSyncIdle": "Chưa đồng bộ",

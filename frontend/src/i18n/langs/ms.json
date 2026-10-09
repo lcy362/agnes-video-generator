@@ -50,6 +50,7 @@
   "vmPortraitRotateHint": "Mod menegak (9:16) siri 2.5 mempunyai kecacatan putaran imej; gunakan 16:9 atau Video 2.0.",
   "progress.video.queue_full": "Barisan video Agnes penuh (HTTP {status} · {code}), mencuba semula (percubaan {n} / menunggu {waited} min). Sila cuba semula kemudian, sebaiknya di luar waktu puncak.",
   "error.video.queue_full": "Barisan video Agnes penuh (HTTP {status} · {code}); selepas {waited} min mencuba semula, tugas masih tidak masuk barisan dan tiada apa yang dijana (tiada kuota digunakan). Cuba semula di luar waktu puncak atau tukar model video lain.",
+  "error.video.queue_full.window_hint": "Berdasarkan pengalaman, pelayan huluan lebih lancar pada waktu ini ({tz}): {windows}. Cuba semula pada waktu tersebut.",
   "footerVersion": "Versi",
   "modelSync": "Segarkan Senarai",
   "modelSyncIdle": "Belum disegerak",

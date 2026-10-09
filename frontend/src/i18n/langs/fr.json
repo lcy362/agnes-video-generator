@@ -50,6 +50,7 @@
   "vmPortraitRotateHint": "Le mode portrait (9:16) de la série 2.5 présente un défaut de rotation ; utilisez 16:9 ou Video 2.0.",
   "progress.video.queue_full": "La file d'attente vidéo Agnes est pleine (HTTP {status} · {code}), nouvelle tentative (tentative {n} / attente {waited} min). Réessayez plus tard, idéalement hors des heures de pointe.",
   "error.video.queue_full": "La file d'attente vidéo Agnes est pleine (HTTP {status} · {code}) ; après {waited} min de tentatives, la tâche n'est jamais entrée dans la file et rien n'a été généré (aucun quota consommé). Réessayez plus tard, idéalement hors des heures de pointe, ou changez de modèle vidéo.",
+  "error.video.queue_full.window_hint": "D'après l'expérience, l'amont est plus fluide sur ces créneaux ({tz}) : {windows}. Réessayez de préférence à ces heures.",
   "footerVersion": "Version",
   "modelSync": "Actualiser la liste",
   "modelSyncIdle": "Non synchronisé",

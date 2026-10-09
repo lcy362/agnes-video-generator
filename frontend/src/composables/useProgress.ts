@@ -7,6 +7,7 @@ import { useGa } from './useGa'
 import { useArtifacts } from './useArtifacts'
 import { useToast } from './useToast'
 import { getRetryCount, bumpRetryCount, clearRetryCount } from '@/utils/feedback'
+import { queueFullWindowHint } from '@/utils/retryWindows'
 import type { TaskState, StepDef } from '@/types'
 
 const POLL_INTERVAL = 30000
@@ -26,6 +27,8 @@ const resultVideoSrc = ref('')
 const steps = ref<StepDef[]>([])
 const stepStates = ref<Record<string, 'done' | 'running' | 'pending'>>({})
 const failedMessage = ref('')
+// v7.3：队列满/上游 503 失败时追加的「错峰重试」指引（按浏览者本地时区渲染，其余失败为空）
+const retryWindowHint = ref('')
 const taskFailed = ref(false)
 // v6.4.8：后端实时环节名（去掉 step_ 前缀）。诊断报告用它而非 taskInfo 快照，
 // 避免「同一页面点重试后环节名停留在上一轮」（issue #56/#57：报告 scene_config，
@@ -123,6 +126,18 @@ function renderBackendMessage(state: TaskState): string {
   return state.current_message || ''
 }
 
+/**
+ * v7.3：失败消息落地（队列满时附带「错峰重试」指引）。
+ *
+ * 后端下发 `error.video.queue_full` 时会带 status/code/waited 参数；这里额外
+ * 给出成功率较高的时段建议，时段按浏览者所在时区换算（多时区自适应）。
+ */
+function applyFailedMessage(state: TaskState) {
+  failedMessage.value = renderBackendMessage(state) || t('genFailedMsg')
+  retryWindowHint.value =
+    state.current_message_key === 'error.video.queue_full' ? queueFullWindowHint() : ''
+}
+
 const currentRunningStep = computed(() => {
   return steps.value.find((s) => stepStates.value[s.key] === 'running')
 })
@@ -191,7 +206,7 @@ async function mountProgressPage(taskId: string, dirName?: string | null) {
     clearRunning()
   } else if (st === 'failed') {
     taskFailed.value = true
-    failedMessage.value = renderBackendMessage(state) || t('genFailedMsg')
+    applyFailedMessage(state)
     retryCount.value = getRetryCount(taskId)
     clearRunning()
   } else if (st === 'pending' && state.current_status === 'awaiting_user') {
@@ -322,7 +337,7 @@ async function pollTaskProgress(taskId: string) {
       })
       clearRunning()
       taskFailed.value = true
-      failedMessage.value = renderBackendMessage(state) || t('genFailedMsg')
+      applyFailedMessage(state)
       retryCount.value = getRetryCount(taskId)
     }
 
@@ -411,6 +426,7 @@ export function useProgress() {
     stepStates,
     taskFailed,
     failedMessage,
+    retryWindowHint,
     liveFailedStep,
     awaitingCheckpoint,
     needsResume,

@@ -50,6 +50,7 @@
   "vmPortraitRotateHint": "O modo retrato (9:16) da série 2.5 apresenta defeito de rotação; use 16:9 ou Video 2.0.",
   "progress.video.queue_full": "A fila de vídeo da Agnes está cheia (HTTP {status} · {code}), tentando novamente (tentativa {n} / espera {waited} min). Tente novamente mais tarde, de preferência fora do horário de pico.",
   "error.video.queue_full": "A fila de vídeo da Agnes está cheia (HTTP {status} · {code}); após {waited} min de tentativas a tarefa nunca entrou na fila e nada foi gerado (nenhuma cota consumida). Tente novamente fora do horário de pico ou use outro modelo de vídeo.",
+  "error.video.queue_full.window_hint": "Pela experiência, o servidor de origem responde melhor nestas faixas ({tz}): {windows}. Vale mais tentar de novo nesses horários.",
   "footerVersion": "Versão",
   "modelSync": "Atualizar lista",
   "modelSyncIdle": "Não sincronizado",

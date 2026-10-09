@@ -50,6 +50,7 @@
   "vmPortraitRotateHint": "Mode potret (9:16) seri 2.5 memiliki cacat rotasi gambar; gunakan 16:9 atau Video 2.0.",
   "progress.video.queue_full": "Antrean video Agnes penuh (HTTP {status} · {code}), mencoba ulang (percobaan {n} / menunggu {waited} menit). Silakan coba lagi nanti, sebaiknya di luar jam sibuk.",
   "error.video.queue_full": "Antrean video Agnes penuh (HTTP {status} · {code}); setelah {waited} menit mencoba ulang, tugas tetap tidak masuk antrean dan tidak ada yang dibuat (kuota tidak terpakai). Coba lagi di luar jam sibuk atau ganti model video lain.",
+  "error.video.queue_full.window_hint": "Berdasarkan pengalaman, server hulu lebih lancar pada rentang waktu ini ({tz}): {windows}. Sebaiknya coba lagi pada jam tersebut.",
   "footerVersion": "Versi",
   "modelSync": "Segarkan Daftar",
   "modelSyncIdle": "Belum disinkron",

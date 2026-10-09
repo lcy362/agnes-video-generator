@@ -4,6 +4,7 @@ import { appState } from '@/store'
 import { useToast } from './useToast'
 import { useGa } from './useGa'
 import { useNavigation } from './useNavigation'
+import { queueFullWindowHint } from '@/utils/retryWindows'
 import * as api from '@/api'
 
 export interface TaskSubmitOptions {
@@ -82,7 +83,9 @@ export function useTaskSubmit() {
         ...(scMatch ? { status_code: scMatch[1] } : {}),
         error: (e.message || '').slice(0, 120),
       })
-      showToast(t('failCreate') + ': ' + e.message, 4500)
+      // v7.3：上游繁忙（503 / 队列满）时附带「错峰重试」建议，按浏览者本地时区渲染
+      const hint = /503|queue/i.test(e.message || '') ? queueFullWindowHint() : ''
+      showToast(t('failCreate') + ': ' + e.message + (hint ? '\n' + hint : ''), hint ? 7000 : 4500)
       return null
     } finally {
       submitting.value = false

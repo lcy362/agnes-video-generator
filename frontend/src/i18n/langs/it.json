@@ -50,6 +50,7 @@
   "vmPortraitRotateHint": "Il verticale (9:16) della serie 2.5 ha un difetto di rotazione; usa 16:9 o Video 2.0.",
   "progress.video.queue_full": "La coda video di Agnes è piena (HTTP {status} · {code}), nuovo tentativo (tentativo {n} / attesa {waited} min). Riprova più tardi, preferibilmente fuori orario di punta.",
   "error.video.queue_full": "La coda video di Agnes è piena (HTTP {status} · {code}); dopo {waited} min di tentativi l'attività non è mai entrata in coda e non è stato generato nulla (nessuna quota consumata). Riprova fuori orario di punta oppure usa un altro modello video.",
+  "error.video.queue_full.window_hint": "In base all'esperienza, l'upstream è più fluido in queste fasce ({tz}): {windows}. Conviene riprovare in quegli orari.",
   "footerVersion": "Versione",
   "modelSync": "Aggiorna elenco",
   "modelSyncIdle": "Non sincronizzato",

@@ -45,6 +45,7 @@
   "vmPortraitRotateHint": "Ang portrait (9:16) ng 2.5 series ay may depekto sa pag-ikot; gamitin ang 16:9 o Video 2.0.",
   "progress.video.queue_full": "Puno na ang video queue ng Agnes (HTTP {status} · {code}), sinusubukan muli (pagsubok {n} / naghintay {waited} min). Pakisubukan muli mamaya, mas mainam sa hindi peak na oras.",
   "error.video.queue_full": "Puno na ang video queue ng Agnes (HTTP {status} · {code}); pagkatapos ng {waited} min na pagsubok muli, hindi pumasok ang task sa queue at walang nagawa (walang nagamit na quota). Subukan muli sa hindi peak na oras o gumamit ng ibang video model.",
+  "error.video.queue_full.window_hint": "Batay sa karanasan, mas maayos ang upstream sa mga oras na ito ({tz}): {windows}. Mas mainam na subukan muli sa mga oras na iyon.",
   "footerVersion": "Bersyon",
   "modelSync": "I-refresh ang Listahan",
   "modelSyncIdle": "Hindi naka-sync",

@@ -75,6 +75,7 @@
   "vmPortraitRotateHint": "上游 2.5 系列竖屏（9:16）存在画面旋转缺陷（容器竖、画面横），建议改用 16:9 或 Video 2.0 竖屏档。",
   "progress.video.queue_full": "Agnes 视频队列已满（HTTP {status} · {code}），正在排队重试（第 {n} 次 / 已等 {waited} 分钟）。建议错峰重试或稍后再试。",
   "error.video.queue_full": "Agnes 视频队列已满（HTTP {status} · {code}），重试 {waited} 分钟后仍未排进队，本次未生成任务（不消耗配额）。建议错峰重试或换用其他视频模型。",
+  "error.video.queue_full.window_hint": "经验上这些时段上游更顺畅（{tz}）：{windows}，可优先在这些时段重试。",
   "footerVersion": "版本",
   "modelSync": "刷新列表",
   "modelSyncIdle": "未同步",

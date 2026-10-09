@@ -50,6 +50,7 @@
   "vmPortraitRotateHint": "El modo vertical (9:16) de la serie 2.5 tiene un defecto de rotación; use 16:9 o Video 2.0.",
   "progress.video.queue_full": "La cola de vídeo de Agnes está llena (HTTP {status} · {code}), reintentando (intento {n} / espera {waited} min). Inténtalo más tarde, preferiblemente en horas de menor actividad.",
   "error.video.queue_full": "La cola de vídeo de Agnes está llena (HTTP {status} · {code}); tras {waited} min de reintentos la tarea nunca entró en la cola y no se generó nada (no se consumió cuota). Inténtalo más tarde, en horas de menor actividad, o cambia a otro modelo de vídeo.",
+  "error.video.queue_full.window_hint": "Según la experiencia, el servidor de origen responde mejor en estas franjas ({tz}): {windows}. Conviene reintentar en esas horas.",
   "footerVersion": "Versión",
   "modelSync": "Actualizar lista",
   "modelSyncIdle": "No sincronizado",

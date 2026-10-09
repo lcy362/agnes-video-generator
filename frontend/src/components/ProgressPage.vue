@@ -21,6 +21,7 @@ const {
   stepStates,
   taskFailed,
   failedMessage,
+  retryWindowHint,
   liveFailedStep,
   awaitingCheckpoint,
   retryCount,
@@ -228,6 +229,8 @@ onUnmounted(() => {
           <div v-if="taskFailed" class="mt-4 p-4 bg-red-950 border border-red-800 rounded-lg space-y-2">
             <p class="text-red-400 font-medium">{{ t('genFailed') }}</p>
             <p class="text-muted text-xs">{{ failedMessage || t('genFailedMsg') }}</p>
+            <!-- v7.3：队列满/上游 503 时的错峰重试建议（按浏览者所在时区换算，不同时区看到各自本地时间） -->
+            <p v-if="retryWindowHint" class="text-xs text-accent leading-relaxed">{{ retryWindowHint }}</p>
             <!-- v6.1 问题反馈：重试引导（偶发故障优先断点续传自愈，多次失败再上报） -->
             <div class="pt-2 border-t border-red-800/60 space-y-2">
               <!-- 引导文案：网络/域名类 → 自查环境；确定性故障 → 建议直接反馈；其余 → 断点续传自愈 -->

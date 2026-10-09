@@ -50,6 +50,7 @@
   "vmPortraitRotateHint": "업스트림 2.5 시리즈 세로(9:16)는 화면 회전 결함이 있습니다. 16:9 또는 Video 2.0 세로를 사용하세요.",
   "progress.video.queue_full": "Agnes 비디오 대기열이 가득 찼습니다(HTTP {status} · {code}). 재시도 중(시도 {n}회 / 대기 {waited}분). 한가한 시간대에 다시 시도해 주세요.",
   "error.video.queue_full": "Agnes 비디오 대기열이 가득 찼습니다(HTTP {status} · {code}). {waited}분 재시도했지만 대기열에 들어가지 못해 작업이 생성되지 않았습니다(할당량 소모 없음). 한가한 시간대에 다시 시도하거나 다른 비디오 모델을 사용하세요.",
+  "error.video.queue_full.window_hint": "경험상 이 시간대는 업스트림이 비교적 원활합니다({tz}): {windows}. 이 시간대에 다시 시도하는 것을 권장합니다.",
   "footerVersion": "버전",
   "modelSync": "목록 새로고침",
   "modelSyncIdle": "미동기화",
