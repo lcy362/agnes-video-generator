@@ -201,24 +201,32 @@ async def test_queue_full_uses_separate_retry_track(api, monkeypatch):
     assert all("queue is full" in (d["message"] or "") for _, d in progress)
 
 
-async def test_queue_full_budget_exhausted_raises(api, monkeypatch):
-    """队列预算到期抛结构化异常：带 HTTP 码 / body code / 等待时长，供 UI 多语言渲染。
+async def test_queue_full_attempts_exhausted_raises(api, monkeypatch):
+    """忙轨次数用尽后抛结构化异常：带 HTTP 码 / body code / 等待时长，供 UI 多语言渲染。
 
     异常消息本身只含技术事实（不写死语种），用户可见文案由
     前端 i18n key（``error.video.queue_full``）或后端兜底 translate 生成。
+
+    v7.2：忙轨封顶由「总时长预算」改为「次数」，此处把次数压到 1（首次忙信号后
+    只允许重试 1 次）以快速触发用尽分支。
     """
+    calls = []
     monkeypatch.setattr(
         "core.config.get_settings",
         lambda: SimpleNamespace(
-            agnes_video_queue_retry_seconds=0,
+            agnes_video_busy_retry_attempts=1,
             agnes_video_poll_timeout=1800,
             agnes_fix_v25_portrait_rotation=False,
         ),
     )
-    monkeypatch.setattr(av.requests, "post", lambda *a, **k: _queue_full_response())
+    monkeypatch.setattr(
+        av.requests, "post",
+        lambda *a, **k: (calls.append(1), _queue_full_response())[1],
+    )
     with pytest.raises(av.AgnesQueueFullError) as exc_info:
         await api._submit_with_retry({"prompt": "x"}, "t2v")
 
+    assert len(calls) == 2          # 1 次首发 + 1 次忙轨重试，第 3 次前判定用尽
     err = exc_info.value
     assert err.queue_full_status == 503
     assert err.queue_full_code == "video_queue_full"
@@ -258,14 +266,18 @@ async def test_fail_to_fetch_task_goes_queue_track(api, monkeypatch):
 
 
 async def test_normal_5xx_still_capped_at_max_retries(api, monkeypatch):
-    """非队列类 5xx 仍只尝试 max_retries 次（不因 U1 变成无限重试）。"""
+    """非忙 5xx（500）仍只尝试 max_retries 次（不因忙轨存在变成无限重试）。
+
+    注：503 自 v7.1 起**全部**归「忙轨」（固定间隔 + 时长预算），不再受次数封顶，
+    故此处用 500 验证故障轨的次数封顶语义。
+    """
     calls = []
     errors = []
 
     def fake_post(url, headers=None, json=None, timeout=None):
         calls.append(1)
         return FakeResponse(
-            status_code=503,
+            status_code=500,
             json_data={"code": "internal_error", "message": "boom"},
         )
 
@@ -277,15 +289,14 @@ async def test_normal_5xx_still_capped_at_max_retries(api, monkeypatch):
 
     assert len(calls) == api.max_retries
     # U2：error_message 透出 body 的 message + extra 带 upstream_code
-    assert any(e.get("error_message") == "HTTP 503: boom" for e in errors)
+    assert any(e.get("error_message") == "HTTP 500: boom" for e in errors)
     assert any(e.get("extra", {}).get("upstream_code") == "internal_error" for e in errors)
 
 
 async def test_queue_full_error_message_not_dict_literal(api, monkeypatch):
     """U2：error_logs 的 error_message 不得是 dict 字面量。
 
-    注：必须把队列预算压到 0——否则默认 900s 预算会按真实时钟空转
-    （退避间隔虽被打桩为 0，但预算到期判定用的是 time.monotonic）。
+    注：必须把忙轨次数压到 1——否则默认 15 次会一路重试到用尽。
     """
     errors = []
     monkeypatch.setattr(av, "collect_error", lambda *a, **k: errors.append(k))
@@ -293,7 +304,7 @@ async def test_queue_full_error_message_not_dict_literal(api, monkeypatch):
     monkeypatch.setattr(
         "core.config.get_settings",
         lambda: SimpleNamespace(
-            agnes_video_queue_retry_seconds=0,
+            agnes_video_busy_retry_attempts=1,
             agnes_video_poll_timeout=1800,
             agnes_fix_v25_portrait_rotation=False,
         ),
@@ -450,7 +461,7 @@ def test_wait_for_video_enables_rotation_for_v25_when_switch_on(monkeypatch):
         "core.config.get_settings",
         lambda: SimpleNamespace(
             agnes_video_poll_timeout=1800,
-            agnes_video_queue_retry_seconds=900,
+            agnes_video_busy_retry_attempts=15,
             agnes_fix_v25_portrait_rotation=True,
         ),
     )
@@ -474,3 +485,197 @@ def test_wait_for_video_enables_rotation_for_v25_when_switch_on(monkeypatch):
         av.AgnesVideoAPI(api_key="k1", model="agnes-video-v2.0").wait_for_video("vid")
     )
     assert out20.fix_rotation is False  # 非 2.5 系列不校正
+
+
+# ── v7.1：忙轨 / 故障轨两轨归拢 ──────────────────────────────────────
+
+
+def _patch_async_sleep(monkeypatch, sink):
+    """把 ``asyncio.sleep`` 换成记录器（避免测试真实等待）。"""
+    async def fake_sleep(seconds):
+        sink.append(seconds)
+
+    monkeypatch.setattr(av.asyncio, "sleep", fake_sleep)
+
+
+def test_retry_policy_two_track_classification():
+    """忙轨判定与间隔：429 / 所有 503 / 队列类 code → 固定；其余 5xx → 逐级。"""
+    from core.api.retry_policy import busy_delay, fault_delay, is_busy_signal
+
+    assert is_busy_signal(429)
+    assert is_busy_signal(503)                       # 裸 503（body 无 code）也算忙
+    assert is_busy_signal(503, "video_queue_full")
+    assert is_busy_signal(500, "video_queue_full")   # 任意状态码 + 队列类 code
+    assert not is_busy_signal(500)
+    assert not is_busy_signal(500, "internal_error")
+    assert not is_busy_signal(400)
+
+    # 忙轨：首跳 0s 贴着限流（节奏交给令牌桶），之后固定不增长
+    assert [busy_delay(30.0, 0.0, n) for n in range(4)] == [0.0, 30.0, 30.0, 30.0]
+    # 抖动只在非首跳生效，且落在 [base, base + jitter)
+    assert all(30.0 <= busy_delay(30.0, 30.0, n) < 60.0 for n in range(1, 20))
+    # 故障轨逐级加长，靠次数封顶
+    assert [fault_delay(30.0, n) for n in range(3)] == [30.0, 60.0, 90.0]
+
+    # 忙轨次数封顶（v7.2 由时长预算改为次数）
+    from core.api.retry_policy import BusyTracker
+
+    tracker = BusyTracker(2)
+    assert tracker.exhausted() is False
+    tracker.retries = 2
+    assert tracker.exhausted() is True
+    assert BusyTracker(0).max_attempts == 1  # 收敛为 1，不至于完全不重试
+
+
+async def test_bare_503_enters_busy_track_not_capped_by_max_retries(api, monkeypatch):
+    """裸 503（body 无 code）归忙轨：调用次数可超过 max_retries 才成功。"""
+    calls = []
+    _patch_async_sleep(monkeypatch, [])
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        calls.append(1)
+        if len(calls) <= 4:
+            return FakeResponse(503)  # 裸 503：无 body code
+        return FakeResponse(200, {"video_id": "vid-busy"})
+
+    monkeypatch.setattr(av.requests, "post", fake_post)
+
+    assert await api._submit_with_retry({"prompt": "x"}, "t2v") == "vid-busy"
+    assert len(calls) == 5 > api.max_retries  # 未被 max_retries=3 截断
+
+
+async def test_busy_track_interval_is_fixed(api, monkeypatch):
+    """忙轨间隔：首跳 0s（贴着限流），之后固定不增长（对比故障轨的逐级加长）。"""
+    monkeypatch.setattr(av, "_QUEUE_RETRY_BASE_DELAY", 30.0)
+    monkeypatch.setattr(av, "_QUEUE_RETRY_JITTER", 0.0)
+    delays = []
+    _patch_async_sleep(monkeypatch, delays)
+    calls = []
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        calls.append(1)
+        if len(calls) <= 3:
+            return _queue_full_response()
+        return FakeResponse(200, {"video_id": "vid-fixed"})
+
+    monkeypatch.setattr(av.requests, "post", fake_post)
+
+    assert await api._submit_with_retry({"prompt": "x"}, "t2v") == "vid-fixed"
+    assert delays == [0.0, 30.0, 30.0]  # 首跳 0s，之后固定，不出现 30/60/90
+
+
+async def test_busy_track_capped_by_attempts_not_elapsed_time(api, monkeypatch):
+    """忙轨按**次数**封顶：间隔全部归零时也会在 N 次后放弃（不再依赖时长）。"""
+    monkeypatch.setattr(av, "_QUEUE_RETRY_BASE_DELAY", 0.0)
+    monkeypatch.setattr(av, "_QUEUE_RETRY_JITTER", 0.0)
+    _patch_async_sleep(monkeypatch, [])
+    monkeypatch.setattr(
+        "core.config.get_settings",
+        lambda: SimpleNamespace(agnes_video_busy_retry_attempts=3),
+    )
+    calls = []
+    monkeypatch.setattr(
+        av.requests, "post",
+        lambda *a, **k: (calls.append(1), _queue_full_response())[1],
+    )
+
+    with pytest.raises(av.AgnesQueueFullError):
+        await api._submit_with_retry({"prompt": "x"}, "t2v")
+
+    assert len(calls) == 4  # 1 次首发 + 3 次忙轨重试，与间隔大小无关
+
+
+async def test_fault_track_interval_grows(api, monkeypatch):
+    """故障轨（非忙 5xx）间隔逐级加长后按次数封顶。"""
+    delays = []
+    _patch_async_sleep(monkeypatch, delays)
+    slow_api = av.AgnesVideoAPI(api_key="k1", max_retries=3, retry_base_delay=10.0)
+    monkeypatch.setattr(av.requests, "post", lambda *a, **k: FakeResponse(500))
+    monkeypatch.setattr(av, "get_key_ring", lambda: FakeRing(["k1"]))
+
+    with pytest.raises(RuntimeError, match="max retries"):
+        await slow_api._submit_with_retry({"prompt": "x"}, "t2v")
+
+    assert delays == [10.0, 20.0, 30.0]
+
+
+async def test_upload_5xx_fault_track_has_retry_limit(api, monkeypatch, tmp_path):
+    """上传侧 5xx 走故障轨且**有次数上限**。
+
+    修复点：原 ``except`` 分支只 sleep 不递增 ``attempt``，持续失败会死循环。
+    """
+    img = tmp_path / "a.png"
+    img.write_bytes(b"png")
+    monkeypatch.setattr(av, "get_key_ring", lambda: FakeRing(["k1"]))
+    monkeypatch.setattr(av, "_UPLOAD_RETRY_BASE_DELAY_SECONDS", 2.0)
+    delays = []
+    _patch_async_sleep(monkeypatch, delays)
+    calls = []
+    monkeypatch.setattr(
+        av.requests, "post",
+        lambda *a, **k: (calls.append(1), FakeResponse(500, {"message": "boom"}))[1],
+    )
+
+    assert await api._upload_image_to_url(str(img), retries=3) is None
+    assert len(calls) == 3       # 有次数上限，不再无限循环
+    assert delays == [2.0, 4.0]  # 故障轨逐级加长，最后一次不再 sleep
+
+
+async def test_upload_busy_retries_exhausted_falls_back_to_base64(api, monkeypatch, tmp_path):
+    """上传侧忙轨次数用尽 → 返回 None（调用方回退 base64），不再重试。
+
+    v7.2：忙轨封顶由「总时长预算」改为「次数」，此处把次数压到 1。
+    """
+    img = tmp_path / "a.png"
+    img.write_bytes(b"png")
+    monkeypatch.setattr(av, "get_key_ring", lambda: FakeRing(["k1"]))
+    monkeypatch.setattr(
+        "core.config.get_settings",
+        lambda: SimpleNamespace(agnes_busy_retry_attempts=1),
+    )
+    calls = []
+    monkeypatch.setattr(
+        av.requests, "post",
+        lambda *a, **k: (calls.append(1), FakeResponse(503))[1],
+    )
+
+    assert await api._upload_image_to_url(str(img), retries=3) is None
+    assert len(calls) == 2  # 1 次首发 + 1 次忙轨重试，第 3 次前判定用尽
+
+
+def test_chat_busy_track_fixed_interval_and_attempts(monkeypatch):
+    """Chat / 通用封装：全 Key 429 → 忙轨首跳贴限流 + 固定间隔（不逐级加长），次数用尽返回响应。
+
+    v7.2：忙轨封顶由「总时长预算」改为「次数」；``agnes_busy_retry_attempts=None``
+    时回退到调用方传入的 ``busy_max_retries``（此处 3）。
+    """
+    from core.api import rate_limiter as rl
+
+    clock = {"t": 0.0}
+    sleeps = []
+
+    def fake_sleep(seconds):
+        sleeps.append(seconds)
+        clock["t"] += seconds
+
+    monkeypatch.setattr(rl.time, "sleep", fake_sleep)
+    monkeypatch.setattr(rl.time, "monotonic", lambda: clock["t"])
+    monkeypatch.setattr(rl, "get_key_ring", lambda: FakeRing(["k1"]))
+    monkeypatch.setattr(
+        "core.config.get_settings",
+        lambda: SimpleNamespace(agnes_busy_retry_attempts=None),
+    )
+    calls = []
+
+    def requester(url, headers=None, **kw):
+        calls.append(1)
+        return FakeResponse(429)
+
+    resp = rl.request_with_key_rotation(
+        requester, "/chat/completions", max_retries=3, retry_base_delay=15.0,
+        busy_max_retries=3,
+    )
+
+    assert resp.status_code == 429
+    assert sleeps == [0.0, 15.0, 15.0]  # 首跳 0s，之后固定 15s，不出现 15/30/45
+    assert len(calls) == 4              # 3 次忙轨重试后次数用尽即返回

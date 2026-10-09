@@ -6,7 +6,6 @@ import json
 import logging
 import mimetypes
 import os
-import random
 import subprocess
 import time
 from typing import List, Optional
@@ -16,6 +15,13 @@ import requests
 from core.api.error_collector import collect_error, collect_error_from_exception
 from core.api.key_manager import get_key_ring
 from core.api.rate_limiter import get_rate_limiter, get_video_submit_limiter
+from core.api.retry_policy import (
+    QUEUE_FULL_CODES,
+    BusyTracker,
+    busy_delay,
+    fault_delay,
+    is_busy_signal,
+)
 from core.config import (
     get_agnes_api_root,
     get_api_key_domains,
@@ -36,8 +42,8 @@ DURATION_PRESETS = {
     20: (409, 24),   # capped at 409 (API max for 720p); actual ~17s
 }
 
-# 图片上传 429 退避间隔基数（秒）：delay = 基数 * (attempt + 1)
-_UPLOAD_RETRY_BASE_DELAY_SECONDS = 30
+_UPLOAD_RETRY_BASE_DELAY_SECONDS = 30  # 上传退避基数：忙轨取固定值，故障轨取 base×(n+1)
+_UPLOAD_RETRY_MAX_ATTEMPTS = 10        # v7.2 上传忙轨次数封顶（等效旧的 300s 预算 ÷ 30s）
 
 
 def _adaptive_poll_interval(interval: int, poll_count: int) -> int:
@@ -52,16 +58,23 @@ def _adaptive_poll_interval(interval: int, poll_count: int) -> int:
     return min(interval, 20 + (poll_count // 5) * 5)
 
 
-# ── v7.0 上游可靠性加固（docs/plans/v7.0/upstream_error_handling_plan.md）──
+# ── v7.0/v7.1 上游可靠性加固（docs/plans/v7.0/upstream_error_handling_plan.md）──
+#
+# 所有上游调用的重试已收敛到「忙轨 / 故障轨」两轨模型（core/api/retry_policy.py）：
+# - 忙轨（429 / 所有 503 / 队列类 code）：首跳 0s 贴着限流（交给令牌桶），
+#   之后固定间隔 + 次数封顶；
+# - 故障轨（非忙 5xx / 超时 / 连接错误）：base×(attempt+1) 逐级 + 次数上限。
+#
+# 队列类瞬时错误（U1）走忙轨的意义：实测 video_queue_full 可持续 12 分钟以上
+# （连续 25 次被拒），而故障轨退避（5 次 × 30s 递增）约 5.5 分钟就会放弃。
 
-# 提交侧「队列类」瞬时错误的 body code（U1）：走独立退避轨道，不消耗普通 5xx
-# 的重试配额。实测 video_queue_full 可持续 12 分钟以上（连续 25 次被拒），
-# 而普通 5xx 退避（5 次 × 30s 递增）约 5.5 分钟就会放弃。
-_QUEUE_FULL_CODES = {"video_queue_full", "fail_to_fetch_task"}
-
-# 队列满退避间隔（秒）：固定基数 + 随机抖动（模块级常量，便于测试缩小）
+# 视频提交忙轨间隔（秒）：第 1 次重试 0s（贴限流），之后为固定基数 + 随机抖动
+# （模块级常量，便于测试缩小）
 _QUEUE_RETRY_BASE_DELAY = 30.0
 _QUEUE_RETRY_JITTER = 30.0
+# 视频提交忙轨次数封顶（v7.2）：单 Key 下 15 次 × 60s(配额下限) ≈ 旧的 900s 窗口，
+# 多 Key 下每次重试更快，跑完同样次数的总耗时随 Key 数缩短。
+_QUEUE_RETRY_MAX_ATTEMPTS = 15
 
 
 def _upstream_error(body) -> tuple:
@@ -378,6 +391,8 @@ class AgnesVideoAPI:
         rotations = 0
         ring = get_key_ring()
         max_rotations = len(ring) * retries
+        # 忙轨（429 / 所有 503）：首跳贴限流 + 固定间隔 + 次数封顶（core.api.retry_policy）
+        busy: BusyTracker | None = None
         while attempt < retries:
             if self.shutdown_event and self.shutdown_event.is_set():
                 logger.info("[AgnesVideo] Image upload cancelled by shutdown")
@@ -404,20 +419,57 @@ class AgnesVideoAPI:
                     json=payload,
                     timeout=(30, 120),
                 )
-                if resp.status_code == 429:
-                    if ring.has_multiple() and rotations < max_rotations:
-                        rotations += 1
-                        ring.rotate()
-                        logger.warning(
-                            f"[KeyRotation] HTTP 429, 换 Key 立即重试 "
-                            f"(upload, rotation {rotations})"
+                if resp.status_code == 429 and ring.has_multiple() and rotations < max_rotations:
+                    rotations += 1
+                    ring.rotate()
+                    logger.warning(
+                        f"[KeyRotation] HTTP 429, 换 Key 立即重试 "
+                        f"(upload, rotation {rotations})"
+                    )
+                    continue
+
+                code, _message = _upstream_error(resp)
+
+                # ── 忙轨（429 / 所有 503）：首跳贴限流 + 固定间隔 + 次数封顶 ──
+                if is_busy_signal(resp.status_code, code):
+                    if busy is None:
+                        from core.config import get_settings
+                        busy = BusyTracker(
+                            get_settings().agnes_busy_retry_attempts
+                            or _UPLOAD_RETRY_MAX_ATTEMPTS
                         )
-                        continue
-                    delay = _UPLOAD_RETRY_BASE_DELAY_SECONDS * (attempt + 1)
-                    logger.warning(f"[AgnesVideo] Image upload 429, retry in {delay}s...")
+                    if busy.exhausted():
+                        logger.warning(
+                            f"[AgnesVideo] Image upload busy retries exhausted "
+                            f"(HTTP {resp.status_code}, {busy.retries} attempts, "
+                            f"waited {busy.waited_s:.0f}s), falling back to base64"
+                        )
+                        return None
+                    busy.retries += 1
+                    # 第 1 次重试 0s（贴着限流，交给共享令牌桶），之后固定基数
+                    delay = busy_delay(
+                        _UPLOAD_RETRY_BASE_DELAY_SECONDS, 0.0, busy.retries - 1
+                    )
+                    logger.warning(
+                        f"[AgnesVideo] Image upload busy (HTTP {resp.status_code}"
+                        f"{f' · {code}' if code else ''}), retry "
+                        f"#{busy.retries}/{busy.max_attempts} in {delay:.0f}s..."
+                    )
                     await asyncio.sleep(delay)
+                    continue
+
+                # ── 故障轨（非忙 5xx）：逐级加长 + retries 次数封顶 ──
+                if resp.status_code >= 500:
+                    if attempt < retries - 1:
+                        delay = fault_delay(_UPLOAD_RETRY_BASE_DELAY_SECONDS, attempt)
+                        logger.warning(
+                            f"[AgnesVideo] Image upload {resp.status_code} server error, "
+                            f"retry {attempt + 1}/{retries} in {delay:.0f}s..."
+                        )
+                        await asyncio.sleep(delay)
                     attempt += 1
                     continue
+
                 # 401：上报归因（不换 Key、不改退避节奏，随后的 raise_for_status
                 # 仍按原逻辑进入重试/降级路径）
                 if resp.status_code == 401:
@@ -430,10 +482,15 @@ class AgnesVideoAPI:
                     if url:
                         logger.info(f"[AgnesVideo] Image uploaded to hosted URL: {url[:80]}...")
                         return url
+                # 响应里没有可用 URL：计一次尝试，避免原地死循环
+                attempt += 1
             except Exception as e:
+                # ── 故障轨（连接/超时/4xx 等）：逐级加长（原为写死 15s）──
                 logger.warning(f"[AgnesVideo] Image upload attempt {attempt + 1}/{retries} failed: {e}")
                 if attempt < retries - 1:
-                    await asyncio.sleep(15)
+                    delay = fault_delay(_UPLOAD_RETRY_BASE_DELAY_SECONDS, attempt)
+                    await asyncio.sleep(delay)
+                attempt += 1
         return None
 
     # API frame limits by resolution tier (from Agnes API error messages)
@@ -625,11 +682,9 @@ class AgnesVideoAPI:
         rotations = 0
         ring = get_key_ring()
         max_rotations = len(ring) * self.max_retries
-        # U1：队列类 503（video_queue_full / fail_to_fetch_task）独立退避轨道
-        # —— 不计入普通 5xx 的 max_retries 配额，预算单独可配
-        queue_started = None   # 首次命中时的时间戳（time.monotonic）
-        queue_deadline = None  # queue_started + 预算秒数
-        queue_retries = 0
+        # 忙轨（429 / 所有 503 / 队列类 code）：首跳贴限流 + 固定间隔 + 次数封顶，
+        # 不计入 max_retries 配额；次数上限首次命中时惰性读取（便于测试覆盖）
+        busy: BusyTracker | None = None
         while attempt < self.max_retries:
             if self.shutdown_event and self.shutdown_event.is_set():
                 raise VideoTaskCancelled("Video generation cancelled by user")
@@ -657,97 +712,111 @@ class AgnesVideoAPI:
                     if video_id:
                         return video_id
 
-                if resp.status_code == 429:
+                if resp.status_code == 429 and ring.has_multiple() and rotations < max_rotations:
                     # 多 Key：换 Key 立即重试（不 sleep、不计入退避）
-                    if ring.has_multiple() and rotations < max_rotations:
-                        rotations += 1
-                        ring.rotate()
-                        logger.warning(
-                            f"[KeyRotation] HTTP 429 on submit, 换 Key 立即重试 "
-                            f"(rotation {rotations})"
-                        )
-                        continue
-                    delay = self.retry_base_delay * (attempt + 1)
+                    rotations += 1
+                    ring.rotate()
                     logger.warning(
-                        f"[AgnesVideo] 429 rate limit on {mode_desc}, "
-                        f"retry {attempt + 1}/{self.max_retries} in {delay:.0f}s..."
+                        f"[KeyRotation] HTTP 429 on submit, 换 Key 立即重试 "
+                        f"(rotation {rotations})"
                     )
-                    collect_error(
-                        "video", "submit_video",
-                        prompt=payload.get("prompt", ""),
-                        error_type="RateLimit429",
-                        error_message="HTTP 429: rate limited",
-                        status_code=429,
-                        response_body=resp.text,
-                        retry_count=attempt + 1,
-                        extra={"mode": mode_desc},
-                    )
-                    await asyncio.sleep(delay)
-                    attempt += 1
                     continue
 
-                if resp.status_code >= 500:
+                if resp.status_code == 429 or resp.status_code >= 500:
                     # U2：解析响应体的 code/message（此前统一丢成 "server error"）
                     code, message = _upstream_error(resp)
 
-                    # U1：队列满走独立退避轨道（不计入普通 5xx 配额）
-                    if code in _QUEUE_FULL_CODES:
-                        if queue_deadline is None:
+                    # ── 忙轨（429 / 所有 503 / 队列类 code）──────────────────
+                    # 服务器忙：首跳 0s 贴着限流（节奏交给令牌桶，单 Key ≈60s、
+                    # 多 Key 先用满各 Key 突发额度）+ 之后固定间隔 + 次数封顶。
+                    if is_busy_signal(resp.status_code, code):
+                        if busy is None:
                             from core.config import get_settings
-                            budget = get_settings().agnes_video_queue_retry_seconds
-                            queue_started = time.monotonic()
-                            queue_deadline = queue_started + budget
-                            logger.warning(
-                                f"[AgnesVideo] {mode_desc}: Agnes video queue full "
-                                f"(HTTP {resp.status_code} · {code}), entering queue "
-                                f"retry track (budget {budget}s)"
+                            attempts = (
+                                get_settings().agnes_video_busy_retry_attempts
+                                or _QUEUE_RETRY_MAX_ATTEMPTS
                             )
-                        waited = time.monotonic() - queue_started
-                        if time.monotonic() >= queue_deadline:
+                            busy = BusyTracker(attempts)
+                            logger.warning(
+                                f"[AgnesVideo] {mode_desc}: entering busy retry "
+                                f"track (HTTP {resp.status_code}"
+                                f"{f' · {code}' if code else ''}, "
+                                f"max {busy.max_attempts} attempts)"
+                            )
+                        waited = busy.waited_s
+                        if resp.status_code == 429:
+                            error_type = "RateLimit429"
+                            error_message = "HTTP 429: rate limited"
+                        elif code in QUEUE_FULL_CODES:
+                            error_type = f"QueueFull_{code}"
+                            error_message = message or f"HTTP {resp.status_code}: {code}"
+                        else:
+                            error_type = f"Busy{resp.status_code}"
+                            error_message = message or f"HTTP {resp.status_code}: server busy"
+                        if busy.exhausted():
                             collect_error(
                                 "video", "submit_video",
                                 prompt=payload.get("prompt", ""),
-                                error_type=f"QueueFull_{code}",
-                                error_message=message or f"HTTP {resp.status_code}: {code}",
+                                error_type=error_type,
+                                error_message=error_message,
                                 status_code=resp.status_code,
                                 response_body=resp.text,
-                                retry_count=queue_retries,
+                                retry_count=busy.retries,
                                 extra={
                                     "mode": mode_desc, "upstream_code": code,
                                     "waited_s": int(waited),
                                 },
                             )
-                            # 结构化异常：用户可见文案由 UI 层按 22 语言渲染，
-                            # 此处只保留技术事实（含 HTTP 码 / body code / 等待时长）
-                            raise AgnesQueueFullError(
-                                status=resp.status_code, code=code, waited_s=int(waited),
+                            if code in QUEUE_FULL_CODES:
+                                # 结构化异常：用户可见文案由 UI 层按 22 语言渲染，
+                                # 此处只保留技术事实（HTTP 码 / body code / 等待时长）
+                                raise AgnesQueueFullError(
+                                    status=resp.status_code, code=code,
+                                    waited_s=int(waited),
+                                )
+                            # 429 / 裸 503 等无队列语义的「忙」：走通用技术报错
+                            raise RuntimeError(
+                                f"[AgnesVideo] {mode_desc}: upstream busy "
+                                f"(HTTP {resp.status_code}"
+                                f"{f' · {code}' if code else ''}) after "
+                                f"{busy.retries} retries"
+                                f"{f' / {int(waited)}s' if waited else ''}; "
+                                f"no job was created"
                             )
-                        delay = _QUEUE_RETRY_BASE_DELAY + random.uniform(0, _QUEUE_RETRY_JITTER)
-                        queue_retries += 1
+                        busy.retries += 1
+                        # 第 1 次重试 0s（贴着限流），之后固定基数 + 抖动
+                        delay = busy_delay(
+                            _QUEUE_RETRY_BASE_DELAY, _QUEUE_RETRY_JITTER,
+                            busy.retries - 1,
+                        )
                         logger.warning(
-                            f"[AgnesVideo] Agnes video queue full on {mode_desc} "
-                            f"(HTTP {resp.status_code} · {code}), queue retry "
-                            f"#{queue_retries} (waited {waited:.0f}s) in {delay:.0f}s..."
+                            f"[AgnesVideo] {mode_desc}: upstream busy "
+                            f"(HTTP {resp.status_code}"
+                            f"{f' · {code}' if code else ''}), busy retry "
+                            f"#{busy.retries}/{busy.max_attempts} "
+                            f"(waited {waited:.0f}s) in {delay:.0f}s..."
                         )
                         collect_error(
                             "video", "submit_video",
                             prompt=payload.get("prompt", ""),
-                            error_type=f"QueueFull_{code}",
-                            error_message=message or f"HTTP {resp.status_code}: {code}",
+                            error_type=error_type,
+                            error_message=error_message,
                             status_code=resp.status_code,
                             response_body=resp.text,
-                            retry_count=queue_retries,
+                            retry_count=busy.retries,
                             extra={
                                 "mode": mode_desc, "upstream_code": code,
                                 "waited_s": int(waited),
                             },
                         )
-                        if progress_callback:
+                        # 仅队列类信号下发进度回调：前端据此渲染「Agnes 队列已满」
+                        # 文案，429 / 裸 503 无队列语义，不误用该 key。
+                        if progress_callback and code in QUEUE_FULL_CODES:
                             try:
                                 # (stage, payload)：payload 带原样报错（HTTP 码 + body code）
                                 # 与等待信息，供前端拼出「Agnes 队列已满 + 原始报错 + 错峰建议」
                                 progress_callback("queue_full", {
-                                    "attempt": queue_retries,
+                                    "attempt": busy.retries,
                                     "waited_s": waited,
                                     "status": resp.status_code,
                                     "code": code,
@@ -761,8 +830,9 @@ class AgnesVideoAPI:
                         await asyncio.sleep(delay)
                         continue
 
-                    # 普通 5xx：沿用 5 次退避配额
-                    delay = self.retry_base_delay * (attempt + 1)
+                    # ── 故障轨（非忙 5xx）──────────────────────────────────
+                    # 服务侧故障：间隔 base×(attempt+1) 逐级加长 + max_retries 次数封顶
+                    delay = fault_delay(self.retry_base_delay, attempt)
                     logger.warning(
                         f"[AgnesVideo] {resp.status_code} server error on {mode_desc}"
                         f"{f' (code={code})' if code else ''}, "
@@ -840,7 +910,7 @@ class AgnesVideoAPI:
                     extra={"mode": mode_desc},
                 )
                 if attempt < self.max_retries - 1:
-                    delay = self.retry_base_delay * (attempt + 1)
+                    delay = fault_delay(self.retry_base_delay, attempt)
                     logger.warning(
                         f"[AgnesVideo] {type(e).__name__} on {mode_desc}, "
                         f"retry {attempt + 1}/{self.max_retries} in {delay:.0f}s..."

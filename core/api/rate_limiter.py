@@ -33,6 +33,7 @@ import time
 from typing import Optional
 
 from core.api.key_manager import get_key_ring
+from core.api.retry_policy import BusyTracker, busy_delay, fault_delay, is_busy_signal
 
 logger = logging.getLogger(__name__)
 
@@ -273,17 +274,23 @@ def request_with_key_rotation(
     retry_base_delay: float = 20.0,
     key_ring=None,
     timeout_retry_limit: int | None = None,
+    busy_max_retries: int = 20,
     **requester_kwargs,
 ):
-    """429 换 Key 立即重试；全 Key 429 或 5xx/超时/连接错误才指数退避。
+    """429 换 Key 立即重试；忙轨 / 故障轨两轨退避（core.api.retry_policy）。
 
     规则：
     1. 每请求前 key_ring.next()（round-robin，均匀分摊），生成带当前 Key 的 headers，
        并按该 Key 绑定域名构造 URL（``get_base_url_for_key``，未绑定回退全局域名）
     2. 429 且 has_multiple() -> key_ring.rotate() 立即重试（不 sleep、不计入退避）
        —— Key 级隔离限速，换 Key 后配额是满的
-    3. 所有 Key 均 429（rotation 计数达到 len(keys) × 退避上限）-> 指数退避
-    4. 5xx / 超时 / 连接错误 -> 同 Key 指数退避（保持现状）
+    3. **忙轨**（换无可换的全 Key 429、所有 503）-> **首跳 0s 贴着限流**
+       （节奏交给本函数调用方的令牌桶）+ 之后**固定间隔**
+       （``retry_base_delay``，不逐级加长）+ **次数**封顶
+       （``AGNES_BUSY_RETRY_ATTEMPTS``，None 时用 ``busy_max_retries``）；次数用尽
+       返回响应交给调用方抛错
+    4. **故障轨**（非忙 5xx / 超时 / 连接错误）-> 间隔 ``base × (n + 1)`` 逐级加长 +
+       ``max_retries`` 次数封顶
 
     超时/连接错误单独受 ``timeout_retry_limit`` 约束（stability_hardening Phase 1）：
     - 默认 ``None``：退回按 ``max_retries`` 上限，行为与旧版完全一致（仅新增分支，回归面为零）；
@@ -298,6 +305,8 @@ def request_with_key_rotation(
         retry_base_delay: 指数退避基数（秒），delay = 基数 × (retries + 1)。
         key_ring: KeyRing 实例；None 时取全局单例。
         timeout_retry_limit: 超时/连接类错误的最大重试次数；None = 沿用 max_retries。
+        busy_max_retries: 忙轨重试次数封顶（默认 20，等效旧的 300s 预算 ÷ 15s 基数）；
+            被 ``AGNES_BUSY_RETRY_ATTEMPTS`` 显式覆盖时以配置为准。
         **requester_kwargs: 透传给 requester（json/timeout 等，不含 headers——
             headers 由本函数基于当前 Key 自动生成）。
 
@@ -316,6 +325,7 @@ def request_with_key_rotation(
     retries = 0
     timeout_retries = 0
     rotations = 0
+    busy: BusyTracker | None = None
     max_rotations = len(ring) * max_retries
     while True:
         # 每请求前轮转 Key：round-robin 均匀分摊；429 换 Key（rotate 推进计数）后
@@ -326,9 +336,10 @@ def request_with_key_rotation(
         try:
             resp = requester(url, headers=headers, **requester_kwargs)
         except (requests.ConnectionError, requests.Timeout) as e:
+            # 故障轨：超时/连接错误 → 逐级加长（受 timeout_retry_limit 约束）
             timeout_limit = timeout_retry_limit if timeout_retry_limit is not None else max_retries
             if timeout_retries < timeout_limit and retries < max_retries:
-                delay = retry_base_delay * (timeout_retries + 1)
+                delay = fault_delay(retry_base_delay, timeout_retries)
                 logger.warning(
                     f"[KeyRotation] {type(e).__name__}, 退避 {delay}s 后重试 "
                     f"(timeout retry {timeout_retries + 1}/{timeout_limit})"
@@ -338,21 +349,33 @@ def request_with_key_rotation(
                 retries += 1
                 continue
             raise
-        if resp.status_code == 429:
-            if ring.has_multiple() and rotations < max_rotations:
+        if is_busy_signal(resp.status_code):
+            # ── 忙轨：全 Key 429 / 所有 503 → 首跳贴限流 + 固定间隔 + 次数封顶 ──
+            if (resp.status_code == 429 and ring.has_multiple()
+                    and rotations < max_rotations):
                 rotations += 1
                 ring.rotate()
                 logger.warning(f"[KeyRotation] HTTP 429, 换 Key 立即重试 (rotation {rotations})")
                 continue  # 换 Key 后无配额缺口，立即重发
-            if retries < max_retries:
-                delay = retry_base_delay * (retries + 1)
-                logger.warning(f"[KeyRotation] 全 Key 429, 退避 {delay}s 后重试")
-                time.sleep(delay)
-                retries += 1
-                continue
-            return resp  # 全部耗尽，交给调用方 collect_error + raise
+            if busy is None:
+                from core.config import get_settings
+                busy = BusyTracker(
+                    get_settings().agnes_busy_retry_attempts or busy_max_retries
+                )
+            if busy.exhausted():
+                return resp  # 次数用尽，交给调用方 collect_error + raise
+            busy.retries += 1
+            # 第 1 次重试 0s（贴着限流），之后固定基数
+            delay = busy_delay(retry_base_delay, 0.0, busy.retries - 1)
+            logger.warning(
+                f"[KeyRotation] HTTP {resp.status_code} busy, 退避 {delay}s 后重试 "
+                f"(busy retry #{busy.retries}/{busy.max_attempts})"
+            )
+            time.sleep(delay)
+            continue
         if resp.status_code >= 500 and retries < max_retries:
-            delay = retry_base_delay * (retries + 1)
+            # 故障轨：非忙 5xx → 逐级加长 + max_retries 次数封顶
+            delay = fault_delay(retry_base_delay, retries)
             logger.warning(f"[KeyRotation] HTTP {resp.status_code}, 退避 {delay}s 后重试")
             time.sleep(delay)
             retries += 1

@@ -252,10 +252,14 @@ try:
         agnes_subtitle_ass: bool = True          # 2.1c 字幕 ASS 单链灰度开关
         agnes_video_poll_timeout: int = 1800     # 1.2 视频轮询总超时
         agnes_chat_timeout: int = 300            # stability_hardening P1：chat 单次读超时（默认与 chat_multimodal 对齐）
-        # v7.0 U1：队列类 503（video_queue_full）独立重试预算（秒）。
-        # 实测队列饱和可持续 12 分钟以上，普通 5xx 退避（~5.5 分钟）会在排进队
-        # 前放弃；此轨道不计入普通配额，默认 900s。
-        agnes_video_queue_retry_seconds: int = 900
+        # v7.0 U1 / v7.2：队列类 503（video_queue_full）等忙信号的独立重试轨道，
+        # **次数**封顶（原为时长预算，因人工退避与令牌桶等待是接力关系，单 Key 下
+        # 15 次 × 60s 即等价于旧的 900s 窗口；多 Key 下总耗时随 Key 数缩短）。
+        agnes_video_busy_retry_attempts: int = 15
+        # v7.1/v7.2：非视频忙轨（图片生成 15 / 图片上传 10 / Chat 20）的统一覆盖
+        # 开关，None = 各 provider 用自己的默认次数（与 agnes_rate_limit 的
+        # 「None=自动」一致）。显式设置则三处都用该值。
+        agnes_busy_retry_attempts: int | None = None
         # v7.0 U3：2.5 系列竖屏（9:16）上游躺倒缺陷的探测式校正开关。
         # 默认关闭——待真实竖屏任务验证后再定默认值（计划 §三建议路径）。
         agnes_fix_v25_portrait_rotation: bool = False
@@ -301,9 +305,10 @@ except ImportError:  # pragma: no cover - pydantic-settings 为必备依赖，�
             )
             self.agnes_video_poll_timeout = int(os.environ.get("AGNES_VIDEO_POLL_TIMEOUT", "1800"))
             self.agnes_chat_timeout = int(os.environ.get("AGNES_CHAT_TIMEOUT", "300"))
-            self.agnes_video_queue_retry_seconds = int(
-                os.environ.get("AGNES_VIDEO_QUEUE_RETRY_SECONDS", "900")
+            self.agnes_video_busy_retry_attempts = int(
+                os.environ.get("AGNES_VIDEO_BUSY_RETRY_ATTEMPTS", "15")
             )
+            self.agnes_busy_retry_attempts = _env_int("AGNES_BUSY_RETRY_ATTEMPTS")
             self.agnes_fix_v25_portrait_rotation = os.environ.get(
                 "AGNES_FIX_V25_PORTRAIT_ROTATION", "0"
             ).strip().lower() in ("1", "true", "on")

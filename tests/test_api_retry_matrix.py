@@ -78,6 +78,9 @@ def api(monkeypatch):
     # 不落盘 error_logs，避免测试污染工作目录
     monkeypatch.setattr(av, "collect_error", lambda *a, **k: None)
     monkeypatch.setattr(av, "collect_error_from_exception", lambda *a, **k: None)
+    # 忙轨退避缩到 0，避免测试真的等 30–60s（v7.1 两轨归拢后 429 也走忙轨）
+    monkeypatch.setattr(av, "_QUEUE_RETRY_BASE_DELAY", 0.0)
+    monkeypatch.setattr(av, "_QUEUE_RETRY_JITTER", 0.0)
     return av.AgnesVideoAPI(api_key="k1", max_retries=3, retry_base_delay=0.001)
 
 
@@ -182,11 +185,15 @@ async def test_cancelled_stop_passthrough(api, monkeypatch):
 
 
 async def test_submit_exhausted_raises(api, monkeypatch):
-    """一直 5xx → 重试耗尽抛 RuntimeError（不静默吞掉）。"""
+    """一直非忙 5xx（500）→ 故障轨重试耗尽抛 RuntimeError（不静默吞掉）。
+
+    注：503 自 v7.1 起归「忙轨」（固定间隔 + 时长预算），不再受 max_retries 次数
+    封顶，故此处用 500 验证故障轨的次数封顶语义。
+    """
     _install_ring(monkeypatch, ["k1"])
 
     def fake_post(url, headers=None, json=None, timeout=None):
-        return FakeResponse(503)
+        return FakeResponse(500)
 
     monkeypatch.setattr(av.requests, "post", fake_post)
 

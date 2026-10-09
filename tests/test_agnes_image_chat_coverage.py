@@ -313,7 +313,7 @@ async def test_image_429_retries_exhausted_raises(image_api, monkeypatch):
         await image_api.generate_single_image("猫", max_retries=2, retry_base_delay=0.001)
     # 第一次 429 走退避收集，最后一次走耗尽收集
     assert collected[-1]["error_type"] == "RateLimit429"
-    assert collected[-1]["error_message"] == "HTTP 429: retries exhausted"
+    assert collected[-1]["error_message"] == "HTTP 429: busy retries exhausted"
 
 
 async def test_image_multi_key_429_rotations_exhausted_then_backoff(image_api, monkeypatch):
@@ -348,12 +348,17 @@ async def test_image_5xx_backoff_then_success(image_api, monkeypatch):
 
 
 async def test_image_5xx_exhausted_raises(image_api, monkeypatch):
+    """非忙 5xx（500）走故障轨，按 ``max_retries`` 次数封顶后抛错。
+
+    v7.2：503 已归属忙轨（按 ``AGNES_BUSY_RETRY_ATTEMPTS`` 次数封顶），
+    本用例改验故障轨语义。
+    """
     _install_ring(monkeypatch, ["k1"])
     calls = []
 
     def fake_post(url, headers=None, json=None, timeout=None):
         calls.append(1)
-        return FakeResponse(503)
+        return FakeResponse(500)
 
     monkeypatch.setattr(ai.requests, "post", fake_post)
     with pytest.raises(_requests.exceptions.HTTPError):

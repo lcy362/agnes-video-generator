@@ -12,6 +12,7 @@ import requests
 from core.api.error_collector import collect_error, collect_error_from_exception
 from core.api.key_manager import get_key_ring
 from core.api.rate_limiter import get_rate_limiter
+from core.api.retry_policy import BusyTracker, busy_delay, fault_delay, is_busy_signal
 from core.config import get_base_url_for_key
 from utils.image import download_image
 from utils.image_normalizer import normalize_reference_path
@@ -20,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 # 图像生成读超时基数（秒）：timeout = 基数 * (attempt + 1)，首次 120s 逐步放宽
 _READ_TIMEOUT_BASE_SECONDS = 120
+
+# v7.2 忙轨次数封顶：等效旧的 300s 预算 ÷ 20s 间隔基数
+_BUSY_MAX_ATTEMPTS = 15
 
 
 class ImageOutput:
@@ -159,6 +163,8 @@ class AgnesImageAPI:
         rotations = 0
         ring = get_key_ring()
         max_rotations = len(ring) * max_retries
+        # 忙轨（429 / 所有 503）：首跳贴限流 + 固定间隔 + 次数封顶
+        busy: BusyTracker | None = None
         while attempt < max_retries:
             try:
                 # 全局限速：在发起 HTTP 请求前获取令牌（2.3 异步原生）
@@ -174,9 +180,12 @@ class AgnesImageAPI:
                     timeout=(30, read_timeout),
                 )
 
-                # 429 限流：多 Key 换 Key 立即重试；否则指数退避
-                if resp.status_code == 429:
-                    if ring.has_multiple() and rotations < max_rotations:
+                # ── 忙轨（429 / 所有 503）────────────────────────────────
+                # 多 Key 先换 Key 立即重试；换无可换则首跳贴限流（交给共享令牌桶）、
+                # 之后固定间隔重试（不逐级加长），由次数封顶兜底。
+                if is_busy_signal(resp.status_code):
+                    if (resp.status_code == 429 and ring.has_multiple()
+                            and rotations < max_rotations):
                         rotations += 1
                         ring.rotate()
                         logger.warning(
@@ -184,40 +193,56 @@ class AgnesImageAPI:
                             f"(image, rotation {rotations})"
                         )
                         continue
-                    if attempt < max_retries - 1:
-                        delay = retry_base_delay * (attempt + 1)
-                        logger.warning(
-                            f"[AgnesImage] 429 rate limit, "
-                            f"retry {attempt + 1}/{max_retries} in {delay:.0f}s..."
+                    if busy is None:
+                        from core.config import get_settings
+                        busy = BusyTracker(
+                            get_settings().agnes_busy_retry_attempts
+                            or _BUSY_MAX_ATTEMPTS
                         )
+                    error_type = (
+                        "RateLimit429" if resp.status_code == 429
+                        else f"Busy{resp.status_code}"
+                    )
+                    if busy.exhausted():
+                        # 次数用尽：交给调用方按原语义抛错（记录最终失败）
                         collect_error(
                             "image", "generate_single_image",
                             prompt=prompt,
-                            error_type="RateLimit429",
-                            error_message="HTTP 429: rate limited",
-                            status_code=429,
+                            error_type=error_type,
+                            error_message=(
+                                f"HTTP {resp.status_code}: busy retries exhausted"
+                            ),
+                            status_code=resp.status_code,
                             response_body=resp.text,
-                            retry_count=attempt + 1,
+                            retry_count=busy.retries,
                         )
-                        await asyncio.sleep(delay)
-                        attempt += 1
-                        continue
-                    # 退避耗尽：记录最终失败并抛出
+                        resp.raise_for_status()
+                        break
+                    busy.retries += 1
+                    # 第 1 次重试 0s（贴着限流），之后固定基数
+                    delay = busy_delay(retry_base_delay, 0.0, busy.retries - 1)
+                    logger.warning(
+                        f"[AgnesImage] {resp.status_code} busy, "
+                        f"retry #{busy.retries}/{busy.max_attempts} in {delay:.0f}s..."
+                    )
                     collect_error(
                         "image", "generate_single_image",
                         prompt=prompt,
-                        error_type="RateLimit429",
-                        error_message="HTTP 429: retries exhausted",
-                        status_code=429,
+                        error_type=error_type,
+                        error_message=(
+                            "HTTP 429: rate limited" if resp.status_code == 429
+                            else f"HTTP {resp.status_code}: server busy"
+                        ),
+                        status_code=resp.status_code,
                         response_body=resp.text,
-                        retry_count=max_retries,
+                        retry_count=busy.retries,
                     )
-                    resp.raise_for_status()
-                    break
+                    await asyncio.sleep(delay)
+                    continue
 
-                # 5xx 服务端错误：退避重试
+                # 故障轨（非忙 5xx）：退避逐级加长 + max_retries 次数封顶
                 if resp.status_code >= 500 and attempt < max_retries - 1:
-                    delay = retry_base_delay * (attempt + 1)
+                    delay = fault_delay(retry_base_delay, attempt)
                     logger.warning(
                         f"[AgnesImage] {resp.status_code} server error, "
                         f"retry {attempt + 1}/{max_retries} in {delay:.0f}s..."
@@ -247,7 +272,7 @@ class AgnesImageAPI:
                     exc=e, prompt=prompt, retry_count=attempt + 1,
                 )
                 if attempt < max_retries - 1:
-                    delay = retry_base_delay * (attempt + 1)
+                    delay = fault_delay(retry_base_delay, attempt)
                     logger.warning(
                         f"[AgnesImage] {type(e).__name__}, "
                         f"retry {attempt + 1}/{max_retries} in {delay:.0f}s..."
