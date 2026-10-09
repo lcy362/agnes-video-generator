@@ -94,6 +94,17 @@ class TestGetConfigKeys:
         monkeypatch.setattr(config_routes, "get_api_keys_with_sources", lambda: items)
         monkeypatch.setattr(config_routes, "get_api_key_domains", lambda: {key: "cn"})
         monkeypatch.setattr(config_routes, "get_api_keys_source", lambda: "mixed")
+
+        # KeyRing 为观测数据来源（401 归因登记）：测试环境无真实 Key，
+        # 必须连同 auth_failures() 一起打桩，否则命中真实空 KeyRing 抛错。
+        class _FakeRing:
+            def auth_failures(self):
+                return {key: {
+                    "count": 2, "status": 401, "domain": "cn",
+                    "message": "Invalid token", "last_at": 1700000000,
+                }}
+
+        monkeypatch.setattr(config_routes, "get_key_ring", lambda: _FakeRing())
         resp = client.get("/api/config/keys")
         assert resp.status_code == 200
         body = resp.json()
@@ -105,8 +116,14 @@ class TestGetConfigKeys:
         assert cfg["mask"] == f"{key[:6]}...{key[-4:]}"
         assert cfg["domain"] == "cn"
         assert cfg["persistable"] is True
+        # 401 归因按 Key 明文映射到稳定 id；无登记的 Key 为 None
+        assert cfg["auth_failed"] == {
+            "count": 2, "status": 401, "domain": "cn",
+            "message": "Invalid token", "last_at": 1700000000,
+        }
         env = by_id[config_routes._key_id("sk-env-99")]
         assert env["persistable"] is False
+        assert env["auth_failed"] is None
 
     def test_mask_key_short(self):
         assert config_routes._mask_key("short-key") == "***"
