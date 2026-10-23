@@ -53,7 +53,7 @@
   "vmUnadaptedHint": "This model is not adapted in the current version; generation may misbehave. Please upgrade and retry.",
   "vmPortraitRotateHint": "Upstream 2.5 series portrait (9:16) currently returns rotated frames; prefer 16:9 or Video 2.0 portrait.",
   "progress.video.queue_full": "Agnes video queue is full (HTTP {status} · {code}), retrying (attempt {n} / waited {waited} min). Please retry later, ideally off-peak.",
-  "error.video.queue_full": "Agnes video queue is full (HTTP {status} · {code}); after retrying for {waited} min the job never entered the queue, so nothing was generated (no quota used). Please retry later, ideally off-peak, or switch to another video model.",
+  "error.video.queue_full": "Agnes video queue is full (HTTP {status} · {code}); after retrying for {waited} min the job never entered the queue, so nothing was generated (no quota used). Please retry later, ideally off-peak, or switch to another video model. Per the upstream provider, 503 and \"queue is full\" issues are expected to improve significantly after 2026-10-26 12:00 (UTC+8).",
   "error.video.queue_full.window_hint": "These windows are usually smoother upstream ({tz}): {windows}. Retrying then tends to work better.",
   "footerVersion": "Version",
   "modelSync": "Refresh List",
@@ -751,5 +751,11 @@
   "presetName_anime_vivid": "Vivid Anime",
   "presetName_anime_retro": "Retro Anime",
   "presetName_cyberpunk": "Cyberpunk",
-  "presetName_epic_fantasy": "Epic Fantasy"
+  "presetName_epic_fantasy": "Epic Fantasy",
+  "noticeRealNameTitle": "Real-name verification reminder (China site)",
+  "noticeRealNameBody": "China-site users must complete real-name verification before 2026-10-26 12:00 (UTC+8) in the Agnes AI China console:",
+  "noticeRealNameFreq": "Without verification, your API call rate will be reduced.",
+  "noticeRealNameGlobal": "If your account was registered on the global site (platform.agnes-ai.com), no action is needed and this change does not affect you. Global console (to confirm which site your account belongs to):",
+  "noticeRealNameOutlook": "After 2026-10-26 12:00 (UTC+8), upstream busy errors such as 503 and \"queue is full\" are expected to improve significantly.",
+  "noticeRealNameGotIt": "Got it"
 }

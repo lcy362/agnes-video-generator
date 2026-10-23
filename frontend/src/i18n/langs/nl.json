@@ -49,7 +49,7 @@
   "vmUnadaptedHint": "Dit model wordt niet ondersteund in de huidige versie; upgrade alstublieft.",
   "vmPortraitRotateHint": "Staand (9:16) van de 2.5-serie heeft een rotatiefout; gebruik 16:9 of Video 2.0.",
   "progress.video.queue_full": "De Agnes-videowachtrij is vol (HTTP {status} · {code}), opnieuw proberen (poging {n} / gewacht {waited} min). Probeer het later opnieuw, bij voorkeur buiten de piekuren.",
-  "error.video.queue_full": "De Agnes-videowachtrij is vol (HTTP {status} · {code}); na {waited} min opnieuw proberen is de taak nooit in de wachtrij gekomen en is er niets gegenereerd (geen quota verbruikt). Probeer het later buiten de piekuren opnieuw of kies een ander videomodel.",
+  "error.video.queue_full": "De Agnes-videowachtrij is vol (HTTP {status} · {code}); na {waited} min opnieuw proberen is de taak nooit in de wachtrij gekomen en is er niets gegenereerd (geen quota verbruikt). Probeer het later buiten de piekuren opnieuw of kies een ander videomodel. Volgens de upstream-provider zullen problemen zoals 503 en \"queue is full\" na 2026-10-26 12:00 (Peking-tijd) sterk afnemen.",
   "error.video.queue_full.window_hint": "Ervaring leert dat de upstream soepeler is in deze tijdvensters ({tz}): {windows}. Probeer het dan opnieuw.",
   "footerVersion": "Versie",
   "modelSync": "Lijst vernieuwen",
@@ -758,5 +758,11 @@
   "checkpoint.probe.resolution": "Resolutie",
   "checkpoint.probe.fps": "FPS",
   "checkpoint.probe.audio": "Audio",
-  "checkpoint.probe.codec": "Codec"
+  "checkpoint.probe.codec": "Codec",
+  "noticeRealNameTitle": "Herinnering identiteitsverificatie (China-site)",
+  "noticeRealNameBody": "Gebruikers van de China-site moeten vóór 2026-10-26 12:00 (Peking-tijd) identiteitsverificatie voltooien in de Agnes AI China-console:",
+  "noticeRealNameFreq": "Zonder verificatie wordt je API-aanroepsnelheid verlaagd.",
+  "noticeRealNameGlobal": "Is je account aangemaakt op de internationale site (platform.agnes-ai.com), dan is er geen actie nodig en heeft deze wijziging geen invloed op je. Internationale console (om de site van je account te controleren):",
+  "noticeRealNameOutlook": "Na 2026-10-26 12:00 (Peking-tijd) zullen upstream-druktefouten zoals 503 en \"queue is full\" naar verwachting sterk afnemen.",
+  "noticeRealNameGotIt": "Begrepen"
 }

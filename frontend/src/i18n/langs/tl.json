@@ -44,7 +44,7 @@
   "vmUnadaptedHint": "Hindi pa sinusuportahan ang modelong ito sa kasalukuyang bersyon; mag-upgrade.",
   "vmPortraitRotateHint": "Ang portrait (9:16) ng 2.5 series ay may depekto sa pag-ikot; gamitin ang 16:9 o Video 2.0.",
   "progress.video.queue_full": "Puno na ang video queue ng Agnes (HTTP {status} · {code}), sinusubukan muli (pagsubok {n} / naghintay {waited} min). Pakisubukan muli mamaya, mas mainam sa hindi peak na oras.",
-  "error.video.queue_full": "Puno na ang video queue ng Agnes (HTTP {status} · {code}); pagkatapos ng {waited} min na pagsubok muli, hindi pumasok ang task sa queue at walang nagawa (walang nagamit na quota). Subukan muli sa hindi peak na oras o gumamit ng ibang video model.",
+  "error.video.queue_full": "Puno na ang video queue ng Agnes (HTTP {status} · {code}); pagkatapos ng {waited} min na pagsubok muli, hindi pumasok ang task sa queue at walang nagawa (walang nagamit na quota). Subukan muli sa hindi peak na oras o gumamit ng ibang video model. Ayon sa upstream provider, inaasahang bababa nang malaki ang mga isyung 503 at \"queue is full\" pagkatapos ng 2026-10-26 12:00 (Beijing time).",
   "error.video.queue_full.window_hint": "Batay sa karanasan, mas maayos ang upstream sa mga oras na ito ({tz}): {windows}. Mas mainam na subukan muli sa mga oras na iyon.",
   "footerVersion": "Bersyon",
   "modelSync": "I-refresh ang Listahan",
@@ -758,5 +758,11 @@
   "checkpoint.probe.resolution": "Resolution",
   "checkpoint.probe.fps": "FPS",
   "checkpoint.probe.audio": "Audio",
-  "checkpoint.probe.codec": "Codec"
+  "checkpoint.probe.codec": "Codec",
+  "noticeRealNameTitle": "Paalala sa identity verification (China site)",
+  "noticeRealNameBody": "Kailangang tapusin ng mga user ng China site ang identity verification bago ang 2026-10-26 12:00 (Beijing time) sa Agnes AI China console:",
+  "noticeRealNameFreq": "Kung hindi pa verified, mababawasan ang dalas ng iyong API calls.",
+  "noticeRealNameGlobal": "Kung ang account mo ay nakarehistro sa global site (platform.agnes-ai.com), wala kang kailangang gawin at hindi ka apektado ng pagbabagong ito. Global console (para tingnan kung saang site kabilang ang account mo):",
+  "noticeRealNameOutlook": "Pagkatapos ng 2026-10-26 12:00 (Beijing time), inaasahang lalo pang bababa ang mga upstream busy error tulad ng 503 at \"queue is full\".",
+  "noticeRealNameGotIt": "Nakuha ko"
 }

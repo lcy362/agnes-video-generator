@@ -44,7 +44,7 @@
   "vmUnadaptedHint": "Bu model mevcut sürümde desteklenmiyor; lütfen güncelleyin.",
   "vmPortraitRotateHint": "2.5 serisi dikey (9:16) modunda görüntü döndürme hatası var; 16:9 veya Video 2.0 kullanın.",
   "progress.video.queue_full": "Agnes video kuyruğu dolu (HTTP {status} · {code}), yeniden deneniyor (deneme {n} / beklenen {waited} dk). Lütfen daha sonra, tercihen yoğun olmayan saatlerde tekrar deneyin.",
-  "error.video.queue_full": "Agnes video kuyruğu dolu (HTTP {status} · {code}); {waited} dk yeniden denedikten sonra iş kuyruğa hiç girmedi ve hiçbir şey üretilmedi (kota harcanmadı). Yoğun olmayan saatlerde tekrar deneyin veya başka bir video modeli kullanın.",
+  "error.video.queue_full": "Agnes video kuyruğu dolu (HTTP {status} · {code}); {waited} dk yeniden denedikten sonra iş kuyruğa hiç girmedi ve hiçbir şey üretilmedi (kota harcanmadı). Yoğun olmayan saatlerde tekrar deneyin veya başka bir video modeli kullanın. Upstream sağlayıcıya göre 503 ve \"queue is full\" sorunlarının 2026-10-26 12:00 (Pekin saati) sonrasında belirgin şekilde azalması bekleniyor.",
   "error.video.queue_full.window_hint": "Deneyime göre bu zaman aralıklarında sunucu daha akıcı çalışır ({tz}): {windows}. Bu saatlerde yeniden denemeniz önerilir.",
   "footerVersion": "Sürüm",
   "modelSync": "Listeyi Yenile",
@@ -758,5 +758,11 @@
   "checkpoint.probe.resolution": "Çözünürlük",
   "checkpoint.probe.fps": "FPS",
   "checkpoint.probe.audio": "Ses",
-  "checkpoint.probe.codec": "Kodek"
+  "checkpoint.probe.codec": "Kodek",
+  "noticeRealNameTitle": "Kimlik doğrulama hatırlatması (Çin sitesi)",
+  "noticeRealNameBody": "Çin sitesi kullanıcılarının 2026-10-26 12:00 (Pekin saati) öncesinde Agnes AI Çin konsolunda kimlik doğrulamasını tamamlaması gerekir:",
+  "noticeRealNameFreq": "Doğrulama tamamlanmazsa API çağrı sıklığınız azaltılır.",
+  "noticeRealNameGlobal": "Hesabınız global sitede (platform.agnes-ai.com) kayıtlıysa hiçbir işlem yapmanız gerekmez ve bu değişiklik sizi etkilemez. Global konsol (hesabınızın hangi siteye ait olduğunu doğrulamak için):",
+  "noticeRealNameOutlook": "2026-10-26 12:00 (Pekin saati) sonrasında 503 ve \"queue is full\" gibi upstream yoğunluk hatalarının belirgin şekilde azalması bekleniyor.",
+  "noticeRealNameGotIt": "Anladım"
 }

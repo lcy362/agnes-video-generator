@@ -44,7 +44,7 @@
   "vmUnadaptedHint": "Mô hình này chưa được hỗ trợ trong phiên bản hiện tại; vui lòng nâng cấp.",
   "vmPortraitRotateHint": "Chế độ dọc (9:16) của dòng 2.5 bị lỗi xoay hình; hãy dùng 16:9 hoặc Video 2.0.",
   "progress.video.queue_full": "Hàng đợi video Agnes đã đầy (HTTP {status} · {code}), đang thử lại (lần {n} / đã chờ {waited} phút). Vui lòng thử lại sau, tốt nhất là ngoài giờ cao điểm.",
-  "error.video.queue_full": "Hàng đợi video Agnes đã đầy (HTTP {status} · {code}); sau {waited} phút thử lại, tác vụ vẫn không vào được hàng đợi và không có gì được tạo (không tốn hạn ngạch). Hãy thử lại ngoài giờ cao điểm hoặc đổi sang mô hình video khác.",
+  "error.video.queue_full": "Hàng đợi video Agnes đã đầy (HTTP {status} · {code}); sau {waited} phút thử lại, tác vụ vẫn không vào được hàng đợi và không có gì được tạo (không tốn hạn ngạch). Hãy thử lại ngoài giờ cao điểm hoặc đổi sang mô hình video khác. Theo nhà cung cấp upstream, các vấn đề 503 và \"queue is full\" dự kiến sẽ giảm đáng kể sau 2026-10-26 12:00 (giờ Bắc Kinh).",
   "error.video.queue_full.window_hint": "Theo kinh nghiệm, máy chủ thượng nguồn thường thông suốt hơn vào các khung giờ này ({tz}): {windows}. Nên thử lại vào các khung giờ đó.",
   "footerVersion": "Phiên bản",
   "modelSync": "Làm mới danh sách",
@@ -758,5 +758,11 @@
   "checkpoint.probe.resolution": "Độ phân giải",
   "checkpoint.probe.fps": "FPS",
   "checkpoint.probe.audio": "Âm thanh",
-  "checkpoint.probe.codec": "Codec"
+  "checkpoint.probe.codec": "Codec",
+  "noticeRealNameTitle": "Nhắc nhở xác thực danh tính (site Trung Quốc)",
+  "noticeRealNameBody": "Người dùng site Trung Quốc cần hoàn tất xác thực danh tính trước 2026-10-26 12:00 (giờ Bắc Kinh) tại bảng điều khiển Agnes AI Trung Quốc:",
+  "noticeRealNameFreq": "Nếu chưa xác thực, tần suất gọi API của bạn sẽ bị giảm.",
+  "noticeRealNameGlobal": "Nếu tài khoản của bạn được đăng ký trên site quốc tế (platform.agnes-ai.com), bạn không cần thao tác gì và thay đổi này không ảnh hưởng đến bạn. Bảng điều khiển quốc tế (để xác nhận tài khoản thuộc site nào):",
+  "noticeRealNameOutlook": "Sau 2026-10-26 12:00 (giờ Bắc Kinh), các lỗi quá tải upstream như 503 và \"queue is full\" dự kiến sẽ giảm đáng kể.",
+  "noticeRealNameGotIt": "Đã hiểu"
 }

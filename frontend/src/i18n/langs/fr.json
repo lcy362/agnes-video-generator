@@ -49,7 +49,7 @@
   "vmUnadaptedHint": "Ce modèle n'est pas pris en charge dans la version actuelle ; veuillez mettre à jour.",
   "vmPortraitRotateHint": "Le mode portrait (9:16) de la série 2.5 présente un défaut de rotation ; utilisez 16:9 ou Video 2.0.",
   "progress.video.queue_full": "La file d'attente vidéo Agnes est pleine (HTTP {status} · {code}), nouvelle tentative (tentative {n} / attente {waited} min). Réessayez plus tard, idéalement hors des heures de pointe.",
-  "error.video.queue_full": "La file d'attente vidéo Agnes est pleine (HTTP {status} · {code}) ; après {waited} min de tentatives, la tâche n'est jamais entrée dans la file et rien n'a été généré (aucun quota consommé). Réessayez plus tard, idéalement hors des heures de pointe, ou changez de modèle vidéo.",
+  "error.video.queue_full": "La file d'attente vidéo Agnes est pleine (HTTP {status} · {code}) ; après {waited} min de tentatives, la tâche n'est jamais entrée dans la file et rien n'a été généré (aucun quota consommé). Réessayez plus tard, idéalement hors des heures de pointe, ou changez de modèle vidéo. Selon le fournisseur en amont, les problèmes 503 et « queue is full » devraient nettement s'améliorer après le 2026-10-26 12:00 (heure de Pékin).",
   "error.video.queue_full.window_hint": "D'après l'expérience, l'amont est plus fluide sur ces créneaux ({tz}) : {windows}. Réessayez de préférence à ces heures.",
   "footerVersion": "Version",
   "modelSync": "Actualiser la liste",
@@ -758,5 +758,11 @@
   "checkpoint.probe.resolution": "Résolution",
   "checkpoint.probe.fps": "FPS",
   "checkpoint.probe.audio": "Audio",
-  "checkpoint.probe.codec": "Codec"
+  "checkpoint.probe.codec": "Codec",
+  "noticeRealNameTitle": "Rappel de vérification d'identité (site Chine)",
+  "noticeRealNameBody": "Les utilisateurs du site Chine doivent effectuer la vérification d'identité avant le 2026-10-26 12:00 (heure de Pékin) dans la console Agnes AI Chine :",
+  "noticeRealNameFreq": "Sans vérification, la fréquence de vos appels API sera réduite.",
+  "noticeRealNameGlobal": "Si votre compte a été créé sur le site international (platform.agnes-ai.com), aucune action n'est nécessaire et ce changement ne vous concerne pas. Console internationale (pour vérifier le site de votre compte) :",
+  "noticeRealNameOutlook": "Après le 2026-10-26 12:00 (heure de Pékin), les erreurs de surcharge en amont comme 503 et « queue is full » devraient nettement diminuer.",
+  "noticeRealNameGotIt": "Compris"
 }

@@ -405,8 +405,8 @@ CATALOG: Dict[str, Dict[str, str]] = {
     },
     # 队列重试预算耗尽（未产生任务、未消耗配额）：同样点名 Agnes + 原样报错 + 可行动作
     "error.video.queue_full": {
-        "zh": "Agnes 视频队列已满（HTTP {status} · {code}），重试 {waited} 分钟后仍未排进队，本次未生成任务（不消耗配额）。建议错峰重试或换用其他视频模型。",
-        "en": "Agnes video queue is full (HTTP {status} · {code}); after retrying for {waited} min the job still never entered the queue, so nothing was generated (no quota used). Please retry later, ideally off-peak, or switch to another video model.",
+        "zh": "Agnes 视频队列已满（HTTP {status} · {code}），重试 {waited} 分钟后仍未排进队，本次未生成任务（不消耗配额）。建议错峰重试或换用其他视频模型。 另据上游官方说明，预计 2026-10-26 12:00（北京时间）后，503、queue is full 等问题将有较大改善。",
+        "en": "Agnes video queue is full (HTTP {status} · {code}); after retrying for {waited} min the job still never entered the queue, so nothing was generated (no quota used). Please retry later, ideally off-peak, or switch to another video model. Per the upstream provider, 503 and \"queue is full\" issues are expected to improve significantly after 2026-10-26 12:00 (UTC+8).",
     },
     "progress.simple.completed": {
         "zh": "视频生成完成",

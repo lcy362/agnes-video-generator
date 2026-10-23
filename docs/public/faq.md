@@ -56,7 +56,7 @@ As of **v7.0**, the app handles this explicitly:
 - The progress panel names the cause and keeps the raw error visible, e.g. `Agnes 视频队列已满（HTTP 503 · video_queue_full），正在排队重试（第 3 次 / 已等 5 分钟）。建议错峰重试或稍后再试。` / `Agnes video queue is full (HTTP 503 · video_queue_full), retrying (attempt 3 / waited 5 min). Please retry later, ideally off-peak.`
 - Only when those retries are exhausted do you get a failure — and the message names Agnes, quotes the raw `HTTP 503 · video_queue_full`, and tells you to **retry later / off-peak or switch model**, instead of a generic `HTTP 503: server error`.
 
-**What you can do:** retry during off-peak hours, or add more API keys (each key has its own quota).
+**What you can do:** retry during off-peak hours, or add more API keys (each key has its own quota). Agnes has announced that these `503` / `video_queue_full` errors are expected to improve significantly after **2026-10-26 12:00 (UTC+8)**.
 
 ### Generation timed out after ~15 minutes with "inference not finished after 15 minutes"
 
