@@ -45,6 +45,7 @@ PROJECT_LANGUAGES = {
     "hi": {"label": "हिन्दी", "script": "devanagari"},
     "fa": {"label": "فارسی", "script": "arabic"},
     "bn": {"label": "বাংলা", "script": "bengali"},
+    "gu": {"label": "ગુજરાતી", "script": "gujarati"},
     "ur": {"label": "اردو", "script": "arabic"},
 }
 
@@ -77,6 +78,7 @@ VOICE_PREVIEW_TEXTS = {
     "hi": "नमस्ते, मैं {name} हूँ, यह आवाज़ का नमूना है।",
     "fa": "سلام، من {name} هستم، این یک نمونه صدا است.",
     "bn": "নমস্কার, আমি {name}, এটি একটি কণ্ঠস্বরের নমুনা।",
+    "gu": "નમસ્તે, હું {name} છું. આ અવાજનો નમૂનો છે.",
     "ur": "السلام علیکم، میں {name} ہوں، یہ آواز کا نمونہ ہے۔",
 }
 
@@ -118,6 +120,7 @@ LANG_COMPAT = {
     "fa": ["fa"],
     "bn": ["bn"],
     "ur": ["ur"],
+    "gu": ["gu"],
 }
 
 
@@ -135,7 +138,8 @@ _SCRIPT_COMPAT_VOICES = {
     "arabic": {"ar", "fa", "ur"},        # 阿拉伯字母 → 阿/波/乌音色（fa/ur 共用阿拉伯字母）
     "thai": {"th"},                     # 泰文 → 仅泰语音色
     "devanagari": {"hi"},               # 天城文 → 仅印地语音色
-    "bengali": {"bn"},                  # 孟加拉文 → 仅孟加拉语音色
+    "bengali": {"bn"},
+    "gujarati": {"gu"},                  # 孟加拉文 → 仅孟加拉语音色
 }
 
 # 阿拉伯字母及常见附加区块（含波斯语/乌尔都语共用字符、阿拉伯语标点、表现形式）。
@@ -149,6 +153,8 @@ _THAI_RE = re.compile(r"[ก-๟]")
 _DEVANAGARI_RE = re.compile(r"[ऀ-ॿ]")
 # 孟加拉文（U+0980–U+09FF）
 _BENGALI_RE = re.compile(r"[ঀ-৿]")
+# Gujarati script (U+0A80–U+0AFF)
+_GUJARATI_RE = re.compile(r"[઀-૿]")
 
 
 def detect_text_script(text: str) -> str:
@@ -169,6 +175,8 @@ def detect_text_script(text: str) -> str:
         return "ru"
     if _BENGALI_RE.search(text):
         return "bengali"
+    if _GUJARATI_RE.search(text):
+        return "gujarati"
     if _DEVANAGARI_RE.search(text):
         return "devanagari"
     if _THAI_RE.search(text):
@@ -483,7 +491,7 @@ async def load_voice_catalog(force: bool = False) -> dict:
     # 保持设计文档约定的高频语言顺序，新补齐语言排在既有语言之后
     _order = [
         "zh", "en", "ja", "ko", "ru", "es", "fr", "de", "nl", "pt", "it", "id", "ms",
-        "ar", "tr", "vi", "th", "tl", "hi", "fa", "bn", "ur",
+        "ar", "tr", "vi", "th", "tl", "hi", "fa", "bn", "ur", "gu",
     ]
     languages.sort(key=lambda g: _order.index(g["code"]) if g["code"] in _order else 99)
 
