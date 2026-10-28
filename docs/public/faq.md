@@ -58,6 +58,17 @@ As of **v7.0**, the app handles this explicitly:
 
 **What you can do:** retry during off-peak hours, or add more API keys (each key has its own quota). Agnes has announced that these `503` / `video_queue_full` errors are expected to improve significantly after **2026-10-26 12:00 (UTC+8)**.
 
+### I get `403 insufficient_user_quota` ("remaining: $0.000000") right at the start
+
+That is Agnes rejecting the submission because **the video model your app is set to needs a paid balance**, and the account behind your key has **$0**. No job was created, so nothing was generated and no quota was consumed — retrying is free.
+
+The two models behave differently:
+
+- `agnes-video-2.5-flash` — free (limited time), 720P, 4–12s. Works at a $0 balance.
+- `agnes-video-2.5` — paid (720P $0.025/s · 960P $0.04/s · 2K $0.055/s). At a $0 balance every submission is rejected with exactly this 403.
+
+**What you can do:** open the settings and switch the video model to `agnes-video-2.5-flash`, then click **Retry Task** — the task resumes at the video step and keeps your script and scene descriptions. Only top up and stay on `agnes-video-2.5` if you actually need 960P/2K output. Retrying without changing the model fails the same way every time: this rejection is deterministic, not a temporary hiccup.
+
 ### Generation timed out after ~15 minutes with "inference not finished after 15 minutes"
 
 That message comes straight from the upstream inference backend. Agnes applies a **~15-minute hard cut-off per inference** — once a job trips it, the task is marked `failed` with that exact message and **waiting longer will not produce a video**. It is not a "needs more time" situation.
