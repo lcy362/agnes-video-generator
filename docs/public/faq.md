@@ -69,6 +69,18 @@ The two models behave differently:
 
 **What you can do:** open the settings and switch the video model to `agnes-video-2.5-flash`, then click **Retry Task** — the task resumes at the video step and keeps your script and scene descriptions. Only top up and stay on `agnes-video-2.5` if you actually need 960P/2K output. Retrying without changing the model fails the same way every time: this rejection is deterministic, not a temporary hiccup.
 
+### I get `402 Payment Required` / `Insufficient Balance`
+
+That rejection comes from a **third-party text provider you configured yourself** — not from Agnes, and not from the app. If you switched the text provider to an external service (e.g. DeepSeek) under *Text model providers*, then every text call (story, scene descriptions) goes to that service; when its account has no balance, it answers `402 Payment Required` (`insufficient_balance_error`). The task stops at its first step: nothing was generated and no quota was consumed, so retrying is free.
+
+What you can do:
+
+1. Top up that provider's account, then click **Retry Task** to resume from the same step.
+2. Or switch the provider back to the built-in **Agnes (built-in)** — free, no key of your own needed — save, and retry.
+3. If you want to keep using that provider, make sure the key, the base URL and the account all belong to the same provider account and that it has balance.
+
+Without switching provider or topping up, retrying reproduces the same `402` every time.
+
 ### Generation timed out after ~15 minutes with "inference not finished after 15 minutes"
 
 That message comes straight from the upstream inference backend. Agnes applies a **~15-minute hard cut-off per inference** — once a job trips it, the task is marked `failed` with that exact message and **waiting longer will not produce a video**. It is not a "needs more time" situation.
