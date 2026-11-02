@@ -128,6 +128,23 @@ def test_translate_unknown_lang_falls_back_to_zh():
     assert "请先配置 API Key" in msg
 
 
+def test_translate_non_zh_lang_falls_back_to_en_not_zh():
+    """非中文界面缺译文时回退英文，不得把中文消息丢给阿语/西语用户（issue #110）。"""
+    assert "ar" in SUPPORTED_UI_LANGS
+    # 该 key 目录里只有 zh/en，阿语界面此前会拿到中文
+    msg = translate(
+        "progress.manuscript.scenes_all_failed", "ar", n=1, index=0, reason="401"
+    )
+    assert "稿件" not in msg
+    assert "manuscript scene descriptions failed" in msg
+
+
+def test_translate_zh_still_prefers_chinese_template():
+    """中文界面不受回退方向调整影响，仍返回中文模板。"""
+    msg = translate("progress.manuscript.scenes_all_failed", "zh", n=2, index=1, reason="x")
+    assert "稿件场景描述生成全部失败" in msg
+
+
 def test_translate_missing_key_returns_key_itself():
     """缺 key 不抛异常，返回 key 名兜底（便于日志排查）。"""
     assert translate("no.such.key", "zh") == "no.such.key"

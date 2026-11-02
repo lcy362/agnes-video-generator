@@ -7,6 +7,8 @@
    - 其余语言缺失 → 列出提醒（返回码 1；回归脚本同样视为不通过）
 2. 占位符不一致：值中 ``{xxx}`` 占位符集合与 zh 不一致 → 提醒（不阻断）
 3. 可疑未翻译：en 值与 zh 完全相同（非纯占位/短文案）→ 提醒（不阻断）
+4. 中文泄漏：非中文语言的值里残留汉字（整段照抄 zh，用户界面直接看到中文）
+   → 提醒（不阻断）。``ja`` 因正文本就含汉字（Kanji）不参与该项检测。
 
 用法:
     python scripts/i18n_check.py          # 全量检查（退出码 0/1/2）
@@ -23,6 +25,10 @@ from pathlib import Path
 BASE_LANG = 'zh'
 # 硬阻断语言：缺失直接返回 2（CI 硬失败 / 回归前置门槛）
 HARD_LANG = 'en'
+# 中文泄漏检测跳过 jap：日文正文本就含汉字（Kanji），按码位判断全是误报
+CJK_LEAK_SKIP = {'zh', 'ja'}
+#: 汉字码位区间（CJK 统一表意文字，含扩展 A 的首段）
+CJK_RE = re.compile(r'[\u3400-\u4dbf\u4e00-\u9fff]')
 
 
 def load_langs(langs_dir: Path) -> dict[str, dict[str, str]]:
@@ -36,6 +42,29 @@ def load_langs(langs_dir: Path) -> dict[str, dict[str, str]]:
 def placeholder_set(text: str) -> set[str]:
     """提取文本中的 ``{xxx}`` 占位符集合。"""
     return set(re.findall(r'\{(\w+)\}', text or ''))
+
+
+def find_cjk_leak(langs_dir: Path) -> dict[str, list[str]]:
+    """返回 ``{lang: [key]}``：该语言的值里残留汉字（整段照抄 zh）。
+
+    判定口径：值的汉字命中 ≥1 个，且该 key 的 zh 值本身就含汉字（说明是照抄），
+    同时排除 :data:`CJK_LEAK_SKIP`（zh 是源语言、ja 的汉字属正常）。纯属提醒，
+    不影响退出码——典型场景是新增文案只补了 zh/en，其余语言直接复制中文占位。
+    """
+    langs = load_langs(langs_dir)
+    base = langs.get(BASE_LANG, {})
+    leak: dict[str, list[str]] = {}
+    for lang, d in langs.items():
+        if lang in CJK_LEAK_SKIP:
+            continue
+        hits = [
+            k for k, v in d.items()
+            if isinstance(v, str) and CJK_RE.search(v)
+            and CJK_RE.search(base.get(k, '') or '')
+        ]
+        if hits:
+            leak[lang] = sorted(hits)
+    return leak
 
 
 def check(langs_dir: Path) -> tuple[dict, dict, dict]:
@@ -92,6 +121,7 @@ def main() -> int:
 
     try:
         missing, ph_mismatch, suspicious = check(langs_dir)
+        cjk_leak = find_cjk_leak(langs_dir)
     except (ValueError, json.JSONDecodeError, OSError) as e:
         print(f'[i18n_check] 解析失败: {e}', file=sys.stderr)
         return 2
@@ -104,6 +134,7 @@ def main() -> int:
             'missing': missing,
             'placeholder_mismatch': ph_mismatch,
             'suspicious_same_as_zh': suspicious,
+            'cjk_leak': cjk_leak,
         }, ensure_ascii=False, indent=2))
         return 2 if en_missing else (1 if other_missing else 0)
 
@@ -124,6 +155,13 @@ def main() -> int:
     if suspicious:
         print(f'[i18n_check] ⚠ 可疑未翻译（en 与 zh 完全相同，仅提醒）：'
               f'{suspicious[:8]}{"..." if len(suspicious) > 8 else ""}')
+    if cjk_leak:
+        total = sum(len(v) for v in cjk_leak.values())
+        union = sorted({k for v in cjk_leak.values() for k in v})
+        print(f'[i18n_check] ⚠ 中文泄漏（值仍是中文占位，{len(cjk_leak)} 种语言 / '
+              f'{len(union)} 个 key，共 {total} 处，仅提醒）：')
+        for lang, keys in sorted(cjk_leak.items()):
+            print(f'  {lang}: {len(keys)} 个 → {keys[:6]}{"..." if len(keys) > 6 else ""}')
     if not hard_fail and not other_missing:
         print('[i18n_check] ✅ 多语言完整，无缺失')
         return 0
