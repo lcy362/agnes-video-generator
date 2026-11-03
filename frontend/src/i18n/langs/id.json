@@ -49,7 +49,7 @@
   "vmUnadaptedHint": "Model ini belum didukung pada versi saat ini; pembuatan bisa salah. Silakan tingkatkan versi.",
   "vmPortraitRotateHint": "Mode potret (9:16) seri 2.5 memiliki cacat rotasi gambar; gunakan 16:9 atau Video 2.0.",
   "progress.video.queue_full": "Antrean video Agnes penuh (HTTP {status} · {code}), mencoba ulang (percobaan {n} / menunggu {waited} menit). Silakan coba lagi nanti, sebaiknya di luar jam sibuk.",
-  "error.video.queue_full": "Antrean video Agnes penuh (HTTP {status} · {code}); setelah {waited} menit mencoba ulang, tugas tetap tidak masuk antrean dan tidak ada yang dibuat (kuota tidak terpakai). Coba lagi di luar jam sibuk atau ganti model video lain.",
+  "error.video.queue_full": "Antrean video Agnes penuh (HTTP {status} · {code}); setelah {waited} menit mencoba ulang, tugas tetap tidak masuk antrean dan tidak ada yang dibuat (kuota tidak terpakai). Coba lagi di luar jam sibuk atau ganti model video lain. Menurut penyedia upstream, masalah 503 dan \"queue is full\" diperkirakan akan jauh berkurang setelah 2026-10-26 12:00 (waktu Beijing).",
   "error.video.queue_full.window_hint": "Berdasarkan pengalaman, server hulu lebih lancar pada rentang waktu ini ({tz}): {windows}. Sebaiknya coba lagi pada jam tersebut.",
   "footerVersion": "Versi",
   "modelSync": "Segarkan Daftar",
@@ -758,5 +758,11 @@
   "checkpoint.probe.resolution": "Resolusi",
   "checkpoint.probe.fps": "FPS",
   "checkpoint.probe.audio": "Audio",
-  "checkpoint.probe.codec": "Codec"
+  "checkpoint.probe.codec": "Codec",
+  "noticeRealNameTitle": "Pemberitahuan verifikasi identitas (situs China)",
+  "noticeRealNameBody": "Pengguna situs China harus menyelesaikan verifikasi identitas sebelum 2026-10-26 12:00 (waktu Beijing) di konsol Agnes AI China:",
+  "noticeRealNameFreq": "Tanpa verifikasi, frekuensi panggilan API Anda akan dikurangi.",
+  "noticeRealNameGlobal": "Jika akun Anda terdaftar di situs global (platform.agnes-ai.com), tidak perlu tindakan apa pun dan perubahan ini tidak memengaruhi Anda. Konsol global (untuk memastikan situs akun Anda):",
+  "noticeRealNameOutlook": "Setelah 2026-10-26 12:00 (waktu Beijing), error kesibukan upstream seperti 503 dan \"queue is full\" diperkirakan akan jauh berkurang.",
+  "noticeRealNameGotIt": "Mengerti"
 }

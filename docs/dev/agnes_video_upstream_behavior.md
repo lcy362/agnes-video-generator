@@ -159,6 +159,22 @@
 - 项目侧待适配（本轮按用户决策仅记档，未改代码）：`core/config.py DEFAULT_VIDEO_MODEL`、6 条流水线默认 `video_model="agnes-video-v2.0"`、AGENTS.md / `docs/public/features*.md` / `docs/public/architecture*.md` 的「v2.0 免费」表述、`docs/dev/regression_test_plan.md` 中 v2.0 相关说明。
 - **A 类修复实施注（2026-10-15）**：上条「项目侧待适配」已随 A1 落地——`DEFAULT_VIDEO_MODEL` 改为 `agnes-video-2.5-flash`，5 条流水线默认同步，`VIDEO_MODEL_CAPABILITIES` 移除 v2.0 条目，`submit_video()` 删除 width/height/num_frames 旧协议分支（恒走 2.5 提交，`_get_frame_config`/`DURATION_PRESETS` 随之删除），`task_creation_routes` 时长校验收敛为 `VIDEO_25_DURATIONS`；AGENTS.md / `docs/public/features*` / `architecture*` 表述同步。竖屏躺倒维持现状（`AGNES_FIX_V25_PORTRAIT_ROTATION` 默认关）。
 
+### 4.0.3 「403 `insufficient_user_quota`」= 选错模型档位，不是免费额度被回收（2026-10-28，#104）
+
+issue #104（7.2.1，manuscript 在 `video_gen` 三次 403 `insufficient_user_quota` remaining ＄0.000000）触发本轮复测。
+同一请求体（`mode=text` / `seconds=4` / `size=720P` / `aspect_ratio=16:9`，仅 `model` 不同）、同一把 $0 余额 Key、同一时段连发：
+
+| 探针 | 结果 |
+|------|------|
+| `agnes-video-2.5-flash` | 503 `video_queue_full`（**免费档，$0 余额不受限**，仍只受队列容量约束） |
+| `agnes-video-2.5` | 403 `insufficient_user_quota`，`remaining: ＄0.000000`（付费档，余额为 0 时提交即被拒） |
+
+结论：
+
+- **403 配额错误与「免费额度被回收」无关**，只取决于提交的是哪个模型档位：免费档 `-flash` 永不走扣费路径，付费档 `agnes-video-2.5` 在余额 0 时必 403。2026-10-15 修订注「2.5-flash 与收费无关」由此再次得到正面对照。
+- 该错误是**确定性**的：不换模型重试必然复现（本轮 #104 的三次报错即 `manuscript_video.py` 的 `_SUBMIT_RETRIES=3` 白等），排查方向只有「切到 `-flash`」或「充值」两条。
+- 应用侧影响（待办，未改码）：403 未比照 `video_queue_full` 走结构化异常 + 多语言引导，失败面板仍显示上游原始 JSON；且确定性 403 未短路流水线层的 3 次提交重试。
+
 
 ### 4.1 待实测：`video_queue_full` 是否按 Key 分池（U7，未验证）
 

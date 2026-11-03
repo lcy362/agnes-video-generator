@@ -32,8 +32,11 @@
   - `normalize_lang(raw)`：把 `en-US` / `zh_Hans_CN` / 未知值归一到 2 字母代码；
   - `parse_accept_language(header)`：按 RFC 7231 q 权重解析浏览器头；
   - `CATALOG`：`{key: {lang: template}}` 消息目录，**当前含 zh / en 两种**；
-  - `translate(key, lang, **params)`：渲染模板，三级回退（目标语言 → zh → en → key 名），
+  - `translate(key, lang, **params)`：渲染模板，三级回退（目标语言 → **非中文界面回退
+    `en`、中文界面回退 `zh`** → 另一侧 → key 名），
     **永不抛异常**（i18n 缺陷不得放大成业务 500）；
+    > 修订（2026-11-02，issue #110）：原回退为「目标语言 → zh → en」，导致阿语等
+    > 20 种未收录语言的界面**收到中文报错**。现改为非中文界面缺译文一律英文兜底。
   - `current_lang` ContextVar + `set/get/resolve_lang`：请求级语言上下文。
 - **`web/middleware.py`**（新增）：`LangContextMiddleware`
   - 每个 HTTP 请求进入时，按 `X-Agnes-UI-Lang` 头 > `Accept-Language` > `zh`
@@ -148,7 +151,8 @@ issue #64 修复批次后剩余的硬编码中文已在收尾批次全部清除�
 2. **CATALOG key 命名**：`<域>.<语义>`，如 `network.dns_failed`、`task.queued`、
    `validation.prompt_too_long`。同一语义在不同路由复用同一 key。
 3. **zh / en 缺一不可**：`tests/test_backend_i18n.py::test_catalog_zh_en_parity`
-   会在 CI 拦住只加一种语言的 PR。其余 20 语言允许暂缺（运行时回退 zh）。
+   会在 CI 拦住只加一种语言的 PR。其余 20 语言允许暂缺（运行时回退 **en**，
+   见 §2.1 的 2026-11-02 修订注）。
 4. **占位符用关键字**：`{host}` 而非 `{0}`，便于翻译时调整语序。
 5. **lang 参数来源**：
    - 同步 HTTP 路径：传 `None`，走 ContextVar（中间件已写入）；

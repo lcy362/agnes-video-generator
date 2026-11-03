@@ -405,8 +405,8 @@ CATALOG: Dict[str, Dict[str, str]] = {
     },
     # 队列重试预算耗尽（未产生任务、未消耗配额）：同样点名 Agnes + 原样报错 + 可行动作
     "error.video.queue_full": {
-        "zh": "Agnes 视频队列已满（HTTP {status} · {code}），重试 {waited} 分钟后仍未排进队，本次未生成任务（不消耗配额）。建议错峰重试或换用其他视频模型。",
-        "en": "Agnes video queue is full (HTTP {status} · {code}); after retrying for {waited} min the job still never entered the queue, so nothing was generated (no quota used). Please retry later, ideally off-peak, or switch to another video model.",
+        "zh": "Agnes 视频队列已满（HTTP {status} · {code}），重试 {waited} 分钟后仍未排进队，本次未生成任务（不消耗配额）。建议错峰重试或换用其他视频模型。 另据上游官方说明，预计 2026-10-26 12:00（北京时间）后，503、queue is full 等问题将有较大改善。",
+        "en": "Agnes video queue is full (HTTP {status} · {code}); after retrying for {waited} min the job still never entered the queue, so nothing was generated (no quota used). Please retry later, ideally off-peak, or switch to another video model. Per the upstream provider, 503 and \"queue is full\" issues are expected to improve significantly after 2026-10-26 12:00 (UTC+8).",
     },
     "progress.simple.completed": {
         "zh": "视频生成完成",
@@ -1092,11 +1092,26 @@ CATALOG: Dict[str, Dict[str, str]] = {
 }
 
 
+def _pick_template(entry: Mapping[str, str], target: str) -> Optional[str]:
+    """按目标语言挑模板，返回 ``None`` 表示该 key 连 zh/en 都没有（开发错误）。
+
+    回退方向随界面语言而变（issue #110：阿语界面收到中文报错）：
+    中文界面缺译文 → 回退 ``en``；**非中文界面缺译文 → 也回退 ``en``，绝不把中文
+    丢给阿语/西语等用户**。目录当前只有 zh/en 两种译文，其余 20 种语言的
+    自产消息一律以英文兜底（详见 ``docs/plans/v7.0/backend_i18n_plan.md``）。
+    """
+    template = entry.get(target)
+    if template is not None:
+        return template
+    first, second = ("en", "zh") if target != DEFAULT_UI_LANG else ("zh", "en")
+    return entry.get(first) or entry.get(second)
+
+
 def translate(key: str, lang: Optional[str] = None, **params: Any) -> str:
     """按语言渲染 ``CATALOG`` 里的模板。
 
-    回退策略：目标语言缺失 → ``zh`` → ``en`` → ``key`` 本身。**永不抛异常**，
-    避免翻译缺失把业务失败放大成 500。
+    回退策略：目标语言缺失 → ``en`` → ``zh`` → ``key`` 本身（见
+    :func:`_pick_template`）。**永不抛异常**，避免翻译缺失把业务失败放大成 500。
 
     Args:
         key: ``CATALOG`` 中的键，如 ``"network.dns_failed"``。
@@ -1111,7 +1126,7 @@ def translate(key: str, lang: Optional[str] = None, **params: Any) -> str:
         logger.warning("[I18n] Missing catalog key: %s", key)
         return key
     target = resolve_lang(lang)
-    template = entry.get(target) or entry.get(DEFAULT_UI_LANG) or entry.get("en")
+    template = _pick_template(entry, target)
     if template is None:
         # 目录里连 zh/en 都没有 —— 属于开发错误，返回 key 兜底
         logger.warning("[I18n] No zh/en fallback for key: %s", key)

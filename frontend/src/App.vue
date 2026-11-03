@@ -19,6 +19,7 @@ import ProgressPage from '@/components/ProgressPage.vue'
 import VoicePickerModal from '@/components/VoicePickerModal.vue'
 import Toast from '@/components/Toast.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
+import RealNameNoticeModal from '@/components/RealNameNoticeModal.vue'
 import LangSwitcher from '@/components/shared/LangSwitcher.vue'
 
 const { themeIcon, themeLabel, cycleTheme } = useTheme()
@@ -268,4 +269,7 @@ async function autoReconnectRunningTask() {
   <!-- Toast / Confirm -->
   <Toast :visible="toastVisible" :message="toastMessage" :type="toastType" />
   <ConfirmModal />
+
+  <!-- 一次性公告：中国站实名认证提醒（localStorage 记录已读，只弹一次） -->
+  <RealNameNoticeModal />
 </template>

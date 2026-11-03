@@ -49,7 +49,7 @@
   "vmUnadaptedHint": "현재 버전에서는 이 모델이 지원되지 않습니다. 업그레이드 후 다시 시도하세요.",
   "vmPortraitRotateHint": "업스트림 2.5 시리즈 세로(9:16)는 화면 회전 결함이 있습니다. 16:9 또는 Video 2.0 세로를 사용하세요.",
   "progress.video.queue_full": "Agnes 비디오 대기열이 가득 찼습니다(HTTP {status} · {code}). 재시도 중(시도 {n}회 / 대기 {waited}분). 한가한 시간대에 다시 시도해 주세요.",
-  "error.video.queue_full": "Agnes 비디오 대기열이 가득 찼습니다(HTTP {status} · {code}). {waited}분 재시도했지만 대기열에 들어가지 못해 작업이 생성되지 않았습니다(할당량 소모 없음). 한가한 시간대에 다시 시도하거나 다른 비디오 모델을 사용하세요.",
+  "error.video.queue_full": "Agnes 비디오 대기열이 가득 찼습니다(HTTP {status} · {code}). {waited}분 재시도했지만 대기열에 들어가지 못해 작업이 생성되지 않았습니다(할당량 소모 없음). 한가한 시간대에 다시 시도하거나 다른 비디오 모델을 사용하세요. 업스트림 제공자에 따르면 2026-10-26 12:00(베이징 시간) 이후 503, queue is full 등의 문제가 크게 개선될 예정입니다.",
   "error.video.queue_full.window_hint": "경험상 이 시간대는 업스트림이 비교적 원활합니다({tz}): {windows}. 이 시간대에 다시 시도하는 것을 권장합니다.",
   "footerVersion": "버전",
   "modelSync": "목록 새로고침",
@@ -758,5 +758,11 @@
   "checkpoint.probe.resolution": "해상도",
   "checkpoint.probe.fps": "프레임 레이트",
   "checkpoint.probe.audio": "오디오",
-  "checkpoint.probe.codec": "코덱"
+  "checkpoint.probe.codec": "코덱",
+  "noticeRealNameTitle": "실명 인증 안내 (중국 사이트)",
+  "noticeRealNameBody": "중국 사이트 사용자는 2026-10-26 12:00(베이징 시간)까지 Agnes AI 중국 콘솔에서 실명 인증을 완료해야 합니다:",
+  "noticeRealNameFreq": "실명 인증을 완료하지 않으면 API 호출 빈도가 낮아집니다.",
+  "noticeRealNameGlobal": "글로벌 사이트(platform.agnes-ai.com)에서 가입한 계정은 별도 조치가 필요 없으며 이번 변경의 영향을 받지 않습니다. 글로벌 콘솔(계정 소속 사이트 확인용):",
+  "noticeRealNameOutlook": "2026-10-26 12:00(베이징 시간) 이후 503, queue is full 등 업스트림 혼잡 오류가 크게 줄어들 것으로 예상됩니다.",
+  "noticeRealNameGotIt": "확인"
 }

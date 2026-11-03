@@ -56,7 +56,30 @@ As of **v7.0**, the app handles this explicitly:
 - The progress panel names the cause and keeps the raw error visible, e.g. `Agnes 视频队列已满（HTTP 503 · video_queue_full），正在排队重试（第 3 次 / 已等 5 分钟）。建议错峰重试或稍后再试。` / `Agnes video queue is full (HTTP 503 · video_queue_full), retrying (attempt 3 / waited 5 min). Please retry later, ideally off-peak.`
 - Only when those retries are exhausted do you get a failure — and the message names Agnes, quotes the raw `HTTP 503 · video_queue_full`, and tells you to **retry later / off-peak or switch model**, instead of a generic `HTTP 503: server error`.
 
-**What you can do:** retry during off-peak hours, or add more API keys (each key has its own quota).
+**What you can do:** retry during off-peak hours, or add more API keys (each key has its own quota). Agnes has announced that these `503` / `video_queue_full` errors are expected to improve significantly after **2026-10-26 12:00 (UTC+8)**.
+
+### I get `403 insufficient_user_quota` ("remaining: $0.000000") right at the start
+
+That is Agnes rejecting the submission because **the video model your app is set to needs a paid balance**, and the account behind your key has **$0**. No job was created, so nothing was generated and no quota was consumed — retrying is free.
+
+The two models behave differently:
+
+- `agnes-video-2.5-flash` — free (limited time), 720P, 4–12s. Works at a $0 balance.
+- `agnes-video-2.5` — paid (720P $0.025/s · 960P $0.04/s · 2K $0.055/s). At a $0 balance every submission is rejected with exactly this 403.
+
+**What you can do:** open the settings and switch the video model to `agnes-video-2.5-flash`, then click **Retry Task** — the task resumes at the video step and keeps your script and scene descriptions. Only top up and stay on `agnes-video-2.5` if you actually need 960P/2K output. Retrying without changing the model fails the same way every time: this rejection is deterministic, not a temporary hiccup.
+
+### I get `402 Payment Required` / `Insufficient Balance`
+
+That rejection comes from a **third-party text provider you configured yourself** — not from Agnes, and not from the app. If you switched the text provider to an external service (e.g. DeepSeek) under *Text model providers*, then every text call (story, scene descriptions) goes to that service; when its account has no balance, it answers `402 Payment Required` (`insufficient_balance_error`). The task stops at its first step: nothing was generated and no quota was consumed, so retrying is free.
+
+What you can do:
+
+1. Top up that provider's account, then click **Retry Task** to resume from the same step.
+2. Or switch the provider back to the built-in **Agnes (built-in)** — free, no key of your own needed — save, and retry.
+3. If you want to keep using that provider, make sure the key, the base URL and the account all belong to the same provider account and that it has balance.
+
+Without switching provider or topping up, retrying reproduces the same `402` every time.
 
 ### Generation timed out after ~15 minutes with "inference not finished after 15 minutes"
 

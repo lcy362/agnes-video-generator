@@ -49,7 +49,7 @@
   "vmUnadaptedHint": "Model ini belum disokong dalam versi semasa; penjanaan mungkin tidak betul. Sila naik taraf.",
   "vmPortraitRotateHint": "Mod menegak (9:16) siri 2.5 mempunyai kecacatan putaran imej; gunakan 16:9 atau Video 2.0.",
   "progress.video.queue_full": "Barisan video Agnes penuh (HTTP {status} · {code}), mencuba semula (percubaan {n} / menunggu {waited} min). Sila cuba semula kemudian, sebaiknya di luar waktu puncak.",
-  "error.video.queue_full": "Barisan video Agnes penuh (HTTP {status} · {code}); selepas {waited} min mencuba semula, tugas masih tidak masuk barisan dan tiada apa yang dijana (tiada kuota digunakan). Cuba semula di luar waktu puncak atau tukar model video lain.",
+  "error.video.queue_full": "Barisan video Agnes penuh (HTTP {status} · {code}); selepas {waited} min mencuba semula, tugas masih tidak masuk barisan dan tiada apa yang dijana (tiada kuota digunakan). Cuba semula di luar waktu puncak atau tukar model video lain. Menurut penyedia upstream, masalah 503 dan \"queue is full\" dijangka berkurangan dengan jelas selepas 2026-10-26 12:00 (waktu Beijing).",
   "error.video.queue_full.window_hint": "Berdasarkan pengalaman, pelayan huluan lebih lancar pada waktu ini ({tz}): {windows}. Cuba semula pada waktu tersebut.",
   "footerVersion": "Versi",
   "modelSync": "Segarkan Senarai",
@@ -758,5 +758,11 @@
   "checkpoint.probe.resolution": "Resolusi",
   "checkpoint.probe.fps": "FPS",
   "checkpoint.probe.audio": "Audio",
-  "checkpoint.probe.codec": "Kodek"
+  "checkpoint.probe.codec": "Kodek",
+  "noticeRealNameTitle": "Peringatan pengesahan identiti (tapak China)",
+  "noticeRealNameBody": "Pengguna tapak China perlu melengkapkan pengesahan identiti sebelum 2026-10-26 12:00 (waktu Beijing) di konsol Agnes AI China:",
+  "noticeRealNameFreq": "Tanpa pengesahan, kekerapan panggilan API anda akan dikurangkan.",
+  "noticeRealNameGlobal": "Jika akaun anda didaftarkan di tapak global (platform.agnes-ai.com), tiada tindakan diperlukan dan perubahan ini tidak menjejaskan anda. Konsol global (untuk menyemak tapak akaun anda):",
+  "noticeRealNameOutlook": "Selepas 2026-10-26 12:00 (waktu Beijing), ralat kesibukan upstream seperti 503 dan \"queue is full\" dijangka berkurangan dengan jelas.",
+  "noticeRealNameGotIt": "Faham"
 }

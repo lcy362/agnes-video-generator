@@ -49,7 +49,7 @@
   "vmUnadaptedHint": "Este modelo não está adaptado na versão atual; atualize para usar.",
   "vmPortraitRotateHint": "O modo retrato (9:16) da série 2.5 apresenta defeito de rotação; use 16:9 ou Video 2.0.",
   "progress.video.queue_full": "A fila de vídeo da Agnes está cheia (HTTP {status} · {code}), tentando novamente (tentativa {n} / espera {waited} min). Tente novamente mais tarde, de preferência fora do horário de pico.",
-  "error.video.queue_full": "A fila de vídeo da Agnes está cheia (HTTP {status} · {code}); após {waited} min de tentativas a tarefa nunca entrou na fila e nada foi gerado (nenhuma cota consumida). Tente novamente fora do horário de pico ou use outro modelo de vídeo.",
+  "error.video.queue_full": "A fila de vídeo da Agnes está cheia (HTTP {status} · {code}); após {waited} min de tentativas a tarefa nunca entrou na fila e nada foi gerado (nenhuma cota consumida). Tente novamente fora do horário de pico ou use outro modelo de vídeo. Segundo o provedor upstream, problemas como 503 e \"queue is full\" devem melhorar bastante após 2026-10-26 12:00 (horário de Pequim).",
   "error.video.queue_full.window_hint": "Pela experiência, o servidor de origem responde melhor nestas faixas ({tz}): {windows}. Vale mais tentar de novo nesses horários.",
   "footerVersion": "Versão",
   "modelSync": "Atualizar lista",
@@ -758,5 +758,11 @@
   "checkpoint.probe.resolution": "Resolução",
   "checkpoint.probe.fps": "FPS",
   "checkpoint.probe.audio": "Áudio",
-  "checkpoint.probe.codec": "Codec"
+  "checkpoint.probe.codec": "Codec",
+  "noticeRealNameTitle": "Aviso de verificação de identidade (site da China)",
+  "noticeRealNameBody": "Usuários do site da China devem concluir a verificação de identidade antes de 2026-10-26 12:00 (horário de Pequim) no console do Agnes AI China:",
+  "noticeRealNameFreq": "Sem a verificação, a frequência das suas chamadas à API será reduzida.",
+  "noticeRealNameGlobal": "Se a sua conta foi registrada no site internacional (platform.agnes-ai.com), nenhuma ação é necessária e esta mudança não afeta você. Console internacional (para confirmar a qual site sua conta pertence):",
+  "noticeRealNameOutlook": "Após 2026-10-26 12:00 (horário de Pequim), erros de sobrecarga no upstream como 503 e \"queue is full\" devem diminuir bastante.",
+  "noticeRealNameGotIt": "Entendi"
 }

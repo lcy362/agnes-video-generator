@@ -74,7 +74,7 @@
   "vmUnadaptedHint": "当前版本未适配该模型，可能无法正确提交参数。请升级到最新版本后重试。",
   "vmPortraitRotateHint": "上游 2.5 系列竖屏（9:16）存在画面旋转缺陷（容器竖、画面横），建议改用 16:9 或 Video 2.0 竖屏档。",
   "progress.video.queue_full": "Agnes 视频队列已满（HTTP {status} · {code}），正在排队重试（第 {n} 次 / 已等 {waited} 分钟）。建议错峰重试或稍后再试。",
-  "error.video.queue_full": "Agnes 视频队列已满（HTTP {status} · {code}），重试 {waited} 分钟后仍未排进队，本次未生成任务（不消耗配额）。建议错峰重试或换用其他视频模型。",
+  "error.video.queue_full": "Agnes 视频队列已满（HTTP {status} · {code}），重试 {waited} 分钟后仍未排进队，本次未生成任务（不消耗配额）。建议错峰重试或换用其他视频模型。 另据上游官方说明，预计 2026-10-26 12:00（北京时间）后，503、queue is full 等问题将有较大改善。",
   "error.video.queue_full.window_hint": "经验上这些时段上游更顺畅（{tz}）：{windows}，可优先在这些时段重试。",
   "footerVersion": "版本",
   "modelSync": "刷新列表",
@@ -751,5 +751,11 @@
   "presetName_anime_vivid": "现代动漫",
   "presetName_anime_retro": "复古动漫",
   "presetName_cyberpunk": "赛博霓虹",
-  "presetName_epic_fantasy": "史诗奇幻"
+  "presetName_epic_fantasy": "史诗奇幻",
+  "noticeRealNameTitle": "实名认证提醒（中国站）",
+  "noticeRealNameBody": "中国站用户请于 2026-10-26 12:00（北京时间）前完成实名认证，前往 Agnes AI 中国站控制台操作：",
+  "noticeRealNameFreq": "未完成实名认证：API 调用频率将降低。",
+  "noticeRealNameGlobal": "如果你是在国际版（platform.agnes-ai.com）注册的账号，无需进行任何操作，也不受本次调整影响。国际站控制台（可用来确认账号归属）：",
+  "noticeRealNameOutlook": "预计 2026-10-26 12:00（北京时间）后，503、queue is full 等上游繁忙问题将有较大改善。",
+  "noticeRealNameGotIt": "我知道了"
 }

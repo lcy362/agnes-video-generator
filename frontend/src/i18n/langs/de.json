@@ -49,7 +49,7 @@
   "vmUnadaptedHint": "Dieses Modell wird in der aktuellen Version nicht unterstützt. Bitte aktualisieren.",
   "vmPortraitRotateHint": "Hochformat (9:16) der 2.5-Serie hat einen Bilddrehungsfehler; nutzen Sie 16:9 oder Video 2.0.",
   "progress.video.queue_full": "Die Agnes-Video-Warteschlange ist voll (HTTP {status} · {code}), neuer Versuch (Versuch {n} / gewartet {waited} Min). Bitte später erneut versuchen, idealerweise außerhalb der Stoßzeiten.",
-  "error.video.queue_full": "Die Agnes-Video-Warteschlange ist voll (HTTP {status} · {code}); nach {waited} Minuten Wiederholen kam der Auftrag nie in die Warteschlange, es wurde nichts erzeugt (kein Kontingent verbraucht). Bitte später, idealerweise außerhalb der Stoßzeiten, erneut versuchen oder ein anderes Videomodell wählen.",
+  "error.video.queue_full": "Die Agnes-Video-Warteschlange ist voll (HTTP {status} · {code}); nach {waited} Minuten Wiederholen kam der Auftrag nie in die Warteschlange, es wurde nichts erzeugt (kein Kontingent verbraucht). Bitte später, idealerweise außerhalb der Stoßzeiten, erneut versuchen oder ein anderes Videomodell wählen. Laut Upstream-Anbieter sollen sich Probleme wie 503 und „queue is full“ nach dem 2026-10-26 12:00 (Pekinger Zeit) deutlich verbessern.",
   "error.video.queue_full.window_hint": "Erfahrungsgemäß ist der Upstream in diesen Zeitfenstern stabiler ({tz}): {windows}. Ein erneuter Versuch lohnt sich dann eher.",
   "footerVersion": "Version",
   "modelSync": "Liste aktualisieren",
@@ -758,5 +758,11 @@
   "checkpoint.probe.resolution": "Auflösung",
   "checkpoint.probe.fps": "FPS",
   "checkpoint.probe.audio": "Audio",
-  "checkpoint.probe.codec": "Codec"
+  "checkpoint.probe.codec": "Codec",
+  "noticeRealNameTitle": "Hinweis zur Identitätsprüfung (China-Site)",
+  "noticeRealNameBody": "Nutzer der China-Site müssen die Identitätsprüfung bis 2026-10-26 12:00 (Pekinger Zeit) in der Agnes-AI-China-Konsole abschließen:",
+  "noticeRealNameFreq": "Ohne Verifizierung wird die API-Aufrufrate reduziert.",
+  "noticeRealNameGlobal": "Wenn dein Konto auf der globalen Site (platform.agnes-ai.com) registriert wurde, ist keine Aktion nötig und diese Änderung betrifft dich nicht. Globale Konsole (um die Site deines Kontos zu prüfen):",
+  "noticeRealNameOutlook": "Nach dem 2026-10-26 12:00 (Pekinger Zeit) werden Upstream-Überlastungsfehler wie 503 und „queue is full“ deutlich seltener.",
+  "noticeRealNameGotIt": "Verstanden"
 }
