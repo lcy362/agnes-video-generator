@@ -326,3 +326,56 @@ def test_remove_api_key_single_missing(conf_file, monkeypatch):
     changed, still_active = config.remove_api_key_single("sk-nope")
     assert changed is False
     assert still_active is False
+
+
+def test_disabled_config_key_stays_listed_but_leaves_pool(conf_file, monkeypatch):
+    """关闭的 config Key 不删除，也不进入 get_api_keys 轮询池。"""
+    monkeypatch.delenv("AGNES_API_KEY", raising=False)
+    conf_file({"api_keys": [
+        {"key": "sk-a", "domain": "com"},
+        {"key": "sk-b", "domain": "cn", "enabled": False},
+    ]})
+    assert config.get_api_keys() == ["sk-a"]
+    listed = {it["key"]: it["enabled"] for it in config.get_api_keys_with_sources()}
+    assert listed == {"sk-a": True, "sk-b": False}
+
+
+def test_set_api_key_enabled_toggles_without_deleting(conf_file, monkeypatch):
+    """开关只改 enabled，Key 明文仍在。"""
+    monkeypatch.delenv("AGNES_API_KEY", raising=False)
+    conf_file({"api_keys": [{"key": "sk-a", "domain": "cn"}, {"key": "sk-b", "domain": ""}]})
+    assert config.set_api_key_enabled("sk-a", False) is True
+    assert config.get_api_keys() == ["sk-b"]
+    saved = config.load_config()["api_keys"]
+    by_key = {e["key"]: e for e in saved}
+    assert by_key["sk-a"]["enabled"] is False
+    assert by_key["sk-a"]["domain"] == "cn"
+    assert "enabled" not in by_key["sk-b"]
+    assert config.set_api_key_enabled("sk-a", True) is True
+    assert config.get_api_keys() == ["sk-a", "sk-b"]
+    assert "enabled" not in {e["key"]: e for e in config.load_config()["api_keys"]}["sk-a"]
+
+
+def test_set_api_keys_preserves_enabled_flag(conf_file, monkeypatch):
+    """重写 Key 列表时保留已关闭状态。"""
+    monkeypatch.delenv("AGNES_API_KEY", raising=False)
+    conf_file({"api_keys": [{"key": "sk-a", "domain": "cn", "enabled": False}]})
+    config.set_api_keys(["sk-a", "sk-c"])
+    saved = {e["key"]: e for e in config.load_config()["api_keys"]}
+    assert saved["sk-a"]["enabled"] is False
+    assert saved["sk-a"]["domain"] == "cn"
+    assert saved["sk-c"].get("enabled", True) is True
+    assert config.get_api_keys() == ["sk-c"]
+
+
+def test_env_key_disabled_list_excludes_pool(conf_file, monkeypatch):
+    """env Key 关开关后留在环境变量里，但不进轮询池。"""
+    monkeypatch.setenv("AGNES_API_KEY", "sk-env")
+    conf_file({"api_keys_disabled": ["sk-env"], "api_keys": [{"key": "sk-cfg", "domain": ""}]})
+    assert config.get_api_keys() == ["sk-cfg"]
+    listed = {it["key"]: it for it in config.get_api_keys_with_sources()}
+    assert listed["sk-env"]["source"] == "env"
+    assert listed["sk-env"]["enabled"] is False
+    assert config.set_api_key_enabled("sk-env", True) is True
+    assert "sk-env" in config.get_api_keys()
+    assert "api_keys_disabled" not in config.load_config()

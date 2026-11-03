@@ -32,7 +32,7 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 # ═══════════════════════════════════════════════════
 # 应用版本号（v6.1 新增：发版时同步更新，见 docs/dev/release_process.md）
 # ═══════════════════════════════════════════════════
-APP_VERSION = "7.2.2"
+APP_VERSION = "7.2.3"
 
 # 未配置 API Key 时的统一报错文案（含免费获取与在线体验兜底，全站路由共用）
 #
@@ -415,22 +415,22 @@ def _collect_env_keys() -> list:
 
 
 def get_api_keys() -> list:
-    """返回所有可用 API Key（去重、去空），合并顺序：
+    """返回进入轮询池的 API Key（去重、去空、去掉已关闭的），合并顺序：
 
     1. 环境变量 / .env：AGNES_API_KEY, AGNES_API_KEY_2 ... _N（环境变量覆盖 .env）
-    2. 配置文件：api_keys 列表（新字段，条目可为字符串或 {key, domain}）或旧 api_key 单个字段
+    2. 配置文件：api_keys 列表（新字段，条目可为字符串或 {key, domain, enabled}）或旧 api_key 单个字段
 
     两来源合并后去重（同 Key 只保留一次，env 位置优先）。因此：
     - Web UI 保存的多 Key（config）与 env Key 可并存；
     - 与 env 重复的 Key 自动去重，不产生双份调用。
+    - ``enabled: false`` 的 config Key，以及 ``api_keys_disabled`` 里的 env Key，
+      仍保留在配置中，但不进入本列表（即不进 KeyRing 轮询池）。
     """
     env_keys = _collect_env_keys()
     config = load_config()
-    cfg_keys = config.get("api_keys", []) or []
-    if not cfg_keys and config.get("api_key"):
-        cfg_keys = [config["api_key"]]
-    cfg_keys = [_extract_key(k) for k in cfg_keys if _extract_key(k)]
-    return _dedup(env_keys + cfg_keys)
+    cfg_keys = [_extract_key(k) for k in _iter_config_key_entries(config) if _extract_key(k)]
+    disabled = _disabled_keys(config)
+    return [k for k in _dedup(env_keys + cfg_keys) if k not in disabled]
 
 
 def _extract_key(entry) -> str:
@@ -438,6 +438,57 @@ def _extract_key(entry) -> str:
     if isinstance(entry, dict):
         return str(entry.get("key") or "").strip()
     return str(entry or "").strip()
+
+
+def _iter_config_key_entries(config: dict) -> list:
+    """配置里的 Key 条目（api_keys 列表，或回退旧 api_key 字段）。"""
+    entries = config.get("api_keys", []) or []
+    if isinstance(entries, dict):
+        entries = []
+    if not entries and config.get("api_key"):
+        entries = [config["api_key"]]
+    return list(entries)
+
+
+def _entry_enabled(entry) -> bool:
+    """条目是否参与轮询。缺省 / 字符串条目视为开启；仅显式 ``enabled: false`` 关闭。"""
+    return not (isinstance(entry, dict) and entry.get("enabled") is False)
+
+
+def _disabled_keys(config: dict) -> set:
+    """不进轮询池的 Key 明文集合（config 关闭项 + env 关闭名单）。"""
+    disabled = set()
+    for raw in config.get("api_keys_disabled") or []:
+        key = str(raw or "").strip()
+        if key:
+            disabled.add(key)
+    for entry in _iter_config_key_entries(config):
+        key = _extract_key(entry)
+        if key and not _entry_enabled(entry):
+            disabled.add(key)
+    return disabled
+
+
+def _key_records(config: dict) -> dict:
+    """config Key → {domain, enabled}。同 Key 只保留首次出现。"""
+    out: dict = {}
+    for entry in _iter_config_key_entries(config):
+        key = _extract_key(entry)
+        if not key or key in out:
+            continue
+        domain = ""
+        if isinstance(entry, dict):
+            domain = str(entry.get("domain") or "").strip()
+        out[key] = {"domain": domain, "enabled": _entry_enabled(entry)}
+    return out
+
+
+def _dump_key_entry(key: str, domain: str, enabled: bool = True) -> dict:
+    """落盘一条 api_keys。开启时不写 enabled，保持旧配置兼容。"""
+    item = {"key": key, "domain": domain if domain in AGNES_DOMAIN_MAP else ""}
+    if not enabled:
+        item["enabled"] = False
+    return item
 
 
 def _key_domain_from_config(config: dict, key: str) -> str:
@@ -484,13 +535,17 @@ def set_api_key_domains(mapping: dict) -> None:
         mapping: {key 明文: 域名}，domain 为空串表示清除绑定（回退全局域名）。
     """
     config = load_config()
+    records = _key_records(config)
     curr = get_api_key_domains()
     for k, d in mapping.items():
         k = _extract_key(k)
         d = str(d or "").strip()
         if k:
             curr[k] = d if d in AGNES_DOMAIN_MAP else ""
-    config["api_keys"] = [{"key": k, "domain": curr[k]} for k in curr]
+    config["api_keys"] = [
+        _dump_key_entry(k, curr[k], records.get(k, {}).get("enabled", True))
+        for k in curr
+    ]
     config.pop("api_key", None)
     save_config(config)
 
@@ -505,14 +560,62 @@ def set_api_keys(keys: list) -> None:
     否则旧配置（单桶 + 旧 KeyRing）继续生效。
     """
     config = load_config()
-    current = get_api_key_domains()
+    records = _key_records(config)
     cleaned = _dedup([_extract_key(k) for k in keys])
     if cleaned:
-        config["api_keys"] = [{"key": k, "domain": current.get(k, "")} for k in cleaned]
+        config["api_keys"] = [
+            _dump_key_entry(
+                k,
+                records.get(k, {}).get("domain", ""),
+                records.get(k, {}).get("enabled", True),
+            )
+            for k in cleaned
+        ]
         config.pop("api_key", None)
     else:
         config.pop("api_keys", None)
     save_config(config)
+
+
+def set_api_key_enabled(key: str, enabled: bool) -> bool:
+    """开关某个 Key 是否进入轮询池。关闭不删除。
+
+    config 来源改条目的 ``enabled``；env 来源写入 ``api_keys_disabled``
+    （环境变量本身无法改）。两边都有的 Key 两处一起改，避免 env 副本仍进池。
+
+    Returns:
+        是否找到并写盘。Key 既不在 config 也不在 env 时返回 False。
+    """
+    key = _extract_key(key)
+    if not key:
+        return False
+    config = load_config()
+    records = _key_records(config)
+    env_keys = set(_dedup(_collect_env_keys()))
+    if key not in records and key not in env_keys:
+        return False
+    if key in records:
+        records[key]["enabled"] = bool(enabled)
+        config["api_keys"] = [
+            _dump_key_entry(k, rec["domain"], rec["enabled"])
+            for k, rec in records.items()
+        ]
+        config.pop("api_key", None)
+    # 环境变量无法改写，关掉的 env Key 记在 api_keys_disabled。
+    # 名单只保留「当前仍在 env 里、且不是这次打开的那把」。
+    env_disabled = {
+        str(k).strip()
+        for k in (config.get("api_keys_disabled") or [])
+        if str(k).strip() in env_keys and str(k).strip() != key
+    }
+    if key in env_keys and not enabled:
+        env_disabled.add(key)
+    if env_disabled:
+        config["api_keys_disabled"] = sorted(env_disabled)
+    else:
+        config.pop("api_keys_disabled", None)
+    save_config(config)
+    return True
 
 
 def _collect_config_keys() -> list:
@@ -528,9 +631,12 @@ def get_api_keys_with_sources() -> list:
     """返回去重后的 Key 列表（env 优先），每个条目含来源标记。
 
     Returns:
-        [{"key": "sk-...", "source": "env"|"config"}, ...]
+        [{"key": "sk-...", "source": "env"|"config", "enabled": bool}, ...]
         同 Key 在 env 与 config 中重复时只保留一次，标记为 env。
+        ``enabled`` 为 False 表示该 Key 仍在列表中，但不进入轮询池。
     """
+    config = load_config()
+    disabled = _disabled_keys(config)
     env_keys = _dedup(_collect_env_keys())
     cfg_keys = _collect_config_keys()
     seen = set()
@@ -538,11 +644,11 @@ def get_api_keys_with_sources() -> list:
     for k in env_keys:
         if k and k not in seen:
             seen.add(k)
-            out.append({"key": k, "source": "env"})
+            out.append({"key": k, "source": "env", "enabled": k not in disabled})
     for k in cfg_keys:
         if k and k not in seen:
             seen.add(k)
-            out.append({"key": k, "source": "config"})
+            out.append({"key": k, "source": "config", "enabled": k not in disabled})
     return out
 
 
@@ -558,11 +664,22 @@ def remove_api_key_single(key: str) -> tuple:
     """
     config = load_config()
     changed = False
+    kept = config.get("api_keys", []) or []
     # 1. 从 api_keys 列表移除（保留其余条目的 domain 绑定）
-    raw_cfg = config.get("api_keys", []) or []
+    raw_cfg = kept
     if any(_extract_key(e) == key for e in raw_cfg):
         kept = [e for e in raw_cfg if _extract_key(e) != key]
         changed = True
+    disabled = [
+        str(k).strip() for k in (config.get("api_keys_disabled") or [])
+        if str(k).strip() and str(k).strip() != key
+    ]
+    if disabled != [str(k).strip() for k in (config.get("api_keys_disabled") or []) if str(k).strip()]:
+        changed = True
+        if disabled:
+            config["api_keys_disabled"] = disabled
+        else:
+            config.pop("api_keys_disabled", None)
     # 2. 命中旧 api_key 字段
     if config.get("api_key") == key:
         config.pop("api_key", None)
@@ -584,12 +701,11 @@ def get_api_keys_source() -> str:
         'env:N' / 'config:N' / 'mixed:envX+configY' / 'none'
         （各来源计数均为各自去重后的数量；合并去重后的总数见 get_api_keys()）
     """
-    keys = get_api_keys()
-    if not keys:
-        return "none"
-
     env_keys = _dedup(_collect_env_keys())
     cfg_keys = _collect_config_keys()
+    # 关闭轮询的 Key 仍算「已配置」，来源描述不因开关变成 none。
+    if not env_keys and not cfg_keys:
+        return "none"
 
     if env_keys and cfg_keys:
         return f"mixed:env{len(env_keys)}+config{len(cfg_keys)}"
