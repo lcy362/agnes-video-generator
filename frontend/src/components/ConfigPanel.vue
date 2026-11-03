@@ -21,8 +21,10 @@ function toggleGaOptOut() {
 const {
   apiKeyStatus,
   keyCount,
+  activeKeyCount,
   keySource,
   keyList,
+  setKeyEnabled,
   saveMultiKeys,
   loadKeyInfo,
   removeKey,
@@ -100,6 +102,15 @@ function keyDomainUrl(root?: string): string {
 // 保存某 Key 的域名（下拉 change 触发；空值清除绑定 → 回退全局域名）
 async function onKeyDomainChange(item: any, domain: string) {
   await saveKeyDomain(item.id, domain)
+}
+async function onToggleKeyPool(item: { id: string; enabled?: boolean }) {
+  await setKeyEnabled(item.id, item.enabled === false)
+}
+const introOpen = ref(false)
+async function onSaveAgnes() {
+  const domainOk = await saveDomain()
+  if (!domainOk) return
+  if (apiKeyInput.value.trim()) await onSaveApiKey()
 }
 // 401 归因提示：后端 KeyRing 只登记事实（不剔除该 Key），是否删除由用户自行决定
 function authFailedHint(item: { auth_failed?: { count: number; last_at: number } | null }): string {
@@ -407,9 +418,18 @@ initCollapse()
       </div>
       <p class="text-xs text-muted mb-4">{{ t('providerManageHint') }}</p>
 
-      <!-- 第三方供应商使用说明：免费模型支持范围 / AMD Radeon Cloud 推荐 / 图像视频暂不支持 -->
-      <div class="rounded-lg bg-paper-3/60 p-4 text-xs leading-relaxed mb-4">
-        <p class="font-medium text-ink-2 mb-2">{{ t('providerIntroTitle') }}</p>
+      <!-- 第三方供应商使用说明：默认折叠，点 Read more 展开 -->
+      <div class="rounded-lg bg-paper-3/60 px-4 py-3 text-xs leading-relaxed mb-4">
+        <div class="flex items-center justify-between gap-3">
+          <p class="font-medium text-ink-2">{{ t('providerIntroTitle') }}</p>
+          <button
+            type="button"
+            class="text-accent hover:text-ink transition whitespace-nowrap"
+            :aria-expanded="introOpen"
+            @click="introOpen = !introOpen"
+          >{{ introOpen ? t('providerReadLess') : t('providerReadMore') }}</button>
+        </div>
+        <div v-show="introOpen" class="mt-2">
         <!-- 官网教程导流：免费 Token / 供应商配置图文教程 -->
         <p class="mb-2">
           <a
@@ -457,6 +477,7 @@ initCollapse()
             >GitHub Discussion</a>
           </li>
         </ul>
+        </div>
       </div>
 
       <!-- 供应商列表：agnes（内置）+ 自定义 -->
@@ -543,33 +564,37 @@ initCollapse()
                 </div>
               </label>
             </div>
-            <div class="flex items-center gap-3 mt-3">
-              <button class="px-4 py-2 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition" @click="saveDomain">{{ t('save') }}</button>
-              <span v-if="domainSaveStatus === 'ok'" class="text-xs text-green-400">{{ t('domainSaved') }}</span>
-              <span v-if="domainSaveStatus === 'error'" class="text-xs text-red-400">{{ domainErrorMsg }}</span>
-            </div>
           </div>
 
           <!-- API Key -->
           <div>
             <p class="text-sm font-medium text-ink-2 mb-1">{{ t('apiKeyTitle') }}</p>
-            <div class="flex gap-3 items-start">
-              <textarea
-                v-model="apiKeyInput"
-                rows="2"
-                :placeholder="hasApiKey ? t('apiKeyAppendPlaceholder') : t('apiKeyPlaceholder')"
-                class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted resize-y"
-              ></textarea>
-              <button class="px-5 py-2.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition whitespace-nowrap" @click="onSaveApiKey">{{ hasApiKey ? t('addKey') : t('save') }}</button>
-              <button v-if="apiKeyStatus !== 'none'" class="px-5 py-2.5 bg-red-600/80 hover:bg-red-500 rounded-lg text-sm font-medium transition whitespace-nowrap" @click="clearApiKey">{{ t('clear') }}</button>
-            </div>
+            <textarea
+              v-model="apiKeyInput"
+              rows="2"
+              :placeholder="hasApiKey ? t('apiKeyAppendPlaceholder') : t('apiKeyPlaceholder')"
+              class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted resize-y"
+            ></textarea>
             <div v-if="keyCount > 0" class="mt-2 flex items-center gap-2 flex-wrap">
               <span class="text-xs px-2 py-0.5 rounded-full bg-green-900 text-green-300">{{ t('keyCountLabel') }}: {{ keyCount }} <span class="opacity-70">({{ keySource }})</span></span>
-              <span v-if="keyCount > 1" class="text-xs px-2 py-0.5 rounded-full bg-blue-900 text-blue-300" :title="t('multiKeyHint')">{{ t('multiKeyActive') }}</span>
+              <span v-if="activeKeyCount > 1" class="text-xs px-2 py-0.5 rounded-full bg-blue-900 text-blue-300" :title="t('multiKeyHint')">{{ t('multiKeyActive') }}</span>
+              <span v-if="activeKeyCount !== keyCount" class="text-xs text-muted">{{ t('keyPoolActive') }}: {{ activeKeyCount }}</span>
             </div>
             <!-- Key 列表 + per-key 域名映射 + 自动探测 -->
             <div v-if="keyList.length > 0" class="mt-3 space-y-1.5">
-              <div v-for="(item, idx) in keyList" :key="item.id + idx" class="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-paper-3/70 text-xs flex-wrap">
+              <div v-for="(item, idx) in keyList" :key="item.id + idx" class="flex items-center gap-2 rounded-lg px-3 py-1.5 bg-paper-3/70 text-xs flex-wrap" :class="item.enabled === false ? 'opacity-60' : ''">
+                <button
+                  type="button"
+                  role="switch"
+                  :aria-checked="item.enabled !== false"
+                  :aria-label="t('keyPoolToggle')"
+                  :title="item.enabled === false ? t('keyPoolOff') : t('keyPoolOn')"
+                  class="relative h-4 w-8 shrink-0 rounded-full transition"
+                  :class="item.enabled !== false ? 'bg-green-600' : 'bg-zinc-600'"
+                  @click="onToggleKeyPool(item)"
+                >
+                  <span class="absolute top-0.5 h-3 w-3 rounded-full bg-white transition" :class="item.enabled !== false ? 'left-4' : 'left-0.5'"></span>
+                </button>
                 <code class="flex-1 font-mono text-ink-2 truncate min-w-[8rem]">{{ item.mask }}</code>
                 <span class="px-1.5 py-0.5 rounded text-[10px] uppercase" :class="item.source === 'env' ? 'bg-amber-900/60 text-amber-300' : 'bg-paper-3 text-muted'">{{ item.source === 'env' ? t('keySrcEnv') : t('keySrcConfig') }}</span>
                 <span v-if="item.domain && keyDomainUrl(item.domain)" class="px-1.5 py-0.5 rounded text-[10px] font-mono" :class="item.domain === 'cn' ? 'bg-green-900/60 text-green-300' : 'bg-blue-900/60 text-blue-300'">{{ keyDomainUrl(item.domain) }}</span>
@@ -597,8 +622,11 @@ initCollapse()
             </div>
           </div>
 
-          <div class="flex justify-end mt-5">
-            <button class="px-4 py-2 rounded-lg text-sm text-ink-2 bg-paper-3 hover:bg-paper-2 border border-rule transition" @click="showProviderModal = false">{{ t('close') }}</button>
+          <div class="flex items-center justify-end gap-3 mt-5">
+            <span v-if="domainSaveStatus === 'ok'" class="text-xs text-green-400 mr-auto">{{ t('domainSaved') }}</span>
+            <span v-if="domainSaveStatus === 'error'" class="text-xs text-red-400 mr-auto">{{ domainErrorMsg }}</span>
+            <button v-if="apiKeyStatus !== 'none'" class="px-4 py-2 bg-red-600/80 hover:bg-red-500 rounded-lg text-sm font-medium transition" @click="clearApiKey">{{ t('clear') }}</button>
+            <button class="px-5 py-2.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg text-sm font-medium transition" @click="onSaveAgnes">{{ apiKeyInput.trim() ? (hasApiKey ? t('addKey') : t('save')) : t('save') }}</button>
           </div>
         </template>
 

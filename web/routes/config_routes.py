@@ -49,6 +49,7 @@ from core.config import (
     set_agnes_domain,
     set_api_key,
     set_api_key_domains,
+    set_api_key_enabled,
     set_api_keys,
     set_selected_models,
     set_selected_text_provider,
@@ -160,26 +161,33 @@ async def get_config_keys():
     Returns:
         {
           "ok": true,
-          "key_count": int,            # 去重后总数
+          "key_count": int,            # 去重后总数（含已关闭、不进轮询池的 Key）
+          "active_count": int,        # 进入轮询池的数量
           "source": "env:N|config:N|mixed:...|none",
           "keys": [{"id": "sha256[:12]", "mask": "sk-xxx...xxxx", "source": "env"|"config",
                     "domain": "com"|"cn"|"cn_bak"|"", "persistable": bool,
+                    "enabled": bool,   # false = 保留但不进轮询池
                     "auth_failed": {"count": int, "status": int, "domain": str,
                                     "message": str, "last_at": int} | None}, ...],
         }
     """
     items = get_api_keys_with_sources()
     domains = get_api_key_domains()
-    # 401 归因登记（KeyRing 内的观测数据，不参与选 Key）；按稳定 id 映射到掩码项
+    # 401 归因登记（KeyRing 内的观测数据，不参与选 Key）；按稳定 id 映射到掩码项。
+    # 全部 Key 都关闭时轮询池为空，KeyRing 无法初始化，登记表按空处理。
     auth_by_id: dict = {}
-    if items:
-        auth_by_id = {
-            _key_id(k): v for k, v in get_key_ring().auth_failures().items()
-        }
+    if items and any(it.get("enabled", True) for it in items):
+        try:
+            auth_by_id = {
+                _key_id(k): v for k, v in get_key_ring().auth_failures().items()
+            }
+        except RuntimeError:
+            auth_by_id = {}
     keys = []
     for it in items:
         key_id = _key_id(it["key"])
         failure = auth_by_id.get(key_id)
+        enabled = bool(it.get("enabled", True))
         keys.append({
             "id": key_id,
             "mask": _mask_key(it["key"]),
@@ -187,6 +195,7 @@ async def get_config_keys():
             # 每个 Key 绑定的域名；config 来源可持久化，env 来源无法落盘（回退全局域名）
             "domain": domains.get(it["key"], ""),
             "persistable": it["source"] == "config",
+            "enabled": enabled,
             "auth_failed": None if not failure else {
                 "count": failure["count"],
                 "status": failure["status"],
@@ -198,8 +207,48 @@ async def get_config_keys():
     return {
         "ok": True,
         "key_count": len(items),
+        "active_count": sum(1 for k in keys if k["enabled"]),
         "source": get_api_keys_source(),
         "keys": keys,
+    }
+
+
+@router.post(
+    "/api/config/keys/enabled",
+    responses={404: {"description": "id 未匹配到任何 Key"}},
+)
+async def save_config_key_enabled(
+    key_id: str = Form("", alias="id"),
+    enabled: str = Form("true"),
+):
+    """开关单个 Key 是否进入轮询池。关闭不删除 Key。
+
+    Args:
+        key_id: GET /api/config/keys 返回的稳定 id。
+        enabled: ``true`` / ``false``（也接受 1 / 0）。
+
+    Raises:
+        404: id 未匹配到任何 Key。
+    """
+    key_id = (key_id or "").strip()
+    on = str(enabled).strip().lower() in ("1", "true", "yes", "on")
+    items = get_api_keys_with_sources()
+    matched = [it for it in items if _key_id(it["key"]) == key_id]
+    if not matched:
+        raise HTTPException(status_code=404, detail=translate(_MSG_KEY_NOT_FOUND))
+    entry = matched[0]
+    if not set_api_key_enabled(entry["key"], on):
+        raise HTTPException(status_code=404, detail=translate(_MSG_KEY_NOT_FOUND))
+    reset_key_ring()
+    reset_rate_limiter()
+    active = get_api_keys()
+    return {
+        "ok": True,
+        "mask": _mask_key(entry["key"]),
+        "enabled": on,
+        "key_count": len(items),
+        "active_count": len(active),
+        "source": get_api_keys_source(),
     }
 
 

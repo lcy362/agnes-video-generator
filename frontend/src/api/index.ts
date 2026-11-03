@@ -68,6 +68,15 @@ export function saveDomain(domain: string) {
   return apiFetch('/api/config/domain', { method: 'POST', body: form })
 }
 // per-key 域名绑定（v2.3）：为单个 config Key 保存其绑定的域名后缀
+export async function setConfigKeyEnabled(id: string, enabled: boolean) {
+  const form = new FormData()
+  form.append('id', id)
+  form.append('enabled', enabled ? 'true' : 'false')
+  const r = await apiFetch('/api/config/keys/enabled', { method: 'POST', body: form })
+  const d = await r.json().catch(() => ({}))
+  if (!r.ok) return { ok: false, detail: d.detail || '' }
+  return d
+}
 export function saveConfigKeyDomain(id: string, domain: string) {
   const form = new FormData()
   form.append('id', id)

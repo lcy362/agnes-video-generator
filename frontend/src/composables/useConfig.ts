@@ -18,7 +18,8 @@ const keySource = ref('')
 // domain: 该 Key 绑定的域名后缀（''=未绑定，回退全局域名）；persistable: 是否可持久化（仅 config 来源）
 // auth_failed: 401 归因登记（后端 KeyRing 只记录事实，是否删除该 Key 由用户在前端决定）
 type KeyAuthFailure = { count: number; status: number; domain: string; message: string; last_at: number }
-const keyList = ref<{ id: string; mask: string; source: string; domain: string; persistable: boolean; auth_failed?: KeyAuthFailure | null }[]>([])
+const keyList = ref<{ id: string; mask: string; source: string; domain: string; persistable: boolean; enabled?: boolean; auth_failed?: KeyAuthFailure | null }[]>([])
+const activeKeyCount = ref(0)
 
 function isApiKeyConfigured() {
   return apiKeyStatus.value !== 'none'
@@ -37,6 +38,7 @@ async function loadKeyInfo() {
   try {
     const d = await api.getConfigKeys()
     keyCount.value = d.key_count || 0
+    activeKeyCount.value = d.active_count ?? d.key_count ?? 0
     keySource.value = d.source || ''
     keyList.value = d.keys || []
     // 同步 Key 状态：source 以 'env' 开头（env:1 / mixed:...）→ env；有 Key → configured
@@ -51,6 +53,18 @@ async function loadKeyInfo() {
 }
 
 // 保存单个 Key 绑定的域名（config 来源可持久化；env 来源前端不会调用）
+async function setKeyEnabled(id: string, enabled: boolean) {
+  const r = await api.setConfigKeyEnabled(id, enabled)
+  if (r.ok) {
+    trackEvent('config_action', { action: enabled ? 'enable_api_key' : 'disable_api_key' })
+    showToast(enabled ? t('keyPoolOn') : t('keyPoolOff'), 2500)
+    await loadKeyInfo()
+    return true
+  }
+  showToast(r.detail || t('keyPoolSaveFailed'), 4500)
+  return false
+}
+
 async function saveKeyDomain(id: string, domain: string) {
   const r = await api.saveConfigKeyDomain(id, domain)
   if (r.ok) {
@@ -381,14 +395,17 @@ async function saveDomain() {
       trackEvent('config_action', { action: 'save_domain', domain })
       domainSaveStatus.value = 'ok'
       setTimeout(() => (domainSaveStatus.value = 'idle'), 2000)
+      return true
     } else {
       const d = await r.json().catch(() => ({}))
       domainErrorMsg.value = d.detail || t('domainSaveFailed')
       domainSaveStatus.value = 'error'
+      return false
     }
   } catch (e) {
     domainErrorMsg.value = t('networkError')
     domainSaveStatus.value = 'error'
+    return false
   }
 }
 
@@ -468,8 +485,10 @@ export function useConfig() {
   return {
     apiKeyStatus,
     keyCount,
+    activeKeyCount,
     keySource,
     keyList,
+    setKeyEnabled,
     isApiKeyConfigured,
     saveApiKey,
     saveMultiKeys,

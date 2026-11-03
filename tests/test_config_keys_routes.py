@@ -384,3 +384,37 @@ class TestDetectConfigKeyDomains:
 
         monkeypatch.setattr(requests, "get", boom)
         assert config_routes._probe_domain("sk-test", "com") is False
+
+
+class TestSaveConfigKeyEnabled:
+    """POST /api/config/keys/enabled：关闭不删除，只移出轮询池。"""
+
+    def test_disable_key(self, client, monkeypatch):
+        secret = "sk-pool-1234567890"
+        monkeypatch.setattr(
+            config_routes, "get_api_keys_with_sources",
+            lambda: [{"key": secret, "source": "config", "enabled": True}],
+        )
+        saved = {}
+        monkeypatch.setattr(
+            config_routes, "set_api_key_enabled",
+            lambda key, on: saved.update(key=key, on=on) or True,
+        )
+        monkeypatch.setattr(config_routes, "reset_key_ring", lambda: saved.update(ring=True))
+        monkeypatch.setattr(config_routes, "reset_rate_limiter", lambda: saved.update(limiter=True))
+        monkeypatch.setattr(config_routes, "get_api_keys", lambda: [])
+        monkeypatch.setattr(config_routes, "get_api_keys_source", lambda: "config:1")
+        kid = config_routes._key_id(secret)
+        resp = client.post("/api/config/keys/enabled", data={"id": kid, "enabled": "false"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True and body["enabled"] is False
+        assert body["active_count"] == 0
+        assert saved["key"] == secret and saved["on"] is False
+        assert saved["ring"] is True and saved["limiter"] is True
+        assert secret not in resp.text
+
+    def test_unknown_id(self, client, monkeypatch):
+        monkeypatch.setattr(config_routes, "get_api_keys_with_sources", lambda: [])
+        resp = client.post("/api/config/keys/enabled", data={"id": "missing", "enabled": "true"})
+        assert resp.status_code == 404
