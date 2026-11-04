@@ -419,6 +419,35 @@ async def test_poll_404_forever_falls_back_to_poll_timeout(api, monkeypatch):
         await api._poll_task("vid", interval=0.01, max_poll_duration=0.05)
 
 
+async def test_poll_401_reports_auth_failure_and_keeps_same_key(api, monkeypatch):
+    """轮询 401：归因上报（供配置页提示 Key/域名不匹配），且不换 Key、仍然失败。
+
+    v7.3：轮询复用提交该任务的 Key；401 说明「这把 Key 打这个站点」不对，
+    不是「Key 失效」——归因登记后仍按原路径失败，由用户决定是否改绑定。
+    """
+    ring = FakeRing(["k1", "k2"])
+    monkeypatch.setattr(av, "get_key_ring", lambda: ring)
+    monkeypatch.setattr(av, "get_api_key_domains", lambda: {"k1": "cn"})
+    monkeypatch.setattr(av, "get_api_root_for_key", lambda k: "https://api.example.com")
+    calls = []
+
+    def fake_get(url, headers=None, timeout=None):
+        calls.append(headers["Authorization"])
+        return FakeResponse(401, json_data={"message": "Invalid token"})
+
+    monkeypatch.setattr(av.requests, "get", fake_get)
+
+    with pytest.raises(RuntimeError, match="consecutive"):
+        await api._poll_task(
+            "vid", interval=0.01, max_consecutive_failures=2, max_poll_duration=600,
+        )
+
+    assert calls == ["Bearer k1", "Bearer k1"]   # 同一把 Key，不轮转
+    assert ring.rotations == []
+    assert ring.auth_failures_log[0]["key"] == "k1"
+    assert ring.auth_failures_log[0]["domain"] == "cn"
+
+
 # ── U3：竖屏躺倒探测签名（默认关闭） ────────────────────────────────
 
 

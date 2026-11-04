@@ -236,10 +236,40 @@ curl -sS -X POST https://apihub.agnes-ai.com/v1/videos \
 4. **回归判定**：分辨率校验必须读产物容器（现行正确），且**当前任何按宽高比做的校验都发现不了"容器对、内容躺倒"**这一缺陷。
 5. **轮询节奏**：`progress` 字段不可信，自适应间隔（`_adaptive_poll_interval`）只能按次数/时间推进，不要依赖进度值做判断。
 6. **404 可见性窗口会劣化**（2026-09-28 实测）：提交成功（200 + `video_id`）后，任务记录在 `/agnesapi` 可见前的 404 窗口平时 ~20s，上游高峰期可劣化到 **10min+ 甚至全程不可见**（三个观测样本 420s / 1100s+ 未出现）。因此轮询侧 404（`task not found`，带 request id 后缀的网关错误）按「任务未就绪」中间态处理（U9，v7.0.4）：不计入连续失败配额、不进 `error_logs`，仅周期性 info 日志，最终由 `max_poll_duration`（`AGNES_VIDEO_POLL_TIMEOUT`）整体兜底；超时异常不属于「服务端确认失败」，续传保留 `video_id`。
+7. **Key 与域名必须严格配对，同一任务提交/轮询必须同一把 Key**（v7.3）：见 §8。
 
 ---
 
-## 7. 复测方法
+## 8. Key 与域名严格配对 + 任务级 Key 绑定（v7.3）
+
+### 8.1 一次真实故障（任务 `4de1bcd26fda`，2026-10-09 提交）
+
+| 事实 | 证据 |
+|---|---|
+| 该任务在国内站（`cn`）提交成功并生成完成 | `GET https://api.agnes-ai.cn/agnesapi?video_id=task_XDdznBlK0Qqhq9oXOg1rGKaRsxNEFQkK` → 200，`status=completed`、`progress=100`、有 mp4 URL |
+| 本地轮询每次都 401 | `error_logs/*_video_poll_task.json`：URL 全是 `https://apihub.agnes-ai.com/agnesapi`，body `Invalid token` |
+| 连续 10 次 401 后判失败 | `task_state.json`：`Polling failed after 10 consecutive errors` |
+| 池内唯一 Key 绑 `cn`，全局域名仍是 `com` | `config.json`：`api_keys[0].domain="cn"`、`agnes_domain="com"` |
+
+用同一把 cn Key 分别打两个根域名：`apihub.agnes-ai.com` → 401 `Invalid token`；`api.agnes-ai.cn` → 200（任务早已完成）。
+
+**根因**：提交用 `get_base_url_for_key(key)`（按 Key 的域名），轮询用全局 `get_agnes_api_root()`（按 `agnes_domain`）。单 Key 场景下轮转逻辑等于空转，但轮询压根没把 Key 交给 URL 构造，于是 100% 确定性打错站点。`Invalid token` 文案会把人误导成「Key 失效」。
+
+### 8.2 修复后的约束
+
+1. **带 Key 的请求，域名只能由这个 Key 决定**：`get_api_root_for_key(key)` / `get_base_url_for_key(key)`（`core/config.py`）。`get_agnes_api_root()` 仅用于「尚未选定 Key」的全局操作。
+2. **视频任务在提交时记录所用 Key**（`AgnesVideoAPI._remember_task_key` → `key_for_task(video_id)`），`wait_for_video` / `_poll_task` 全程复用该 Key。
+3. **轮询不再换 Key**：429 也保持同一把（换 Key 可能打错站点，或看不到别人账号下的任务 → 404），只按自适应间隔退避重探。
+4. **轮询 401 也做归因登记**（`[KeyAuth]`，只记录不换池），配置页可见「Key 与域名不匹配」。
+5. **进程重启后**内存绑定丢失（旧任务 / 外部传入 `video_id`）：退化为「本次轮询固定一把 Key」并打 WARNING，无法自动推断提交 Key。
+
+### 8.3 排查提示
+
+出现 `401 Invalid token` 且 `error_logs` 里 URL 的域名与该 Key 绑定域名不一致时，改 Key 的域名绑定（配置页 Key 行）或改全局域名，不要先怀疑 Key 失效；两者必须指向同一站点。
+
+---
+
+## 9. 复测方法
 
 无需启动本项目服务，直接复放上游调用即可（与官网 demo 同链路）：
 
