@@ -222,3 +222,49 @@ More projects by the same author:
 - **[Flint](https://github.com/lcy362/flint)** — Local-first AI skills manager: centralize, tag, deduplicate and deploy your Skills into any agent or project directory. If it helps you, a star is very welcome! ⭐
 
 **Keywords**: free AI video generator, AI video generation tool, text to video AI, free AI video maker, AI video creator, open source video generator, Agnes AI, text-to-video, image-to-video, keyframes video, AI narration, auto subtitles, multi-scene video, zero cost AI video, no subscription AI video tool, digital anchor, self-hosted AI video generator, open source alternative to Runway
+
+---
+
+## 🛠️ Gujarati AI News Anchor — Development Progress
+
+> Progress log for the Gujarati female news-anchor workflow. This section records only verified repository/deployment findings; a successful website build does **not** mean that audio or a talking-anchor video has been tested successfully.
+
+### Latest verified status — 25 October 2026
+
+- **Deployment:** Vercel deployment is `READY`; build logs report `Build Completed` and `Deployment completed`.
+- **Gujarati text-to-speech:** The repository declares `edge-tts` in `requirements.txt`. Actual Gujarati audio generation and playback have **not yet been verified**.
+- **Anchor lip-sync:** A successful end-to-end lip-sync test has **not yet been verified**.
+- **Video export/download:** A complete generated anchor video and its download have **not yet been verified**.
+
+### Next work
+
+1. Trace the existing voice-generation path and confirm it selects a Gujarati female voice for Gujarati scripts.
+2. Run a real Gujarati text-to-speech test and verify that audio is produced and playable.
+3. Connect the generated audio to the existing anchor-video workflow and test lip-sync.
+4. Verify the finished video and download path; record actual test results here.
+
+**Important:** This log is a progress record, not a claim that the unfinished tests have passed. It will be updated when a concrete code change or test result is confirmed.
+
+
+### Investigation update — 25 October 2026, 17:32 IST
+
+- **Code path inspected:** `core/pipelines/anchor_video.py` and `core/audio/tts.py`.
+- **Confirmed behavior:** the anchor pipeline generates Edge-TTS narration only when `audio_source=post_stitch`; `audio_source=model` intentionally skips the project's TTS step. A Gujarati script switches from the default Chinese voice to `gu-IN-DhwaniNeural`, while an explicitly chosen voice is preserved.
+- **Not yet verified:** the deployed service has not been run with a real Gujarati script/audio request, so voice availability, playable audio, lip-sync, and final video download remain unproven.
+- **Next engineering step:** verify the actual voice catalog and request/config path, then run a real Gujarati TTS smoke test before changing the lip-sync pipeline. No mock audio or demo result will be used.
+
+- **Code fix committed:** `core/audio/tts.py` now rejects an empty Edge-TTS audio stream before replacing the output file, and logs the saved audio byte count. This prevents a zero-byte MP3 from being mistaken for successful speech generation. Commit: `19c3535234d575dd7069b35c7ce9a8eef0ad05c2`.
+- **Test status:** source change committed; automated tests and a live Gujarati audio request have not been run in this environment. Do not treat this as proof that Gujarati speech generation works end-to-end.
+
+
+- **Gujarati TTS cache fix committed:** voice selection now happens before the cached-audio check. Gujarati scripts using the default voice select `gu-IN-DhwaniNeural` and use a voice-specific output filename, preventing an existing default-voice narration from being reused accidentally. Commit: `fdee3b5456b4f5d3033e41fb4ec508a40d93f9c4`.
+- **Verification status:** source re-read after commit and the expected change is present. No live Gujarati TTS request or end-to-end video test has run yet; deployment and real audio playback remain unverified.
+
+
+## Gujarati anchor lip-sync — current engineering status (2026-10-25)
+
+- Confirmed: `post_stitch` currently generates a short five-second image-to-video anchor clip, then loops it and overlays a separate TTS narration. This synchronizes the audio track with the video duration, but it does **not** synchronize mouth shapes to Gujarati phonemes.
+- Confirmed: repository code search did not find an existing Wav2Lip/lip-sync implementation or dedicated lip-sync provider integration.
+- The Gujarati TTS voice/cache fix is present on `feature/gujarati-news-anchor-lipsync`.
+- No new lip-sync implementation has been committed yet. A genuine solution needs a supported lip-sync model/service or an available model endpoint; simply changing FFmpeg timing cannot create accurate mouth movement. Do not mark a render as lip-synced unless that stage actually ran successfully.
+- Verification still required: generate a real Gujarati narration, run the selected lip-sync stage, inspect the output video/audio streams and playback, and then verify the deployed build. Vercel's deployment being READY only confirms deployment readiness, not that a real AI render works.

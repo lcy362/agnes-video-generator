@@ -293,7 +293,22 @@ class AnchorPipeline(MultiScenePipeline):
             logger.warning("[Anchor] audio: empty text, skipping")
             return None
 
-        audio_path = os.path.join(self.working_dir, "full_narration.mp3")
+        audio_config = self._state.audio_config
+        # Gujarati anchor scripts must not inherit the global Chinese TTS default.
+        # Preserve any explicit non-default voice selected by the user.
+        is_gujarati = any("\u0A80" <= ch <= "\u0AFF" for ch in full_text)
+        if is_gujarati and audio_config.voice == "zh-CN-XiaoxiaoNeural":
+            audio_config = audio_config.model_copy(update={"voice": "gu-IN-DhwaniNeural"})
+            logger.info("[Anchor] Gujarati script detected; using Gujarati female TTS voice")
+
+        # Use a voice-specific cache so an old narration generated with the default
+        # Chinese voice cannot be reused for a Gujarati script.
+        audio_filename = (
+            "full_narration_gu-IN-DhwaniNeural.mp3"
+            if is_gujarati and audio_config.voice == "gu-IN-DhwaniNeural"
+            else "full_narration.mp3"
+        )
+        audio_path = os.path.join(self.working_dir, audio_filename)
         # v5.x 产物规范前置：导出读稿纯文本（供外部 Agent/工具处理）
         self._save_narration_txt(full_text, audio_path)
 
@@ -302,11 +317,10 @@ class AnchorPipeline(MultiScenePipeline):
             logger.info("[Anchor] audio: file already exists, skipping")
             # 续传：音频已存在则仅重采 cues，避免字幕退回 legacy 启发式
             return await self._recover_sub_maker(
-                full_text, self._state.audio_config, self._state.subtitle_config,
+                full_text, audio_config, self._state.subtitle_config,
                 audio_path,
             )
 
-        audio_config = self._state.audio_config
         await self._emit("audio", "running", self._t("progress.anchor.audio_running", n=len(full_text)), _PROGRESS_AUDIO_START)
 
         sub_maker = await self._generate_audio_with_fallback(
