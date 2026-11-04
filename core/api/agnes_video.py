@@ -23,8 +23,8 @@ from core.api.retry_policy import (
     is_busy_signal,
 )
 from core.config import (
-    get_agnes_api_root,
     get_api_key_domains,
+    get_api_root_for_key,
     get_base_url_for_key,
     is_v25_video_model,
     width_height_to_aspect_ratio,
@@ -318,6 +318,31 @@ class AgnesVideoAPI:
         }
         # 向后兼容：旧调用方可能读取 self.headers
         self.headers = dict(self._base_headers)
+        # 任务 → 提交时使用的 Key（v7.3）：同一任务的提交与轮询必须用同一把 Key。
+        # 每个 Key 绑定自己的域名（com/cn），混用会打错站点 → 401 Invalid token；
+        # 多 Key 池下换 Key 还可能看不到别人账号下的任务（404）。
+        self._task_keys: dict = {}
+
+    # ── 任务与 Key 绑定（v7.3）──────────────────────────────────────
+
+    def _remember_task_key(self, video_id: str, key: str) -> None:
+        """记录提交该任务所用的 Key（供 ``wait_for_video`` 复用）。"""
+        if len(self._task_keys) >= 256:
+            # 长驻进程兜底：只保留最近的绑定，避免无界增长
+            self._task_keys.pop(next(iter(self._task_keys)), None)
+        self._task_keys[video_id] = key
+
+    def key_for_task(self, video_id: str) -> Optional[str]:
+        """返回提交该任务所用的 Key；未知（进程重启/旧任务/外部传入）返回 None。"""
+        return self._task_keys.get(video_id)
+
+    def api_root_for_task(self, video_id: str) -> Optional[str]:
+        """返回该任务所在站点的 API Root（按提交 Key 的域名绑定）；未知返回 None。
+
+        供调试产物（curl.sh 等）输出与真实请求一致的地址。
+        """
+        key = self.key_for_task(video_id)
+        return get_api_root_for_key(key) if key else None
 
     def _auth_headers(self, key: str | None = None) -> dict:
         """每次请求前生成带当前 Key 的 headers 副本。
@@ -488,7 +513,8 @@ class AgnesVideoAPI:
     async def _poll_task(self, video_id: str, interval: int = 60,
                           max_poll_duration: int = 1800,
                           max_consecutive_failures: int = 10,
-                          progress_callback=None) -> dict:
+                          progress_callback=None,
+                          key: str | None = None) -> dict:
         last_status = ""
         poll_count = 0
         consecutive_failures = 0
@@ -499,12 +525,35 @@ class AgnesVideoAPI:
         # 最终兜底是循环顶部的 max_poll_duration 整体超时。
         not_found_count = 0
         start_time = asyncio.get_event_loop().time()
+        ring = get_key_ring()
+        # v7.3 任务与 Key 绑定：轮询复用提交该任务的 Key，且整个轮询周期只用这一把。
+        # 原因：①Key 绑定自己的域名（com/cn），混用会打错站点 → 401 Invalid token；
+        # ②上游任务归属该 Key 的账号，换 Key 可能查不到（404 task not found）。
+        # 进程重启后内存绑定丢失（旧任务/外部传入 video_id）时，退化为「本次轮询
+        # 固定一把 Key」，不再逐次轮转——轮转只会让同一任务在多把 Key 之间跳动。
+        pinned_key = key or self._task_keys.get(video_id)
+        pool_keys = getattr(ring, "keys", None)
+        if pinned_key is not None and pool_keys is not None and pinned_key not in pool_keys:
+            # 提交 Key 已被删除/关闭：继续用只会 401，改用当前池内 Key 并提示
+            logger.warning(
+                f"[AgnesVideo] Video {video_id[:16]}... 的提交 Key 已不在 Key 池内"
+                f"（被删除/关闭），改用当前 Key 轮询"
+            )
+            pinned_key = None
+        poll_key = pinned_key or ring.next()
+        if pinned_key is None and ring.has_multiple():
+            logger.warning(
+                f"[AgnesVideo] Video {video_id[:16]}... 无提交 Key 记录"
+                f"（进程重启或旧任务），本次轮询固定复用同一 Key；"
+                f"若持续 401/404 请在配置页核对该 Key 的域名绑定"
+            )
         # 2.5 系列查询需带 model_name（text 模式可省略，但带上更通用）
         model_param = f"&model_name={self.model}" if is_v25_video_model(self.model) else ""
-        curl_cmd = (
-            f'curl -s -H "Authorization: Bearer $AGNES_API_KEY" '
-            f'"{get_agnes_api_root()}/agnesapi?video_id={video_id}{model_param}"'
+        # URL 与 Key 严格配对：域名取自该 Key 的绑定配置（未绑定才回退全局域名）
+        poll_url = (
+            f"{get_api_root_for_key(poll_key)}/agnesapi?video_id={video_id}{model_param}"
         )
+        curl_cmd = f'curl -s -H "Authorization: Bearer $AGNES_API_KEY" "{poll_url}"'
         while True:
             # M2: 每次轮询前检查停止信号
             if self.shutdown_event and self.shutdown_event.is_set():
@@ -530,24 +579,26 @@ class AgnesVideoAPI:
                     logger.info(f"[AgnesVideo] Polling video {video_id[:16]}... (poll #{poll_count + 1}, elapsed {elapsed:.0f}s)")
                 # 全局限速：每次轮询都消耗一个令牌（2.3 异步原生，停止可打断）
                 await get_rate_limiter().acquire_async(self.shutdown_event)
-                # M2: 用 wait_for 包裹以支持取消；429 换 Key 立即重试（轮询也轮转 Key 分摊配额）
-                poll_attempts = 0
-                while True:
-                    resp = await asyncio.wait_for(
-                        asyncio.to_thread(
-                            requests.get,
-                            f"{get_agnes_api_root()}/agnesapi?video_id={video_id}{model_param}",
-                            headers=self._auth_headers(),
-                            timeout=15,
-                        ),
-                        timeout=30,
+                # M2: 用 wait_for 包裹以支持取消
+                resp = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        requests.get,
+                        poll_url,
+                        headers=self._auth_headers(poll_key),
+                        timeout=15,
+                    ),
+                    timeout=30,
+                )
+                if resp.status_code == 429:
+                    # 任务与 Key 绑定：不换 Key（换 Key 可能打错站点或看不到任务），
+                    # 交给连续失败计数 + 自适应间隔退避后用同一把 Key 继续探
+                    logger.warning(
+                        f"[AgnesVideo] Poll 429 for {video_id[:16]}..., "
+                        f"保持同一 Key 重试（任务与 Key 绑定）"
                     )
-                    if resp.status_code == 429 and get_key_ring().has_multiple() and poll_attempts < 5:
-                        get_key_ring().rotate()
-                        poll_attempts += 1
-                        logger.warning("[KeyRotation] HTTP 429 on poll, 换 Key 立即重试")
-                        continue
-                    break
+                # 401：只做归因登记（不换 Key、不改池），失败路径仍由 raise_for_status 保持原样
+                if resp.status_code == 401:
+                    _register_auth_failure(ring, poll_key, resp)
                 # U9：404（task not found）= 记录尚未在网关任务库可见，中间态
                 if resp.status_code == 404:
                     not_found_count += 1
@@ -663,6 +714,8 @@ class AgnesVideoAPI:
                     result = resp.json()
                     video_id = result.get("video_id") or result.get("task_id") or result.get("id")
                     if video_id:
+                        # 记住提交 Key：此后轮询必须复用该 Key（见 _poll_task）
+                        self._remember_task_key(video_id, key)
                         return video_id
 
                 if resp.status_code == 429 and ring.has_multiple() and rotations < max_rotations:
@@ -1011,7 +1064,18 @@ class AgnesVideoAPI:
         logger.info(f"[AgnesVideo] Video submitted: {video_id[:20]}...")
         return video_id
 
-    async def wait_for_video(self, video_id: str, progress_callback=None) -> VideoOutput:
+    async def wait_for_video(self, video_id: str, progress_callback=None,
+                             key: str | None = None) -> VideoOutput:
+        """轮询视频直至完成。
+
+        Args:
+            video_id: 上游任务 id。
+            progress_callback: 进度回调。
+            key: 显式指定轮询使用的 Key（默认复用提交该任务的 Key）。
+                同一任务的提交与轮询必须使用同一把 Key——每个 Key 绑定自己的
+                域名（com/cn），混用会打错站点（401 Invalid token）；多 Key 池
+                下换 Key 还可能看不到别人账号下的任务（404）。
+        """
         # 1.2：轮询总超时可经 AGNES_VIDEO_POLL_TIMEOUT 配置（3.5 RuntimeSettings 收敛）
         from core.config import get_settings
         settings = get_settings()
@@ -1019,6 +1083,7 @@ class AgnesVideoAPI:
         final = await self._poll_task(
             video_id, progress_callback=progress_callback,
             max_poll_duration=poll_timeout,
+            key=key or self._task_keys.get(video_id),
         )
 
         video_url = (

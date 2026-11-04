@@ -971,12 +971,27 @@ class BasePipeline(ABC):
         )
         return None
 
-    @staticmethod
-    def _make_curl(video_id: str) -> str:
-        """生成用于查询视频状态的 curl 命令（供调试/续传）。"""
+    def _make_curl(self, video_id: str) -> str:
+        """生成用于查询视频状态的 curl 命令（供调试/续传）。
+
+        域名取自该任务提交时使用的 Key（与真实轮询一致）：Key 绑定域名与全局
+        域名可以不同，硬编码或取全局域名会给出打错站点的调试命令。
+        拿不到 Key 记录（旧任务/进程重启）时才回退全局域名。
+        """
+        root = ""
+        for attr in ("video_api", "video_generator"):
+            api = getattr(self, attr, None)
+            getter = getattr(api, "api_root_for_task", None)
+            if callable(getter):
+                root = getter(video_id) or ""
+                if root:
+                    break
+        if not root:
+            from core.config import get_agnes_api_root
+            root = get_agnes_api_root()
         return (
             f'curl -s -H "Authorization: Bearer $AGNES_API_KEY" '
-            f'"https://apihub.agnes-ai.com/agnesapi?video_id={video_id}"'
+            f'"{root}/agnesapi?video_id={video_id}"'
         )
 
     def _save_task_json(self, sub_dir: str, data: dict) -> None:

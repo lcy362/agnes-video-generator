@@ -50,6 +50,7 @@ class FakeRing:
         self._keys = list(keys)
         self._i = -1
         self._force = None
+        self.rotations = []           # 记录 rotate 调用（断言轮询不换 Key）
 
     def next(self):
         if self._force is not None:
@@ -61,6 +62,7 @@ class FakeRing:
     def rotate(self):
         self._i = (self._i + 1) % len(self._keys)
         self._force = self._i
+        self.rotations.append(self._keys[self._i])
         return self._keys[self._i]
 
     def has_multiple(self):
@@ -68,6 +70,10 @@ class FakeRing:
 
     def __len__(self):
         return len(self._keys)
+
+    def mark_auth_failed(self, key, *, status=401, domain="", message=""):
+        """401 归因登记桩（只记录，不参与选 Key）。"""
+        return {"key": key, "status": status, "domain": domain, "message": message}
 
 
 @pytest.fixture
@@ -204,9 +210,13 @@ async def test_submit_exhausted_raises(api, monkeypatch):
 # ── _poll_task ──────────────────────────────────────────────────────
 
 
-async def test_poll_429_multi_key_rotates(api, monkeypatch):
-    """轮询 429（多 Key）→ 换 Key 立即重试 → completed。"""
-    _install_ring(monkeypatch, ["k1", "k2"])
+async def test_poll_429_keeps_same_key(api, monkeypatch):
+    """轮询 429（多 Key）→ **不换 Key**，退避后用同一把 Key 续探 → completed。
+
+    依据（v7.3）：一个任务归属提交它的 Key，换 Key 可能打错站点（域名不同）
+    或看不到任务（404），因此轮询周期内只允许一把 Key。
+    """
+    ring = _install_ring(monkeypatch, ["k1", "k2"])
     calls = []
 
     def fake_get(url, headers=None, timeout=None):
@@ -219,7 +229,58 @@ async def test_poll_429_multi_key_rotates(api, monkeypatch):
 
     result = await api._poll_task("vid", interval=0.01, max_consecutive_failures=3, max_poll_duration=600)
     assert result["status"] == "completed"
-    assert calls == ["Bearer k1", "Bearer k2"]
+    assert calls == ["Bearer k1", "Bearer k1"]   # 始终同一把 Key
+    assert ring.rotations == []                  # 未触发 Key 轮转
+
+
+async def test_poll_uses_pinned_key_and_its_domain(api, monkeypatch):
+    """轮询 URL 的域名取自「该任务的 Key」，不是全局 agnes_domain。
+
+    回归 Issue：单 Key 绑定 cn、全局域名仍是 com 时，轮询打到国际站 →
+    401 Invalid token，视频其实早已在国内站生成完成。
+    """
+    _install_ring(monkeypatch, ["k1", "k2"])
+    monkeypatch.setattr(av, "get_api_root_for_key", lambda k: f"https://{k}.example.com")
+    api._remember_task_key("vid-1", "k2")
+    seen = []
+
+    def fake_get(url, headers=None, timeout=None):
+        seen.append((url, headers["Authorization"]))
+        return FakeResponse(200, {"status": "completed"})
+
+    monkeypatch.setattr(av.requests, "get", fake_get)
+
+    await api._poll_task("vid-1", interval=0.01)
+    assert len(seen) == 1
+    url, auth = seen[0]
+    assert auth == "Bearer k2"                       # 提交 Key
+    assert url.startswith("https://k2.example.com/agnesapi")  # 该 Key 的域名
+
+
+async def test_wait_for_video_reuses_submit_key(api, monkeypatch):
+    """提交用哪把 Key，轮询就用哪把（即使 KeyRing 下一次会轮到别的 Key）。"""
+    _install_ring(monkeypatch, ["k1", "k2"])
+    monkeypatch.setattr(av, "get_api_root_for_key", lambda k: f"https://{k}.example.com")
+    polled = []
+
+    monkeypatch.setattr(
+        av.requests, "post", lambda *a, **k: FakeResponse(200, {"video_id": "vid-x"})
+    )
+
+    def fake_get(url, headers=None, timeout=None):
+        polled.append((url, headers["Authorization"]))
+        return FakeResponse(200, {"status": "completed", "url": "https://cdn/v.mp4"})
+
+    monkeypatch.setattr(av.requests, "get", fake_get)
+
+    vid = await api._submit_with_retry({"prompt": "x"}, "t2v")
+    assert vid == "vid-x"
+    out = await api.wait_for_video(vid)
+    assert out.data == "https://cdn/v.mp4"
+    assert len(polled) == 1
+    url, auth = polled[0]
+    assert auth == "Bearer k1"                                # 与提交同一把 Key
+    assert url.startswith("https://k1.example.com/agnesapi")  # 且用该 Key 的域名
 
 
 async def test_poll_consecutive_failures_gives_up(api, monkeypatch):

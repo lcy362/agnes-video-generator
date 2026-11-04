@@ -32,7 +32,7 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 # ═══════════════════════════════════════════════════
 # 应用版本号（v6.1 新增：发版时同步更新，见 docs/dev/release_process.md）
 # ═══════════════════════════════════════════════════
-APP_VERSION = "7.2.3"
+APP_VERSION = "7.2.4"
 
 # 未配置 API Key 时的统一报错文案（含免费获取与在线体验兜底，全站路由共用）
 #
@@ -1413,23 +1413,37 @@ def get_agnes_base_url() -> str:
     return f"{root}/v1"
 
 
-def get_base_url_for_key(key: str) -> str:
-    """返回某 Key 应使用的 API Base URL（含 /v1 后缀），按 Key 绑定域名路由。
+def get_api_root_for_key(key: str) -> str:
+    """返回某 Key 应使用的 API Root URL（不含 /v1 后缀），按 Key 绑定域名路由。
 
     - 若该 Key 在配置中绑定了有效域名（com/cn/cn_bak）→ 走该域名；
     - 否则（未绑定 / env key / 无效域名）→ 回退到全局 agnes_domain。
 
-    供各 API 客户端在选中具体 Key 后据此构造请求 URL。
+    **带 Key 的请求一律用它（或 ``get_base_url_for_key``）取域名**，
+    不得改用全局的 ``get_agnes_api_root()``：Key 与域名错配时上游会返回
+    401 ``Invalid token``，看起来像 Key 失效，实际是打错了站点。
     """
     config = load_config()
     domain = _key_domain_from_config(config, key)
     if domain not in AGNES_DOMAIN_MAP:
         domain = config.get("agnes_domain") or _DEFAULT_DOMAIN
-    root = AGNES_DOMAIN_MAP.get(domain, AGNES_DOMAIN_MAP[_DEFAULT_DOMAIN])
-    return f"{root}/v1"
+    return AGNES_DOMAIN_MAP.get(domain, AGNES_DOMAIN_MAP[_DEFAULT_DOMAIN])
+
+
+def get_base_url_for_key(key: str) -> str:
+    """返回某 Key 应使用的 API Base URL（含 /v1 后缀），按 Key 绑定域名路由。
+
+    规则与 ``get_api_root_for_key`` 同源（Key 绑定域名优先，未绑定回退全局域名）。
+    供各 API 客户端在选中具体 Key 后据此构造请求 URL。
+    """
+    return f"{get_api_root_for_key(key)}/v1"
 
 
 def get_agnes_api_root() -> str:
-    """返回基于当前域名配置的 API Root URL（不含 /v1 后缀）。"""
+    """返回基于**全局**域名配置的 API Root URL（不含 /v1 后缀）。
+
+    仅用于「还没有选定 Key」的全局操作（如未绑定 Key 的探测）。带 Key 的
+    请求请用 ``get_api_root_for_key(key)``，否则 Key 与域名会脱钩。
+    """
     domain = get_agnes_domain()
     return AGNES_DOMAIN_MAP.get(domain, AGNES_DOMAIN_MAP[_DEFAULT_DOMAIN])
