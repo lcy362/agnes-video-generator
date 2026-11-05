@@ -267,6 +267,23 @@ curl -sS -X POST https://apihub.agnes-ai.com/v1/videos \
 
 出现 `401 Invalid token` 且 `error_logs` 里 URL 的域名与该 Key 绑定域名不一致时，改 Key 的域名绑定（配置页 Key 行）或改全局域名，不要先怀疑 Key 失效；两者必须指向同一站点。
 
+### 8.4 站点 Key 空间与「域名探测」判据（2026-11-05 实测，Issue #112）
+
+- **Key 空间按站点隔离**：仅国内站签发的 Key → `api.agnes-ai.cn` 200，而
+  `apihub.agnes-ai.cn`（`cn_bak`）与 `apihub.agnes-ai.com`（`com`）均 401
+  `Invalid token`。所以「某一步 401」最快的判别方式是拿这把 Key 三站各打一次
+  `GET /v1/models`：200 的那个站点才属于它，三个都 401 ＝ Key 失效 / 抄错 / 带空格。
+- **`/v1/models` 不能单独当鉴权判据**：`apihub.agnes-ai.com` 的该端点会被上游 CDN
+  缓存成**公开目录**——不带 Key、带任意假 Key 也偶发返回 200 与完整模型列表，同一
+  URL 加查询串或 `Cache-Control: no-cache` 才回到 401（实测 6 次里 3 次 200）。
+  只按状态码判定会把任何 Key 误判为「com 可用」。
+- **可靠探测端点**：`GET /v1/dashboard/billing/subscription` 在三个站点都强制鉴权
+  （无 Key / 坏 Key 一律 401，200 仅在 Key 与站点匹配时出现），且不消耗配额。
+  `web/routes/config_routes.py::_probe_domain` 已改为「首选该端点 + 假 Key 负对照
+  （假 Key 也 200 则该端点不可信）」。
+- **给用户的建议**：手动选域名，别依赖「自动探测域名」；旧实现会把任意 Key 绑到
+  `com`（含只在国内站有效的 Key），运行期复发 401。
+
 ---
 
 ## 9. 复测方法

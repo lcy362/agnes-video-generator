@@ -368,16 +368,67 @@ class TestDetectConfigKeyDomains:
         assert resp.json()["results"][0]["skipped"] is True
 
     def test_probe_domain_ok(self, monkeypatch):
-        """_probe_domain 直接单元测试：200 → True。"""
-        resp = requests.Response()
-        resp.status_code = 200
+        """_probe_domain：真 Key 200 且假 Key 被拒（端点确实鉴权）→ True。"""
         monkeypatch.setattr(config_routes, "AGNES_DOMAIN_MAP", {"com": "https://api.com"})
-        monkeypatch.setattr(requests, "get", lambda *a, **k: resp)
+        monkeypatch.setattr(config_routes, "_auth_enforced_cache", {})
+        seen = []
+
+        def fake_get(url, headers=None, timeout=None):
+            token = (headers or {}).get("Authorization", "")
+            seen.append(url)
+            resp = requests.Response()
+            resp.status_code = 200 if config_routes._PROBE_INVALID_KEY not in token else 401
+            return resp
+
+        monkeypatch.setattr(requests, "get", fake_get)
         assert config_routes._probe_domain("sk-test", "com") is True
+        # 首选端点即帐单端点，不应退化到 /v1/models
+        assert seen and seen[0].endswith("/v1/dashboard/billing/subscription")
+
+    def test_probe_domain_public_catalog_200_rejected(self, monkeypatch):
+        """回归 issue #112：端点把公开目录缓存成 200（假 Key 也 200）时不得判定可用。
+
+        真实观测：apihub.agnes-ai.com 的 /v1/models 不带 Key 也偶发返回 200，
+        旧实现据此把任意 Key 绑到 com，运行期 401 Invalid token。
+        """
+        monkeypatch.setattr(config_routes, "AGNES_DOMAIN_MAP", {"com": "https://api.com"})
+        monkeypatch.setattr(config_routes, "_auth_enforced_cache", {})
+
+        def fake_get(url, headers=None, timeout=None):
+            resp = requests.Response()
+            resp.status_code = 200  # 不论 Key 是什么都 200
+            return resp
+
+        monkeypatch.setattr(requests, "get", fake_get)
+        assert config_routes._probe_domain("sk-test", "com") is False
+
+    def test_probe_domain_falls_back_when_billing_missing(self, monkeypatch):
+        """首选端点下线（404）→ 退化到 /v1/models，仍要求假 Key 负对照。"""
+        monkeypatch.setattr(config_routes, "AGNES_DOMAIN_MAP", {"cn": "https://api.cn"})
+        monkeypatch.setattr(config_routes, "_auth_enforced_cache", {})
+
+        def fake_get(url, headers=None, timeout=None):
+            token = (headers or {}).get("Authorization", "")
+            resp = requests.Response()
+            if url.endswith("/v1/dashboard/billing/subscription"):
+                resp.status_code = 404
+            else:
+                resp.status_code = 401 if config_routes._PROBE_INVALID_KEY in token else 200
+            return resp
+
+        monkeypatch.setattr(requests, "get", fake_get)
+        assert config_routes._probe_domain("sk-test", "cn") is True
+
+    def test_probe_domain_unknown_domain(self, monkeypatch):
+        """不在 AGNES_DOMAIN_MAP 的域名直接 False，不发请求。"""
+        monkeypatch.setattr(config_routes, "AGNES_DOMAIN_MAP", {"com": "https://api.com"})
+        monkeypatch.setattr(requests, "get", lambda *a, **k: pytest.fail("不应发请求"))
+        assert config_routes._probe_domain("sk-test", "nope") is False
 
     def test_probe_domain_exception(self, monkeypatch):
         """_probe_domain 异常 → False。"""
         monkeypatch.setattr(config_routes, "AGNES_DOMAIN_MAP", {"com": "https://api.com"})
+        monkeypatch.setattr(config_routes, "_auth_enforced_cache", {})
 
         def boom(*a, **k):
             raise TimeoutError

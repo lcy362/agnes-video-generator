@@ -428,34 +428,91 @@ async def save_config_key_domain(key_id: str = Form("", alias="id"), domain: str
 
 # 探测候选域名顺序：官方国际站优先，其次国内站备用，最后严格国内站专属端点
 _DETECT_CANDIDATES = ["com", "cn_bak", "cn"]
-# 探测 /v1/models 的超时与并发上限
+# 探测端点顺序：优先用强制鉴权的帐单端点，退化时才用 /v1/models
+# （见下方 _PROBE_ENDPOINTS 注释）
 _DETECT_TIMEOUT = 10
 _DETECT_CONCURRENCY = 4
 
+# ⚠️ 探测端点必须「只有持该站点有效 Key 才返回 200」，且**不能**只看状态码：
+# ``/v1/models`` 实测会被上游 CDN 缓存成公开目录——``apihub.agnes-ai.com`` 上
+# 不带 Key、或带任意假 Key 也偶发返回 200 与完整模型列表（同一 URL 换个查询串
+# 即恢复 401）。旧实现把 200 当作鉴权通过，于是「com 永远探测成功」：任何 Key
+# （含只在国内站 api.agnes-ai.cn 有效的 Key）都会被绑到 com，运行期回报
+# ``401 Invalid token``（issue #112 排查时实测确认）。
+# ``/v1/dashboard/billing/subscription`` 在三个站点都强制鉴权（无 Key / 坏 Key
+# 一律 401）、不消耗配额，故作为首选判据；并保留 /v1/models 作为端点下线时的
+# 退化路径——但两者都必须先通过下面的假 Key 负对照。
+_PROBE_ENDPOINTS = ("/v1/dashboard/billing/subscription", "/v1/models")
+# 负对照用的假 Key：确认该端点在该站点确实在鉴权，避免缓存/放行造成的假 200
+_PROBE_INVALID_KEY = "sk-agnes-domain-probe-invalid"
+# {(root, path): bool} 站点鉴权行为的进程内缓存（探测为低频手动操作）
+_auth_enforced_cache: dict = {}
 
-def _probe_domain(key: str, domain: str) -> bool:
-    """同步探测单个 Key 在某个域名下是否鉴权通过（/v1/models 返回 200）。"""
+
+def _probe_status(key: str, root: str, path: str) -> int | None:
+    """请求单个探测端点，返回状态码；连接/超时返回 None。"""
     import requests
 
-    root = AGNES_DOMAIN_MAP[domain]
     try:
         resp = requests.get(
-            f"{root}/v1/models",
-            headers={"Authorization": f"Bearer {key}"},
+            f"{root}{path}",
+            headers={
+                "Authorization": f"Bearer {key}",
+                # 绕过任何中间缓存：缓存住的 200 会伪造出「鉴权通过」
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+            },
             timeout=_DETECT_TIMEOUT,
         )
-        return resp.status_code == 200
+        return resp.status_code
     except Exception:  # noqa: BLE001 — 连接/超时均视为该域名不可用
+        return None
+
+
+def _probe_auth_enforced(root: str, path: str) -> bool:
+    """该端点在该站点是否真的校验鉴权（假 Key 必须被拒）。结果按站点缓存。
+
+    只有确认端点会拒绝假 Key，真实 Key 拿到的 200 才能作为「Key 与该站点匹配」
+    的凭证；否则 200 可能只是公开目录/缓存，无法区分 Key 归属。
+    """
+    cached = _auth_enforced_cache.get((root, path))
+    if cached is not None:
+        return cached
+    code = _probe_status(_PROBE_INVALID_KEY, root, path)
+    if code is None:  # 连不上：不缓存，留给下次重试
         return False
+    enforced = code != 200
+    _auth_enforced_cache[(root, path)] = enforced
+    return enforced
+
+
+def _probe_domain(key: str, domain: str) -> bool:
+    """同步探测某个 Key 在某个域名下是否鉴权通过。
+
+    判据 = 探测端点返回 200 **且**该端点确实在鉴权（假 Key 被拒）。旧实现只看
+    200，被上游公开缓存的 ``/v1/models`` 欺骗，会把 Key 绑到错误站点。
+    """
+    root = AGNES_DOMAIN_MAP.get(domain)
+    if not root:
+        return False
+    for path in _PROBE_ENDPOINTS:
+        if _probe_status(key, root, path) != 200:
+            continue
+        if _probe_auth_enforced(root, path):
+            return True
+    return False
 
 
 @router.post("/api/config/keys/detect")
 async def detect_config_key_domains(force: bool = Form(False)):
     """自动探测每个 config Key 应绑定的域名，并补写 key -> domain 映射。
 
-    逐个 Key 按候选域名顺序（com / cn_bak / cn）探测 GET /v1/models：
-    首个返回 200 的域名即判定为该 Key 的有效域名并落盘。探测并行执行，
-    并限量并发（网络超时 10s，最多 4 个并发），避免阻塞 & 打爆外部接口。
+    逐个 Key 按候选域名顺序（com / cn_bak / cn）探测：首个「探测端点返回 200
+    且该端点确实校验鉴权（假 Key 被拒）」的域名即判定为该 Key 的有效域名并落盘。
+    端点优先 ``/v1/dashboard/billing/subscription``，退化用 ``/v1/models``——
+    后者曾被上游 CDN 缓存成公开目录（任意 Key 都 200），单看状态码会把 Key
+    误绑到错误站点。探测并行执行，并限量并发（网络超时 10s，最多 4 个并发），
+    避免阻塞 & 打爆外部接口。
 
     ``force=True`` 时对所有 config Key 重新探测并覆盖已有绑定；
     默认对尚未绑定域名的 Key 补写映射；对已绑定域名也会重新校验，
