@@ -207,6 +207,18 @@ export function stopTask(taskId: string) {
 export function deleteTask(taskId: string) {
   return apiFetch('/api/tasks/' + taskId, { method: 'DELETE' }).then((r) => r.json())
 }
+// v7.7 快速重试模式：连续 2 次 503 后由用户在进度页开启/关闭
+export function setFastRetry(
+  taskId: string,
+  opts: { enabled: boolean; perMinute?: number; minutes?: number },
+) {
+  const form = new FormData()
+  form.append('enabled', String(opts.enabled))
+  if (opts.perMinute) form.append('per_minute', String(opts.perMinute))
+  if (opts.minutes) form.append('minutes', String(opts.minutes))
+  return apiFetch('/api/tasks/' + taskId + '/fast-retry', { method: 'POST', body: form })
+    .then((r) => r.json())
+}
 
 // ── v6.1 问题反馈：任务诊断（二期）──
 export function getTaskDiagnostics(taskId: string) {

@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "Nếu chưa xác thực, tần suất gọi API của bạn sẽ bị giảm.",
   "noticeRealNameGlobal": "Nếu tài khoản của bạn được đăng ký trên site quốc tế (platform.agnes-ai.com), bạn không cần thao tác gì và thay đổi này không ảnh hưởng đến bạn. Bảng điều khiển quốc tế (để xác nhận tài khoản thuộc site nào):",
   "noticeRealNameOutlook": "Sau 2026-10-26 12:00 (giờ Bắc Kinh), các lỗi quá tải upstream như 503 và \"queue is full\" dự kiến sẽ giảm đáng kể.",
-  "noticeRealNameGotIt": "Đã hiểu"
+  "noticeRealNameGotIt": "Đã hiểu",
+  "fastRetry.title": "Thử lại nhanh",
+  "fastRetry.desc": "Hàng đợi video Agnes liên tục bận. Bật để thử lại theo tần suất bạn chọn (trong trạng thái này không bị giới hạn tốc độ); thử lại thường quay lại sau khi gửi thành công hoặc hết hạn. 1–120 lần mỗi phút, 1–30 phút.",
+  "fastRetry.perMinute": "Số lần / phút",
+  "fastRetry.minutes": "Thời lượng (phút)",
+  "fastRetry.start": "Bật thử lại nhanh",
+  "fastRetry.stop": "Dừng thử lại nhanh",
+  "fastRetry.remaining": "Thử lại nhanh: {x}/phút, còn {t}",
+  "fastRetry.expiredHint": "Lần thử lại nhanh trước đã hết hạn; bạn có thể bật lại.",
+  "fastRetry.failed": "Thao tác thử lại nhanh thất bại",
+  "fastRetry.attempts": "Đã gửi {n} lần",
+  "progress.video.polling": "Đang tạo: {status} · đã chờ {t} (tác vụ {vid})"
 }

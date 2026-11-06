@@ -32,7 +32,7 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 # ═══════════════════════════════════════════════════
 # 应用版本号（v6.1 新增：发版时同步更新，见 docs/dev/release_process.md）
 # ═══════════════════════════════════════════════════
-APP_VERSION = "7.2.4"
+APP_VERSION = "7.2.5"
 
 # 未配置 API Key 时的统一报错文案（含免费获取与在线体验兜底，全站路由共用）
 #
@@ -277,6 +277,11 @@ try:
         # v7.0 U3：2.5 系列竖屏（9:16）上游躺倒缺陷的探测式校正开关。
         # 默认关闭——待真实竖屏任务验证后再定默认值（计划 §三建议路径）。
         agnes_fix_v25_portrait_rotation: bool = False
+        # v7.7：快速重试模式的默认参数（用户在前端开关上一次可调，未调时用这两项）。
+        # 实测 503 队列满阶段不会触发 429，故默认 30 次/分钟（每 2s 一跳）是安全的；
+        # 持续 3 分钟覆盖「队列短时拥塞」的典型窗口，到期自动回到常规忙轨。
+        agnes_fast_retry_per_minute: int = 30
+        agnes_fast_retry_minutes: int = 3
 
         # ── CORS（PR #33 吸收 Phase 2：可配置跨源白名单）──
         # 供独立本地伴侣工具（如 agnes-simple-ui）从浏览器跨源调用本服务 API。
@@ -326,6 +331,12 @@ except ImportError:  # pragma: no cover - pydantic-settings 为必备依赖，�
             self.agnes_fix_v25_portrait_rotation = os.environ.get(
                 "AGNES_FIX_V25_PORTRAIT_ROTATION", "0"
             ).strip().lower() in ("1", "true", "on")
+            self.agnes_fast_retry_per_minute = int(
+                os.environ.get("AGNES_FAST_RETRY_PER_MINUTE", "30")
+            )
+            self.agnes_fast_retry_minutes = int(
+                os.environ.get("AGNES_FAST_RETRY_MINUTES", "3")
+            )
             self.agnes_cors_origins = os.environ.get("AGNES_CORS_ORIGINS", "")
             _cors_enabled = os.environ.get("AGNES_CORS_ENABLED", "").strip().lower()
             if _cors_enabled in ("0", "false", "off"):

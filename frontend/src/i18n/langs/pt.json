@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "Sem a verificação, a frequência das suas chamadas à API será reduzida.",
   "noticeRealNameGlobal": "Se a sua conta foi registrada no site internacional (platform.agnes-ai.com), nenhuma ação é necessária e esta mudança não afeta você. Console internacional (para confirmar a qual site sua conta pertence):",
   "noticeRealNameOutlook": "Após 2026-10-26 12:00 (horário de Pequim), erros de sobrecarga no upstream como 503 e \"queue is full\" devem diminuir bastante.",
-  "noticeRealNameGotIt": "Entendi"
+  "noticeRealNameGotIt": "Entendi",
+  "fastRetry.title": "Repetição rápida",
+  "fastRetry.desc": "A fila de vídeo da Agnes está sempre ocupada. Ative para tentar novamente na frequência escolhida (o limite de taxa não é acionado neste estado); a repetição normal volta após o envio bem-sucedido ou ao expirar. 1–120 tentativas por minuto, 1–30 minutos.",
+  "fastRetry.perMinute": "Tentativas / min",
+  "fastRetry.minutes": "Duração (min)",
+  "fastRetry.start": "Ativar repetição rápida",
+  "fastRetry.stop": "Parar repetição rápida",
+  "fastRetry.remaining": "Repetição rápida: {x}/min, restam {t}",
+  "fastRetry.expiredHint": "A repetição rápida anterior expirou; você pode ativá-la novamente.",
+  "fastRetry.failed": "Falha na ação de repetição rápida",
+  "fastRetry.attempts": "{n} tentativas enviadas",
+  "progress.video.polling": "Gerando: {status} · {t} decorridos (tarefa {vid})"
 }

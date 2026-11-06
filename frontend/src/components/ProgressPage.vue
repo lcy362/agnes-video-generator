@@ -10,6 +10,7 @@ import StepTimeline from './StepTimeline.vue'
 import ArtifactCard from './ArtifactCard.vue'
 import CheckpointDetail from './CheckpointDetail.vue'
 import FeedbackPanel from './FeedbackPanel.vue'
+import FastRetryPanel from './FastRetryPanel.vue'
 import { isDeterministicError, isLocalNetworkError } from '@/utils/feedback'
 
 const {
@@ -263,6 +264,9 @@ onUnmounted(() => {
           </div>
           <!-- 进度消息（HTML 渲染，来自后端安全文案） -->
           <div v-else class="mt-4 text-sm text-muted" v-html="progressMessage"></div>
+
+          <!-- v7.7 快速重试：连续 2 次 503 后出现开关（提交成功/到期自动消失或收起） -->
+          <FastRetryPanel v-if="!taskFailed" />
 
           <!-- 1.7：连接异常横幅（连续轮询失败 N 次后展示） -->
           <div v-if="connectionLost" class="mt-3 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-400">

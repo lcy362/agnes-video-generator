@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "Kung hindi pa verified, mababawasan ang dalas ng iyong API calls.",
   "noticeRealNameGlobal": "Kung ang account mo ay nakarehistro sa global site (platform.agnes-ai.com), wala kang kailangang gawin at hindi ka apektado ng pagbabagong ito. Global console (para tingnan kung saang site kabilang ang account mo):",
   "noticeRealNameOutlook": "Pagkatapos ng 2026-10-26 12:00 (Beijing time), inaasahang lalo pang bababa ang mga upstream busy error tulad ng 503 at \"queue is full\".",
-  "noticeRealNameGotIt": "Nakuha ko"
+  "noticeRealNameGotIt": "Nakuha ko",
+  "fastRetry.title": "Mabilis na pagsubok muli",
+  "fastRetry.desc": "Patuloy na abala ang queue ng video ng Agnes. I-enable para subukang muli sa napiling rate (hindi umaandar ang limitasyon sa rate sa ganitong estado); babalik sa normal na pagsubok muli kapag matagumpay na naipadala o nag-expire. 1–120 pagsubok kada minuto, 1–30 minuto.",
+  "fastRetry.perMinute": "Pagsubok / minuto",
+  "fastRetry.minutes": "Tagal (minuto)",
+  "fastRetry.start": "I-enable ang mabilis na pagsubok muli",
+  "fastRetry.stop": "Itigil ang mabilis na pagsubok muli",
+  "fastRetry.remaining": "Mabilis na pagsubok muli: {x}/min, natitira {t}",
+  "fastRetry.expiredHint": "Nag-expire ang dating mabilis na pagsubok muli; maaari mong i-enable muli.",
+  "fastRetry.failed": "Nabigo ang aksyon sa mabilis na pagsubok muli",
+  "fastRetry.attempts": "{n} pagsubok naipadala",
+  "progress.video.polling": "Ginagawa: {status} · {t} ang lumipas (gawain {vid})"
 }

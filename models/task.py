@@ -129,6 +129,44 @@ class ManualConfig(BaseModel):
         return self.enabled and bool(self.pause_points)
 
 
+class FastRetryConfig(BaseModel):
+    """快速重试模式（v7.7）：503 队列满时由用户主动开启的高频重试。
+
+    背景：实测（2026-11-06）上游 503 ``video_queue_full`` 阶段**不会触发 429**
+    （单 Key 连打 26 次零限流），且被拒请求不建任务、不消耗渲染配额。因此
+    在队列饱和时段，提高探测频率是安全且有效的（更早捕获空位）。此前忙轨
+    固定 30–60s 间隔对多 Key 无任何加速，用户只能干等。
+
+    状态机（字段全部有默认值，旧 task_state.json 加载自动补齐）::
+
+        available=False → 连续 2 次忙信号（503/队列满）后 available=True
+        available=True + 用户开启 → enabled=True, started_at=now
+        enabled=True 且未超时 → 每次忙信号按 60/per_minute 秒连打
+        提交成功 → enabled=False, finished_reason="success"
+        到达 minutes 分钟 → enabled=False, finished_reason="expired"
+        用户关闭 → enabled=False, finished_reason="disabled"
+
+    与项目既有两轨重试的关系：**只替换忙轨的等待节奏**，不改判定、不改次数
+    上限、不改令牌桶配置。快速模式期间不消耗常规忙轨次数（否则 15 次额度
+    会在 y 分钟内被烧光），到期后原样回到常规忙轨继续。
+    """
+
+    available: bool = False            # 连续 2 次忙信号后置 True（前端据此显示开关）
+    enabled: bool = False              # 用户已开启
+    per_minute: int = 30               # 每分钟重试次数 x（1–120）
+    minutes: int = 3                   # 持续分钟数 y（1–30）
+    consecutive_busy: int = 0          # 连续忙信号计数（提交成功后清零）
+    attempts: int = 0                  # 快速模式期间已发出的请求次数（含成功那跳）
+    started_at: str = ""               # 开启时刻（本地 ISO，与 created_at 同格式）
+    finished_reason: str = ""          # "" | success | expired | disabled
+
+    @property
+    def interval_seconds(self) -> float:
+        """快速模式的两次请求间隔（秒），下限 0.5s 防止除零/打爆。"""
+        per_minute = max(1, int(self.per_minute or 1))
+        return max(0.5, 60.0 / per_minute)
+
+
 # ═══════════════════════════════════════════════════
 # 子结构模型
 # ═══════════════════════════════════════════════════
@@ -216,6 +254,18 @@ class BaseTaskState(BaseModel):
 
     # ── v6.0：手动模式配置（默认自动模式，向后兼容）──
     manual_config: ManualConfig = Field(default_factory=ManualConfig)
+
+    # ── v7.7：快速重试模式（默认关闭；旧 JSON 缺字段自动补默认）──
+    # 只在视频提交连续遇到 2 次忙信号（503 / 队列满）后才 available=True，
+    # 由用户在进度页显式开启，不影响未开启时的任何既有重试行为。
+    fast_retry: FastRetryConfig = Field(default_factory=FastRetryConfig)
+
+    # ── v7.8：视频任务 → 提交 Key 指纹（进程重启后仍能找回轮询用的 Key）──
+    # 实测（2026-11-06）：上游视频任务按「账号/Key」隔离，同一 video_id 用
+    # 别的 Key 查一律 404。此前绑定只存在内存 dict ``_task_keys``，服务重启或
+    # resume 后丢失，轮询会随机挑一把 Key → 404 → 被当成「入库延迟」无限容忍
+    # → 白等 30 分钟后超时。这里只存 sha256(Key)[:16] 指纹，不存明文。
+    video_key_hints: dict[str, str] = Field(default_factory=dict)
 
     # ── v6.1 二期：任务时间戳（诊断端点时间窗口匹配兜底用）──
     # 默认值保证旧 task_state.json 加载时向后兼容（无字段 → 自动补齐）。

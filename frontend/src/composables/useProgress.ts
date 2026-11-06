@@ -8,7 +8,7 @@ import { useArtifacts } from './useArtifacts'
 import { useToast } from './useToast'
 import { getRetryCount, bumpRetryCount, clearRetryCount } from '@/utils/feedback'
 import { queueFullWindowHint } from '@/utils/retryWindows'
-import type { TaskState, StepDef } from '@/types'
+import type { TaskState, StepDef, FastRetryState } from '@/types'
 
 const POLL_INTERVAL = 30000
 
@@ -40,6 +40,8 @@ const awaitingCheckpoint = ref('')
 const retryCount = ref(0)
 // v6.1：任务未完成但后台无活跃 pipeline → 待续传（展示续传入口）
 const needsResume = ref(false)
+// v7.7 快速重试模式：后端连续遇到 2 次 503 后置 available，用户开启后 enabled
+const fastRetry = ref<FastRetryState | null>(null)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -275,6 +277,25 @@ function unmountProgressPage() {
   taskFailed.value = false
   retryCount.value = 0
   liveFailedStep.value = ''
+  fastRetry.value = null
+}
+
+// v7.7 快速重试模式：开启 / 关闭（参数范围与「是否已可开启」由后端校验）
+async function setFastRetryMode(enabled: boolean, perMinute?: number, minutes?: number) {
+  const taskId = appState.currentTaskId
+  if (!taskId) return
+  try {
+    const d = await api.setFastRetry(taskId, { enabled, perMinute, minutes })
+    if (d?.detail) {
+      showToast(t('fastRetry.failed') + ': ' + d.detail, 4000)
+      return
+    }
+    if (d?.fast_retry) fastRetry.value = d.fast_retry
+    // 立即刷新一次，避免等 30s 轮询才看到「已开启 / 已关闭」
+    await pollTaskProgress(taskId)
+  } catch (e: any) {
+    showToast(t('fastRetry.failed') + (e.message ? ': ' + e.message : ''), 3500)
+  }
 }
 
 async function pollTaskProgress(taskId: string) {
@@ -289,6 +310,8 @@ async function pollTaskProgress(taskId: string) {
     reportUpstreamErrors(state)
 
     progressPct.value = Math.round((state.current_progress || 0) * 100)
+    // v7.7：快速重试状态（available 出现开关、enabled 显示进行中、finished_reason 提示收尾）
+    fastRetry.value = (state as any).fast_retry || null
     if (state.current_message) {
       // 0.8：后端消息最终由 v-html 渲染，必须转义
       // v7.0：有结构化 key 时用前端 22 语言文案渲染（后端只有 zh/en 兜底句）
@@ -432,6 +455,8 @@ export function useProgress() {
     needsResume,
     retryCount,
     connectionLost,
+    fastRetry,
+    setFastRetryMode,
     retryFailedTask,
     resumeTask,
     showProgress,

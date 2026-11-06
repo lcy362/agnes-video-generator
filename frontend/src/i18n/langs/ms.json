@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "Tanpa pengesahan, kekerapan panggilan API anda akan dikurangkan.",
   "noticeRealNameGlobal": "Jika akaun anda didaftarkan di tapak global (platform.agnes-ai.com), tiada tindakan diperlukan dan perubahan ini tidak menjejaskan anda. Konsol global (untuk menyemak tapak akaun anda):",
   "noticeRealNameOutlook": "Selepas 2026-10-26 12:00 (waktu Beijing), ralat kesibukan upstream seperti 503 dan \"queue is full\" dijangka berkurangan dengan jelas.",
-  "noticeRealNameGotIt": "Faham"
+  "noticeRealNameGotIt": "Faham",
+  "fastRetry.title": "Cuba pantas",
+  "fastRetry.desc": "Baris gilir video Agnes sentiasa sibuk. Dayakan untuk mencuba semula pada kadar pilihan anda (had kadar tidak dicetuskan dalam keadaan ini); cubaan biasa disambung selepas berjaya dihantar atau tamat tempoh. 1–120 cubaan seminit, 1–30 minit.",
+  "fastRetry.perMinute": "Cubaan / minit",
+  "fastRetry.minutes": "Tempoh (minit)",
+  "fastRetry.start": "Dayakan cuba pantas",
+  "fastRetry.stop": "Hentikan cuba pantas",
+  "fastRetry.remaining": "Cuba pantas: {x}/minit, tinggal {t}",
+  "fastRetry.expiredHint": "Cuba pantas sebelum ini telah tamat; anda boleh dayakan semula.",
+  "fastRetry.failed": "Tindakan cuba pantas gagal",
+  "fastRetry.attempts": "{n} cubaan dihantar",
+  "progress.video.polling": "Menjana: {status} · {t} berlalu (tugas {vid})"
 }

@@ -568,4 +568,65 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 
 ---
 
-*文档版本：v3.7 | 更新日期：2026-10-15 | 变更：新增 v7.6 外部素材模式回归（即梦协作）*
+## 十四、v7.7 快速重试模式回归（增量）
+
+> 新增于 v7.7（`docs/plans/v7.7/fast_retry_PRD.md`）。
+> 连续 2 次忙信号（503 / 队列满）后进度页出现开关；用户可开「每分钟 x 次、持续 y 分钟」
+> 快速连打，提交成功 / 到期 / 手动关闭即回常规忙轨。单测见 `tests/test_fast_retry.py`。
+>
+> **ID 说明**：本专项用 `QR*` 命名，避开既有的 F（产物校验 / 问题反馈）与 X（外部素材）系列。
+
+### 14.1 单测（自动）
+
+| ID | 条目 | 验证要点 |
+|----|------|---------|
+| QR1 | 状态机 | 连续 2 次忙信号 → `fast_retry.available=True`、落盘一次并推送 `progress.video.fast_retry.available`；开启后返回 `60/x`；超过 `minutes` → `enabled=False` + `finished_reason=expired`；提交成功 → `available=False` + `success`；未开启时成功不额外推消息 |
+| QR2 | 节奏隔离 | 快速模式只首跳 `acquire` 视频提交桶（之后跳过）、`sleep` 按 `60/x`、hook 收到的 `busy_attempt` 恒为 0（不消耗 15 次额度）；到期后重新取桶并恢复递增 |
+| QR3 | 零回归 | `fast_retry_hook is None` 时每跳都取桶、退避序列与引入前一致；钩子抛异常退化为常规忙轨且提交不失败 |
+| QR4 | 端点 | `POST /api/tasks/{id}/fast-retry`：available 时开启 200（回传 `started_at`）；未 available 400；x/y 越界 422；关闭置 `finished_reason=disabled` |
+| QR5 | 兼容 | 旧 `task_state.json`（无 `fast_retry`）加载后取默认值；真实 `TaskManager` 落盘新字段可回读 |
+| QR7 | 计数 / 逐跳日志 | `payload.probe` → `fast_retry.attempts`，每 5 跳落盘一次、到期与成功保留终值；快速模式每跳都有 `[FastRetry] probe #N → POST`（含 payload）与 `← HTTP`（含 body），成功那跳同样有响应日志 |
+
+### 14.2 端到端场景（人工，需真实 503 时段）
+
+| ID | 场景 | 验证要点 |
+|----|------|---------|
+| QR6 | 真实队列饱和 | `agnes-video-2.5-flash` 连续 503 → 进度页在 2 次忙信号后出现开关；开启（如 30 次/分钟 × 3 分钟）后日志出现 `[FastRetry] ... fast retry probe #N` 且间隔 ≈2s；3 分钟后自动恢复 `busy retry #N/15`；期间提交成功 → 面板收起并提示 success |
+
+### 14.3 隔离性回归
+
+| 项 | 期望 |
+|----|------|
+| 未触发 503 的任务 | 状态里 `fast_retry` 全默认，进度页不出现面板 |
+| 图片 / Chat / 上传忙轨 | 完全不受影响（首期不覆盖） |
+| 令牌桶配置 | `AGNES_VIDEO_RATE_LIMIT` / `AGNES_RATE_LIMIT` 语义不变 |
+
+---
+
+## 十五、v7.8 轮询健壮性回归（增量）
+
+> 新增于 v7.8（`docs/plans/v7.8/polling_resilience_PRD.md`）。
+> 触发：服务重启后 resume，任务级 Key 绑定丢失 → 404 被当成入库延迟无限轮询。
+> 单测见 `tests/test_poll_key_binding.py`；本专项用 `PB*` 命名，避开 F/X/QR 系列。
+
+### 15.1 单测（自动）
+
+| ID | 条目 | 验证要点 |
+|----|------|---------|
+| PB1 | Key 指纹落盘 | 提交成功写 `video_key_hints`，值为 `sha256(Key)[:16]`，状态文件不含 Key 明文；重复绑定不重复落盘 |
+| PB2 | resume 反查 | 按指纹在当前 Key 池找回提交 Key（Key 顺序变化也能命中）；Key 被删时返回 None 并交给 404 探测 |
+| PB3 | 404 分流 | 首轮 404（错 Key）→ 探测到归属 Key → 固定切换域名与 URL → 立刻重查 → 拿到 `completed`；请求序列为 k1(404)/探测 k1(404)/探测 k2(200)/切换后 k2(200) |
+| PB4 | U9 语义保护 | 全部 Key 均 404 时不切换、不报错，打「均 404 / 入库延迟」日志并继续等；已有绑定时不做探测 |
+| PB5 | 进度透传 | `poll_progress_hook` 每轮被调用，流水线按「状态变化或 ≥25s」节流推送 `progress.video.polling` |
+| PB6 | 零回归 | 三个钩子默认 `None`，`retry_policy` / 令牌桶 / 忙轨判定均未改动 |
+
+### 15.2 端到端（人工，需多 Key + 一次真实提交）
+
+| ID | 场景 | 验证要点 |
+|----|------|---------|
+| PB7 | 提交后重启服务再 resume | 新任务状态含 Key 指纹 → 日志 `[KeyBind] restored submit key`，**首轮即 200**（不触发 404 探测）；旧任务（无指纹）走探测兜底；两种路径都应恢复轮询直至 `completed` 并完成水印 |
+| PB8 | 恢复已完成的上游任务 | 不重新提交、不消耗渲染配额；下载视频 → 水印 → `status=completed` / `final_video_file` 有效（`probe_duration` 可读） |
+
+---
+
+*文档版本：v3.9 | 更新日期：2026-11-06 | 变更：新增 v7.8 轮询健壮性回归*

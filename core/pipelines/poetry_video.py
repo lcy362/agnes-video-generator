@@ -82,6 +82,8 @@ class PoetryVideoPipeline(MultiScenePipeline):
     ):
         super().__init__(api_key, task_id, dir_name, progress_callback, shutdown_event)
         self.video_api = AgnesVideoAPI(api_key=api_key, model=video_model)
+        # v7.7：批量提交阶段的 503 快速重试钩子（用户开启后才生效）
+        self._attach_fast_retry(self.video_api)
         self.screenwriter = Screenwriter(api_key=api_key, model=chat_model)
         self._state: Optional[PoetryVideoTask] = None
 

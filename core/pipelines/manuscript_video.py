@@ -154,6 +154,8 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
         super().__init__(api_key, task_id, dir_name, progress_callback, shutdown_event)
         self.video_api = AgnesVideoAPI(api_key=api_key, model=video_model)
         self.video_api.shutdown_event = shutdown_event
+        # v7.7：批量提交阶段的 503 快速重试钩子（用户开启后才生效）
+        self._attach_fast_retry(self.video_api)
         # PRD 1.4：Screenwriter language pinning——默认 en、尊重显式配置
         # （未显式设置 PROMPT_LANGUAGE 时固定 en，修复非中文稿件被写成中文的问题）。
         _sw_language = None if is_prompt_language_explicit() else "en"

@@ -764,5 +764,16 @@
   "noticeRealNameFreq": "未完成实名认证：API 调用频率将降低。",
   "noticeRealNameGlobal": "如果你是在国际版（platform.agnes-ai.com）注册的账号，无需进行任何操作，也不受本次调整影响。国际站控制台（可用来确认账号归属）：",
   "noticeRealNameOutlook": "预计 2026-10-26 12:00（北京时间）后，503、queue is full 等上游繁忙问题将有较大改善。",
-  "noticeRealNameGotIt": "我知道了"
+  "noticeRealNameGotIt": "我知道了",
+  "fastRetry.title": "快速重试",
+  "fastRetry.desc": "检测到 Agnes 视频队列连续繁忙。开启后按设定频率自动重试（实测该阶段不会触发限流）；提交成功或到期后自动恢复正常重试。每分钟 1–120 次，持续 1–30 分钟。",
+  "fastRetry.perMinute": "每分钟次数",
+  "fastRetry.minutes": "持续（分钟）",
+  "fastRetry.start": "开启快速重试",
+  "fastRetry.stop": "停止快速重试",
+  "fastRetry.remaining": "快速重试中：每分钟 {x} 次，剩余 {t}",
+  "fastRetry.expiredHint": "上次快速重试已到期，可再次开启。",
+  "fastRetry.failed": "快速重试操作失败",
+  "fastRetry.attempts": "已发 {n} 次",
+  "progress.video.polling": "上游生成中：{status} · 已等 {t}（任务 {vid}）"
 }

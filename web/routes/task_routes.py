@@ -309,6 +309,108 @@ async def stop_task(task_id: str):
     return {"ok": True, "task_id": task_id}
 
 
+@router.post("/api/tasks/{task_id}/fast-retry")
+async def set_fast_retry(
+    task_id: str,
+    enabled: bool = Form(...),
+    per_minute: int = Form(0),
+    minutes: int = Form(0),
+):
+    """开关「快速重试模式」（v7.7）。
+
+    背景：视频提交连续遇到 2 次队列繁忙（503 ``video_queue_full``）后，任务状态
+    里 ``fast_retry.available`` 置 True，前端进度页据此显示开关。用户开启后，
+    提交循环按 ``60/per_minute`` 秒连打（不占共享视频提交桶、不消耗常规忙轨
+    次数），提交成功或到达 ``minutes`` 分钟后自动恢复正常节奏。
+
+    隔离性：本端点只改任务状态里的 ``fast_retry`` 字段；未开启时（或任务类型
+    没有该字段时）行为与升级前完全一致，不影响 ``retry_policy`` 的两轨判定。
+
+    Args:
+        task_id: 任务 id。
+        enabled: True 开启 / False 关闭。
+        per_minute: 每分钟重试次数 x（0 = 用 ``AGNES_FAST_RETRY_PER_MINUTE``）。
+        minutes: 持续分钟数 y（0 = 用 ``AGNES_FAST_RETRY_MINUTES``）。
+
+    Returns:
+        ``{"ok": True, "task_id": ..., "fast_retry": {...最新状态...}}``
+    """
+    from core.api.fast_retry import (
+        FAST_RETRY_MAX_MINUTES,
+        FAST_RETRY_MAX_PER_MINUTE,
+        FAST_RETRY_MIN_MINUTES,
+        FAST_RETRY_MIN_PER_MINUTE,
+    )
+    from core.config import get_settings
+
+    dir_name = helpers.find_dir_name(task_id)
+    # 运行中优先复用流水线的 TaskManager：它的 _state 就是流水线正在写的那一份，
+    # 用它落盘可避免「两份缓存互相覆盖」（端点另建实例读改写会把流水线进度冲掉）。
+    pipeline = app_state.active_pipelines.get(task_id)
+    tm = pipeline.task_manager if pipeline is not None else TaskManager(task_id, dir_name=dir_name)
+    state = tm.get_state() or tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    cfg = getattr(state, "fast_retry", None)
+    if cfg is None:
+        raise HTTPException(status_code=400, detail="Fast retry is not supported for this task")
+
+    settings = get_settings()
+    if per_minute and not (FAST_RETRY_MIN_PER_MINUTE <= per_minute <= FAST_RETRY_MAX_PER_MINUTE):
+        raise HTTPException(status_code=422, detail=translate(
+            "fast_retry.invalid_range", None,
+            xmin=FAST_RETRY_MIN_PER_MINUTE, xmax=FAST_RETRY_MAX_PER_MINUTE,
+            ymin=FAST_RETRY_MIN_MINUTES, ymax=FAST_RETRY_MAX_MINUTES,
+        ))
+    if minutes and not (FAST_RETRY_MIN_MINUTES <= minutes <= FAST_RETRY_MAX_MINUTES):
+        raise HTTPException(status_code=422, detail=translate(
+            "fast_retry.invalid_range", None,
+            xmin=FAST_RETRY_MIN_PER_MINUTE, xmax=FAST_RETRY_MAX_PER_MINUTE,
+            ymin=FAST_RETRY_MIN_MINUTES, ymax=FAST_RETRY_MAX_MINUTES,
+        ))
+
+    x = int(per_minute or settings.agnes_fast_retry_per_minute)
+    y = int(minutes or settings.agnes_fast_retry_minutes)
+    x = max(FAST_RETRY_MIN_PER_MINUTE, min(FAST_RETRY_MAX_PER_MINUTE, x))
+    y = max(FAST_RETRY_MIN_MINUTES, min(FAST_RETRY_MAX_MINUTES, y))
+
+    if enabled:
+        # 只有「连续 2 次忙信号」之后才允许开启（避免对健康任务做高频空转）
+        if not (cfg.available or cfg.enabled):
+            raise HTTPException(
+                status_code=400,
+                detail=translate("fast_retry.not_available", None),
+            )
+        cfg.enabled = True
+        cfg.per_minute = x
+        cfg.minutes = y
+        cfg.attempts = 0          # 每轮开启重新计数（面板展示「已发 N 次」）
+        cfg.started_at = datetime.now().isoformat(timespec="seconds")
+        cfg.finished_reason = ""
+        msg_key, msg_params = "progress.video.fast_retry.active", {"x": x, "y": y}
+    else:
+        cfg.enabled = False
+        cfg.finished_reason = "disabled"
+        msg_key, msg_params = "progress.video.fast_retry.disabled", {}
+
+    try:
+        tm.update_state()
+    except Exception as e:  # 落盘失败不能假装成功
+        logger.error(f"[FastRetry] persist failed for task %s: {e}", safe_log(task_id))
+        raise HTTPException(status_code=500, detail="Failed to persist fast-retry state")
+
+    # 运行中：额外推一条用户可见消息（pipeline 侧异步 emit，失败不影响功能）
+    if pipeline is not None and pipeline.state is state:
+        pipeline._emit_fast_retry(msg_key, msg_params)
+
+    logger.info(
+        "[FastRetry] Task %s: enabled=%s x=%d/min y=%dmin",
+        safe_log(task_id), enabled, x, y,
+    )
+    return {"ok": True, "task_id": task_id, "fast_retry": cfg.model_dump()}
+
+
 @router.post("/api/tasks/{task_id}/mode")
 async def switch_task_mode(task_id: str, mode: str = Form(...)):
     """运行时切换执行模式（v6.0 手动模式）。

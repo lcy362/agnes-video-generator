@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "Doğrulama tamamlanmazsa API çağrı sıklığınız azaltılır.",
   "noticeRealNameGlobal": "Hesabınız global sitede (platform.agnes-ai.com) kayıtlıysa hiçbir işlem yapmanız gerekmez ve bu değişiklik sizi etkilemez. Global konsol (hesabınızın hangi siteye ait olduğunu doğrulamak için):",
   "noticeRealNameOutlook": "2026-10-26 12:00 (Pekin saati) sonrasında 503 ve \"queue is full\" gibi upstream yoğunluk hatalarının belirgin şekilde azalması bekleniyor.",
-  "noticeRealNameGotIt": "Anladım"
+  "noticeRealNameGotIt": "Anladım",
+  "fastRetry.title": "Hızlı yeniden deneme",
+  "fastRetry.desc": "Agnes video kuyruğu sürekli meşgul. Seçtiğiniz sıklıkta yeniden denemek için etkinleştirin (bu durumda hız sınırı tetiklenmez); başarılı gönderimden veya süre dolduğunda normal yeniden denemeye dönülür. Dakikada 1–120 deneme, 1–30 dakika.",
+  "fastRetry.perMinute": "Deneme / dakika",
+  "fastRetry.minutes": "Süre (dakika)",
+  "fastRetry.start": "Hızlı yeniden denemeyi aç",
+  "fastRetry.stop": "Hızlı yeniden denemeyi durdur",
+  "fastRetry.remaining": "Hızlı yeniden deneme: dakikada {x}, kalan {t}",
+  "fastRetry.expiredHint": "Önceki hızlı yeniden deneme süresi doldu; yeniden açabilirsiniz.",
+  "fastRetry.failed": "Hızlı yeniden deneme işlemi başarısız",
+  "fastRetry.attempts": "{n} deneme gönderildi",
+  "progress.video.polling": "Oluşturuluyor: {status} · {t} geçti (görev {vid})"
 }

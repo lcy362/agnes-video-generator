@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "Ohne Verifizierung wird die API-Aufrufrate reduziert.",
   "noticeRealNameGlobal": "Wenn dein Konto auf der globalen Site (platform.agnes-ai.com) registriert wurde, ist keine Aktion nötig und diese Änderung betrifft dich nicht. Globale Konsole (um die Site deines Kontos zu prüfen):",
   "noticeRealNameOutlook": "Nach dem 2026-10-26 12:00 (Pekinger Zeit) werden Upstream-Überlastungsfehler wie 503 und „queue is full“ deutlich seltener.",
-  "noticeRealNameGotIt": "Verstanden"
+  "noticeRealNameGotIt": "Verstanden",
+  "fastRetry.title": "Schnelles Wiederholen",
+  "fastRetry.desc": "Die Agnes-Videowarteschlange ist dauerhaft ausgelastet. Aktivieren, um mit der gewählten Rate erneut zu versuchen (in diesem Zustand greift keine Ratenbegrenzung); nach Erfolg oder Ablauf wird das normale Wiederholen fortgesetzt. 1–120 Versuche pro Minute, 1–30 Minuten.",
+  "fastRetry.perMinute": "Versuche / Minute",
+  "fastRetry.minutes": "Dauer (Min.)",
+  "fastRetry.start": "Schnelles Wiederholen aktivieren",
+  "fastRetry.stop": "Schnelles Wiederholen stoppen",
+  "fastRetry.remaining": "Schnelles Wiederholen: {x}/Min., verbleibend {t}",
+  "fastRetry.expiredHint": "Das letzte schnelle Wiederholen ist abgelaufen; Sie können es erneut aktivieren.",
+  "fastRetry.failed": "Aktion für schnelles Wiederholen fehlgeschlagen",
+  "fastRetry.attempts": "{n} Versuche gesendet",
+  "progress.video.polling": "Rendern: {status} · {t} vergangen (Aufgabe {vid})"
 }

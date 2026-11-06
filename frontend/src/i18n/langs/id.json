@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "Tanpa verifikasi, frekuensi panggilan API Anda akan dikurangi.",
   "noticeRealNameGlobal": "Jika akun Anda terdaftar di situs global (platform.agnes-ai.com), tidak perlu tindakan apa pun dan perubahan ini tidak memengaruhi Anda. Konsol global (untuk memastikan situs akun Anda):",
   "noticeRealNameOutlook": "Setelah 2026-10-26 12:00 (waktu Beijing), error kesibukan upstream seperti 503 dan \"queue is full\" diperkirakan akan jauh berkurang.",
-  "noticeRealNameGotIt": "Mengerti"
+  "noticeRealNameGotIt": "Mengerti",
+  "fastRetry.title": "Coba cepat",
+  "fastRetry.desc": "Antrean video Agnes terus sibuk. Aktifkan untuk mencoba ulang dengan laju pilihan Anda (batas laju tidak terpicu pada kondisi ini); coba ulang normal kembali setelah berhasil dikirim atau kedaluwarsa. 1–120 percobaan per menit, 1–30 menit.",
+  "fastRetry.perMinute": "Percobaan / menit",
+  "fastRetry.minutes": "Durasi (menit)",
+  "fastRetry.start": "Aktifkan coba cepat",
+  "fastRetry.stop": "Hentikan coba cepat",
+  "fastRetry.remaining": "Coba cepat: {x}/menit, sisa {t}",
+  "fastRetry.expiredHint": "Coba cepat sebelumnya sudah kedaluwarsa; Anda bisa mengaktifkannya lagi.",
+  "fastRetry.failed": "Tindakan coba cepat gagal",
+  "fastRetry.attempts": "{n} percobaan terkirim",
+  "progress.video.polling": "Sedang membuat: {status} · {t} berlalu (tugas {vid})"
 }

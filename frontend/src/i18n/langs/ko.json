@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "실명 인증을 완료하지 않으면 API 호출 빈도가 낮아집니다.",
   "noticeRealNameGlobal": "글로벌 사이트(platform.agnes-ai.com)에서 가입한 계정은 별도 조치가 필요 없으며 이번 변경의 영향을 받지 않습니다. 글로벌 콘솔(계정 소속 사이트 확인용):",
   "noticeRealNameOutlook": "2026-10-26 12:00(베이징 시간) 이후 503, queue is full 등 업스트림 혼잡 오류가 크게 줄어들 것으로 예상됩니다.",
-  "noticeRealNameGotIt": "확인"
+  "noticeRealNameGotIt": "확인",
+  "fastRetry.title": "빠른 재시도",
+  "fastRetry.desc": "Agnes 영상 대기열이 계속 혼잡합니다. 활성화하면 설정한 빈도로 자동 재시도합니다(이 상태에서는 속도 제한이 발생하지 않음). 제출 성공 또는 만료 후 일반 재시도로 돌아갑니다. 분당 1~120회, 1~30분.",
+  "fastRetry.perMinute": "분당 시도 횟수",
+  "fastRetry.minutes": "지속(분)",
+  "fastRetry.start": "빠른 재시도 켜기",
+  "fastRetry.stop": "빠른 재시도 중지",
+  "fastRetry.remaining": "빠른 재시도 중: 분당 {x}회, 남은 시간 {t}",
+  "fastRetry.expiredHint": "이전 빠른 재시도가 만료되었습니다. 다시 켤 수 있습니다.",
+  "fastRetry.failed": "빠른 재시도 조작 실패",
+  "fastRetry.attempts": "{n}회 전송됨",
+  "progress.video.polling": "생성 중: {status} · 경과 {t} (작업 {vid})"
 }

@@ -408,6 +408,41 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "Agnes 视频队列已满（HTTP {status} · {code}），重试 {waited} 分钟后仍未排进队，本次未生成任务（不消耗配额）。建议错峰重试或换用其他视频模型。 另据上游官方说明，预计 2026-10-26 12:00（北京时间）后，503、queue is full 等问题将有较大改善。",
         "en": "Agnes video queue is full (HTTP {status} · {code}); after retrying for {waited} min the job still never entered the queue, so nothing was generated (no quota used). Please retry later, ideally off-peak, or switch to another video model. Per the upstream provider, 503 and \"queue is full\" issues are expected to improve significantly after 2026-10-26 12:00 (UTC+8).",
     },
+    # ── v7.7 快速重试模式（503 队列满时由用户主动开启的高频重试）──
+    # 参数：x 每分钟次数、y 持续分钟、n 连续忙信号次数、status/code 上游原样报错
+    "progress.video.fast_retry.available": {
+        "zh": "Agnes 视频队列连续繁忙（HTTP {status} · {code}，第 {n} 次）。可在进度页开启「快速重试」，提高重试频率以更快排进队列。",
+        "en": "Agnes video queue is busy repeatedly (HTTP {status} · {code}, {n} in a row). You can enable Fast retry on the progress page to probe more frequently and enter the queue sooner.",
+    },
+    "progress.video.fast_retry.active": {
+        "zh": "快速重试已开启：每分钟 {x} 次，持续 {y} 分钟。提交成功或到期后自动恢复常规重试。",
+        "en": "Fast retry enabled: {x} attempts/min for {y} min. Normal retry resumes on success or expiry.",
+    },
+    "progress.video.fast_retry.expired": {
+        "zh": "快速重试已到期（{y} 分钟），已恢复常规重试节奏。",
+        "en": "Fast retry expired after {y} min; normal retry cadence resumed.",
+    },
+    "progress.video.fast_retry.success": {
+        "zh": "快速重试命中队列，视频任务已提交成功。",
+        "en": "Fast retry got through the queue; the video job was submitted successfully.",
+    },
+    "progress.video.fast_retry.disabled": {
+        "zh": "快速重试已关闭，恢复常规重试节奏。",
+        "en": "Fast retry disabled; normal retry cadence resumed.",
+    },
+    "fast_retry.not_available": {
+        "zh": "当前任务尚未连续遇到队列繁忙，暂不能开启快速重试（连续 2 次 503 后开放）。",
+        "en": "Fast retry is not available yet — it unlocks after 2 consecutive queue-busy (503) responses.",
+    },
+    "fast_retry.invalid_range": {
+        "zh": "参数超出范围：每分钟 {xmin}–{xmax} 次，持续 {ymin}–{ymax} 分钟。",
+        "en": "Parameters out of range: {xmin}–{xmax} attempts per minute, {ymin}–{ymax} minutes.",
+    },
+    # ── v7.8：轮询进度透传（每轮状态变化时刷新进度页文案）──
+    "progress.video.polling": {
+        "zh": "上游生成中：{status} · 已等 {t}（任务 {vid}）",
+        "en": "Upstream rendering: {status} · waited {t} (task {vid})",
+    },
     "progress.simple.completed": {
         "zh": "视频生成完成",
         "en": "Video generation complete",

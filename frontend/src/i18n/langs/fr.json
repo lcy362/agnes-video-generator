@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "Sans vérification, la fréquence de vos appels API sera réduite.",
   "noticeRealNameGlobal": "Si votre compte a été créé sur le site international (platform.agnes-ai.com), aucune action n'est nécessaire et ce changement ne vous concerne pas. Console internationale (pour vérifier le site de votre compte) :",
   "noticeRealNameOutlook": "Après le 2026-10-26 12:00 (heure de Pékin), les erreurs de surcharge en amont comme 503 et « queue is full » devraient nettement diminuer.",
-  "noticeRealNameGotIt": "Compris"
+  "noticeRealNameGotIt": "Compris",
+  "fastRetry.title": "Nouvelle tentative rapide",
+  "fastRetry.desc": "La file vidéo Agnes est constamment saturée. Activez pour réessayer à la fréquence choisie (aucune limitation de débit n'est déclenchée dans cet état) ; les tentatives normales reprennent après un envoi réussi ou à l'expiration. 1–120 tentatives par minute, 1–30 minutes.",
+  "fastRetry.perMinute": "Tentatives / min",
+  "fastRetry.minutes": "Durée (min)",
+  "fastRetry.start": "Activer la nouvelle tentative rapide",
+  "fastRetry.stop": "Arrêter la nouvelle tentative rapide",
+  "fastRetry.remaining": "Nouvelle tentative rapide : {x}/min, reste {t}",
+  "fastRetry.expiredHint": "La précédente tentative rapide a expiré ; vous pouvez la réactiver.",
+  "fastRetry.failed": "Échec de l'action de nouvelle tentative rapide",
+  "fastRetry.attempts": "{n} tentatives envoyées",
+  "progress.video.polling": "Génération : {status} · {t} écoulées (tâche {vid})"
 }

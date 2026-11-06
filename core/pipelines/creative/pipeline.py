@@ -85,6 +85,8 @@ class CreativeVideoPipeline(
         self.image_generator = AgnesImageAPI(api_key=api_key, model=image_model)
         self.video_generator = AgnesVideoAPI(api_key=api_key, model=video_model)
         self.video_generator.shutdown_event = shutdown_event
+        # v7.7：批量提交阶段的 503 快速重试钩子（用户开启后才生效）
+        self._attach_fast_retry(self.video_generator)
 
         self._state: Optional[CreativeVideoTask] = None
 
