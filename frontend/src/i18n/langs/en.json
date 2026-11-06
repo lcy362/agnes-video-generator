@@ -764,5 +764,16 @@
   "noticeRealNameFreq": "Without verification, your API call rate will be reduced.",
   "noticeRealNameGlobal": "If your account was registered on the global site (platform.agnes-ai.com), no action is needed and this change does not affect you. Global console (to confirm which site your account belongs to):",
   "noticeRealNameOutlook": "After 2026-10-26 12:00 (UTC+8), upstream busy errors such as 503 and \"queue is full\" are expected to improve significantly.",
-  "noticeRealNameGotIt": "Got it"
+  "noticeRealNameGotIt": "Got it",
+  "fastRetry.title": "Fast retry",
+  "fastRetry.desc": "The Agnes video queue is repeatedly busy. Enable it to retry at your chosen rate (no rate limiting is triggered in this state); normal retry resumes after a successful submit or when it expires. 1–120 attempts per minute, 1–30 minutes.",
+  "fastRetry.perMinute": "Attempts / min",
+  "fastRetry.minutes": "Duration (min)",
+  "fastRetry.start": "Enable fast retry",
+  "fastRetry.stop": "Stop fast retry",
+  "fastRetry.remaining": "Fast retry: {x}/min, {t} left",
+  "fastRetry.expiredHint": "The previous fast retry expired; you can enable it again.",
+  "fastRetry.failed": "Fast retry action failed",
+  "fastRetry.attempts": "{n} attempts sent",
+  "progress.video.polling": "Upstream rendering: {status} · waited {t} (task {vid})"
 }

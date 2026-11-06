@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "Zonder verificatie wordt je API-aanroepsnelheid verlaagd.",
   "noticeRealNameGlobal": "Is je account aangemaakt op de internationale site (platform.agnes-ai.com), dan is er geen actie nodig en heeft deze wijziging geen invloed op je. Internationale console (om de site van je account te controleren):",
   "noticeRealNameOutlook": "Na 2026-10-26 12:00 (Peking-tijd) zullen upstream-druktefouten zoals 503 en \"queue is full\" naar verwachting sterk afnemen.",
-  "noticeRealNameGotIt": "Begrepen"
+  "noticeRealNameGotIt": "Begrepen",
+  "fastRetry.title": "Snel opnieuw proberen",
+  "fastRetry.desc": "De Agnes-videowachtrij is voortdurend bezet. Schakel in om met de gekozen frequentie opnieuw te proberen (in deze toestand wordt geen snelheidslimiet geactiveerd); normaal opnieuw proberen hervat na succes of na afloop. 1–120 pogingen per minuut, 1–30 minuten.",
+  "fastRetry.perMinute": "Pogingen / min",
+  "fastRetry.minutes": "Duur (min)",
+  "fastRetry.start": "Snel opnieuw proberen inschakelen",
+  "fastRetry.stop": "Snel opnieuw proberen stoppen",
+  "fastRetry.remaining": "Snel opnieuw proberen: {x}/min, resterend {t}",
+  "fastRetry.expiredHint": "De vorige snelle poging is verlopen; u kunt deze opnieuw inschakelen.",
+  "fastRetry.failed": "Actie voor snel opnieuw proberen mislukt",
+  "fastRetry.attempts": "{n} pogingen verzonden",
+  "progress.video.polling": "Renderen: {status} · {t} verstreken (taak {vid})"
 }

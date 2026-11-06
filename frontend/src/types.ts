@@ -28,7 +28,21 @@ export interface TaskState {
   active?: boolean
   // GA 埋点：error_collector 内存聚合的上游接口报错（按状态码计数，轮询增量上报）
   upstream_errors?: UpstreamError[]
+  // v7.7：快速重试模式状态（连续 2 次 503 后 available=true，用户开启后 enabled=true）
+  fast_retry?: FastRetryState
   [key: string]: any
+}
+
+// v7.7 快速重试模式（后端 models/task.py::FastRetryConfig 对齐）
+export interface FastRetryState {
+  available?: boolean
+  enabled?: boolean
+  per_minute?: number
+  minutes?: number
+  consecutive_busy?: number
+  attempts?: number
+  started_at?: string
+  finished_reason?: '' | 'success' | 'expired' | 'disabled' | string
 }
 
 export interface UpstreamError {

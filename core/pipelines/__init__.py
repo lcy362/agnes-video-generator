@@ -6,11 +6,13 @@ BasePipeline 抽象基类 + 四种流水线导出。
 import asyncio
 import concurrent.futures
 import functools
+import hashlib
 import json
 import logging
 import os
 import time
 from abc import ABC, abstractmethod
+from datetime import datetime
 from types import SimpleNamespace
 from typing import Callable, List, Optional
 
@@ -23,6 +25,8 @@ _ENCODING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
     max_workers=2, thread_name_prefix="encoding"
 )
 
+from core.api.fast_retry import FAST_RETRY_AVAILABLE_AFTER
+from core.api.key_manager import get_key_ring
 from core.async_io import read_text, write_text
 from core.compositor.ffmpeg_tool import probe_duration, resolve_cmd_binary
 from core.compositor.watermark import add_watermark, detect_language
@@ -180,6 +184,120 @@ def compute_current_checkpoint(state) -> str:
         if step_field and getattr(state, step_field, None) == StepStatus.COMPLETED:
             return cp
     return ""
+
+
+def _fast_retry_elapsed(started_at: str) -> Optional[float]:
+    """快速重试已开启秒数；``started_at`` 缺失/非法时返回 None（视为已到期）。"""
+    if not started_at:
+        return None
+    try:
+        started = datetime.fromisoformat(started_at)
+    except (TypeError, ValueError):
+        return None
+    return max(0.0, (datetime.now() - started).total_seconds())
+
+
+class _PipelineFastRetryHook:
+    """v7.7 快速重试钩子：把「可否开启 / 是否生效 / 是否到期」落到任务状态。
+
+    ``AgnesVideoAPI`` 每收到一次忙信号（503 / 429 / 队列满）就同步调用
+    ``decide()``，由本钩子决定这一跳走常规忙轨还是快速节奏：
+
+    - 未开启：累计连续忙信号，达到 ``FAST_RETRY_AVAILABLE_AFTER``（2 次）后
+      置 ``available=True`` 并落盘 → 前端进度页出现开关；返回 None（常规节奏）。
+    - 已开启且未到期：返回 ``interval_seconds``（60/x），由 API 层按该间隔
+      连打，且**不占用**常规忙轨次数与视频提交令牌桶。
+    - 已开启但到期：置 ``enabled=False, finished_reason="expired"`` 后返回
+      None，API 层原样回到常规忙轨继续。
+
+    状态读写都在流水线协程内（单写者）；用户点开关的 HTTP 请求侧走
+    ``pipeline.task_manager`` 同一实例，因此不会出现两份缓存互相覆盖落盘。
+    """
+
+    def __init__(self, pipeline):
+        self._pipeline = pipeline
+
+    def decide(self, busy_attempt: int, payload: dict) -> Optional[float]:
+        """返回 None = 常规忙轨；返回秒数 = 本跳快速模式间隔。"""
+        p = self._pipeline
+        cfg = getattr(getattr(p, "_state", None), "fast_retry", None)
+        if cfg is None:
+            return None
+
+        if not cfg.enabled:
+            cfg.consecutive_busy += 1
+            if cfg.consecutive_busy >= FAST_RETRY_AVAILABLE_AFTER and not cfg.available:
+                cfg.available = True
+                p._save_fast_retry()
+                p._emit_fast_retry(
+                    "progress.video.fast_retry.available",
+                    {
+                        "n": cfg.consecutive_busy,
+                        "status": payload.get("status") or "",
+                        "code": payload.get("code") or "",
+                    },
+                )
+                logger.info(
+                    "[FastRetry] Task %s: available after %d consecutive busy signals "
+                    "(HTTP %s · %s), waiting for user to enable",
+                    p.task_id, cfg.consecutive_busy,
+                    payload.get("status"), payload.get("code") or "-",
+                )
+            return None
+
+        # 已打次数同步（用户要在面板看到「已发 N 次」）：
+        # 30 次/分钟时逐跳落盘会把状态文件写成每秒 2 次，故每 5 跳落一次，
+        # 到期/成功/关闭时各落一次确保终值准确。
+        probe = int(payload.get("probe") or 0)
+        if probe and probe != cfg.attempts:
+            cfg.attempts = probe
+            if probe % 5 == 0:
+                p._save_fast_retry()
+
+        elapsed = _fast_retry_elapsed(cfg.started_at)
+        limit = max(1, int(cfg.minutes or 1)) * 60
+        if elapsed is None or elapsed >= limit:
+            cfg.enabled = False
+            cfg.finished_reason = "expired"
+            p._save_fast_retry()
+            p._emit_fast_retry(
+                "progress.video.fast_retry.expired", {"y": int(cfg.minutes or 1)}
+            )
+            logger.info(
+                "[FastRetry] Task %s: expired after %s (limit %ds), "
+                "back to normal busy track",
+                p.task_id, f"{elapsed:.0f}s" if elapsed is not None else "unknown", limit,
+            )
+            return None
+        return cfg.interval_seconds
+
+    def on_success(self, probe: int = 0) -> None:
+        """提交成功：关闭快速模式（若开着）并清理可开启标记。
+
+        Args:
+            probe: 快速模式期间已发出的请求次数（含本次成功那跳）。
+        """
+        p = self._pipeline
+        cfg = getattr(getattr(p, "_state", None), "fast_retry", None)
+        if cfg is None:
+            return
+        was_enabled = cfg.enabled
+        changed = bool(was_enabled or cfg.available or cfg.consecutive_busy or probe)
+        cfg.consecutive_busy = 0
+        cfg.available = False
+        if probe:
+            cfg.attempts = int(probe)
+        if was_enabled:
+            cfg.enabled = False
+            cfg.finished_reason = "success"
+        if not changed:
+            return
+        p._save_fast_retry()
+        if was_enabled:
+            p._emit_fast_retry("progress.video.fast_retry.success", {})
+            logger.info(
+                "[FastRetry] Task %s: submitted successfully in fast mode", p.task_id
+            )
 
 
 class BasePipeline(ABC):
@@ -503,6 +621,138 @@ class BasePipeline(ABC):
                     f"(waited {waited:.0f}s)"
                 )
         return _cb
+
+    # ── v7.7 快速重试模式（503 队列满时由用户主动开启的高频重试）────────
+
+    def _attach_fast_retry(self, video_api) -> None:
+        """把流水线侧的可选钩子注入视频 API（v7.7 快速重试 + v7.8 轮询健壮性）。
+
+        所有钩子在 ``AgnesVideoAPI`` 上默认 ``None``：未注入时忙轨与轮询行为
+        与升级前完全一致（零回归）。5 个流水线构造视频 API 后各调用一次。
+        """
+        if video_api is None:
+            return
+        hooks = {
+            "fast_retry_hook": _PipelineFastRetryHook(self),
+            "on_task_key_bound": self._on_task_key_bound,
+            "key_hint_resolver": self._resolve_video_key_hint,
+            "poll_progress_hook": self._on_poll_progress,
+        }
+        for name, hook in hooks.items():
+            try:
+                setattr(video_api, name, hook)
+            except Exception as e:  # 注入失败不影响主流程
+                logger.debug(f"[KeyBind] attach {name} failed: {e}")
+
+    # ── v7.8：视频任务与提交 Key 的绑定持久化 ────────────────────────
+
+    @staticmethod
+    def _key_fingerprint(key: str) -> str:
+        """Key 指纹：只把哈希写进 task_state.json，不落明文。"""
+        return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+
+    def _on_task_key_bound(self, video_id: str, key: str) -> None:
+        """提交成功时落盘 ``video_id → Key 指纹``（进程重启后仍可恢复）。"""
+        state = self._state
+        if state is None:
+            return
+        try:
+            fp = self._key_fingerprint(key)
+            hints = dict(getattr(state, "video_key_hints", {}) or {})
+            if hints.get(video_id) == fp:
+                return
+            hints[video_id] = fp
+            if len(hints) > 128:  # 长视频多场景兜底，避免状态文件无限膨胀
+                hints = dict(list(hints.items())[-128:])
+            state.video_key_hints = hints
+            self.task_manager.update_state()
+            logger.info(
+                "[KeyBind] Task %s: persisted key hint for video %s (key=...%s)",
+                self.task_id, video_id[:16], key[-4:],
+            )
+        except Exception as e:
+            logger.debug(f"[KeyBind] persist key hint failed: {e}")
+
+    def _resolve_video_key_hint(self, video_id: str):
+        """resume：按指纹在当前 Key 池里找回提交时那把 Key；找不到交给 404 探测。"""
+        state = self._state
+        if state is None:
+            return None
+        fp = (getattr(state, "video_key_hints", {}) or {}).get(video_id)
+        if not fp:
+            return None
+        try:
+            for k in get_key_ring().keys:
+                if self._key_fingerprint(k) == fp:
+                    logger.info(
+                        "[KeyBind] Task %s: restored submit key for video %s (key=...%s)",
+                        self.task_id, video_id[:16], k[-4:],
+                    )
+                    return k
+        except Exception as e:
+            logger.debug(f"[KeyBind] restore key hint failed: {e}")
+        logger.warning(
+            "[KeyBind] Task %s: key hint %s 已不在池中，交给 404 归属探测",
+            self.task_id, fp,
+        )
+        return None
+
+    # ── v7.8：轮询进度透传 ──────────────────────────────────────────
+
+    def _on_poll_progress(self, video_id: str, status: str, progress, elapsed: float) -> None:
+        """每轮轮询回调：节流后把上游状态推到前端（避免 20s 一次刷盘）。"""
+        if self._state is None:
+            return
+        now = time.monotonic()
+        last_ts, last_status = getattr(self, "_last_poll_emit", (0.0, ""))
+        if status == last_status and now - last_ts < 25.0:
+            return
+        self._last_poll_emit = (now, status)
+        mins, secs = divmod(int(elapsed), 60)
+        self._emit_status_message("progress.video.polling", {
+            "status": status or "-",
+            "t": f"{mins}m{secs:02d}s",
+            "vid": video_id[:12],
+        })
+
+    def _save_fast_retry(self) -> None:
+        """把当前内存状态落盘（快速模式字段变更后调用）。
+
+        直接 ``update_state()``（无字段变更）刷新 ``updated_at`` 并整份落盘，
+        保证落盘对象就是流水线正在用的 ``_state``（create 时已同引用），
+        避免与用户端点侧的另一份缓存互相覆盖。
+        """
+        try:
+            self.task_manager.update_state()
+        except Exception as e:
+            logger.debug(f"[FastRetry] persist failed: {e}")
+
+    def _emit_status_message(self, message_key: str, params: dict) -> None:
+        """异步推送一条用户可见消息（保留当前 step 与进度，只换文案）。"""
+        state = self._state
+        if state is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        step = getattr(state, "current_step", "") or "video_gen"
+        progress = float(getattr(state, "current_progress", 0.0) or 0.0)
+        try:
+            loop.create_task(self._emit(
+                step, "running",
+                self._t(message_key, **params),
+                progress,
+                preserve_step=True,
+                message_key=message_key,
+                message_params=dict(params),
+            ))
+        except Exception as e:
+            logger.debug(f"[StatusEmit] emit failed: {e}")
+
+    def _emit_fast_retry(self, message_key: str, params: dict) -> None:
+        """v7.7 快速重试：兼容入口（实际推送统一走 ``_emit_status_message``）。"""
+        self._emit_status_message(message_key, params)
 
     @abstractmethod
     async def run(self, state: BaseTaskState) -> str:

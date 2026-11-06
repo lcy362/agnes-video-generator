@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "Senza verifica, la frequenza delle chiamate API verrà ridotta.",
   "noticeRealNameGlobal": "Se il tuo account è stato registrato sul sito internazionale (platform.agnes-ai.com), non è necessaria alcuna azione e questa modifica non ti riguarda. Console internazionale (per verificare a quale sito appartiene il tuo account):",
   "noticeRealNameOutlook": "Dopo il 2026-10-26 12:00 (ora di Pechino), errori di sovraccarico upstream come 503 e \"queue is full\" dovrebbero ridursi sensibilmente.",
-  "noticeRealNameGotIt": "Ho capito"
+  "noticeRealNameGotIt": "Ho capito",
+  "fastRetry.title": "Ripetizione rapida",
+  "fastRetry.desc": "La coda video di Agnes è costantemente occupata. Attiva per riprovare con la frequenza scelta (in questo stato non scatta il limite di frequenza); la ripetizione normale riprende dopo un invio riuscito o alla scadenza. 1–120 tentativi al minuto, 1–30 minuti.",
+  "fastRetry.perMinute": "Tentativi / min",
+  "fastRetry.minutes": "Durata (min)",
+  "fastRetry.start": "Attiva ripetizione rapida",
+  "fastRetry.stop": "Interrompi ripetizione rapida",
+  "fastRetry.remaining": "Ripetizione rapida: {x}/min, mancano {t}",
+  "fastRetry.expiredHint": "La ripetizione rapida precedente è scaduta; puoi attivarla di nuovo.",
+  "fastRetry.failed": "Azione di ripetizione rapida non riuscita",
+  "fastRetry.attempts": "{n} tentativi inviati",
+  "progress.video.polling": "Generazione: {status} · trascorsi {t} (attività {vid})"
 }

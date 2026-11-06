@@ -322,6 +322,18 @@ class AgnesVideoAPI:
         # 每个 Key 绑定自己的域名（com/cn），混用会打错站点 → 401 Invalid token；
         # 多 Key 池下换 Key 还可能看不到别人账号下的任务（404）。
         self._task_keys: dict = {}
+        # v7.7 快速重试模式：由流水线注入的可选钩子（见 core/api/fast_retry.py）。
+        # 默认 None = 完全走原有忙轨节奏，行为与引入本功能前一致（零回归）。
+        self.fast_retry_hook = None
+        # 快速模式下的探测计数（仅用于 collect_error 降采样）
+        self._fast_retry_probes = 0
+        # ── v7.8：轮询健壮性钩子（全部由流水线注入，默认 None = 零回归）──
+        # on_task_key_bound(video_id, key)：提交成功时把 Key 指纹落到任务状态
+        self.on_task_key_bound = None
+        # key_hint_resolver(video_id) -> key | None：resume 时按指纹找回 Key
+        self.key_hint_resolver = None
+        # poll_progress_hook(video_id, status, progress, elapsed_s)：每轮透传进度
+        self.poll_progress_hook = None
 
     # ── 任务与 Key 绑定（v7.3）──────────────────────────────────────
 
@@ -331,6 +343,12 @@ class AgnesVideoAPI:
             # 长驻进程兜底：只保留最近的绑定，避免无界增长
             self._task_keys.pop(next(iter(self._task_keys)), None)
         self._task_keys[video_id] = key
+        # v7.8：同步落盘指纹（进程重启 / resume 后仍可找回这把 Key）
+        if self.on_task_key_bound is not None:
+            try:
+                self.on_task_key_bound(video_id, key)
+            except Exception as e:  # 落盘失败不影响提交
+                logger.debug(f"[KeyBind] persist hook failed: {e}")
 
     def key_for_task(self, video_id: str) -> Optional[str]:
         """返回提交该任务所用的 Key；未知（进程重启/旧任务/外部传入）返回 None。"""
@@ -355,6 +373,72 @@ class AgnesVideoAPI:
         h = dict(self._base_headers)
         h["Authorization"] = f"Bearer {k}"
         return h
+
+    # ── v7.7 快速重试模式（用户显式开启的高频忙信号探测）──────────────
+
+    @staticmethod
+    def _fast_retry_payload_brief(payload: dict) -> str:
+        """快速模式日志用：序列化提交 payload（prompt 截断，避免刷屏）。"""
+        try:
+            brief = dict(payload)
+        except (TypeError, ValueError):
+            return str(payload)[:300]
+        prompt = brief.get("prompt")
+        if isinstance(prompt, str) and len(prompt) > 80:
+            brief["prompt"] = f"{prompt[:80]}...(len={len(prompt)})"
+        try:
+            return json.dumps(brief, ensure_ascii=False)
+        except (TypeError, ValueError):
+            return str(brief)[:300]
+
+    def _fast_retry_decide(self, busy_attempt: int, payload: dict) -> Optional[float]:
+        """询问快速重试钩子：本跳是否改用快速节奏（默认否）。
+
+        钩子由流水线注入（见 ``core/api/fast_retry.py`` 的协议说明），内部只读
+        任务状态；未注入（``fast_retry_hook is None``）时恒返回 None，调用方
+        走原有忙轨节奏，行为与引入本功能前完全一致。
+
+        Args:
+            busy_attempt: 常规忙轨已重试次数（快速模式期间不递增）。
+            payload: 上游忙信号事实（status / code / attempt / waited_s）。
+
+        Returns:
+            None = 走常规忙轨；float = 快速模式间隔（秒），本跳起按该节奏连打。
+        """
+        hook = self.fast_retry_hook
+        if hook is None:
+            return None
+        try:
+            interval = hook.decide(busy_attempt, payload)
+        except Exception as e:  # 钩子异常绝不打断提交流程
+            logger.warning(f"[FastRetry] hook decide() failed, fallback to busy track: {e}")
+            return None
+        if interval is None:
+            return None
+        try:
+            return max(0.05, float(interval))
+        except (TypeError, ValueError):
+            return None
+
+    def _fast_retry_notify_success(self, probe: int = 0) -> None:
+        """提交通知钩子（用于把快速模式标记为 success 并关闭）。
+
+        Args:
+            probe: 快速模式下已发出的请求次数（含本次成功那一跳）。
+        """
+        hook = self.fast_retry_hook
+        if hook is None:
+            return
+        try:
+            hook.on_success(probe)
+        except TypeError:
+            # 兼容只实现 on_success() 的旧钩子
+            try:
+                hook.on_success()
+            except Exception as e:
+                logger.warning(f"[FastRetry] hook on_success() failed: {e}")
+        except Exception as e:
+            logger.warning(f"[FastRetry] hook on_success() failed: {e}")
 
     def _path_to_b64(self, path: str) -> str:
         with open(path, "rb") as f:
@@ -510,6 +594,45 @@ class AgnesVideoAPI:
                 attempt += 1
         return None
 
+    async def _probe_owner_key(self, video_id: str, ring, model_param: str) -> Optional[str]:
+        """v7.8：绑定丢失时，探测哪把 Key 拥有该上游任务（只读查询，最多 N 次）。
+
+        实测（2026-11-06）：同一个 ``video_id``，只有提交时那把 Key 查得到
+        （HTTP 200），同站点的另一把 Key 与 cn 站 Key 都返回 404。因此当
+        ``_task_keys`` 因进程重启/resume 丢失时，用一次性的只读探测找回
+        「任务归属的 Key」，避免把错 Key 导致的 404 误判为「网关入库延迟」
+        而无限轮询到 1800s 超时。
+
+        Returns:
+            第一个能查到该任务的 Key；全部查不到返回 ``None``（交回 U9 语义）。
+        """
+        candidates = getattr(ring, "keys", None) or []
+        if len(candidates) < 2:
+            return None  # 单 Key 不存在「用错 Key」的可能
+        for k in candidates:
+            url = f"{get_api_root_for_key(k)}/agnesapi?video_id={video_id}{model_param}"
+            try:
+                resp = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        requests.get, url,
+                        headers=self._auth_headers(k), timeout=10,
+                    ),
+                    timeout=20,
+                )
+                if resp.status_code == 200:
+                    logger.info(
+                        f"[KeyBind] Video {video_id[:16]}... 归属 Key 探测命中 "
+                        f"(key=...{k[-4:]}, domain={get_api_root_for_key(k)})"
+                    )
+                    return k
+            except Exception as e:
+                logger.debug(f"[KeyBind] owner probe failed for key=...{k[-4:]}: {e}")
+        logger.warning(
+            f"[KeyBind] Video {video_id[:16]}... 全部 {len(candidates)} 把 Key 均 404，"
+            f"按 U9「网关入库延迟」继续等待"
+        )
+        return None
+
     async def _poll_task(self, video_id: str, interval: int = 60,
                           max_poll_duration: int = 1800,
                           max_consecutive_failures: int = 10,
@@ -550,10 +673,16 @@ class AgnesVideoAPI:
         # 2.5 系列查询需带 model_name（text 模式可省略，但带上更通用）
         model_param = f"&model_name={self.model}" if is_v25_video_model(self.model) else ""
         # URL 与 Key 严格配对：域名取自该 Key 的绑定配置（未绑定才回退全局域名）
-        poll_url = (
-            f"{get_api_root_for_key(poll_key)}/agnesapi?video_id={video_id}{model_param}"
-        )
-        curl_cmd = f'curl -s -H "Authorization: Bearer $AGNES_API_KEY" "{poll_url}"'
+        def _poll_url_for(k: str) -> str:
+            return f"{get_api_root_for_key(k)}/agnesapi?video_id={video_id}{model_param}"
+
+        def _curl_for(url: str) -> str:
+            return f'curl -s -H "Authorization: Bearer $AGNES_API_KEY" "{url}"'
+
+        poll_url = _poll_url_for(poll_key)
+        curl_cmd = _curl_for(poll_url)
+        # v7.8：绑定丢失时只在第一次 404 做一次「Key 归属探测」，避免每轮多发 N 个请求
+        owner_probed = False
         while True:
             # M2: 每次轮询前检查停止信号
             if self.shutdown_event and self.shutdown_event.is_set():
@@ -575,8 +704,9 @@ class AgnesVideoAPI:
                 raise RuntimeError(error_msg)
 
             try:
-                if poll_count % 10 == 0:
-                    logger.info(f"[AgnesVideo] Polling video {video_id[:16]}... (poll #{poll_count + 1}, elapsed {elapsed:.0f}s)")
+                # v7.8：10 次才打一行太稀疏（20s 起步 ≈ 200s 静默），改为每 5 次
+                if poll_count % 5 == 0:
+                    logger.info(f"[AgnesVideo] Polling video {video_id[:16]}... (poll #{poll_count + 1}, elapsed {elapsed:.0f}s, key=...{(poll_key or '')[-4:]})")
                 # 全局限速：每次轮询都消耗一个令牌（2.3 异步原生，停止可打断）
                 await get_rate_limiter().acquire_async(self.shutdown_event)
                 # M2: 用 wait_for 包裹以支持取消
@@ -599,16 +729,34 @@ class AgnesVideoAPI:
                 # 401：只做归因登记（不换 Key、不改池），失败路径仍由 raise_for_status 保持原样
                 if resp.status_code == 401:
                     _register_auth_failure(ring, poll_key, resp)
-                # U9：404（task not found）= 记录尚未在网关任务库可见，中间态
+                # U9：404（task not found）既可能是「记录尚未在网关任务库可见」，
+                # 也可能是 v7.8 实测的「用错 Key / 站点」（同 video_id 换 Key 一律 404）。
                 if resp.status_code == 404:
                     not_found_count += 1
                     poll_count += 1  # 计入自适应间隔与周期日志的推进
-                    if not_found_count == 1 or not_found_count % 10 == 0:
+                    if not_found_count == 1 or not_found_count % 5 == 0:
                         logger.info(
                             f"[AgnesVideo] Video {video_id[:16]}... not yet visible "
                             f"(404 task not found), poll #{not_found_count}, "
                             f"elapsed {elapsed:.0f}s"
                         )
+                    # 绑定丢失时做一次只读探测：谁查得到就固定用谁；
+                    # 全部 404 才按 U9「入库延迟」继续等（不误伤高峰期可见性延迟）。
+                    if pinned_key is None and not owner_probed:
+                        owner_probed = True
+                        found_key = await self._probe_owner_key(
+                            video_id, ring, model_param
+                        )
+                        if found_key and found_key != poll_key:
+                            logger.warning(
+                                f"[KeyBind] Video {video_id[:16]}... 的 404 系 Key 错配，"
+                                f"已探测到所属账号并固定改用该 Key 轮询"
+                            )
+                            poll_key = found_key
+                            pinned_key = found_key
+                            poll_url = _poll_url_for(poll_key)
+                            curl_cmd = _curl_for(poll_url)
+                            continue  # 立刻用正确 Key 重查，不额外 sleep
                     await asyncio.sleep(_adaptive_poll_interval(interval, poll_count))
                     continue
                 resp.raise_for_status()
@@ -627,6 +775,13 @@ class AgnesVideoAPI:
 
                 if progress_callback:
                     progress_callback(status, progress, curl_cmd)
+
+                # v7.8：把上游状态/已等时长透传给流水线，前端不再「一直等待」无反馈
+                if self.poll_progress_hook is not None:
+                    try:
+                        self.poll_progress_hook(video_id, status, progress, elapsed)
+                    except Exception as e:
+                        logger.debug(f"[PollProgress] hook failed: {e}")
 
                 if status in ("completed", "COMPLETED"):
                     return result
@@ -684,31 +839,59 @@ class AgnesVideoAPI:
         frame_reductions_left = 2  # allow up to 2 frame-count reductions on 400
         attempt = 0
         rotations = 0
+        # v7.7：每次提交独立计数（快速模式降采样用）
+        self._fast_retry_probes = 0
         ring = get_key_ring()
         max_rotations = len(ring) * self.max_retries
         # 忙轨（429 / 所有 503 / 队列类 code）：首跳贴限流 + 固定间隔 + 次数封顶，
         # 不计入 max_retries 配额；次数上限首次命中时惰性读取（便于测试覆盖）
         busy: BusyTracker | None = None
+        # v7.7 快速重试：>0 表示本跳按该间隔连打，且**跳过**共享视频提交桶
+        # （用户显式开启；实测 503 阶段不会 429，若仍取桶令牌则 x 次/分钟无法兑现）
+        fast_gap = 0.0
         while attempt < self.max_retries:
             if self.shutdown_event and self.shutdown_event.is_set():
                 raise VideoTaskCancelled("Video generation cancelled by user")
             try:
                 logger.info(f"[AgnesVideo] Submitting {mode_desc} (attempt {attempt + 1}/{self.max_retries})...")
-                # 视频提交独立限速桶（服务端 1/min 硬限制，不与 chat/image 共享配额；
-                # 2.3 异步原生，停止可打断）
-                await get_video_submit_limiter().acquire_async(self.shutdown_event)
+                fast_mode = fast_gap > 0
+                if fast_mode:
+                    # 快速模式自带节奏：不占用共享桶，避免抢占其他任务的提交配额
+                    self._fast_retry_probes += 1
+                    await asyncio.sleep(fast_gap)
+                else:
+                    # 视频提交独立限速桶（服务端 1/min 硬限制，不与 chat/image 共享配额；
+                    # 2.3 异步原生，停止可打断）
+                    await get_video_submit_limiter().acquire_async(self.shutdown_event)
                 # M2: 缩短读超时从 180s 到 60s，使 stop() 更快生效
                 key = ring.next()
+                url = f"{get_base_url_for_key(key)}/videos"
+                # v7.7：快速模式下逐跳打印「请求 / 响应」原文，便于用户与排查侧核对
+                # 每一次探测到底发了什么、上游回了什么（常规忙轨保持原有日志量）。
+                if fast_mode:
+                    logger.info(
+                        "[FastRetry] probe #%d → POST %s | key=%s | payload=%s",
+                        self._fast_retry_probes, url,
+                        (key[:8] + "***" + key[-4:]) if len(key) > 14 else "***",
+                        self._fast_retry_payload_brief(payload),
+                    )
+                req_started = time.monotonic()
                 resp = await asyncio.wait_for(
                     asyncio.to_thread(
                         requests.post,
-                        f"{get_base_url_for_key(key)}/videos",
+                        url,
                         headers=self._auth_headers(key),
                         json=payload,
                         timeout=(15, 60),
                     ),
                     timeout=90,
                 )
+                if fast_mode:
+                    logger.info(
+                        "[FastRetry] probe #%d ← HTTP %d in %.2fs | body=%s",
+                        self._fast_retry_probes, resp.status_code,
+                        time.monotonic() - req_started, (resp.text or "")[:400],
+                    )
 
                 if resp.status_code == 200:
                     result = resp.json()
@@ -716,6 +899,8 @@ class AgnesVideoAPI:
                     if video_id:
                         # 记住提交 Key：此后轮询必须复用该 Key（见 _poll_task）
                         self._remember_task_key(video_id, key)
+                        # v7.7：快速模式命中队列 → 通知钩子收尾（enabled=False/success）
+                        self._fast_retry_notify_success(self._fast_retry_probes)
                         return video_id
 
                 if resp.status_code == 429 and ring.has_multiple() and rotations < max_rotations:
@@ -759,6 +944,70 @@ class AgnesVideoAPI:
                         else:
                             error_type = f"Busy{resp.status_code}"
                             error_message = message or f"HTTP {resp.status_code}: server busy"
+
+                        # ── v7.7 快速重试模式（用户显式开启，优先级高于常规忙轨）──
+                        # 期间**不消耗**常规忙轨次数（否则 15 次额度会在几分钟内烧光），
+                        # 到期/关闭后 hook 返回 None，原样回到下面的常规忙轨继续。
+                        fast_interval = self._fast_retry_decide(
+                            busy.retries,
+                            {
+                                "status": resp.status_code,
+                                "code": code,
+                                "attempt": busy.retries,
+                                "waited_s": waited,
+                                # v7.7：快速模式已打次数（计数在请求发出前递增）
+                                "probe": self._fast_retry_probes,
+                            },
+                        )
+                        if fast_interval is not None:
+                            fast_gap = fast_interval
+                            # 请求/响应原文已在上面逐跳打印，这里只补充节奏信息
+                            logger.warning(
+                                f"[AgnesVideo] {mode_desc}: fast mode active "
+                                f"(probe #{self._fast_retry_probes}, HTTP "
+                                f"{resp.status_code}{f' · {code}' if code else ''}), "
+                                f"next in {fast_interval:.1f}s "
+                                f"(waited {waited:.0f}s, busy quota intact)"
+                            )
+                            # 降采样落盘：高频探测若逐跳写 error_logs 会在几分钟内
+                            # 刷掉诊断目录（轮转上限 500 个），只保留首跳与每 20 跳。
+                            if (self._fast_retry_probes == 1
+                                    or self._fast_retry_probes % 20 == 0):
+                                collect_error(
+                                    "video", "submit_video",
+                                    prompt=payload.get("prompt", ""),
+                                    error_type=error_type,
+                                    error_message=error_message,
+                                    status_code=resp.status_code,
+                                    response_body=resp.text,
+                                    retry_count=busy.retries,
+                                    extra={
+                                        "mode": mode_desc, "upstream_code": code,
+                                        "waited_s": int(waited),
+                                        "fast_retry_probe": self._fast_retry_probes,
+                                    },
+                                )
+                            # 仅队列类信号下发进度回调（与常规忙轨一致）；
+                            # 高频下每秒一次的进度推送没有意义，只在第 1 跳推一次。
+                            if (progress_callback and code in QUEUE_FULL_CODES
+                                    and self._fast_retry_probes == 1):
+                                try:
+                                    progress_callback("queue_full", {
+                                        "attempt": busy.retries,
+                                        "waited_s": waited,
+                                        "status": resp.status_code,
+                                        "code": code,
+                                        "message": message,
+                                    })
+                                except Exception:
+                                    logger.debug(
+                                        "[AgnesVideo] fast-retry progress callback failed",
+                                        exc_info=True,
+                                    )
+                            continue
+
+                        # 快速模式到期/被关闭：本跳起恢复常规忙轨（含令牌桶节奏）
+                        fast_gap = 0.0
                         if busy.exhausted():
                             collect_error(
                                 "video", "submit_video",
@@ -1080,10 +1329,17 @@ class AgnesVideoAPI:
         from core.config import get_settings
         settings = get_settings()
         poll_timeout = settings.agnes_video_poll_timeout
+        # v7.8：优先内存绑定 → 其次按任务状态里的 Key 指纹恢复（进程重启/resume）
+        pinned_key = key or self._task_keys.get(video_id)
+        if pinned_key is None and self.key_hint_resolver is not None:
+            try:
+                pinned_key = self.key_hint_resolver(video_id)
+            except Exception as e:
+                logger.debug(f"[KeyBind] hint resolver failed: {e}")
         final = await self._poll_task(
             video_id, progress_callback=progress_callback,
             max_poll_duration=poll_timeout,
-            key=key or self._task_keys.get(video_id),
+            key=pinned_key,
         )
 
         video_url = (

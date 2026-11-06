@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "本人確認が未完了の場合、API 呼び出しの頻度が制限されます。",
   "noticeRealNameGlobal": "国際版（platform.agnes-ai.com）で登録したアカウントは、何もする必要がなく、今回の変更の影響も受けません。国際版コンソール（アカウントの登録サイト確認用）：",
   "noticeRealNameOutlook": "2026-10-26 12:00（北京時間）以降、503 や queue is full などの上流混雑エラーは大幅に改善する見込みです。",
-  "noticeRealNameGotIt": "了解しました"
+  "noticeRealNameGotIt": "了解しました",
+  "fastRetry.title": "高速リトライ",
+  "fastRetry.desc": "Agnes の動画キューが継続的に混雑しています。有効にすると設定した頻度で自動リトライします（この状態ではレート制限は発生しません）。送信成功または期限切れで通常のリトライに戻ります。毎分 1〜120 回、1〜30 分。",
+  "fastRetry.perMinute": "毎分の回数",
+  "fastRetry.minutes": "継続（分）",
+  "fastRetry.start": "高速リトライを有効化",
+  "fastRetry.stop": "高速リトライを停止",
+  "fastRetry.remaining": "高速リトライ中：毎分 {x} 回、残り {t}",
+  "fastRetry.expiredHint": "前回の高速リトライは期限切れです。再度有効にできます。",
+  "fastRetry.failed": "高速リトライの操作に失敗しました",
+  "fastRetry.attempts": "{n} 回送信済み",
+  "progress.video.polling": "生成中：{status} · 経過 {t}（タスク {vid}）"
 }

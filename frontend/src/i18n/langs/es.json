@@ -771,5 +771,16 @@
   "noticeRealNameFreq": "Sin verificación, la frecuencia de tus llamadas a la API se reducirá.",
   "noticeRealNameGlobal": "Si tu cuenta se registró en el sitio internacional (platform.agnes-ai.com), no necesitas hacer nada y este cambio no te afecta. Consola internacional (para confirmar a qué sitio pertenece tu cuenta):",
   "noticeRealNameOutlook": "Después del 2026-10-26 12:00 (hora de Pekín), errores de saturación del upstream como 503 y «queue is full» deberían reducirse notablemente.",
-  "noticeRealNameGotIt": "Entendido"
+  "noticeRealNameGotIt": "Entendido",
+  "fastRetry.title": "Reintento rápido",
+  "fastRetry.desc": "La cola de vídeo de Agnes está continuamente ocupada. Actívalo para reintentar con la frecuencia elegida (en este estado no se activa el límite de velocidad); el reintento normal se reanuda tras un envío correcto o al expirar. 1–120 intentos por minuto, 1–30 minutos.",
+  "fastRetry.perMinute": "Intentos / min",
+  "fastRetry.minutes": "Duración (min)",
+  "fastRetry.start": "Activar reintento rápido",
+  "fastRetry.stop": "Detener reintento rápido",
+  "fastRetry.remaining": "Reintento rápido: {x}/min, quedan {t}",
+  "fastRetry.expiredHint": "El reintento rápido anterior expiró; puedes activarlo de nuevo.",
+  "fastRetry.failed": "Falló la acción de reintento rápido",
+  "fastRetry.attempts": "{n} intentos enviados",
+  "progress.video.polling": "Generando: {status} · {t} transcurridos (tarea {vid})"
 }
