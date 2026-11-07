@@ -115,6 +115,47 @@ def _register_auth_failure(ring, key: str, resp) -> None:
     )
 
 
+# ── v7.9：任务查询端点双轨 ────────────────────────────────────────────
+#
+# 实测（2026-11-07，任务 8363228b8a2d / task_i0340b4VzAELyzMf1dRPApPjaWZIrnLT）：
+# 国内站 ``api.agnes-ai.cn`` 的 `GET /agnesapi?video_id=xxx` 对**任何**任务都
+# 返回 404「任务不存在」，而同一把 Key 打 `GET /v1/videos/{id}` 返回 200
+# （status=completed、progress=100、``metadata.url`` 即成品地址）；国际站
+# ``apihub.agnes-ai.com`` 两个端点都认（老端点 404 才是真的查不到）。
+# 此前只查老端点 → 国内站提交的任务从第一轮就 404，被 U9 当成「网关入库延迟」
+# 白等到 AGNES_VIDEO_POLL_TIMEOUT（1800s）后超时，成品其实早就生成好了。
+POLL_STYLE_LEGACY = "agnesapi"   # GET {root}/agnesapi?video_id=xxx（老网关端点）
+POLL_STYLE_REST = "v1"           # GET {root}/v1/videos/{id}（RESTful 端点）
+_POLL_STYLES = (POLL_STYLE_LEGACY, POLL_STYLE_REST)
+# /v1/videos 用 HTTP 400 + code 表达「任务不存在」（老端点用 404）
+_TASK_NOT_FOUND_CODES = {"task_not_exist", "task_not_found"}
+
+
+def _poll_url_for_style(key: str, video_id: str, model_param: str, style: str) -> str:
+    """按查询风格构造轮询 URL（域名严格取自该 Key 的绑定配置）。"""
+    if style == POLL_STYLE_REST:
+        return f"{get_base_url_for_key(key)}/videos/{video_id}"
+    return f"{get_api_root_for_key(key)}/agnesapi?video_id={video_id}{model_param}"
+
+
+def _is_task_not_found(resp) -> bool:
+    """是否「上游查不到该任务」——两站点表达方式不同，语义一致（U9 中间态）。
+
+    老端点：HTTP 404 ``{"error": {"code": 404, "message": "task not found"}}``；
+    REST 端点：HTTP 400 ``{"code": "task_not_exist"}``。
+    """
+    if resp.status_code == 404:
+        return True
+    if resp.status_code != 400:
+        return False
+    try:
+        body = resp.json()
+    except Exception:
+        return False
+    code = str((body or {}).get("code") or "").lower() if isinstance(body, dict) else ""
+    return code in _TASK_NOT_FOUND_CODES
+
+
 def _needs_portrait_rotation_fix(perf_w, perf_h, cont_w, cont_h) -> bool:
     """U3：判定 2.5 系列「容器竖、像素横」的竖屏躺倒缺陷签名。
 
@@ -603,6 +644,9 @@ class AgnesVideoAPI:
         「任务归属的 Key」，避免把错 Key 导致的 404 误判为「网关入库延迟」
         而无限轮询到 1800s 超时。
 
+        v7.9：每把 Key 都同时探「老网关端点」与「REST 端点」——国内站只认后者，
+        只探老端点会把真实存在的任务误判成「全部 Key 都查不到」。
+
         Returns:
             第一个能查到该任务的 Key；全部查不到返回 ``None``（交回 U9 语义）。
         """
@@ -610,26 +654,31 @@ class AgnesVideoAPI:
         if len(candidates) < 2:
             return None  # 单 Key 不存在「用错 Key」的可能
         for k in candidates:
-            url = f"{get_api_root_for_key(k)}/agnesapi?video_id={video_id}{model_param}"
-            try:
-                resp = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        requests.get, url,
-                        headers=self._auth_headers(k), timeout=10,
-                    ),
-                    timeout=20,
-                )
-                if resp.status_code == 200:
-                    logger.info(
-                        f"[KeyBind] Video {video_id[:16]}... 归属 Key 探测命中 "
-                        f"(key=...{k[-4:]}, domain={get_api_root_for_key(k)})"
+            for style in _POLL_STYLES:
+                url = _poll_url_for_style(k, video_id, model_param, style)
+                try:
+                    resp = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            requests.get, url,
+                            headers=self._auth_headers(k), timeout=10,
+                        ),
+                        timeout=20,
                     )
-                    return k
-            except Exception as e:
-                logger.debug(f"[KeyBind] owner probe failed for key=...{k[-4:]}: {e}")
+                    if resp.status_code == 200:
+                        logger.info(
+                            f"[KeyBind] Video {video_id[:16]}... 归属 Key 探测命中 "
+                            f"(key=...{k[-4:]}, domain={get_api_root_for_key(k)}, "
+                            f"endpoint={style})"
+                        )
+                        return k
+                except Exception as e:
+                    logger.debug(
+                        f"[KeyBind] owner probe failed for key=...{k[-4:]} "
+                        f"({style}): {e}"
+                    )
         logger.warning(
-            f"[KeyBind] Video {video_id[:16]}... 全部 {len(candidates)} 把 Key 均 404，"
-            f"按 U9「网关入库延迟」继续等待"
+            f"[KeyBind] Video {video_id[:16]}... 全部 {len(candidates)} 把 Key "
+            f"（两种查询端点）均查不到，按 U9「网关入库延迟」继续等待"
         )
         return None
 
@@ -673,12 +722,15 @@ class AgnesVideoAPI:
         # 2.5 系列查询需带 model_name（text 模式可省略，但带上更通用）
         model_param = f"&model_name={self.model}" if is_v25_video_model(self.model) else ""
         # URL 与 Key 严格配对：域名取自该 Key 的绑定配置（未绑定才回退全局域名）
-        def _poll_url_for(k: str) -> str:
-            return f"{get_api_root_for_key(k)}/agnesapi?video_id={video_id}{model_param}"
+        def _poll_url_for(k: str, style: str = POLL_STYLE_LEGACY) -> str:
+            return _poll_url_for_style(k, video_id, model_param, style)
 
         def _curl_for(url: str) -> str:
             return f'curl -s -H "Authorization: Bearer $AGNES_API_KEY" "{url}"'
 
+        # v7.9：已确认可用的查询端点（拿到 200 后固定下来，此后每轮只查它）；
+        # None = 尚未确认，本轮按「老网关 → REST」逐个试。国内站只认 REST。
+        poll_style: Optional[str] = None
         poll_url = _poll_url_for(poll_key)
         curl_cmd = _curl_for(poll_url)
         # v7.8：绑定丢失时只在第一次 404 做一次「Key 归属探测」，避免每轮多发 N 个请求
@@ -707,41 +759,64 @@ class AgnesVideoAPI:
                 # v7.8：10 次才打一行太稀疏（20s 起步 ≈ 200s 静默），改为每 5 次
                 if poll_count % 5 == 0:
                     logger.info(f"[AgnesVideo] Polling video {video_id[:16]}... (poll #{poll_count + 1}, elapsed {elapsed:.0f}s, key=...{(poll_key or '')[-4:]})")
-                # 全局限速：每次轮询都消耗一个令牌（2.3 异步原生，停止可打断）
-                await get_rate_limiter().acquire_async(self.shutdown_event)
-                # M2: 用 wait_for 包裹以支持取消
-                resp = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        requests.get,
-                        poll_url,
-                        headers=self._auth_headers(poll_key),
-                        timeout=15,
-                    ),
-                    timeout=30,
-                )
-                if resp.status_code == 429:
-                    # 任务与 Key 绑定：不换 Key（换 Key 可能打错站点或看不到任务），
-                    # 交给连续失败计数 + 自适应间隔退避后用同一把 Key 继续探
-                    logger.warning(
-                        f"[AgnesVideo] Poll 429 for {video_id[:16]}..., "
-                        f"保持同一 Key 重试（任务与 Key 绑定）"
+                # v7.9：端点双轨——已确认可用的只查它；否则本轮按「老网关 → REST」
+                # 逐个试（前者 404 立刻换后者，不 sleep），谁 200 就固定下来。
+                styles = [poll_style] if poll_style else list(_POLL_STYLES)
+                resp = None
+                for idx, style in enumerate(styles):
+                    style_url = _poll_url_for(poll_key, style)
+                    # 全局限速：每次轮询都消耗一个令牌（2.3 异步原生，停止可打断）
+                    await get_rate_limiter().acquire_async(self.shutdown_event)
+                    # M2: 用 wait_for 包裹以支持取消
+                    resp = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            requests.get,
+                            style_url,
+                            headers=self._auth_headers(poll_key),
+                            timeout=15,
+                        ),
+                        timeout=30,
                     )
-                # 401：只做归因登记（不换 Key、不改池），失败路径仍由 raise_for_status 保持原样
-                if resp.status_code == 401:
-                    _register_auth_failure(ring, poll_key, resp)
-                # U9：404（task not found）既可能是「记录尚未在网关任务库可见」，
-                # 也可能是 v7.8 实测的「用错 Key / 站点」（同 video_id 换 Key 一律 404）。
-                if resp.status_code == 404:
+                    poll_url = style_url
+                    curl_cmd = _curl_for(style_url)
+                    if resp.status_code == 429:
+                        # 任务与 Key 绑定：不换 Key（换 Key 可能打错站点或看不到任务），
+                        # 交给连续失败计数 + 自适应间隔退避后用同一把 Key 继续探
+                        logger.warning(
+                            f"[AgnesVideo] Poll 429 for {video_id[:16]}..., "
+                            f"保持同一 Key 重试（任务与 Key 绑定）"
+                        )
+                    # 401：只做归因登记（不换 Key、不改池），失败路径仍由 raise_for_status 保持原样
+                    if resp.status_code == 401:
+                        _register_auth_failure(ring, poll_key, resp)
+                    if resp.status_code == 200:
+                        if poll_style != style:
+                            logger.info(
+                                f"[AgnesVideo] Video {video_id[:16]}... 查询端点确认 "
+                                f"为 {style}（{style_url.split('?')[0]}）"
+                            )
+                        poll_style = style
+                        break
+                    if _is_task_not_found(resp) and idx < len(styles) - 1:
+                        continue  # 换另一个端点再试（U9 中间态，本跳不 sleep）
+                    break
+                # U9：查不到任务（404 / 400 task_not_exist）既可能是「记录尚未在网关
+                # 任务库可见」，也可能是 v7.8 实测的「用错 Key / 站点」（同 video_id
+                # 换 Key 一律查不到）。
+                if _is_task_not_found(resp):
+                    # 已确认的端点又开始查不到 → 下一轮重新做双端点确认
+                    poll_style = None
                     not_found_count += 1
                     poll_count += 1  # 计入自适应间隔与周期日志的推进
                     if not_found_count == 1 or not_found_count % 5 == 0:
                         logger.info(
                             f"[AgnesVideo] Video {video_id[:16]}... not yet visible "
-                            f"(404 task not found), poll #{not_found_count}, "
+                            f"(task not found: HTTP {resp.status_code}, 端点 "
+                            f"{'/'.join(styles)}), poll #{not_found_count}, "
                             f"elapsed {elapsed:.0f}s"
                         )
                     # 绑定丢失时做一次只读探测：谁查得到就固定用谁；
-                    # 全部 404 才按 U9「入库延迟」继续等（不误伤高峰期可见性延迟）。
+                    # 全部查不到才按 U9「入库延迟」继续等（不误伤高峰期可见性延迟）。
                     if pinned_key is None and not owner_probed:
                         owner_probed = True
                         found_key = await self._probe_owner_key(
@@ -754,6 +829,8 @@ class AgnesVideoAPI:
                             )
                             poll_key = found_key
                             pinned_key = found_key
+                            # 换 Key 可能换了站点，端点能力需重新确认
+                            poll_style = None
                             poll_url = _poll_url_for(poll_key)
                             curl_cmd = _curl_for(poll_url)
                             continue  # 立刻用正确 Key 重查，不额外 sleep
@@ -1351,8 +1428,13 @@ class AgnesVideoAPI:
             data = final.get("data", {})
             if isinstance(data, dict):
                 video_url = data.get("video_url") or data.get("url")
-            if not video_url:
-                raise RuntimeError(f"Agnes video: no URL in completed task: {final}")
+        if not video_url:
+            # v7.9：REST 端点（/v1/videos/{id}）把成品地址放在 metadata.url
+            meta = final.get("metadata")
+            if isinstance(meta, dict):
+                video_url = meta.get("url") or meta.get("video_url")
+        if not video_url:
+            raise RuntimeError(f"Agnes video: no URL in completed task: {final}")
 
         logger.info(f"[AgnesVideo] Done: {video_url[:80]}...")
         # U3：携带推理内部尺寸 + 校正开关（默认关闭；仅 2.5 系列探测「容器竖、

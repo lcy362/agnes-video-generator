@@ -187,8 +187,10 @@ async def test_poll_404_switches_to_owner_key_and_completes(api, monkeypatch):
     result = await api._poll_task(VID, key=None)
 
     assert result["status"] == "completed"
-    # k1 首轮 404 → 探测 k1(404) + k2(200) → 切换后用 k2 再查一次
-    assert calls == ["k1", "k1", "k2", "k2"]
+    # k1 查不到 → 探测到归属 Key 是 k2 → 固定改用 k2 查出 completed
+    # （v7.9 起每个 Key 会按「老端点 + REST 端点」逐个试，故 k1 的调用次数不再固定）
+    assert set(calls[:4]) == {"k1"}
+    assert calls[-1] == "k2"
     assert progress == ["completed"]
 
 
@@ -207,7 +209,7 @@ async def test_poll_all_keys_404_keeps_u9_semantics(api, monkeypatch, caplog):
     with pytest.raises(RuntimeError, match="Polling timed out"):
         await api._poll_task(VID, key=None, max_poll_duration=0.05)
 
-    assert "均 404" in caplog.text
+    assert "均查不到" in caplog.text
     assert "入库延迟" in caplog.text
 
 

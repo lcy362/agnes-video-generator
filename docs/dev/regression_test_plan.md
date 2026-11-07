@@ -615,8 +615,8 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 |----|------|---------|
 | PB1 | Key 指纹落盘 | 提交成功写 `video_key_hints`，值为 `sha256(Key)[:16]`，状态文件不含 Key 明文；重复绑定不重复落盘 |
 | PB2 | resume 反查 | 按指纹在当前 Key 池找回提交 Key（Key 顺序变化也能命中）；Key 被删时返回 None 并交给 404 探测 |
-| PB3 | 404 分流 | 首轮 404（错 Key）→ 探测到归属 Key → 固定切换域名与 URL → 立刻重查 → 拿到 `completed`；请求序列为 k1(404)/探测 k1(404)/探测 k2(200)/切换后 k2(200) |
-| PB4 | U9 语义保护 | 全部 Key 均 404 时不切换、不报错，打「均 404 / 入库延迟」日志并继续等；已有绑定时不做探测 |
+| PB3 | 404 分流 | 首轮查不到（错 Key）→ 探测到归属 Key → 固定切换域名与 URL → 立刻重查 → 拿到 `completed`（v7.9 起每个 Key 按「老端点 + REST 端点」逐个试，调用次数不固定，断言取「首个 k1、末次 k2」而非固定序列） |
+| PB4 | U9 语义保护 | 全部 Key（两种端点）均查不到时不切换、不报错，打「均查不到 / 入库延迟」日志并继续等；已有绑定时不做探测 |
 | PB5 | 进度透传 | `poll_progress_hook` 每轮被调用，流水线按「状态变化或 ≥25s」节流推送 `progress.video.polling` |
 | PB6 | 零回归 | 三个钩子默认 `None`，`retry_policy` / 令牌桶 / 忙轨判定均未改动 |
 
@@ -629,4 +629,30 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 
 ---
 
-*文档版本：v3.9 | 更新日期：2026-11-06 | 变更：新增 v7.8 轮询健壮性回归*
+## 十六、v7.9 轮询查询端点双轨回归（增量）
+
+> 新增于 v7.9（`docs/dev/agnes_video_upstream_behavior.md` §9）。
+> 触发：国内站（`api.agnes-ai.cn`）提交的任务，轮询走 `/agnesapi?video_id=` 一律 404
+> → 被 U9 当成「入库延迟」白等到 1800s 超时，成品其实早已生成。
+> 单测见 `tests/test_poll_endpoints.py`；本专项用 `PE*` 命名。
+
+### 16.1 单测（自动）
+
+| ID | 条目 | 验证要点 |
+|----|------|---------|
+| PE1 | 端点回退 | 老端点 404 → 同轮改用 `/v1/videos/{id}` → 200 `completed`；请求序列为 legacy/rest（不 sleep、不计失败） |
+| PE2 | 端点确认后不重复 | 首轮确认 REST 后，后续轮次只打 REST（不再打老端点，省配额） |
+| PE3 | `task_not_exist` 语义 | `/v1/videos` 的 `400 code=task_not_exist` 等同 404，按 U9 中间态继续等，**不抛 HTTPError** |
+| PE4 | 归属探测覆盖 REST | 老端点全 404 但 REST 200 时，`_probe_owner_key` 仍能找回归属 Key |
+| PE5 | 成品地址取值 | `wait_for_video` 能从 `metadata.url` 取到地址（REST 端点无顶层 `url`） |
+
+### 16.2 端到端（人工，国内站 Key + 一个已提交任务）
+
+| ID | 场景 | 验证要点 |
+|----|------|---------|
+| PE6 | 国内站任务 resume | 日志出现 `查询端点确认 为 v1（https://api.agnes-ai.cn/v1/videos/...）` → `status=completed` → 下载（字节数 > 0）+ 水印 → `final_video_file` 可播放 |
+| PE7 | 国际站任务零回归 | `com` 站点任务仍走 `/agnesapi`，首轮即 200，不产生多余请求 |
+
+---
+
+*文档版本：v3.10 | 更新日期：2026-11-07 | 变更：新增 v7.9 轮询查询端点双轨回归*

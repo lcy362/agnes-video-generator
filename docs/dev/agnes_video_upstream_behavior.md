@@ -1,7 +1,7 @@
 # Agnes 视频上游接口实测行为（Upstream Video API Behavior）
 
 > **文档定位**：记录 `apihub.agnes-ai.com` 视频接口**实测**的行为、错误语义与产物规格，供流水线重试策略、错误透出、回归判定与对外文档撰写时引用。本文只写「观测到的事实」，改进项见 `../plans/v7.0/upstream_error_handling_plan.md`。
-> **最近实测**：2026-10-14 晚（UTC+8，Issue #95 排查，提交侧探针，见 §4.0.2）。上一轮全链路实测 2026-09-28 上午（UTC+8），用本机 `AGNES_API_KEY` 直连上游，请求体逐字段复刻官网 `/en/demo` 前端（`video-website/components/demo/TextToVideo.tsx`）。样本量小（每档 1–2 次），标注为「单例」的结论不得当作稳定规律。
+> **最近实测**：2026-11-07 晚（UTC+8，任务 `8363228b8a2d` 轮询 404 排查，任务查询端点双轨，见 §9）。上一轮 2026-10-14 晚（Issue #95 排查，提交侧探针，见 §4.0.2）。全链路实测 2026-09-28 上午（UTC+8），用本机 `AGNES_API_KEY` 直连上游，请求体逐字段复刻官网 `/en/demo` 前端（`video-website/components/demo/TextToVideo.tsx`）。样本量小（每档 1–2 次），标注为「单例」的结论不得当作稳定规律。
 > **关联**：Issue #75（demo 报 "Video generation timed out"）、`docs/public/faq.md`、`docs/dev/regression_test_plan.md` F3、`docs/dev/pipeline_products.md`。
 
 ---
@@ -11,8 +11,8 @@
 | 用途 | 端点 | 实测结论 |
 |------|------|----------|
 | 提交生成 | `POST /v1/videos` | 正常。返回体同时含 `id` / `video_id` / `task_id` 三个字段（语义见 §2） |
-| 轮询状态 | `GET /agnesapi?video_id=<id>` | **唯一能拿到终态与失败原因的端点**。2.5 系列需追加 `&model_name=<model>` |
-| 查询单任务 | `GET /v1/videos/<id>` | 对本项目产生的任务一律 `400 {"code":"task_not_exist"}`，不可用 |
+| 轮询状态（老网关） | `GET /agnesapi?video_id=<id>` | `com` 站点可用，是拿终态与失败原因的主端点；2.5 系列需追加 `&model_name=<model>`。**`cn` 站点对任何任务都返回 404「任务不存在」，不可用**（见 §9） |
+| 查询单任务（RESTful） | `GET /v1/videos/<id>` | **`cn` 站点唯一可用**（200 + `metadata.url`），`com` 站点对该端点的本项目任务返回 `400 {"code":"task_not_exist"}`（见 §9） |
 | 任务列表 | `GET /v1/videos` | `404 {"message":"Invalid URL (GET /v1/videos)"}`，不存在 |
 | 模型清单 | `GET /v1/models` | 正常，含 `agnes-video-2.5-flash` 等 |
 | 文生图 | `POST /v1/images/generations` | 正常，同步返回（实测 11.6s 出 `data[0].url`） |
@@ -286,7 +286,50 @@ curl -sS -X POST https://apihub.agnes-ai.com/v1/videos \
 
 ---
 
-## 9. 复测方法
+## 9. 任务查询端点按站点不同：老网关 `/agnesapi` vs RESTful `/v1/videos/{id}`（v7.9，2026-11-07 实测）
+
+**故障现场**：任务 `8363228b8a2d`（`simple`，2026-11-06 18:51 用国内站 Key 提交成功，
+`video_id=task_i0340b4VzAELyzMf1dRPApPjaWZIrnLT`），提交后**每一轮轮询都 404**，
+状态一直停在 `init`；resume 后依旧 404，最终白等 1800s 超时。用户观感即「又 404 了」。
+
+**实测事实**（同一把国内站 Key、同一个 `video_id`）：
+
+| 端点 | 结果 |
+|------|------|
+| `GET https://api.agnes-ai.cn/agnesapi?video_id=<id>&model_name=agnes-video-2.5-flash` | `404 {"error":{"code":404,"message":"任务不存在"}}` |
+| `GET https://api.agnes-ai.cn/agnesapi?video_id=<id>`（不带 model_name） | 同上 404 |
+| `GET https://api.agnes-ai.cn/v1/videos/<id>` | **`200`**：`status=completed`、`progress=100`、`metadata.url=https://cos-platform-outputs.agnes-ai.cn/videos/...mp4` |
+| `GET https://apihub.agnes-ai.com/agnesapi?video_id=<id>`（换国际站 Key） | `401 Invalid token`（Key 与站点不匹配，符合 §8.4） |
+| `GET https://apihub.agnes-ai.com/v1/videos/<id>`（换国际站 Key） | `400 {"code":"task_not_exist"}` |
+
+- **结论 1**：`cn` 站点的 `/agnesapi` 查询端点**整个不可用**（对存在的任务也 404），
+  `cn` 站点只认 RESTful `/v1/videos/{id}`；`com` 站点反之沿用 `/agnesapi`。
+  这不是 Key 归属问题（v7.8 的错 Key 探测对此无效，探测同样是查 `/agnesapi`）。
+- **结论 2**：「查不到」的表达方式两站点不同——老端点 `HTTP 404 + error.code=404`，
+  REST 端点 `HTTP 400 + code=task_not_exist`。**`/v1/videos` 的 400 必须按 U9
+  「任务不可见」处理，不能当参数错误抛出。**
+- **结论 3**：REST 响应的成品地址在 `metadata.url`（老端点是顶层 `url`），
+  状态字段名一致（`status` / `progress`）。
+- **结论 4**：任务记录本身不会「过期消失」——`com` 站点同一批任务（`task_P3s1l...`）
+  在 28 小时后查是 `task_not_exist`，但那是端点/站点差异，不能据此推断保留期。
+
+**代码落点**（`core/api/agnes_video.py`）：`_poll_task` 采用**端点双轨**——先试老网关端
+点，命中「查不到」就同轮改用 REST 端点（不额外 sleep），谁返回 200 就把该端点固定下来
+（`poll_style`，换 Key 后重新确认）；`_probe_owner_key` 每把 Key 也同时探两个端点；
+`wait_for_video` 增加 `metadata.url` 取值。单测 `tests/test_poll_endpoints.py`。
+
+**复测命令**：
+
+```bash
+KEY=<国内站 Key>; VID=<video_id>
+curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $KEY" \
+  "https://api.agnes-ai.cn/agnesapi?video_id=$VID&model_name=agnes-video-2.5-flash"   # 期望 404
+curl -s -H "Authorization: Bearer $KEY" "https://api.agnes-ai.cn/v1/videos/$VID"      # 期望 200
+```
+
+---
+
+## 10. 复测方法
 
 无需启动本项目服务，直接复放上游调用即可（与官网 demo 同链路）：
 
