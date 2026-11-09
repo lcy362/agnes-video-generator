@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "Referenzaudio muss eine öffentliche http(s)-URL sein.",
   "ratioLandscape": "Querformat",
   "ratioPortrait": "Hochformat",
-  "ratioSquare": "Quadrat",
-  "fastRetry.perSecond": "Versuche / Sek",
-  "fastRetry.remainingPerSecond": "Schnellwiederholung: {x}/Sek, verbleibend {t}",
-  "fastRetry.descPerSecond": "Erhöhe die Aktualisierungsrate bei belegter Warteschlange: 0,1–2 Versuche/Sek für 1–30 Minuten; nach Erfolg oder Ablauf greift wieder die normale Wiederholung."
+  "ratioSquare": "Quadrat"
 }

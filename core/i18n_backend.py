@@ -415,8 +415,8 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "en": "Agnes video queue is busy repeatedly (HTTP {status} · {code}, {n} in a row). You can enable Fast retry on the progress page to probe more frequently and enter the queue sooner.",
     },
     "progress.video.fast_retry.active": {
-        "zh": "快速重试已开启：每秒 {x} 次，持续 {y} 分钟。提交成功或到期后自动恢复常规重试。",
-        "en": "Fast retry enabled: {x} attempts/sec for {y} min. Normal retry resumes on success or expiry.",
+        "zh": "快速重试已开启：每分钟 {x} 次，持续 {y} 分钟。提交成功或到期后自动恢复常规重试。",
+        "en": "Fast retry enabled: {x} attempts/min for {y} min. Normal retry resumes on success or expiry.",
     },
     "progress.video.fast_retry.expired": {
         "zh": "快速重试已到期（{y} 分钟），已恢复常规重试节奏。",
@@ -435,8 +435,8 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "en": "Fast retry is not available yet — it unlocks after 2 consecutive queue-busy (503) responses.",
     },
     "fast_retry.invalid_range": {
-        "zh": "参数超出范围：每秒 {xmin}–{xmax} 次，持续 {ymin}–{ymax} 分钟。",
-        "en": "Parameters out of range: {xmin}–{xmax} attempts per second, {ymin}–{ymax} minutes.",
+        "zh": "参数超出范围：每分钟 {xmin}–{xmax} 次，持续 {ymin}–{ymax} 分钟。",
+        "en": "Parameters out of range: {xmin}–{xmax} attempts per minute, {ymin}–{ymax} minutes.",
     },
     # ── v7.8：轮询进度透传（每轮状态变化时刷新进度页文案）──
     "progress.video.polling": {

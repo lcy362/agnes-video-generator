@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "เสียงอ้างอิงต้องเป็น URL http(s) ที่เข้าถึงได้สาธารณะ",
   "ratioLandscape": "แนวนอน",
   "ratioPortrait": "แนวตั้ง",
-  "ratioSquare": "สี่เหลี่ยมจัตุรัส",
-  "fastRetry.perSecond": "ครั้ง/วินาที",
-  "fastRetry.remainingPerSecond": "ลองใหม่แบบเร็ว: {x}/วินาที เหลือ {t}",
-  "fastRetry.descPerSecond": "เพิ่มความถี่ขณะคิวไม่ว่าง: 0.1–2 ครั้ง/วินาที นาน 1–30 นาที กลับสู่การลองใหม่ปกติเมื่อสำเร็จหรือหมดเวลา"
+  "ratioSquare": "สี่เหลี่ยมจัตุรัส"
 }

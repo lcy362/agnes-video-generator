@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "Referans ses herkese açık bir http(s) URL'si olmalıdır.",
   "ratioLandscape": "Yatay",
   "ratioPortrait": "Dikey",
-  "ratioSquare": "Kare",
-  "fastRetry.perSecond": "Deneme / sn",
-  "fastRetry.remainingPerSecond": "Hızlı yeniden deneme: {x}/sn, kalan {t}",
-  "fastRetry.descPerSecond": "Kuyruk yoğunken yenileme hızını artırın: 1–30 dakika boyunca 0,1–2 deneme/sn; başarı veya süre bitiminde normal yeniden denemeye dönülür."
+  "ratioSquare": "Kare"
 }

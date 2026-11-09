@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "يجب أن يكون الصوت المرجعي رابط http(s) عامًا.",
   "ratioLandscape": "أفقي",
   "ratioPortrait": "عمودي",
-  "ratioSquare": "مربع",
-  "fastRetry.perSecond": "محاولات / ثانية",
-  "fastRetry.remainingPerSecond": "إعادة محاولة سريعة: {x}/ثانية، المتبقي {t}",
-  "fastRetry.descPerSecond": "ارفع معدل التحديث أثناء انشغال الطابور: 0.1–2 محاولة/ثانية لمدة 1–30 دقيقة؛ تعود المحاولة العادية بعد النجاح أو الانتهاء."
+  "ratioSquare": "مربع"
 }

@@ -800,8 +800,5 @@
   "simpleAudioUrlInvalid": "参考音频必须是 http(s) 开头的公开链接",
   "ratioLandscape": "横屏",
   "ratioPortrait": "竖屏",
-  "ratioSquare": "方形",
-  "fastRetry.perSecond": "次 / 秒",
-  "fastRetry.remainingPerSecond": "快速重试：{x} 次/秒，剩余 {t}",
-  "fastRetry.descPerSecond": "队列持续繁忙时可提高刷新频率：每秒 0.1–2 次，持续 1–30 分钟；提交成功或到期后自动回到常规重试。"
+  "ratioSquare": "方形"
 }

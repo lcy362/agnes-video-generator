@@ -382,13 +382,13 @@ async def set_fast_retry(
     if per_minute and not (FAST_RETRY_MIN_PER_MINUTE <= per_minute <= FAST_RETRY_MAX_PER_MINUTE):
         raise HTTPException(status_code=422, detail=translate(
             "fast_retry.invalid_range", None,
-            xmin=0.1, xmax=2,  # 界面单位：次/秒
+            xmin=FAST_RETRY_MIN_PER_MINUTE, xmax=FAST_RETRY_MAX_PER_MINUTE,
             ymin=FAST_RETRY_MIN_MINUTES, ymax=FAST_RETRY_MAX_MINUTES,
         ))
     if minutes and not (FAST_RETRY_MIN_MINUTES <= minutes <= FAST_RETRY_MAX_MINUTES):
         raise HTTPException(status_code=422, detail=translate(
             "fast_retry.invalid_range", None,
-            xmin=0.1, xmax=2,  # 界面单位：次/秒
+            xmin=FAST_RETRY_MIN_PER_MINUTE, xmax=FAST_RETRY_MAX_PER_MINUTE,
             ymin=FAST_RETRY_MIN_MINUTES, ymax=FAST_RETRY_MAX_MINUTES,
         ))
 
@@ -410,9 +410,9 @@ async def set_fast_retry(
         cfg.attempts = 0          # 每轮开启重新计数（面板展示「已发 N 次」）
         cfg.started_at = datetime.now().isoformat(timespec="seconds")
         cfg.finished_reason = ""
-        # 界面单位是「次/秒」，进度消息同步换算（后端存储仍是 per_minute）
+        # 界面与进度消息统一用「次/分钟」，与 per_minute 存储一致
         msg_key, msg_params = "progress.video.fast_retry.active", {
-            "x": round(x / 60, 1), "y": y,
+            "x": x, "y": y,
         }
     else:
         cfg.enabled = False

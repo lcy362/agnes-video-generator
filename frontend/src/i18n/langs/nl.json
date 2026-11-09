@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "Referentie-audio moet een openbare http(s)-URL zijn.",
   "ratioLandscape": "Liggend",
   "ratioPortrait": "Staand",
-  "ratioSquare": "Vierkant",
-  "fastRetry.perSecond": "Pogingen / sec",
-  "fastRetry.remainingPerSecond": "Snel opnieuw: {x}/sec, resterend {t}",
-  "fastRetry.descPerSecond": "Verhoog de frequentie zolang de wachtrij bezet is: 0,1–2 pogingen/sec gedurende 1–30 minuten; daarna weer normale retry."
+  "ratioSquare": "Vierkant"
 }

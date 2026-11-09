@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "참조 오디오는 공개 http(s) URL이어야 합니다.",
   "ratioLandscape": "가로",
   "ratioPortrait": "세로",
-  "ratioSquare": "정사각형",
-  "fastRetry.perSecond": "회 / 초",
-  "fastRetry.remainingPerSecond": "빠른 재시도: 초당 {x}회, 남은 시간 {t}",
-  "fastRetry.descPerSecond": "대기열이 혼잡한 동안 갱신 빈도를 높입니다: 초당 0.1~2회, 1~30분. 성공 또는 만료 후 일반 재시도로 돌아갑니다."
+  "ratioSquare": "정사각형"
 }

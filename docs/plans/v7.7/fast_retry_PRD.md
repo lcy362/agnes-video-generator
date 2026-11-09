@@ -23,7 +23,7 @@ v7.2 起忙轨采用「首跳 0s 贴限流 + 之后固定 30–60s + 次数封�
 
 1. 连续两次 503 之后，页面上出现开关；
 2. 用户可开启，开启后即**快速连打**；
-3. 可配置「每秒 x 次」+「持续 y 分钟」（后端契约仍是 `per_minute`，前端提交时 ×60 换算）；
+3. 可配置「每分钟 x 次」+「持续 y 分钟」（与后端 `per_minute` 契约一致，界面直接透传，不做单位换算）；
 4. 提交成功或到达 y 分钟后，恢复**正常模式**；
 5. **不干扰其他逻辑**。
 
@@ -43,7 +43,7 @@ idle ──(连续 2 次忙信号)──> available ──(用户开启)──> 
 |---|---|---|
 | `available` | 连续 2 次忙信号后 True，前端据此显示开关 | False |
 | `enabled` | 用户已开启 | False |
-| `per_minute` | 每分钟次数 x（1–120）；界面按「次/秒」输入（0.1–2），提交时 ×60 换算 | 30（`AGNES_FAST_RETRY_PER_MINUTE`） |
+| `per_minute` | 每分钟次数 x（1–120）；界面、状态行与进度消息同用「次/分钟」，直接透传 | 30（`AGNES_FAST_RETRY_PER_MINUTE`） |
 | `minutes` | 持续分钟数 y（1–30） | 3（`AGNES_FAST_RETRY_MINUTES`） |
 | `consecutive_busy` | 连续忙信号计数（成功清零） | 0 |
 | `attempts` | 快速模式期间**已发出的请求次数**（含成功那跳，面板显示「已发 N 次」） | 0 |
@@ -99,7 +99,7 @@ Content-Type: multipart/form-data
 | **逐跳请求日志** | `[FastRetry] probe #N → POST <url> \| key=<脱敏> \| payload=<完整字段，prompt 截断至 80 字>` |
 | **逐跳响应日志** | `[FastRetry] probe #N ← HTTP <code> in <耗时>s \| body=<响应体前 400 字>` |
 | 节奏日志 | `[AgnesVideo] ... fast mode active (probe #N, HTTP ...), next in <间隔>s (busy quota intact)` |
-| 面板计数 | `fast_retry.attempts` 每跳更新内存值、最多每 1 秒落盘一次（避免 2 次/秒把状态文件写爆），到期/成功/关闭各再落一次保证终值；前端快速模式期间 1s 轮询，实时刷新 |
+| 面板计数 | `fast_retry.attempts` 每跳更新内存值、最多每 1 秒落盘一次（120 次/分钟≈2 次/秒，避免把状态文件写爆），到期/成功/关闭各再落一次保证终值；前端快速模式期间 1s 轮询，实时刷新 |
 | 任务消息 | `progress.video.fast_retry.{available,active,expired,success,disabled}`（后端 zh/en 兜底 + 前端 22 语言） |
 | `error_logs/` | 快速模式**降采样**：仅第 1 跳与每 20 跳落盘（否则 30 次/分钟 × 3 分钟会刷掉诊断目录轮转上限） |
 

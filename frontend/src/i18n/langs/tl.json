@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "Ang reference na audio ay dapat pampublikong http(s) URL.",
   "ratioLandscape": "Landscape",
   "ratioPortrait": "Portrait",
-  "ratioSquare": "Parisukat",
-  "fastRetry.perSecond": "Pagtatangka / seg",
-  "fastRetry.remainingPerSecond": "Mabilis na pagtatangka: {x}/seg, {t} natitira",
-  "fastRetry.descPerSecond": "Taasan ang refresh rate habang abala ang pila: 0.1–2 pagtatangka/seg sa 1–30 minuto; babalik sa normal na pagtatangka pagkatapos ng tagumpay o pag-expire."
+  "ratioSquare": "Parisukat"
 }

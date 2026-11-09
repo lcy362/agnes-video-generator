@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "حوالہ آڈیو عوامی http(s) URL ہونی چاہیے۔",
   "ratioLandscape": "افقی",
   "ratioPortrait": "عمودی",
-  "ratioSquare": "مربع",
-  "fastRetry.perSecond": "کوششیں / سیکنڈ",
-  "fastRetry.remainingPerSecond": "تیز دوبارہ کوشش: {x}/سیکنڈ، باقی {t}",
-  "fastRetry.descPerSecond": "قطار مصروف رہنے پر ریفریش کی شرح بڑھائیں: 1–30 منٹ تک 0.1–2 کوششیں/سیکنڈ؛ کامیابی یا اختتام پر عام دوبارہ کوشش واپس آتی ہے۔"
+  "ratioSquare": "مربع"
 }

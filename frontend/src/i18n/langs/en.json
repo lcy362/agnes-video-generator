@@ -800,8 +800,5 @@
   "simpleAudioUrlInvalid": "Reference audio must be a public http(s) URL.",
   "ratioLandscape": "Landscape",
   "ratioPortrait": "Portrait",
-  "ratioSquare": "Square",
-  "fastRetry.perSecond": "Attempts / sec",
-  "fastRetry.remainingPerSecond": "Fast retry: {x}/sec, {t} left",
-  "fastRetry.descPerSecond": "Raise the refresh rate while the queue stays busy: 0.1–2 attempts/sec for 1–30 minutes; normal retry resumes after success or expiry."
+  "ratioSquare": "Square"
 }

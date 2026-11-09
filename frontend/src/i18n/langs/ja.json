@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "参照音声は公開された http(s) URL である必要があります。",
   "ratioLandscape": "横長",
   "ratioPortrait": "縦長",
-  "ratioSquare": "正方形",
-  "fastRetry.perSecond": "回 / 秒",
-  "fastRetry.remainingPerSecond": "高速再試行: {x} 回/秒、残り {t}",
-  "fastRetry.descPerSecond": "キューが混雑している間、更新頻度を上げます：毎秒 0.1〜2 回、1〜30 分間。成功または期限切れで通常の再試行に戻ります。"
+  "ratioSquare": "正方形"
 }

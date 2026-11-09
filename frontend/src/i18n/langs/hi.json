@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "संदर्भ ऑडियो सार्वजनिक http(s) URL होना चाहिए।",
   "ratioLandscape": "लैंडस्केप",
   "ratioPortrait": "पोर्ट्रेट",
-  "ratioSquare": "वर्ग",
-  "fastRetry.perSecond": "प्रयास / सेकंड",
-  "fastRetry.remainingPerSecond": "तेज़ पुनःप्रयास: {x}/सेकंड, शेष {t}",
-  "fastRetry.descPerSecond": "कतार व्यस्त रहने पर रीफ़्रेश दर बढ़ाएँ: 1–30 मिनट तक 0.1–2 प्रयास/सेकंड; सफलता या समाप्ति पर सामान्य पुनःप्रयास लौटता है।"
+  "ratioSquare": "वर्ग"
 }

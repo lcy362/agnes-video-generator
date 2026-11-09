@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "Audio rujukan mesti URL http(s) awam.",
   "ratioLandscape": "Landskap",
   "ratioPortrait": "Potret",
-  "ratioSquare": "Segi empat sama",
-  "fastRetry.perSecond": "Cubaan / saat",
-  "fastRetry.remainingPerSecond": "Cuba cepat: {x}/saat, baki {t}",
-  "fastRetry.descPerSecond": "Tingkatkan kadar muat semula semasa baris gilir sibuk: 0.1–2 cubaan/saat selama 1–30 minit; cuba semula biasa kembali selepas berjaya atau tamat."
+  "ratioSquare": "Segi empat sama"
 }

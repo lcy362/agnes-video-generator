@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "Âm thanh tham chiếu phải là URL http(s) công khai.",
   "ratioLandscape": "Ngang",
   "ratioPortrait": "Dọc",
-  "ratioSquare": "Vuông",
-  "fastRetry.perSecond": "Lần / giây",
-  "fastRetry.remainingPerSecond": "Thử lại nhanh: {x}/giây, còn {t}",
-  "fastRetry.descPerSecond": "Tăng tần suất khi hàng đợi bận: 0,1–2 lần/giây trong 1–30 phút; thử lại thường trở lại sau khi thành công hoặc hết hạn."
+  "ratioSquare": "Vuông"
 }

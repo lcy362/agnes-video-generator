@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "Референсное аудио должно быть публичной http(s)-ссылкой.",
   "ratioLandscape": "Альбомная",
   "ratioPortrait": "Портретная",
-  "ratioSquare": "Квадрат",
-  "fastRetry.perSecond": "Попыток / сек",
-  "fastRetry.remainingPerSecond": "Быстрый повтор: {x}/сек, осталось {t}",
-  "fastRetry.descPerSecond": "Повысьте частоту, пока очередь занята: 0,1–2 попытки/сек в течение 1–30 минут; после успеха или истечения срока возвращается обычный повтор."
+  "ratioSquare": "Квадрат"
 }

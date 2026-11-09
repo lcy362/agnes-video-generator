@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "রেফারেন্স অডিও প্রকাশ্য http(s) URL হতে হবে।",
   "ratioLandscape": "ল্যান্ডস্কেপ",
   "ratioPortrait": "পোর্ট্রেট",
-  "ratioSquare": "বর্গ",
-  "fastRetry.perSecond": "চেষ্টা / সেকেন্ড",
-  "fastRetry.remainingPerSecond": "দ্রুত পুনঃচেষ্টা: {x}/সেকেন্ড, বাকি {t}",
-  "fastRetry.descPerSecond": "সারি ব্যস্ত থাকলে রিফ্রেশ হার বাড়ান: ১–৩০ মিনিট ধরে ০.১–২ চেষ্টা/সেকেন্ড; সফল বা মেয়াদ শেষে সাধারণ পুনঃচেষ্টা ফিরে আসে।"
+  "ratioSquare": "বর্গ"
 }

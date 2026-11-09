@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "L'audio di riferimento deve essere un URL http(s) pubblico.",
   "ratioLandscape": "Orizzontale",
   "ratioPortrait": "Verticale",
-  "ratioSquare": "Quadrato",
-  "fastRetry.perSecond": "Tentativi / s",
-  "fastRetry.remainingPerSecond": "Tentativo rapido: {x}/s, restano {t}",
-  "fastRetry.descPerSecond": "Aumenta la frequenza mentre la coda è occupata: 0,1–2 tentativi/s per 1–30 minuti; il retry normale riprende dopo successo o scadenza."
+  "ratioSquare": "Quadrato"
 }

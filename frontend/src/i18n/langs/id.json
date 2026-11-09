@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "Audio referensi harus berupa URL http(s) publik.",
   "ratioLandscape": "Lanskap",
   "ratioPortrait": "Potret",
-  "ratioSquare": "Persegi",
-  "fastRetry.perSecond": "Percobaan / detik",
-  "fastRetry.remainingPerSecond": "Coba cepat: {x}/detik, sisa {t}",
-  "fastRetry.descPerSecond": "Tingkatkan laju penyegaran saat antrean sibuk: 0,1–2 percobaan/detik selama 1–30 menit; coba ulang normal kembali setelah berhasil atau kedaluwarsa."
+  "ratioSquare": "Persegi"
 }

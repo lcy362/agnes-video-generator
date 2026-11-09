@@ -807,8 +807,5 @@
   "simpleAudioUrlInvalid": "صدای مرجع باید یک نشانی http(s) عمومی باشد.",
   "ratioLandscape": "افقی",
   "ratioPortrait": "عمودی",
-  "ratioSquare": "مربع",
-  "fastRetry.perSecond": "تلاش / ثانیه",
-  "fastRetry.remainingPerSecond": "تلاش سریع: {x}/ثانیه، باقی‌مانده {t}",
-  "fastRetry.descPerSecond": "هنگام شلوغی صف، نرخ تازه‌سازی را افزایش دهید: ۰.۱–۲ تلاش در ثانیه برای ۱–۳۰ دقیقه؛ پس از موفقیت یا پایان، تلاش عادی بازمی‌گردد."
+  "ratioSquare": "مربع"
 }
