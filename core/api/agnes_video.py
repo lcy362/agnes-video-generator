@@ -27,6 +27,7 @@ from core.config import (
     get_api_root_for_key,
     get_base_url_for_key,
     is_v25_video_model,
+    normalize_video_size,
     width_height_to_aspect_ratio,
 )
 from utils.image_normalizer import normalize_reference_path
@@ -1299,6 +1300,9 @@ class AgnesVideoAPI:
         seed: Optional[int] = None,
         negative_prompt: Optional[str] = None,
         progress_callback=None,
+        first_frame: Optional[str] = None,
+        last_frame: Optional[str] = None,
+        reference_audio_urls: Optional[List[str]] = None,
         **kwargs,
     ) -> str:
         # 2.5 系列为标准协议（v6.2）：mode / seconds / size / aspect_ratio。
@@ -1312,6 +1316,9 @@ class AgnesVideoAPI:
             height=height,
             seed=seed,
             progress_callback=progress_callback,
+            first_frame=first_frame,
+            last_frame=last_frame,
+            reference_audio_urls=reference_audio_urls,
             **kwargs,
         )
 
@@ -1334,23 +1341,30 @@ class AgnesVideoAPI:
         height: int = 720,
         seed: Optional[int] = None,
         progress_callback=None,
+        first_frame: Optional[str] = None,
+        last_frame: Optional[str] = None,
+        reference_audio_urls: Optional[List[str]] = None,
         **kwargs,
     ) -> str:
         """2.5 / 2.5-flash 新协议提交：mode / seconds / size / aspect_ratio。
 
         与 v2.0 的关键差异：
-        - size 固定 720P（flash）或 720P/960P/2K（2.5）；不传 width/height/num_frames
+        - size 走官方枚举（flash 强制 720P；2.5 支持 720P/1080P/1K/2K）
         - seconds 为字符串 "4"–"12"
-        - 单参考图 → reference(images)；多图 → keyframe(first_frame + last_frame)
+        - 首/尾帧 → 原生 keyframe（first_frame/last_frame）
+        - 参考图 → reference(images)；参考音频 → reference(audios)
         - 不支持 negative_prompt（忽略）
+
+        模式互斥（官方规则）：``text`` 不允许任何媒体字段；``keyframe`` 只允许
+        first_frame/last_frame；``reference`` 只允许 images/audios/videos。
+        调用方若混传，本方法按「keyframe > reference > text」取舍，保证不触发
+        上游 400（前端/路由层另有显式校验）。
         """
         # 时长：duration(秒) → seconds 字符串（4–12，超界截断）
         secs = int(duration) if duration else 5
         seconds = str(max(4, min(secs, 12)))
-        # 分辨率：flash 固定 720P；2.5 用 video_size 参数（缺省 720P）
-        size = kwargs.get("video_size") or "720P"
-        if self.model == "agnes-video-2.5-flash":
-            size = "720P"
+        # 分辨率：官方枚举归一（旧 960P → 1080P；flash 强制 720P）
+        size = normalize_video_size(kwargs.get("video_size"), self.model)
         aspect_ratio = self._width_height_to_aspect_ratio(width, height)
 
         payload: dict = {
@@ -1364,24 +1378,58 @@ class AgnesVideoAPI:
         if seed is not None:
             payload["seed"] = seed
 
-        # 参考图解析（与 v2.0 一致：归一化 + 上传为公开 URL）
-        resolved_refs = []
-        for p in reference_image_paths:
-            norm = await asyncio.to_thread(normalize_reference_path, p, width, height)
-            resolved_refs.append(await self._resolve_image_ref(norm))
-        n_refs = len(resolved_refs)
+        async def _resolve(src: str) -> str:
+            """本地图片 → 归一化 → 公开 URL（与既有参考图链路一致）。"""
+            norm = await asyncio.to_thread(normalize_reference_path, src, width, height)
+            return await self._resolve_image_ref(norm)
 
-        if n_refs == 1:
+        # 参考图（reference 模式，多图）
+        resolved_refs: List[str] = []
+        for p in reference_image_paths:
+            if p:
+                resolved_refs.append(await _resolve(p))
+        # 首尾帧（keyframe 模式，原生字段）
+        resolved_first = await _resolve(first_frame) if first_frame else ""
+        resolved_last = await _resolve(last_frame) if last_frame else ""
+        # 参考音频（仅接受公开 http(s) URL；本地文件上传通道暂不支持音频）
+        audios = [
+            u.strip() for u in (reference_audio_urls or [])
+            if isinstance(u, str) and u.strip().startswith(("http://", "https://"))
+        ][:3]
+
+        # 原生 keyframe 开关（默认开）。关闭后回落 v6.2.1 的 reference 多图降级，
+        # 便于上游若仍存在「keyframe 固定 704×704」问题时一键回退。
+        native_keyframe = os.environ.get("AGNES_KEYFRAME_NATIVE", "1").strip().lower() not in (
+            "0", "false", "off", "no",
+        )
+        max_refs = 5 if self.model == "agnes-video-2.5-flash" else 8
+
+        if (resolved_first or resolved_last) and native_keyframe:
+            payload["mode"] = "keyframe"
+            if resolved_first:
+                payload["first_frame"] = resolved_first
+            if resolved_last:
+                payload["last_frame"] = resolved_last
+            mode_desc = (
+                "keyframe (first+last)" if resolved_first and resolved_last
+                else ("keyframe (first)" if resolved_first else "keyframe (last)")
+            )
+        elif resolved_first or resolved_last or resolved_refs or audios:
             payload["mode"] = "reference"
-            payload["images"] = resolved_refs
-            mode_desc = "reference (1 image)"
-        elif n_refs >= 2:
-            # v6.2.1: Agnes 2.5 系列 keyframe 模式固定输出 704x704 正方形
-            # （忽略 aspect_ratio，竖屏/横屏画面会被拉伸，人物显宽）。
-            # 降级为 reference 模式（多图参考，≤5 张），输出遵循 aspect_ratio。
-            payload["mode"] = "reference"
-            payload["images"] = resolved_refs[:5]
-            mode_desc = f"reference ({n_refs} images, keyframe fallback)"
+            images = resolved_refs
+            if not native_keyframe:
+                # 降级路径：首尾帧并入参考图（旧行为），输出遵循 aspect_ratio
+                images = [x for x in (resolved_first, resolved_last) if x] + images
+            if images:
+                payload["images"] = images[:max_refs]
+            if audios:
+                payload["audios"] = audios
+            descs = []
+            if images:
+                descs.append(f"{len(images)} image(s)")
+            if audios:
+                descs.append(f"{len(audios)} audio(s)")
+            mode_desc = "reference (" + ", ".join(descs) + ")"
         else:
             mode_desc = "text-to-video"
 

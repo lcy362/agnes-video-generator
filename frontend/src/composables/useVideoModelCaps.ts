@@ -91,18 +91,18 @@ export function useVideoModelCaps() {
     ]
   }
 
-  // 时长选项
+  // 时长选项（兜底与后端 VIDEO_25_DURATIONS 同源，避免未适配模型选中即 422）
   function durationOptions(model: string): number[] {
     const c = capsOf(model)
     if (c.durations && Array.isArray(c.durations)) return c.durations
-    return [5, 10, 15, 18, 20]
+    return [4, 5, 6, 8, 10, 12]
   }
 
-  // 画幅比例选项
+  // 画幅比例选项（兜底顺序与后端 VIDEO_ASPECT_RATIOS 一致）
   function ratioOptions(model: string): string[] {
     const c = capsOf(model)
     if (c.resolution && c.resolution.ratios) return c.resolution.ratios
-    return ['16:9', '9:16', '1:1', '21:9', '4:3', '3:4']
+    return ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16']
   }
 
   // 清晰度档位选项（v2.0 无）
@@ -148,6 +148,12 @@ export function useVideoModelCaps() {
     return c.max_ref_images ?? null
   }
 
+  // 参考音频上限（None = 不支持/不限）
+  function maxRefAudios(model: string): number | null {
+    const c = capsOf(model)
+    return c.max_ref_audios ?? null
+  }
+
   // 支持参考视频？
   function supportsRefVideo(model: string): boolean {
     return !!capsOf(model).supports_ref_video
@@ -186,6 +192,7 @@ export function useVideoModelCaps() {
     ratioWHText,
     supportsNegative,
     maxRefImages,
+    maxRefAudios,
     supportsRefVideo,
     descOf,
     allCapabilities,

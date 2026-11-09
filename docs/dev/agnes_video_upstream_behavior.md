@@ -329,6 +329,54 @@ curl -s -H "Authorization: Bearer $KEY" "https://api.agnes-ai.cn/v1/videos/$VID"
 
 ---
 
+## 9.5 官方最新参数表与本项目对齐（v8.0，2026-11 核对）
+
+**来源**（官方 wiki 文档，2026 版；`agnes-ai.com/doc/...` 同文）：
+
+- <https://wiki.agnes-ai.com/zh-Hans/docs/agnes-video-25>
+- <https://wiki.agnes-ai.com/zh-Hans/docs/agnes-video-25-flash>
+
+> 官网营销页 `/api-docs` 仍是 2026-08 的 v2.0 旧协议（`width`/`height`/`num_frames`），
+> 不可作为契约依据。以上表 + 本文实测结论为准。
+
+### 9.5.1 公共参数
+
+| 参数 | 取值 | 说明 |
+|---|---|---|
+| `model` | `agnes-video-2.5-flash` / `agnes-video-2.5` | — |
+| `prompt` | string | 必填 |
+| `mode` | `text` / `keyframe` / `reference` | 必填；模式互斥规则见下 |
+| `seconds` | `"4"`–`"12"` | 默认 `"5"` |
+| `size` | flash 固定 `720P`；2.5 `720P/1080P/1K/2K` | **历史 `960P` 上游不存在**；v8.0 起自动归一 `1080P` |
+| `aspect_ratio` | `21:9/16:9/4:3/1:1/3:4/9:16` | 默认 `16:9` |
+| `seed` | int | 可选 |
+| `n` | 仅 `1` | 不暴露 |
+
+### 9.5.2 模式专用参数
+
+| 模式 | 允许字段 | 规则 |
+|---|---|---|
+| `text` | 无媒体字段 | 传任何媒体字段均非法 |
+| `keyframe` | `first_frame` / `last_frame` | 至少一个；不允许 `images`/`audios`/`videos` |
+| `reference` | `images`（Flash ≤5 / 2.5 ≤8）、`audios`（≤3）、`videos`（仅 2.5，≤1） | 至少一类非空；不允许 `first_frame`/`last_frame` |
+
+提示词可用 `<Picture N>` / `<Audio N>` / `<Video N>` 指代素材。
+
+### 9.5.3 与 v6.2.1 结论的冲突：keyframe 输出尺寸需复验
+
+v6.2.1 曾实测「keyframe 模式固定输出 704×704」，因此把首尾帧降级为 reference 多图。
+官方 2026 文档明确 keyframe 支持 `first_frame`/`last_frame`，且未声明固定方形输出，
+**该结论可能来自旧版本，或来自未传 `aspect_ratio` 的请求**。
+
+v8.0 起默认走原生 keyframe，并保留一键回退：
+
+```bash
+export AGNES_KEYFRAME_NATIVE=0   # 回落 reference 多图降级（旧行为）
+```
+
+**待办**：用真实 Key 复验 `mode=keyframe + aspect_ratio=16:9 + first_frame/last_frame`
+的输出尺寸与方向，结论回填本节与 §5.2。
+
 ## 10. 复测方法
 
 无需启动本项目服务，直接复放上游调用即可（与官网 demo 同链路）：

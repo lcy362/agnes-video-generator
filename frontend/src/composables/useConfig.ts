@@ -196,6 +196,8 @@ async function loadModels() {
       const d = await r.json()
       if (d.models) appState.modelListCache = d.models
       if (d.video_capabilities) appState.videoCapabilities = d.video_capabilities
+      // v8.0：简单视频一键预设（后端单一来源）
+      if (d.simple_default) appState.simpleDefault = d.simple_default
     }
   } catch (e) {
     console.error('load /api/models failed:', e)
@@ -223,6 +225,7 @@ async function syncModels() {
       const d = await r.json()
       if (d.models) appState.modelListCache = d.models
       if (d.video_capabilities) appState.videoCapabilities = d.video_capabilities
+      if (d.simple_default) appState.simpleDefault = d.simple_default
       modelSyncStatus.value = 'ok'
       setTimeout(() => (modelSyncStatus.value = 'idle'), 1500)
     } else {

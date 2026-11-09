@@ -1,6 +1,30 @@
 import { reactive } from 'vue'
 import type { TaskType, VoiceCatalog, Workspace } from './types'
 
+// ── v8.0：记住上次选择的任务类型（默认 simple，让文生视频真正「打开即用」）──
+const TASK_TYPE_STORAGE_KEY = 'wb_task_type'
+const KNOWN_TASK_TYPES = ['simple', 'creative', 'manuscript', 'anchor', 'poetry']
+
+function loadTaskType(): string {
+  try {
+    const saved = localStorage.getItem(TASK_TYPE_STORAGE_KEY) || ''
+    if (KNOWN_TASK_TYPES.includes(saved)) return saved
+  } catch {
+    /* 隐私模式/禁用 localStorage 时回退默认 */
+  }
+  return 'simple'
+}
+
+/** 记录用户主动切换的任务类型（非法值忽略，避免脏数据污染下次启动）。 */
+export function rememberTaskType(type: string) {
+  if (!KNOWN_TASK_TYPES.includes(type)) return
+  try {
+    localStorage.setItem(TASK_TYPE_STORAGE_KEY, type)
+  } catch {
+    /* ignore */
+  }
+}
+
 // 全局应用状态（模块级 reactive，跨组件共享）
 export const appState = reactive({
   // 顶层视图：创建 / 任务列表 / 产物画廊 / 简易模式 / 任务进度页
@@ -8,8 +32,8 @@ export const appState = reactive({
   // 进度页当前任务（首次执行与任务列表进入复用同一页面）
   progressTaskId: null as string | null,
   progressOrigin: 'create' as 'create' | 'list' | 'gallery',
-  // 任务类型 tab
-  currentTaskType: 'creative' as TaskType | string,
+  // 任务类型 tab（v8.0：默认 simple + 记住上次选择）
+  currentTaskType: loadTaskType() as TaskType | string,
   // 运行中任务
   isTaskRunning: false,
   currentTaskId: null as string | null,
@@ -33,6 +57,8 @@ export const appState = reactive({
   providerModelCache: {} as Record<string, string[]>,
   // v6.2：视频模型能力元数据（来自 /api/models video_capabilities）
   videoCapabilities: {} as Record<string, any>,
+  // v8.0：简单视频一键预设（来自 /api/models simple_default，后端单一来源）
+  simpleDefault: {} as Record<string, any>,
   // 音色目录
   voiceCatalog: null as VoiceCatalog | null,
   voiceIndex: {} as Record<string, any>,

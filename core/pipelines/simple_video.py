@@ -8,12 +8,12 @@ import logging
 import os
 import re
 import traceback
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 from core.api.agnes_video import AgnesVideoAPI
 from core.config import DEFAULT_TEXT_MODEL
 from core.pipelines import BasePipeline, PipelineShutdown
-from models.task import SimpleVideoTask, StepStatus
+from models.task import SimpleVideoTask, StepStatus, VideoMode
 from utils.network import (
     describe_network_error,
     describe_queue_full_error,
@@ -152,12 +152,25 @@ class SimpleVideoPipeline(BasePipeline):
             await video_output.save(video_path)
             return video_path
 
-        # 构建参考图列表
-        ref_images = []
-        if self._state.reference_image:
-            ref_images.append(self._state.reference_image)
-        if self._state.end_frame_image:
-            ref_images.append(self._state.end_frame_image)
+        # 构建素材（v8.0：区分 keyframe 首尾帧 / reference 多图 / 参考音频）
+        state = self._state
+        ref_images: List[str] = list(getattr(state, "reference_images", None) or [])
+        first_frame = getattr(state, "first_frame_image", "") or ""
+        last_frame = getattr(state, "last_frame_image", "") or ""
+        audio_urls = list(getattr(state, "reference_audio_urls", None) or [])
+
+        if state.mode == VideoMode.KEYFRAMES:
+            # 历史 keyframes 任务把首尾帧存在 reference_image / end_frame_image
+            first_frame = first_frame or state.reference_image or ""
+            last_frame = last_frame or state.end_frame_image or ""
+            # 官方规则：keyframe 不允许 images/audios，素材互斥
+            ref_images, audio_urls = [], []
+        elif state.mode in (VideoMode.I2V, VideoMode.TI2VID):
+            # 图生视频只走 reference(images)，不混入首尾帧
+            first_frame, last_frame = "", ""
+            if not ref_images and state.reference_image:
+                ref_images = [state.reference_image]
+        # t2v：保持「有素材则自动按 reference 处理」的旧行为（兼容旧 API 调用）
 
         await self._emit("video_gen", "running", self._t("progress.simple.submitting", mode=self._state.mode), _PROGRESS_SUBMIT)
 
@@ -174,6 +187,9 @@ class SimpleVideoPipeline(BasePipeline):
             seed=self._state.seed,
             negative_prompt=self._state.negative_prompt,
             video_size=getattr(self._state, "video_size", None) or "720P",
+            first_frame=first_frame or None,
+            last_frame=last_frame or None,
+            reference_audio_urls=audio_urls or None,
             # U1（v7.0）：队列满时实时向前端推「排队重试中」
             progress_callback=self._submit_progress_callback("video_gen", _PROGRESS_SUBMIT),
         )

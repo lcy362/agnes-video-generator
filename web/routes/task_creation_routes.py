@@ -5,6 +5,7 @@ import io
 import json
 import logging
 import os
+import re
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -14,9 +15,13 @@ from PIL import Image
 
 from core.async_io import write_bytes
 from core.config import (
+    SIMPLE_DEFAULT_PRESET,
     VIDEO_25_DURATIONS,
     api_key_missing_msg,
     get_api_key,
+    get_selected_models,
+    get_video_model_capabilities,
+    normalize_video_size,
 )
 from core.i18n_backend import get_current_lang, translate
 from core.path_security import safe_join
@@ -297,18 +302,28 @@ async def _save_upload_file(
 @router.post("/api/tasks/simple")
 async def create_simple_task(
     prompt: str = Form(...),
-    mode: str = Form("t2v"),
-    duration: int = Form(5),
-    video_width: int = Form(768),
-    video_height: int = Form(1152),
+    mode: str = Form(SIMPLE_DEFAULT_PRESET["mode"]),
+    duration: int = Form(SIMPLE_DEFAULT_PRESET["duration"]),
+    video_width: int = Form(SIMPLE_DEFAULT_PRESET["video_width"]),
+    video_height: int = Form(SIMPLE_DEFAULT_PRESET["video_height"]),
     seed: Optional[int] = Form(None),
     negative_prompt: Optional[str] = Form(None),
     system_prompt: str = Form(""),
+    # ── 旧字段（历史前端/API 调用兼容）──
     reference_image: UploadFile = File(None),
     end_frame_image: UploadFile = File(None),
+    # ── v8.0：对齐官方最新接口 ──
+    reference_images: List[UploadFile] = File(None),  # reference：多图（≤5/≤8）
+    first_frame_image: UploadFile = File(None),      # keyframe：首帧
+    last_frame_image: UploadFile = File(None),       # keyframe：尾帧
+    reference_audio_urls: str = Form(""),            # reference：音频公开 URL（换行/逗号分隔，≤3）
     video_size: Optional[str] = Form(None),
 ):
-    """创建简单视频任务（类型 1）。"""
+    """创建简单视频任务（类型 1）。
+
+    v8.0：只传 prompt 即走一键预设（免费 2.5-flash / 5s / 16:9 / 720P）；
+    其余参数按官方 2.5 协议（mode/seconds/size/aspect_ratio + 模式专用素材）透传。
+    """
     api_key = get_api_key()
     if not api_key:
         raise HTTPException(status_code=400, detail=api_key_missing_msg())
@@ -338,6 +353,52 @@ async def create_simple_task(
             detail=translate("validation.prompt_too_long", None),
         )
 
+    # ── v8.0：素材解析与「模式 ↔ 素材」一致性校验 ──
+    video_model = get_selected_models()["video"]
+    caps = get_video_model_capabilities().get(video_model, {})
+    max_ref_images = int(caps.get("max_ref_images") or 5)
+    max_ref_audios = int(caps.get("max_ref_audios") or 3)
+
+    ref_files = [f for f in (reference_images or []) if f and f.filename]
+    audio_urls = [
+        u for u in re.split(r"[\n,，;；\s]+", reference_audio_urls or "") if u.strip()
+    ]
+    audio_urls = [u.strip() for u in audio_urls]
+
+    if len(ref_files) > max_ref_images:
+        raise HTTPException(
+            status_code=422,
+            detail=translate(
+                "validation.too_many_ref_images", None,
+                max=max_ref_images, current=len(ref_files),
+            ),
+        )
+    if len(audio_urls) > max_ref_audios:
+        raise HTTPException(
+            status_code=422,
+            detail=translate(
+                "validation.too_many_ref_audios", None,
+                max=max_ref_audios, current=len(audio_urls),
+            ),
+        )
+    if audio_urls and any(not u.startswith(("http://", "https://")) for u in audio_urls):
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.ref_audio_url_invalid", None),
+        )
+    # 官方模式互斥：keyframe 不允许 images/audios。
+    # 注：i2v/keyframes 缺素材不在后端硬拒——旧 API 调用方（含历史测试/脚本）依赖
+    # 「无图也能建任务」；「选了图生视频却没传图」的拦截放在前端表单，既保证正常
+    # 用户不会被静默降级，也不破坏既有契约。
+    if mode == "keyframes" and (ref_files or audio_urls):
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.mode_media_conflict", None),
+        )
+
+    # 清晰度归一到官方枚举（旧 960P → 1080P；flash 强制 720P）
+    video_size = normalize_video_size(video_size, video_model)
+
     task_id = uuid.uuid4().hex[:12]
     dir_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_id}"
 
@@ -356,19 +417,33 @@ async def create_simple_task(
         duration=duration,
         video_width=video_width,
         video_height=video_height,
-        video_size=video_size or "720P",
+        video_size=video_size,
         seed=seed,
         negative_prompt=negative_prompt,
         system_prompt=system_prompt,
+        reference_audio_urls=audio_urls,
         # v7.0（issue #64）：任务级 UI 语言快照，供异步流水线本地化消息
         ui_language=get_current_lang(),
     )
 
     upload_dir = helpers.get_upload_dir()
     # 处理参考图上传（L4: 用 UUID 替代客户端文件名，避免路径穿越）
+    # v8.0：reference 多图；旧单图字段同时回填，保证 pipeline 兼容两条入口
+    saved_refs: List[str] = []
+    for idx, f in enumerate(ref_files):
+        saved_refs.append(await _save_upload_file(f, upload_dir, f"{task_id}_ref{idx}"))
     if reference_image and reference_image.filename:
         state.reference_image = await _save_upload_file(reference_image, upload_dir, f"{task_id}_ref")
-    # 处理尾帧图上传（keyframes 模式）
+        if not saved_refs:
+            saved_refs = [state.reference_image]
+    if saved_refs:
+        state.reference_images = saved_refs
+    # v8.0：keyframe 原生首/尾帧
+    if first_frame_image and first_frame_image.filename:
+        state.first_frame_image = await _save_upload_file(first_frame_image, upload_dir, f"{task_id}_first")
+    if last_frame_image and last_frame_image.filename:
+        state.last_frame_image = await _save_upload_file(last_frame_image, upload_dir, f"{task_id}_last")
+    # 旧 keyframes 尾帧字段（历史前端仍可能只传这一个）
     if end_frame_image and end_frame_image.filename:
         state.end_frame_image = await _save_upload_file(end_frame_image, upload_dir, f"{task_id}_end")
 

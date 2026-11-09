@@ -38,6 +38,7 @@ from core.config import (
     get_api_keys_source,
     get_api_keys_with_sources,
     get_selected_models,
+    get_simple_default_preset,
     get_selected_text_provider,
     get_text_providers,
     get_video_model_capabilities,
@@ -602,6 +603,8 @@ async def list_models(refresh: bool = False):
             # 是否因版本过旧（能力表随发版硬编码）
             "app_version": APP_VERSION,
             "video_capabilities": get_video_model_capabilities(),
+            # v8.0：简单视频一键预设（单一事实来源，前端据此初始化表单）
+            "simple_default": get_simple_default_preset(),
         }
     grouped = fetch_available_models(key)
     _MODEL_CACHE["models"] = grouped
@@ -612,6 +615,7 @@ async def list_models(refresh: bool = False):
         "cached": False,
         "app_version": APP_VERSION,
         "video_capabilities": get_video_model_capabilities(),
+        "simple_default": get_simple_default_preset(),
     }
 
 

@@ -874,6 +874,23 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "prompt 最多 5000 字符",
         "en": "prompt must be at most 5000 characters",
     },
+    # ── v8.0：简单视频「模式 ↔ 素材」一致性校验 ──
+    "validation.too_many_ref_images": {
+        "zh": "参考图最多 {max} 张，当前 {current} 张",
+        "en": "At most {max} reference images are allowed, got {current}",
+    },
+    "validation.too_many_ref_audios": {
+        "zh": "参考音频最多 {max} 段，当前 {current} 段",
+        "en": "At most {max} reference audios are allowed, got {current}",
+    },
+    "validation.ref_audio_url_invalid": {
+        "zh": "参考音频必须是可公开访问的 http(s) URL",
+        "en": "Reference audio must be a publicly accessible http(s) URL",
+    },
+    "validation.mode_media_conflict": {
+        "zh": "首尾帧模式不能同时提交参考图或参考音频",
+        "en": "First/last-frame mode cannot be combined with reference images or audios",
+    },
     "validation.idea_empty": {
         "zh": "idea 不能为空",
         "en": "idea must not be empty",

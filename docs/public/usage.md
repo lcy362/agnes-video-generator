@@ -12,16 +12,21 @@ export AGNES_API_KEY="your-api-key"
 
 ### Simple Video
 
-Quick single-clip generation with full parameter control:
+Quick single-clip generation. **Only the prompt is required** — everything else is preset
+(free `Video 2.5 Flash` / text-to-video / 5s / 16:9 / 720P), so one click is enough:
 
 | Field | Description |
 |-------|-------------|
-| Prompt | Describe the AI video scene in natural language |
-| Generation Mode | Text-to-Video / Image-to-Video / Text+Image / Keyframes |
-| Resolution | Portrait 9:16 / Landscape 16:9 / Square 1:1 |
-| Duration | 5s / 10s / 15s / 18s / 20s |
-| Reference Image | Optional upload for image-to-video modes |
-| End Frame Image | Optional end frame for keyframes mode |
+| Prompt | Required. Fill this and click Generate to use the one-click preset |
+| Preset summary | Shows the effective model, mode, duration and aspect ratio; click *Customize* to expand |
+| Model | Free/paid is labelled in the dropdown. Paid models are listed after free ones and require a second confirmation |
+| Generation Mode | Text-to-video / First-last frame / Image & audio reference (Agnes 2.5 modes) |
+| Duration | 4 / 5 / 6 / 8 / 10 / 12 s |
+| Aspect Ratio | 21:9 landscape / 16:9 landscape / 4:3 landscape / 1:1 square / 3:4 portrait / 9:16 portrait (default 16:9; 9:16 has an upstream rotation defect on 2.5 Flash) |
+| Resolution | 720P (fixed on Flash); paid 2.5 also supports 1080P / 1K / 2K |
+| Reference Images | Reference mode: up to 5 (Flash) / 8 (2.5); refer to them as `<Picture 1>`, `<Picture 2>`… |
+| First / Last Frame | Keyframe mode: at least one of first/last frame |
+| Reference Audio | Reference mode: public http(s) audio URLs, up to 3 clips; refer to them as `<Audio 1>` |
 
 ### Creative Video
 

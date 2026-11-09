@@ -7,6 +7,7 @@ core/config.py — Agnes Video Generator v2.0 配置模块
 import json
 import logging
 import os
+from typing import Optional
 
 from models.task import AudioConfig, SubtitleConfig, SubtitleStyle
 
@@ -1312,32 +1313,60 @@ def width_height_to_aspect_ratio(width: int, height: int) -> str:
 # 2.5 系列时长档位（seconds 字符串 "4"–"12"）
 VIDEO_25_DURATIONS = [4, 5, 6, 8, 10, 12]
 
+# 2.5 系列清晰度档位（官方文档 2026：720P / 1080P / 1K / 2K）
+# 历史坑：v6.2 曾把付费档写成 ``960P``，该值上游不存在（必 400），已在 v8.0 修正。
+VIDEO_25_SIZES = ["720P", "1080P", "1K", "2K"]
+
+# 历史清晰度值兼容：旧任务/旧草稿里的 960P → 官方最接近的 1080P
+VIDEO_LEGACY_SIZE_MAP = {"960P": "1080P", "960p": "1080P"}
+
+
+def normalize_video_size(size: Optional[str], model: str = "") -> str:
+    """把清晰度档位归一到官方枚举。
+
+    - 空值 → ``720P``；
+    - 历史 ``960P`` → ``1080P``；
+    - ``agnes-video-2.5-flash`` 强制 ``720P``（官方唯一合法值）；
+    - 其余未知值 → ``720P``（避免把非法值透传给上游换 400）。
+    """
+    value = (size or "").strip()
+    value = VIDEO_LEGACY_SIZE_MAP.get(value, value)
+    if not value or value not in VIDEO_25_SIZES:
+        value = "720P"
+    if model == "agnes-video-2.5-flash":
+        return "720P"
+    return value
+
+
 # 视频模型能力元数据：供前端「选模型阶段」展示差异 + 按模型归拢表单选项
+# 数据来源：Agnes 官方文档（wiki.agnes-ai.com，2026）＋ 项目实测
+# （docs/dev/agnes_video_upstream_behavior.md）。改动前请先核对官方参数表。
 VIDEO_MODEL_CAPABILITIES = {
     "agnes-video-2.5": {  # 付费模型
         "label": "Video 2.5",
         "price": "paid",
         "price_text": {
-            "zh": "付费：720P $0.025/s · 960P $0.04/s · 2K $0.055/s；图片前 5 张免费",
-            "en": "Paid: 720P $0.025/s · 960P $0.04/s · 2K $0.055/s; first 5 images free",
+            "zh": "付费：720P $0.025/s · 1080P/1K $0.04/s · 2K $0.055/s；参考图前 5 张免费",
+            "en": "Paid: 720P $0.025/s · 1080P/1K $0.04/s · 2K $0.055/s; first 5 images free",
         },
         "modes": [
             {"id": "text", "label": {"zh": "文生视频", "en": "Text to video"}},
-            {"id": "keyframe", "label": {"zh": "首尾帧（自动降级图片参考）", "en": "First/last frame (auto fallback)"}},
+            {"id": "keyframe", "label": {"zh": "首尾帧控制", "en": "First/last frame"}},
             {"id": "reference", "label": {"zh": "图片/音频参考", "en": "Image/audio reference"}},
         ],
         "durations": VIDEO_25_DURATIONS,
         "resolution": {
             "type": "ratio_size",
             "ratios": VIDEO_ASPECT_RATIOS,
-            "sizes": ["720P", "960P", "2K"],
+            "sizes": VIDEO_25_SIZES,
         },
         "supports_negative": False,
-        "max_ref_images": 5,  # 第 6 张起 $0.005/张
-        "supports_ref_video": True,
+        "max_ref_images": 8,   # 官方：最多 8 张；前 5 张免费
+        "max_ref_audios": 3,   # 官方：最多 3 段，单段 2–12s
+        "supports_ref_video": True,  # 官方支持 videos[]（本期不暴露 UI）
         "desc": {
-            "zh": "新一代付费模型。最高 2K 分辨率、4–12 秒、支持参考视频；不支持负面提示词。",
-            "en": "New paid model. Up to 2K, 4–12s, supports reference videos; no negative prompt.",
+            "zh": "付费模型。720P/1080P/1K/2K、4–12 秒、支持首尾帧与图片/音频参考；不支持负面提示词。",
+            "en": "Paid model. 720P/1080P/1K/2K, 4–12s, keyframes and image/audio reference; no negative prompt.",
         },
     },
     "agnes-video-2.5-flash": {  # 免费新版（限时免费）
@@ -1346,8 +1375,8 @@ VIDEO_MODEL_CAPABILITIES = {
         "price_text": {"zh": "免费（限时）", "en": "Free (limited time)"},
         "modes": [
             {"id": "text", "label": {"zh": "文生视频", "en": "Text to video"}},
-            {"id": "keyframe", "label": {"zh": "首尾帧（自动降级图片参考）", "en": "First/last frame (auto fallback)"}},
-            {"id": "reference", "label": {"zh": "图片参考（≤5 张）", "en": "Image reference (≤5)"}},
+            {"id": "keyframe", "label": {"zh": "首尾帧控制", "en": "First/last frame"}},
+            {"id": "reference", "label": {"zh": "图片/音频参考（≤5 图 / ≤3 音频）", "en": "Image/audio reference (≤5 / ≤3)"}},
         ],
         "durations": VIDEO_25_DURATIONS,
         "resolution": {
@@ -1357,10 +1386,11 @@ VIDEO_MODEL_CAPABILITIES = {
         },
         "supports_negative": False,
         "max_ref_images": 5,
+        "max_ref_audios": 3,
         "supports_ref_video": False,
         "desc": {
-            "zh": "免费新版（限时免费）。固定 720P、4–12 秒、图片参考最多 5 张；不支持负面提示词与参考视频。比例保真、绝对像素由上游按标准档归一（如 3:4 实际输出 834x1112）。",
-            "en": "Free new model (limited time). Fixed 720P, 4–12s, up to 5 ref images; no negative prompt or ref video. Aspect ratio preserved; absolute pixels normalized by upstream (e.g. 3:4 renders at 834x1112).",
+            "zh": "免费（限时）。固定 720P、4–12 秒、图片参考 ≤5 张、音频参考 ≤3 段；不支持负面提示词与参考视频。16:9 实际输出约 1280x704，以成片为准。",
+            "en": "Free (limited time). Fixed 720P, 4–12s, ≤5 ref images, ≤3 ref audios; no negative prompt or ref video. 16:9 renders around 1280x704.",
         },
     },
 }
@@ -1369,6 +1399,32 @@ VIDEO_MODEL_CAPABILITIES = {
 def get_video_model_capabilities() -> dict:
     """返回全部视频模型能力元数据（含未知模型的兜底默认）。"""
     return dict(VIDEO_MODEL_CAPABILITIES)
+
+
+# ═══════════════════════════════════════════════════
+# v8.0：简单视频「一键预设」（单一事实来源）
+# ═══════════════════════════════════════════════════
+# 目标：用户只输入 prompt 就能得到一条方向正确、免费、可用的视频。
+# 该字典经 ``GET /api/models`` 的 ``simple_default`` 下发，前端据此初始化表单；
+# 后端 ``POST /api/tasks/simple`` 的 Form 默认值与此保持一致，避免三套默认值漂移。
+# 说明：
+#   - aspect_ratio 取官方默认 16:9 —— 2.5-flash 的 9:16 存在画面躺倒缺陷
+#     （docs/dev/agnes_video_upstream_behavior.md §5.2），默认竖屏会让「一键」产物直接不可用；
+#   - model 固定免费档，付费档必须由用户显式选择并二次确认。
+SIMPLE_DEFAULT_PRESET = {
+    "model": DEFAULT_VIDEO_MODEL,  # agnes-video-2.5-flash（免费限时）
+    "mode": "t2v",                 # 后端语义；前端 2.5 语义为 text
+    "duration": 5,                 # 官方默认 "5"
+    "aspect_ratio": "16:9",        # 官方默认，规避 9:16 躺倒
+    "video_width": 1280,
+    "video_height": 720,
+    "video_size": "720P",          # Flash 唯一合法档位
+}
+
+
+def get_simple_default_preset() -> dict:
+    """返回简单视频一键预设（副本，避免调用方就地修改全局常量）。"""
+    return dict(SIMPLE_DEFAULT_PRESET)
 
 
 # ═══════════════════════════════════════════════════

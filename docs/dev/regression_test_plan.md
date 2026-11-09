@@ -9,7 +9,7 @@
 
 | 任务类型 | 测试场景数 | 涉及核心模块 |
 |----------|-----------|-------------|
-| 简单视频 (Type 1) | 1 | `simple_video.py`, `agnes_video.py`, `task_manager.py` |
+| 简单视频 (Type 1) | 4 | `simple_video.py`, `agnes_video.py`, `task_manager.py`, `task_creation_routes.py` |
 | 创意视频 (Type 2) | 5 | `creative_video.py`, `agnes_image.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `tashkeel.py` |
 | 稿件视频 (Type 3) | 5 | `manuscript_video.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `concatenator.py`, `preview_routes.py` |
 | 数字人口播 (Type 4) | 2 | `anchor_video.py`, `agnes_image.py`, `agnes_video.py`, `screenwriter.py`, `tts.py`, `subtitle.py`, `concatenator.py` |
@@ -21,11 +21,14 @@
 
 ### 2.1 简单视频 (SimpleVideoPipeline)
 
-仅测试 keyframes 模式（其他模式精简掉）：
+v8.0 起覆盖一键路径与官方 2.5 三种模式：
 
-| ID | 场景 | mode | 参考图 | 尾帧 | 覆盖要点 |
-|----|------|------|--------|------|---------|
-| S1 | 关键帧动画 | keyframes | 上传参考图 | 上传尾帧 | 双图模式、keyframes 参数构建 |
+| ID | 场景 | mode | 素材 | 覆盖要点 |
+|----|------|------|------|---------|
+| S1 | 一键预设（无特殊需求） | 不传（默认 t2v） | 无 | 只传 `prompt`：免费 flash / 5s / **16:9** / 720P；产物方向正确；`task.json` 预设与 `SIMPLE_DEFAULT_PRESET` 一致 |
+| S2 | 多图参考 | i2v | 2–5 张参考图 | `reference(images)` 组装、逐张上传、上限拦截 |
+| S3 | 原生首尾帧 | keyframes | 首帧 + 尾帧 | `keyframe(first_frame/last_frame)`；不复用 `images`；缺帧前端拦截、混传 422 |
+| S4 | 参考音频 | i2v | 1 张图 + 1 段音频 URL | `reference(audios)` 透传、非 http(s) 拒绝、`<Audio 1>` 占位符 |
 
 ### 2.2 创意视频 (CreativeVideoPipeline)
 
@@ -297,7 +300,8 @@ python scripts/regression_runner.py --resume
 一、简单视频 (Simple)
 ────────────────────────────────────────────────
 
-  S1 [关键帧 keyframes] — ✅ 最终产物全部通过
+  S3 [关键帧 keyframes · v8.0 前编号为 S1] — ✅ 最终产物全部通过（历史记录）
+  S1/S2/S4 [一键预设 / 多图参考 / 参考音频] — ⬜ v8.0 新增，待执行
 
 ────────────────────────────────────────────────
 二、创意视频 (Creative)
@@ -369,7 +373,10 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 
 | ID | 端点 | 关键参数 | 超时 |
 |----|------|---------|------|
-| S1 | `/api/tasks/simple` | mode=keyframes, ref+end | 30m |
+| S1 | `/api/tasks/simple` | 只传 prompt（一键预设） | 30m |
+| S2 | `/api/tasks/simple` | mode=i2v, 2–5 张 reference_images | 30m |
+| S3 | `/api/tasks/simple` | mode=keyframes, first_frame+last_frame | 30m |
+| S4 | `/api/tasks/simple` | mode=i2v, reference_images+reference_audio_urls | 30m |
 | C1 | `/api/tasks/creative` | chaining_mode=keyframes, ref | 120m |
 | C2 | `/api/tasks/creative` | keyframes+end_frame_from_ref | 120m |
 | C3 | `/api/tasks/creative` | keyframes, audio+subtitle | 120m |

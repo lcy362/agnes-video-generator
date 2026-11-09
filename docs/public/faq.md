@@ -65,9 +65,9 @@ That is Agnes rejecting the submission because **the video model your app is set
 The two models behave differently:
 
 - `agnes-video-2.5-flash` — free (limited time), 720P, 4–12s. Works at a $0 balance.
-- `agnes-video-2.5` — paid (720P $0.025/s · 960P $0.04/s · 2K $0.055/s). At a $0 balance every submission is rejected with exactly this 403.
+- `agnes-video-2.5` — paid (720P $0.025/s · 1080P/1K $0.04/s · 2K $0.055/s). At a $0 balance every submission is rejected with exactly this 403.
 
-**What you can do:** open the settings and switch the video model to `agnes-video-2.5-flash`, then click **Retry Task** — the task resumes at the video step and keeps your script and scene descriptions. Only top up and stay on `agnes-video-2.5` if you actually need 960P/2K output. Retrying without changing the model fails the same way every time: this rejection is deterministic, not a temporary hiccup.
+**What you can do:** open the settings and switch the video model to `agnes-video-2.5-flash`, then click **Retry Task** — the task resumes at the video step and keeps your script and scene descriptions. Only top up and stay on `agnes-video-2.5` if you actually need 1080P/1K/2K output. Retrying without changing the model fails the same way every time: this rejection is deterministic, not a temporary hiccup.
 
 ### I get `402 Payment Required` / `Insufficient Balance`
 

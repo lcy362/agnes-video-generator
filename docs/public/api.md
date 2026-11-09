@@ -137,6 +137,24 @@ AGNES_CORS_ORIGINS=http://localhost:8787,http://127.0.0.1:8787 bash start.sh
 | POST | `/api/tasks` | Legacy task creation (mapped to creative) |
 | GET | `/api/poetry-scene-prompt` | Pre-generate poetry scene prompts |
 
+**`POST /api/tasks/simple` 参数（v8.0）**：只有 `prompt` 必填，其余走一键预设
+（`agnes-video-2.5-flash` / 文生视频 / 5s / 16:9 / 720P）。
+
+| 参数 | 说明 |
+|------|------|
+| `prompt` | 必填，视频描述（≤5000 字符） |
+| `mode` | `t2v`（默认）/ `i2v` / `ti2vid` / `keyframes` |
+| `duration` | 4 / 5 / 6 / 8 / 10 / 12（秒） |
+| `video_width` / `video_height` | 像素宽高，仅用于推导 2.5 `aspect_ratio`（默认 1280×720） |
+| `video_size` | `720P`（flash 固定）/ `1080P` / `1K` / `2K`；历史 `960P` 自动归一为 `1080P` |
+| `seed` | 可选随机种子 |
+| `reference_images` | `i2v`/reference：多张参考图（Flash ≤5，2.5 ≤8） |
+| `first_frame_image` / `last_frame_image` | `keyframes`：原生首帧 / 尾帧（至少 1 张） |
+| `reference_audio_urls` | reference：参考音频公开 URL，换行分隔，≤3 段 |
+
+> 模式与素材互斥：`keyframes` 不允许同时传 `reference_images` / `reference_audio_urls`（返回 422）。
+> 参考图/音频需可被 Agnes 服务公开访问。
+
 **PR #33 吸收新增表单参数**：
 - `audio_add_tashkeel`（creative / manuscript，默认 `false`）：阿拉伯语旁白自动加变音符号（tashkeel/harakat），提升 TTS 朗读准确度。**只作用于送入 TTS 的文本**——字幕与 `narration.txt` 产物始终保持无变音符号的干净版本（字幕隔离）。
 - `reference_images`（manuscript，文件列表）+ `reference_images_map`（JSON 数组字符串）：逐段参考图，按段落 index 显式映射（见上「参考图 API 语义差异」）。
@@ -189,12 +207,27 @@ AGNES_CORS_ORIGINS=http://localhost:8787,http://127.0.0.1:8787 bash start.sh
 # 1. 保存 API Key（免费获取：https://platform.agnes-ai.com）
 curl -X POST http://localhost:8765/api/config -F "api_key=sk-你的Key"
 
-# 2. 创建简单视频任务
+# 2. 创建简单视频任务（只传 prompt = 一键预设：免费 flash / 5s / 16:9 / 720P）
+curl -X POST http://localhost:8765/api/tasks/simple \
+  -F "prompt=一只橘猫趴在雨后窗台上打盹，4K 写实"
+
+# 2b. 自定义参数（官方 2.5 协议；分辨率用 video_size + 比例由宽高推导）
 curl -X POST http://localhost:8765/api/tasks/simple \
   -F "prompt=一只橘猫趴在雨后窗台上打盹，4K 写实" \
-  -F "mode=t2v" \
-  -F "duration=5" \
-  -F "resolution=768x1152"
+  -F "mode=t2v" -F "duration=8" \
+  -F "video_width=1280" -F "video_height=720" -F "video_size=720P"
+
+# 2c. 首尾帧（原生 keyframe）：至少 1 张
+curl -X POST http://localhost:8765/api/tasks/simple \
+  -F "prompt=人物转身走向窗边" -F "mode=keyframes" \
+  -F "first_frame_image=@first.png" -F "last_frame_image=@last.png"
+
+# 2d. 多图 + 参考音频（公开 URL，≤3 段）
+curl -X POST http://localhost:8765/api/tasks/simple \
+  -F "prompt=以 <Picture 1> 的角色为主角，跟随 <Audio 1> 的节奏" \
+  -F "mode=i2v" \
+  -F "reference_images=@a.png" -F "reference_images=@b.png" \
+  -F "reference_audio_urls=https://example.com/music.mp3"
 
 # 3. 轮询任务状态，直到 status=completed
 curl http://localhost:8765/api/tasks/<task_id>

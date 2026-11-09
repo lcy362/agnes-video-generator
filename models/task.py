@@ -293,10 +293,20 @@ class SimpleVideoTask(BaseTaskState):
 
     prompt: str = ""
     mode: VideoMode = VideoMode.T2V
+    # ── 旧字段（历史任务兼容，勿删）──
+    # 单参考图 / 尾帧：v8.0 之前前端只支持各传 1 张，历史 task.json 里仍是这两个字段。
     reference_image: str = ""
     end_frame_image: str = ""
+    # ── v8.0：对齐官方最新接口新增能力（全部带默认值，旧任务反序列化自动补齐）──
+    # reference 模式：多图参考（Flash ≤5 / 2.5 ≤8）
+    reference_images: List[str] = Field(default_factory=list)
+    # keyframe 模式：原生首帧 / 尾帧（各自可选，至少一个）
+    first_frame_image: str = ""
+    last_frame_image: str = ""
+    # reference 模式：参考音频公开 URL（Flash ≤3 段）
+    reference_audio_urls: List[str] = Field(default_factory=list)
     duration: int = 5
-    # v6.2：2.5 系列模型分辨率档位（720P/960P/2K；v2.0 忽略，默认 720P）
+    # v6.2：2.5 系列模型分辨率档位（官方 720P/1080P/1K/2K，默认 720P）
     video_size: str = "720P"
     seed: Optional[int] = None
     negative_prompt: Optional[str] = None

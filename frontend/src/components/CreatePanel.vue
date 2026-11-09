@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { t } from '@/i18n'
-import { appState } from '@/store'
+import { appState, rememberTaskType } from '@/store'
 import { useGa } from '@/composables/useGa'
 import * as api from '@/api'
 import SimpleForm from './forms/SimpleForm.vue'
@@ -108,6 +108,8 @@ const providerFaqHref = computed(() => siteUrl(selectedProvider.value?.faq_path 
 function switchTaskType(type: string) {
   trackEvent('ui_action', { action: 'switch_task_type', type })
   appState.currentTaskType = type
+  // v8.0：记住上次选择（下次打开直接回到该类型）
+  rememberTaskType(type)
   // 切换任务类型时按 PRD §4.8 预填默认暂停点
   appState.pausePoints = [...(defaultPausePoints[type] || [])]
 }

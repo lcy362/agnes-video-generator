@@ -67,6 +67,13 @@ const {
 // v6.2：视频模型能力（选模型阶段差异说明）
 const vmCaps = useVideoModelCaps()
 
+// v8.0：免费档排前，降低免费用户误选付费档的概率（仍保留「付费」标签与提示）
+const sortedVideoModels = computed(() =>
+  [...(appState.modelListCache.video || [])].sort(
+    (a, b) => Number(vmCaps.isPaidTag(a)) - Number(vmCaps.isPaidTag(b)),
+  ),
+)
+
 // 模板渲染 helper（vue-tsc 严格模式：避免模板箭头函数隐式 any）
 function vmDurationsLabel(ds: unknown[]): string {
   return (Array.isArray(ds) ? ds : []).map((x) => String(x) + 's').join(' / ')
@@ -768,7 +775,7 @@ initCollapse()
         <div>
           <label class="block text-xs text-muted mb-1">{{ t('modelVideoLabel') }} (v6.2)</label>
           <select v-model="appState.models.video" class="flex-1 glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
-            <option v-for="m in appState.modelListCache.video" :key="m" :value="m">{{ modelDisplayLabel(m) }}{{ vmCaps.isAdapted(m) ? '' : ' ⚠' }}</option>
+            <option v-for="m in sortedVideoModels" :key="m" :value="m">{{ modelDisplayLabel(m) }}{{ vmCaps.isAdapted(m) ? '' : ' ⚠' }}</option>
           </select>
           <!-- v7.0 U8：上游有、本地能力表无的模型显式提示（避免「模型可见档位不能用」） -->
           <p v-if="appState.models.video && !vmCaps.isAdapted(appState.models.video)" class="text-xs text-amber-400 mt-1.5">{{ t('vmUnadaptedHint') }}</p>
