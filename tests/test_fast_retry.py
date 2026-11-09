@@ -27,7 +27,7 @@ from core.api.fast_retry import (
     interval_seconds,
 )
 from core.pipelines import _PipelineFastRetryHook
-from models.task import SimpleVideoTask
+from models.task import SimpleVideoTask, StepStatus
 
 
 class FakeResponse:
@@ -185,19 +185,26 @@ def test_success_closes_fast_mode_and_clears_available():
     assert p.emits[-1][0] == "progress.video.fast_retry.success"
 
 
-def test_attempts_tracked_and_persisted_every_five_probes():
-    """面板「已发 N 次」：由 hook 从 payload.probe 同步，每 5 跳落盘一次。"""
+def test_attempts_tracked_and_throttled():
+    """面板「已发 N 次」：每跳同步内存值，落盘最多 1 秒一次（配前端 1s 轮询）。"""
     state = _state(enabled=True, per_minute=30, minutes=3,
                    started_at=datetime.now().isoformat(timespec="seconds"),
                    available=True)
     p = FakePipeline(state)
     hook = _PipelineFastRetryHook(p)
 
+    # 首跳即落盘（上一轮 _last_attempts_save 初值 0）
     for n in range(1, 13):
         assert hook.decide(0, {**BUSY, "probe": n}) == pytest.approx(2.0)
 
     assert state.fast_retry.attempts == 12
-    # 第 5、10 跳各落盘一次（避免 30 次/分钟把状态文件写成每秒 2 次）
+    # 12 跳在 1 秒内完成 → 只有首跳落盘，避免把状态文件写成每秒 2 次
+    assert p.task_manager.saved == 1
+
+    # 模拟跨过 1 秒：下一跳再落盘一次
+    hook._last_attempts_save -= 2.0
+    hook.decide(0, {**BUSY, "probe": 13})
+    assert state.fast_retry.attempts == 13
     assert p.task_manager.saved == 2
 
 
@@ -504,3 +511,34 @@ class TestFastRetryEndpoint:
         assert r.status_code == 200
         assert state.fast_retry.enabled is False
         assert state.fast_retry.finished_reason == "disabled"
+
+    def test_resume_resets_fast_retry_state(self, monkeypatch):
+        """续传是一次新运行：清掉上一轮残留的 available/attempts。
+
+        否则上次失败前已连续 2 次 503 的任务，一点续传就显示快速重试开关。
+        """
+        from web.routes import task_routes
+
+        state = _state(
+            available=True, enabled=False, consecutive_busy=3, attempts=9,
+            started_at=datetime.now().isoformat(timespec="seconds"),
+        )
+        state.status = StepStatus.FAILED
+        client, _ = self._client(monkeypatch, state)
+        monkeypatch.setattr(task_routes, "get_api_key", lambda: "k")
+        monkeypatch.setattr(
+            task_routes.deps, "create_pipeline_for_type", lambda *a, **kw: object(),
+        )
+        monkeypatch.setattr(
+            task_routes.app_state, "launch_background_task",
+            lambda coro: coro.close(),
+        )
+
+        r = client.post("/api/tasks/t_fast/resume")
+
+        assert r.status_code == 200
+        assert state.fast_retry.available is False
+        assert state.fast_retry.consecutive_busy == 0
+        assert state.fast_retry.attempts == 0
+        assert state.fast_retry.started_at == ""
+        assert state.fast_retry.finished_reason == ""

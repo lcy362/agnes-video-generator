@@ -277,6 +277,28 @@ async def resume_task(task_id: str):
         if state.status == StepStatus.COMPLETED:
             raise HTTPException(status_code=400, detail="Task is already completed")
 
+        # v8.0：续传视为一次新的运行，重置快速重试的「本轮」状态。
+        # 否则上次失败/停止前已 available=True（连续 2 次 503）的任务，一点续传
+        # 就会立刻显示快速重试开关——那是上一轮留下的残留，不是本轮的真实状态。
+        cfg = getattr(state, "fast_retry", None)
+        if cfg is not None and (
+            cfg.available or cfg.enabled or cfg.consecutive_busy or cfg.attempts or cfg.started_at
+        ):
+            cfg.available = False
+            cfg.enabled = False
+            cfg.consecutive_busy = 0
+            cfg.attempts = 0
+            cfg.started_at = ""
+            cfg.finished_reason = ""
+            try:
+                tm.update_state()
+            except Exception as e:
+                logger.warning(
+                    "[Resume] reset fast_retry failed for task %s: %s",
+                    safe_log(task_id), e,
+                )
+            logger.info("[Resume] Task %s: fast_retry state reset for a new run", safe_log(task_id))
+
         logger.info("[Resume] Starting resume for task %s, type=%s, status=%s",
                     safe_log(task_id), state.task_type, state.status)
 
@@ -360,13 +382,13 @@ async def set_fast_retry(
     if per_minute and not (FAST_RETRY_MIN_PER_MINUTE <= per_minute <= FAST_RETRY_MAX_PER_MINUTE):
         raise HTTPException(status_code=422, detail=translate(
             "fast_retry.invalid_range", None,
-            xmin=FAST_RETRY_MIN_PER_MINUTE, xmax=FAST_RETRY_MAX_PER_MINUTE,
+            xmin=0.1, xmax=2,  # 界面单位：次/秒
             ymin=FAST_RETRY_MIN_MINUTES, ymax=FAST_RETRY_MAX_MINUTES,
         ))
     if minutes and not (FAST_RETRY_MIN_MINUTES <= minutes <= FAST_RETRY_MAX_MINUTES):
         raise HTTPException(status_code=422, detail=translate(
             "fast_retry.invalid_range", None,
-            xmin=FAST_RETRY_MIN_PER_MINUTE, xmax=FAST_RETRY_MAX_PER_MINUTE,
+            xmin=0.1, xmax=2,  # 界面单位：次/秒
             ymin=FAST_RETRY_MIN_MINUTES, ymax=FAST_RETRY_MAX_MINUTES,
         ))
 
@@ -388,7 +410,10 @@ async def set_fast_retry(
         cfg.attempts = 0          # 每轮开启重新计数（面板展示「已发 N 次」）
         cfg.started_at = datetime.now().isoformat(timespec="seconds")
         cfg.finished_reason = ""
-        msg_key, msg_params = "progress.video.fast_retry.active", {"x": x, "y": y}
+        # 界面单位是「次/秒」，进度消息同步换算（后端存储仍是 per_minute）
+        msg_key, msg_params = "progress.video.fast_retry.active", {
+            "x": round(x / 60, 1), "y": y,
+        }
     else:
         cfg.enabled = False
         cfg.finished_reason = "disabled"

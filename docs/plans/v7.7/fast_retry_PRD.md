@@ -77,7 +77,7 @@ Content-Type: multipart/form-data
 500 → 落盘失败
 ```
 
-`GET /api/tasks/{id}` 的 `fast_retry` 字段随任务状态下发，前端 30s 轮询读取。
+`GET /api/tasks/{id}` 的 `fast_retry` 字段随任务状态下发；前端常规 30s 轮询，快速模式期间自动切到 1s 轮询（见 v8.0）。
 
 ## 五、隔离性设计（对应需求 5「不干扰其他逻辑」）
 
@@ -99,7 +99,7 @@ Content-Type: multipart/form-data
 | **逐跳请求日志** | `[FastRetry] probe #N → POST <url> \| key=<脱敏> \| payload=<完整字段，prompt 截断至 80 字>` |
 | **逐跳响应日志** | `[FastRetry] probe #N ← HTTP <code> in <耗时>s \| body=<响应体前 400 字>` |
 | 节奏日志 | `[AgnesVideo] ... fast mode active (probe #N, HTTP ...), next in <间隔>s (busy quota intact)` |
-| 面板计数 | `fast_retry.attempts` 每 5 跳落盘一次（避免 30 次/分钟把状态文件写成每秒 2 次），到期/成功/关闭各落一次保证终值；前端随 30s 轮询刷新，最多滞后 5 跳 |
+| 面板计数 | `fast_retry.attempts` 每跳更新内存值、最多每 1 秒落盘一次（避免 2 次/秒把状态文件写爆），到期/成功/关闭各再落一次保证终值；前端快速模式期间 1s 轮询，实时刷新 |
 | 任务消息 | `progress.video.fast_retry.{available,active,expired,success,disabled}`（后端 zh/en 兜底 + 前端 22 语言） |
 | `error_logs/` | 快速模式**降采样**：仅第 1 跳与每 20 跳落盘（否则 30 次/分钟 × 3 分钟会刷掉诊断目录轮转上限） |
 

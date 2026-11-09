@@ -216,6 +216,9 @@ class _PipelineFastRetryHook:
 
     def __init__(self, pipeline):
         self._pipeline = pipeline
+        # attempts 落盘节流：快速模式 0.5–2 次/秒，逐跳写盘没有意义；
+        # 1 秒粒度配合前端 1s 轮询，既「实时」又不把状态文件写爆。
+        self._last_attempts_save = 0.0
 
     def decide(self, busy_attempt: int, payload: dict) -> Optional[float]:
         """返回 None = 常规忙轨；返回秒数 = 本跳快速模式间隔。"""
@@ -245,13 +248,15 @@ class _PipelineFastRetryHook:
                 )
             return None
 
-        # 已打次数同步（用户要在面板看到「已发 N 次」）：
-        # 30 次/分钟时逐跳落盘会把状态文件写成每秒 2 次，故每 5 跳落一次，
-        # 到期/成功/关闭时各落一次确保终值准确。
+        # 已打次数同步（用户要在面板看到「已发 N 次」实时跳动）：
+        # 每跳都更新内存值，最多每 1 秒落盘一次（前端快速模式期间 1s 轮询），
+        # 到期/成功/关闭时各再落一次确保终值准确。
         probe = int(payload.get("probe") or 0)
         if probe and probe != cfg.attempts:
             cfg.attempts = probe
-            if probe % 5 == 0:
+            now = time.monotonic()
+            if now - self._last_attempts_save >= 1.0:
+                self._last_attempts_save = now
                 p._save_fast_retry()
 
         elapsed = _fast_retry_elapsed(cfg.started_at)

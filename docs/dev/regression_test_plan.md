@@ -592,7 +592,7 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 | QR3 | 零回归 | `fast_retry_hook is None` 时每跳都取桶、退避序列与引入前一致；钩子抛异常退化为常规忙轨且提交不失败 |
 | QR4 | 端点 | `POST /api/tasks/{id}/fast-retry`：available 时开启 200（回传 `started_at`）；未 available 400；x/y 越界 422；关闭置 `finished_reason=disabled` |
 | QR5 | 兼容 | 旧 `task_state.json`（无 `fast_retry`）加载后取默认值；真实 `TaskManager` 落盘新字段可回读 |
-| QR7 | 计数 / 逐跳日志 | `payload.probe` → `fast_retry.attempts`，每 5 跳落盘一次、到期与成功保留终值；快速模式每跳都有 `[FastRetry] probe #N → POST`（含 payload）与 `← HTTP`（含 body），成功那跳同样有响应日志 |
+| QR7 | 计数 / 逐跳日志 | `payload.probe` → `fast_retry.attempts`，每跳更新、最多每 1 秒落盘一次，到期与成功保留终值；前端快速模式期间 1s 轮询实时刷新；快速模式每跳都有 `[FastRetry] probe #N → POST`（含 payload）与 `← HTTP`（含 body），成功那跳同样有响应日志 |
 
 ### 14.2 端到端场景（人工，需真实 503 时段）
 

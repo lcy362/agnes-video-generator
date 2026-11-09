@@ -11,6 +11,8 @@ import { queueFullWindowHint } from '@/utils/retryWindows'
 import type { TaskState, StepDef, FastRetryState } from '@/types'
 
 const POLL_INTERVAL = 30000
+// v8.0：快速模式期间提高轮询频率，让「已重试次数」实时跳动（后端 1s 粒度落盘）
+const FAST_POLL_INTERVAL = 1000
 
 const { trackTaskResultOnce, trackEvent } = useGa()
 const { showToast } = useToast()
@@ -43,7 +45,9 @@ const needsResume = ref(false)
 // v7.7 快速重试模式：后端连续遇到 2 次 503 后置 available，用户开启后 enabled
 const fastRetry = ref<FastRetryState | null>(null)
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
+let pollTimer: ReturnType<typeof setTimeout> | null = null
+// 轮询代际：stopPolling / 切换任务时 +1，旧代际的回调不再续排
+let pollGeneration = 0
 
 // 1.7 前端轮询体验：in-flight 守卫 + 连续失败退避提示 + 后台标签页暂停
 let pollInFlight = false
@@ -293,6 +297,8 @@ async function setFastRetryMode(enabled: boolean, perMinute?: number, minutes?: 
     if (d?.fast_retry) fastRetry.value = d.fast_retry
     // 立即刷新一次，避免等 30s 轮询才看到「已开启 / 已关闭」
     await pollTaskProgress(taskId)
+    // 开关切换后重排轮询：开启 → 1s 实时；关闭/到期 → 回到 30s
+    reschedulePolling(taskId)
   } catch (e: any) {
     showToast(t('fastRetry.failed') + (e.message ? ': ' + e.message : ''), 3500)
   }
@@ -387,18 +393,42 @@ async function pollTaskProgress(taskId: string) {
   }
 }
 
+function schedulePoll(taskId: string, gen: number) {
+  if (gen !== pollGeneration) return
+  // 快速模式 1s（已重试次数实时跳动），常规 30s
+  const delay = fastRetry.value?.enabled ? FAST_POLL_INTERVAL : POLL_INTERVAL
+  pollTimer = setTimeout(async () => {
+    if (gen !== pollGeneration) return
+    await pollTaskProgress(taskId)
+    schedulePoll(taskId, gen)
+  }, delay)
+}
+
 function startPolling(taskId: string) {
   stopPolling()
+  const gen = pollGeneration
   // 立即执行首次轮询：恢复/继续后无需等一个完整轮询周期（30s）即可刷新状态
   void pollTaskProgress(taskId)
-  pollTimer = setInterval(() => pollTaskProgress(taskId), POLL_INTERVAL)
+  schedulePoll(taskId, gen)
   // 1.7：后台标签页暂停轮询，恢复可见时立即补一次（省资源 + 状态不落后）
   document.addEventListener('visibilitychange', handlePollVisibility)
 }
 
-function stopPolling() {
+// 快速模式开关切换后重排下一次轮询（不额外立即请求）
+function reschedulePolling(taskId: string) {
+  if (!appState.isTaskRunning || appState.currentTaskId !== taskId) return
+  pollGeneration += 1
   if (pollTimer) {
-    clearInterval(pollTimer)
+    clearTimeout(pollTimer)
+    pollTimer = null
+  }
+  schedulePoll(taskId, pollGeneration)
+}
+
+function stopPolling() {
+  pollGeneration += 1
+  if (pollTimer) {
+    clearTimeout(pollTimer)
     pollTimer = null
   }
   document.removeEventListener('visibilitychange', handlePollVisibility)
@@ -408,7 +438,7 @@ function stopPolling() {
 function handlePollVisibility() {
   if (document.hidden) {
     if (pollTimer) {
-      clearInterval(pollTimer)
+      clearTimeout(pollTimer)
       pollTimer = null
     }
   } else if (appState.currentTaskId) {
