@@ -196,7 +196,9 @@ export function getTasks() {
   return request('/api/tasks')
 }
 export function getTask(taskId: string) {
-  return request('/api/tasks/' + taskId)
+  // v8.0：进度轮询禁止浏览器缓存——启发式缓存会让快速模式的「已发 N 次」
+  // 看起来完全不刷新（后端同时下发 Cache-Control: no-store 兜底）。
+  return request('/api/tasks/' + taskId, { cache: 'no-store' })
 }
 export function resumeTask(taskId: string) {
   return apiFetch('/api/tasks/' + taskId + '/resume', { method: 'POST' }).then((r) => r.json())

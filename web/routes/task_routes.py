@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Form, HTTPException
+from fastapi import APIRouter, Form, HTTPException, Response
 
 from core.config import api_key_missing_msg, get_api_key
 from core.i18n_backend import translate
@@ -97,12 +97,16 @@ async def list_tasks(limit: int = 0, offset: int = 0, status: str = ""):
 
 
 @router.get("/api/tasks/{task_id}")
-async def get_task(task_id: str):
+async def get_task(task_id: str, response: Response):
     dir_name = helpers.find_dir_name(task_id)
     tm = TaskManager(task_id, dir_name=dir_name)
     state = tm.load()
     if not state:
         raise HTTPException(status_code=404, detail="Task not found")
+    # v8.0：这是个 1s 级轮询端点（快速模式期间），必须显式禁止任何缓存。
+    # 浏览器对无 Cache-Control 的 GET 会做启发式缓存，导致「已发 N 次」
+    # 与进度看起来完全不刷新。
+    response.headers["Cache-Control"] = "no-store, max-age=0"
     data = state.model_dump()
     data["dir_name"] = dir_name
     # 后台是否有活跃 pipeline（v6.1）：前端据此区分「运行中/排队中」与

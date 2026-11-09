@@ -216,8 +216,9 @@ class _PipelineFastRetryHook:
 
     def __init__(self, pipeline):
         self._pipeline = pipeline
-        # attempts 落盘节流：快速模式 0.5–2 次/秒，逐跳写盘没有意义；
-        # 1 秒粒度配合前端 1s 轮询，既「实时」又不把状态文件写爆。
+        # attempts 落盘节流：快速模式 0.5–2 次/秒，逐跳写盘没有意义。
+        # 用 0.8s（而不是 1.0s）配合前端 1s 轮询：轮询与落盘周期相同时
+        # 会因相位差连续读到同一份旧值，看起来「完全不刷新」。
         self._last_attempts_save = 0.0
 
     def decide(self, busy_attempt: int, payload: dict) -> Optional[float]:
@@ -255,7 +256,7 @@ class _PipelineFastRetryHook:
         if probe and probe != cfg.attempts:
             cfg.attempts = probe
             now = time.monotonic()
-            if now - self._last_attempts_save >= 1.0:
+            if now - self._last_attempts_save >= 0.8:
                 self._last_attempts_save = now
                 p._save_fast_retry()
 

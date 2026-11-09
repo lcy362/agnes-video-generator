@@ -186,7 +186,7 @@ def test_success_closes_fast_mode_and_clears_available():
 
 
 def test_attempts_tracked_and_throttled():
-    """面板「已发 N 次」：每跳同步内存值，落盘最多 1 秒一次（配前端 1s 轮询）。"""
+    """面板「已发 N 次」：每跳同步内存值，落盘 0.8s 节流（略快于前端 1s 轮询）。"""
     state = _state(enabled=True, per_minute=30, minutes=3,
                    started_at=datetime.now().isoformat(timespec="seconds"),
                    available=True)
@@ -481,6 +481,17 @@ class TestFastRetryEndpoint:
         assert body["fast_retry"]["minutes"] == 2
         assert body["fast_retry"]["started_at"]      # 记录开启时刻，供到期判定
         assert state.fast_retry.enabled is True
+
+    def test_task_detail_disables_http_cache(self, monkeypatch):
+        """1s 轮询端点必须禁缓存：浏览器启发式缓存会让「已发 N 次」不刷新。"""
+        state = _state(enabled=True, available=True, per_minute=60, minutes=3,
+                       started_at=datetime.now().isoformat(timespec="seconds"))
+        client, _ = self._client(monkeypatch, state)
+
+        r = client.get("/api/tasks/t_fast")
+
+        assert r.status_code == 200
+        assert "no-store" in r.headers.get("cache-control", "")
 
     def test_reject_when_not_available(self, monkeypatch):
         """未连续遇到 2 次忙信号时不允许开启（防止对健康任务高频空转）。"""

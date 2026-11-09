@@ -395,8 +395,11 @@ async function pollTaskProgress(taskId: string) {
 
 function schedulePoll(taskId: string, gen: number) {
   if (gen !== pollGeneration) return
-  // 快速模式 1s（已重试次数实时跳动），常规 30s
-  const delay = fastRetry.value?.enabled ? FAST_POLL_INTERVAL : POLL_INTERVAL
+  // 快速模式 1s（已重试次数实时跳动），常规 30s。
+  // 开关一出现（available）就用 1s：否则开启瞬间可能仍排在 30s 的回调里，
+  // 面板上的次数要等半分钟才动一次。
+  const hot = !!(fastRetry.value?.enabled || fastRetry.value?.available)
+  const delay = hot ? FAST_POLL_INTERVAL : POLL_INTERVAL
   pollTimer = setTimeout(async () => {
     if (gen !== pollGeneration) return
     await pollTaskProgress(taskId)
