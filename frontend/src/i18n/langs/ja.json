@@ -235,6 +235,7 @@
   "stopTask": "中断",
   "sStepSubmit": "送信",
   "sStepVideoGen": "動画生成",
+  "sStepImageGen": "画像生成",
   "cStepInit": "初期化",
   "cStepSceneConfig": "シーン設定",
   "cStepImageAnalysis": "画像分析",

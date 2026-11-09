@@ -235,6 +235,7 @@
   "stopTask": "Taak stoppen",
   "sStepSubmit": "Indienen",
   "sStepVideoGen": "Videogeneratie",
+  "sStepImageGen": "Afbeeldingsgeneratie",
   "cStepInit": "Initialisatie",
   "cStepSceneConfig": "Scèneconfiguratie",
   "cStepImageAnalysis": "Afbeeldingsanalyse",

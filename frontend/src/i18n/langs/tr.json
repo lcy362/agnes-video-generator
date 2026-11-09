@@ -249,6 +249,7 @@
   "stopTask": "Görevi Durdur",
   "sStepSubmit": "Gönder",
   "sStepVideoGen": "Video Üretimi",
+  "sStepImageGen": "Görsel Üretimi",
   "cStepInit": "Başlatma",
   "cStepSceneConfig": "Sahne Yapılandırması",
   "cStepImageAnalysis": "Görsel Analizi",

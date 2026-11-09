@@ -252,6 +252,7 @@
   "stopTask": "Stop Task",
   "sStepSubmit": "Submit",
   "sStepVideoGen": "Video Generation",
+  "sStepImageGen": "Image Generation",
   "cStepInit": "Init",
   "cStepSceneConfig": "Scene Config",
   "cStepImageAnalysis": "Image Analysis",

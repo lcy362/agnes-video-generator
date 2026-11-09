@@ -285,6 +285,7 @@
   "stopTask": "中断任务",
   "sStepSubmit": "提交任务",
   "sStepVideoGen": "视频生成",
+  "sStepImageGen": "图片生成",
   "cStepInit": "初始化",
   "cStepSceneConfig": "场景配置",
   "cStepImageAnalysis": "图片分析",

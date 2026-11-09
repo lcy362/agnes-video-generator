@@ -6,6 +6,13 @@ export const STEPS: Record<string, StepDef[]> = {
     { key: 'submit', labelKey: 'sStepSubmit' },
     { key: 'video_gen', labelKey: 'sStepVideoGen' },
   ],
+  // 简单图片：后端一次同步调用，没有流水线环节。
+  // 此前缺 image 分支 → getStepsForType 回退创意 12 步，图片任务详情页
+  // 会显示「场景配置/故事/剧本/拼接」等完全不相干的环节。
+  image: [
+    { key: 'submit', labelKey: 'sStepSubmit' },
+    { key: 'image_gen', labelKey: 'sStepImageGen' },
+  ],
   creative: [
     { key: 'init', labelKey: 'cStepInit' },
     { key: 'scene_config', labelKey: 'cStepSceneConfig' },

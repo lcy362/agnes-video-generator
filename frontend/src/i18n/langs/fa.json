@@ -249,6 +249,7 @@
   "stopTask": "توقف وظیفه",
   "sStepSubmit": "ارسال",
   "sStepVideoGen": "تولید ویدیو",
+  "sStepImageGen": "تولید تصویر",
   "cStepInit": "راه‌اندازی",
   "cStepSceneConfig": "پیکربندی صحنه",
   "cStepImageAnalysis": "تحلیل تصویر",

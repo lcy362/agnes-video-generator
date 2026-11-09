@@ -249,6 +249,7 @@
   "stopTask": "หยุดงาน",
   "sStepSubmit": "ส่ง",
   "sStepVideoGen": "สร้างวิดีโอ",
+  "sStepImageGen": "สร้างรูปภาพ",
   "cStepInit": "เริ่มต้น",
   "cStepSceneConfig": "ตั้งค่าฉาก",
   "cStepImageAnalysis": "วิเคราะห์รูปภาพ",

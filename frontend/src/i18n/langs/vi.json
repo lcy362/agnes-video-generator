@@ -249,6 +249,7 @@
   "stopTask": "Dừng nhiệm vụ",
   "sStepSubmit": "Gửi",
   "sStepVideoGen": "Tạo video",
+  "sStepImageGen": "Tạo hình ảnh",
   "cStepInit": "Khởi tạo",
   "cStepSceneConfig": "Cấu hình cảnh",
   "cStepImageAnalysis": "Phân tích ảnh",

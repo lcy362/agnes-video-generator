@@ -249,6 +249,7 @@
   "stopTask": "إيقاف المهمة",
   "sStepSubmit": "إرسال",
   "sStepVideoGen": "توليد الفيديو",
+  "sStepImageGen": "توليد الصورة",
   "cStepInit": "تهيئة",
   "cStepSceneConfig": "إعداد المشاهد",
   "cStepImageAnalysis": "تحليل الصور",

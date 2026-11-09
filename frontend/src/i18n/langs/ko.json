@@ -235,6 +235,7 @@
   "stopTask": "중단",
   "sStepSubmit": "제출",
   "sStepVideoGen": "영상 생성",
+  "sStepImageGen": "이미지 생성",
   "cStepInit": "초기화",
   "cStepSceneConfig": "장면 설정",
   "cStepImageAnalysis": "이미지 분석",

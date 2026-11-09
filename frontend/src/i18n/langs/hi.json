@@ -249,6 +249,7 @@
   "stopTask": "कार्य रोकें",
   "sStepSubmit": "सबमिट",
   "sStepVideoGen": "वीडियो जनरेशन",
+  "sStepImageGen": "छवि जनरेशन",
   "cStepInit": "आरंभ",
   "cStepSceneConfig": "दृश्य कॉन्फ़िग",
   "cStepImageAnalysis": "इमेज विश्लेषण",

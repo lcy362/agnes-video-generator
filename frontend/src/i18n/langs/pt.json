@@ -235,6 +235,7 @@
   "stopTask": "Parar tarefa",
   "sStepSubmit": "Enviar",
   "sStepVideoGen": "Geração de vídeo",
+  "sStepImageGen": "Geração de imagem",
   "cStepInit": "Inicialização",
   "cStepSceneConfig": "Configuração de cenas",
   "cStepImageAnalysis": "Análise de imagem",

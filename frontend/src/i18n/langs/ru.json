@@ -235,6 +235,7 @@
   "stopTask": "Остановить",
   "sStepSubmit": "Отправка",
   "sStepVideoGen": "Генерация видео",
+  "sStepImageGen": "Генерация изображения",
   "cStepInit": "Инициализация",
   "cStepSceneConfig": "Настройки сцен",
   "cStepImageAnalysis": "Анализ",

@@ -235,6 +235,7 @@
   "stopTask": "Henti",
   "sStepSubmit": "Hantar",
   "sStepVideoGen": "Hasilkan Video",
+  "sStepImageGen": "Hasilkan Imej",
   "cStepInit": "Permulaan",
   "cStepSceneConfig": "Konfigurasi Babak",
   "cStepImageAnalysis": "Analisis",

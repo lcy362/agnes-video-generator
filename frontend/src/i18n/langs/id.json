@@ -233,6 +233,7 @@
   "stopTask": "Hentikan",
   "sStepSubmit": "Kirim",
   "sStepVideoGen": "Hasilkan Video",
+  "sStepImageGen": "Hasilkan Gambar",
   "cStepInit": "Inisialisasi",
   "cStepSceneConfig": "Konfigurasi Adegan",
   "cStepImageAnalysis": "Analisis",

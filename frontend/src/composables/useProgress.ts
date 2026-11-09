@@ -26,6 +26,9 @@ const progressPct = ref(0)
 const progressMessage = ref('')
 const resultVideoVisible = ref(false)
 const resultVideoSrc = ref('')
+// 图片任务（simple_image）的结果是 PNG 而非 MP4：结果区必须换成 <img>，
+// 且取图端点用 /api/image/{id}（/api/video/{id} 只认 final_video.mp4，图片任务恒 404）。
+const resultIsImage = ref(false)
 const steps = ref<StepDef[]>([])
 const stepStates = ref<Record<string, 'done' | 'running' | 'pending'>>({})
 const failedMessage = ref('')
@@ -103,8 +106,11 @@ function markStep(stepKey: string, status: 'done' | 'running' | 'pending') {
 
 function markCompletedStepsFromState(state: TaskState) {
   const taskType = state.task_type || appState.currentTaskType || 'creative'
+  // 任务已整体完成 → 全部环节必然是完成态。simple / image 这类没有流水线
+  // 步骤字段的任务（后端不落 step_* 状态）否则会一直显示「○ 待执行」。
+  const allDone = state.status === 'completed'
   steps.value.forEach((s) => {
-    if (isStepDoneInState(state, s.key, taskType)) {
+    if (allDone || isStepDoneInState(state, s.key, taskType)) {
       markStep(s.key, 'done')
     }
   })
@@ -152,6 +158,7 @@ async function showProgress(taskId: string, dirName?: string | null): Promise<Ta
   progressVisible.value = true
   taskFailed.value = false
   resultVideoVisible.value = false
+  resultIsImage.value = false
   progressPct.value = 0
 
   let state: TaskState | null = null
@@ -206,7 +213,9 @@ async function mountProgressPage(taskId: string, dirName?: string | null) {
     }
     startPolling(taskId)
   } else if (st === 'completed') {
-    if (state.final_video_file) showResult(state.final_video_file, taskId)
+    if (state.final_video_file) showResult(state.final_video_file, taskId, state.task_type)
+    // 覆盖 showProgress 里的「任务启动中」占位：已完成任务不该显示启动中
+    setProgressMessageHtml(t('taskComplete'))
     clearRetryCount(taskId)
     retryCount.value = 0
     clearRunning()
@@ -347,7 +356,8 @@ async function pollTaskProgress(taskId: string) {
         // simple 任务携带生成模式（t2v / i2v / ti2vid / keyframes），便于 GA 按模式统计生成量
         ...(state.mode ? { mode: state.mode } : {}),
       })
-      showResult(state.final_video_file, taskId)
+      showResult(state.final_video_file, taskId, state.task_type)
+      progressMessage.value = t('taskComplete')
       clearRetryCount(taskId)
       retryCount.value = 0
       clearRunning()
@@ -451,10 +461,14 @@ function handlePollVisibility() {
   }
 }
 
-function showResult(videoPath?: string, taskId?: string | null) {
+function showResult(videoPath?: string, taskId?: string | null, taskType?: string) {
   if (videoPath && taskId) {
+    const isImage = (taskType || appState.currentTaskType) === 'image'
+    resultIsImage.value = isImage
     resultVideoVisible.value = true
-    resultVideoSrc.value = '/api/video/' + taskId
+    resultVideoSrc.value = (isImage ? '/api/image/' : '/api/video/') + taskId
+    // 完成即 100%：图片任务后端从不写 current_progress，进度条否则停在上一次的 0%
+    progressPct.value = 100
   }
 }
 
@@ -478,6 +492,7 @@ export function useProgress() {
     progressMessage,
     resultVideoVisible,
     resultVideoSrc,
+    resultIsImage,
     steps,
     stepStates,
     taskFailed,

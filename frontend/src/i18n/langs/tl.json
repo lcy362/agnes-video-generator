@@ -249,6 +249,7 @@
   "stopTask": "Itigil ang Task",
   "sStepSubmit": "Isumite",
   "sStepVideoGen": "Video Generation",
+  "sStepImageGen": "Image Generation",
   "cStepInit": "Pagsisimula",
   "cStepSceneConfig": "Scene Config",
   "cStepImageAnalysis": "Image Analysis",

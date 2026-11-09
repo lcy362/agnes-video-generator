@@ -18,6 +18,7 @@ const {
   progressMessage,
   resultVideoVisible,
   resultVideoSrc,
+  resultIsImage,
   steps,
   stepStates,
   taskFailed,
@@ -37,6 +38,7 @@ const {
   artifactGroups,
   imageModalUrl,
   stepLabelMap,
+  openImageModal,
   closeImageModal,
 } = useArtifacts()
 
@@ -114,6 +116,12 @@ const INPUT_FIELDS: Record<string, { field: string; label: string }[]> = {
   ],
   poetry: [{ field: 'poem_text', label: 'tiPoem' }],
   simple: [{ field: 'prompt', label: 'tiPrompt' }],
+  // 简单图片：提示词 + 负面提示词 + 系统提示词（后两者可选，空值展示「—」）
+  image: [
+    { field: 'prompt', label: 'tiPrompt' },
+    { field: 'negative_prompt', label: 'vmColNegative' },
+    { field: 'system_prompt', label: 'systemPrompt' },
+  ],
 }
 
 // 各任务类型：关键配置展示（字段 → i18n label）
@@ -144,6 +152,8 @@ const CONFIG_FIELDS: Record<string, { field: string; label: string; fmt?: (v: an
     { field: 'mode', label: 'tiMode' },
     { field: 'duration', label: 'tiDuration', fmt: (v) => String(v ?? '') },
   ],
+  // 简单图片：后端只有 size（video_width/height 只是基类默认值 1280x720，展示会误导）
+  image: [{ field: 'size', label: 'imageSize' }],
 }
 
 const taskInputs = computed(() => INPUT_FIELDS[appState.currentTaskType] || [])
@@ -335,11 +345,17 @@ onUnmounted(() => {
           :checkpoint="awaitingCheckpoint"
         />
 
-        <!-- 结果视频 -->
+        <!-- 结果：视频任务出 <video>，图片任务（simple_image）出 <img> -->
         <div v-if="resultVideoVisible" class="mt-4 p-4 glass-card rounded-2xl">
-          <p class="text-green-400 text-sm font-medium mb-2">{{ t('videoComplete') }}</p>
-          <video :src="resultVideoSrc" controls class="w-full rounded-lg max-h-96"></video>
-          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs">
+          <p class="text-green-400 text-sm font-medium mb-2">{{ resultIsImage ? t('imgComplete') : t('videoComplete') }}</p>
+          <img
+            v-if="resultIsImage"
+            :src="resultVideoSrc"
+            class="w-full rounded-lg max-h-[70vh] object-contain cursor-zoom-in"
+            @click="openImageModal(resultVideoSrc)"
+          />
+          <video v-else :src="resultVideoSrc" controls class="w-full rounded-lg max-h-96"></video>
+          <div v-if="!resultIsImage" class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs">
             <span>🎉</span>
             <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">{{ t('doneTipTiktok') }}</a>
             <span class="text-ink/10 select-none">·</span>
