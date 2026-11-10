@@ -141,6 +141,8 @@ release 内容后续会在**官网开辟板块展示**，并被搜索引擎**独
 
 ## 六、发布流程（融合现有 release 流程）
 
+> **分支模型**：开发与发版都在 `vX.Y-dev`（当前 `v8.0-dev`）上进行，`master` 是**发布镜像分支**，只做快进合入，不承载独立开发。CI 只由 tag 触发，因此 master 不更新也能发版成功——**合回 master 必须显式执行**（第 9 步），否则 master 会与发版内容漂移。
+
 ```
 1. 用户触发发版（含版本类型或明确版本号）
 2. 确认版本类型 → 按「二、版本号规则」升位，确定 vX.Y.Z
@@ -159,8 +161,18 @@ release 内容后续会在**官网开辟板块展示**，并被搜索引擎**独
      What's New 章节前置到 overview 顶部（Quick Start 之后）
    - **npm README 前部**：release.yml 把本版 What's New 章节 + npm Quick Start
      前置到发布用 README 顶部
-9. 若有版本号示例位置需同步（README / docker-compose / AGENTS.md），一并更新
+9. 🔴 合回 master（强制，漏做会导致 master 落后于发版内容）：
+   git checkout master
+   git merge --ff-only vX.Y-dev        # 期望纯快进；报 "not possible to fast-forward"
+                                       # 说明 master 上有未回到 dev 的提交，先查清来源再手工 merge
+   git push origin master
+   git push gitee master               # Gitee 镜像同步（仅镜像 master，不含 dev 分支）
+   git checkout vX.Y-dev
+   校验：git rev-list --count --left-right origin/master...origin/vX.Y-dev   # 期望输出 0	0
+10. 若有版本号示例位置需同步（README / docker-compose / AGENTS.md），一并更新
 ```
+
+> **🔴 第 9 步的由来（v7.5.1 漂移复盘，2026-11-10）**：master 从 v7.2.4 之后停更，`v7.0-dev` 带着 v7.2.5 / v7.2.6 / v7.5.0 / v7.5.1 四个版本跑了 13 个提交。原因是当时流程里**只有 tag + push、没有合回 master**，历史 12 次「Merge branch 'v7.0-dev' into master — release vX.Y.Z」（v7.0.5 → v7.2.4）全靠人工顺手做；加上 CI 只由 tag 触发（dev 分支的 tag 照样发版成功，无任何告警），漂移完全不可见。更早还出现过 master 直接提交（如 config 修复）后 dev 快进到 master 之上、分支方向反转的情况。现已固化为强制第 9 步：**发版不合并 master 视为未完成**。
 
 > **`APP_VERSION` 同步**：自 v6.1 起，`core/config.py` 的 `APP_VERSION` 常量作为「应用版本」通过 `GET /api/config` 暴露给前端（失败面板诊断信息使用）。**发版时必须同步更新**该常量为本版 `vX.Y.Z`，否则失败反馈的诊断信息会显示过期版本号。建议在第 4 步写 release notes 时一并修改（含 3.4 所述、release notes 中体现的版本号）。
 
@@ -179,4 +191,4 @@ release 内容后续会在**官网开辟板块展示**，并被搜索引擎**独
 
 ---
 
-*文档版本：v1.4 | 更新日期：2026-08-31 | 状态：✅ 已生效*
+*文档版本：v1.5 | 更新日期：2026-11-10 | 状态：✅ 已生效（v1.5 新增第 9 步「合回 master」及 v7.5.1 漂移复盘）*
