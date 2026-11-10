@@ -235,6 +235,37 @@ def test_success_with_probe_count():
     assert state.fast_retry.finished_reason == "success"
 
 
+def test_on_probe_advances_attempts_outside_decide():
+    """非忙响应（500 / 换 Key 的 429 / 超时）也要推进「已发 N 次」。
+
+    这些跳不会进入 ``decide()``；若只靠 decide 同步，面板会冻结在旧值上
+    —— 用户看到的就是「次数不自动刷新」。
+    """
+    state = _state(enabled=True, per_minute=120, minutes=3,
+                   started_at=datetime.now().isoformat(timespec="seconds"),
+                   available=True)
+    p = FakePipeline(state)
+    hook = _PipelineFastRetryHook(p)
+
+    for n in (1, 2, 3):
+        hook.on_probe(n)
+
+    assert state.fast_retry.attempts == 3
+    assert p.task_manager.saved >= 1
+
+
+def test_on_probe_ignored_when_mode_disabled():
+    """未开启快速模式时，逐跳回调不得改动次数。"""
+    state = _state(enabled=False, attempts=7)
+    p = FakePipeline(state)
+    hook = _PipelineFastRetryHook(p)
+
+    hook.on_probe(9)
+
+    assert state.fast_retry.attempts == 7
+    assert p.task_manager.saved == 0
+
+
 def test_success_without_fast_mode_does_not_emit():
     """未开启快速模式时提交成功只清理计数，不额外推送消息。"""
     state = _state(available=True, consecutive_busy=2)
@@ -359,6 +390,41 @@ async def test_fast_mode_logs_every_request_and_response(api, monkeypatch, caplo
     assert "← HTTP 200" in res[-1]                       # 成功那跳也有响应日志
     assert api._fast_retry_probes == 3
     assert ticks["success_probe"] == 3
+
+
+async def test_fast_mode_counts_non_busy_probes(api, monkeypatch):
+    """连打期间遇到非忙 500，这一跳也要计入「已发 N 次」。
+
+    非忙 5xx 走故障轨、不经过 ``decide()``；旧实现下这一跳的计数会丢失，
+    面板显示的次数停在上一次忙信号的值，看起来「不自动刷新」。
+    """
+    state = _state(enabled=True, per_minute=120, minutes=30,
+                   started_at=datetime.now().isoformat(timespec="seconds"),
+                   available=True)
+    pipeline = FakePipeline(state)
+    api.fast_retry_hook = _PipelineFastRetryHook(pipeline)
+    _patch_sleep(monkeypatch)
+
+    seen = []
+    calls = {"n": 0}
+
+    def fake_post(*a, **k):
+        calls["n"] += 1
+        seen.append(state.fast_retry.attempts)   # 本跳发出前已同步的次数
+        if calls["n"] == 1:
+            return FakeResponse(503, {"code": "video_queue_full",
+                                      "message": "video queue is full"})
+        if calls["n"] == 2:
+            return FakeResponse(500, {"message": "boom"})
+        return FakeResponse(200, {"video_id": "vidok"})
+
+    monkeypatch.setattr(av.requests, "post", fake_post)
+
+    assert await api._submit_with_retry({"prompt": "x"}, "t2v") == "vidok"
+    # 第 3 跳发出前，第 2 跳（非忙 500）已把次数同步为 1
+    assert seen[-1] == 1
+    # 成功那跳也计入，终值为 2
+    assert state.fast_retry.attempts == 2
 
 
 async def test_fast_mode_expiry_falls_back_to_normal_busy_track(api, monkeypatch):

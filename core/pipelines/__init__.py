@@ -250,15 +250,11 @@ class _PipelineFastRetryHook:
             return None
 
         # 已打次数同步（用户要在面板看到「已发 N 次」实时跳动）：
-        # 每跳都更新内存值，最多每 1 秒落盘一次（前端快速模式期间 1s 轮询），
-        # 到期/成功/关闭时各再落一次确保终值准确。
-        probe = int(payload.get("probe") or 0)
-        if probe and probe != cfg.attempts:
-            cfg.attempts = probe
-            now = time.monotonic()
-            if now - self._last_attempts_save >= 0.8:
-                self._last_attempts_save = now
-                p._save_fast_retry()
+        # 这里只是「忙信号」路径的兜底同步，真正的逐跳同步走 ``on_probe()``
+        # ——快速模式连打时上游可能回非忙响应（500 / 多 Key 换 Key 的 429 /
+        # 超时），那些路径不会进入 ``decide()``，只在 decide 里同步会让面板
+        # 停在某个旧值上不动。
+        self._sync_attempts(cfg, payload.get("probe"))
 
         elapsed = _fast_retry_elapsed(cfg.started_at)
         limit = max(1, int(cfg.minutes or 1)) * 60
@@ -276,6 +272,45 @@ class _PipelineFastRetryHook:
             )
             return None
         return cfg.interval_seconds
+
+    def _sync_attempts(self, cfg, probe) -> None:
+        """把「已打次数」写进任务状态（内存立即生效，落盘节流 0.8s）。
+
+        前端在快速模式期间按 1s 轮询任务状态，因此落盘节流取 0.8s（而不是
+        1.0s）：与轮询同周期时会因相位差连续读到同一份旧值，看起来「完全
+        不刷新」。到期 / 成功 / 关闭时各再落一次，保证终值准确。
+
+        Args:
+            cfg: 任务状态的 ``fast_retry`` 配置。
+            probe: 本次提交循环累计发出的请求数；0 / 非法值直接忽略。
+        """
+        try:
+            n = int(probe or 0)
+        except (TypeError, ValueError):
+            return
+        if not n or n == cfg.attempts:
+            return
+        cfg.attempts = n
+        now = time.monotonic()
+        if now - self._last_attempts_save >= 0.8:
+            self._last_attempts_save = now
+            self._pipeline._save_fast_retry()
+
+    def on_probe(self, probe: int = 0) -> None:
+        """快速模式每发出一跳就回调一次（与响应类型无关）。
+
+        ``decide()`` 只在**忙信号**（503 / 429 / 队列类 code）时才被调用，
+        而连打期间上游也可能回非忙响应（非队列 5xx、多 Key 轮换的 429、请求
+        超时）。若只在 decide 里同步次数，这些跳会让面板上的「已发 N 次」
+        冻结在旧值——用户看到的就是「次数不自动刷新」。
+
+        Args:
+            probe: 本次提交循环累计发出的请求数（含本次）。
+        """
+        cfg = getattr(getattr(self._pipeline, "_state", None), "fast_retry", None)
+        if cfg is None or not cfg.enabled:
+            return
+        self._sync_attempts(cfg, probe)
 
     def on_success(self, probe: int = 0) -> None:
         """提交成功：关闭快速模式（若开着）并清理可开启标记。

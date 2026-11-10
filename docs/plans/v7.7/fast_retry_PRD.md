@@ -99,7 +99,7 @@ Content-Type: multipart/form-data
 | **逐跳请求日志** | `[FastRetry] probe #N → POST <url> \| key=<脱敏> \| payload=<完整字段，prompt 截断至 80 字>` |
 | **逐跳响应日志** | `[FastRetry] probe #N ← HTTP <code> in <耗时>s \| body=<响应体前 400 字>` |
 | 节奏日志 | `[AgnesVideo] ... fast mode active (probe #N, HTTP ...), next in <间隔>s (busy quota intact)` |
-| 面板计数 | `fast_retry.attempts` 每跳更新内存值、以 0.8s 节流落盘（120 次/分钟≈2 次/秒，避免把状态文件写爆；0.8s 略小于前端 1s 轮询，避免同相位连续读到旧值），到期/成功/关闭各再落一次保证终值；前端在 `available`/`enabled` 期间切 1s 轮询，实时刷新 |
+| 面板计数 | `fast_retry.attempts` 每跳更新内存值、以 0.8s 节流落盘（120 次/分钟≈2 次/秒，避免把状态文件写爆；0.8s 略小于前端 1s 轮询，避免同相位连续读到旧值），到期/成功/关闭各再落一次保证终值；前端在 `available`/`enabled` 期间切 1s 轮询，实时刷新。**v8.0 修正**：次数同步改由钩子的 `on_probe()` 承担（API 层每跳发包后无条件调用），不再只依赖 `decide()`——后者只在忙信号（503/429/队列类 code）时才被调用，连打期间遇到非队列 5xx、多 Key 轮换的 429 或请求超时会漏计，面板上的「已发 N 次」会冻结在旧值 |
 | 任务消息 | `progress.video.fast_retry.{available,active,expired,success,disabled}`（后端 zh/en 兜底 + 前端 22 语言） |
 | `error_logs/` | 快速模式**降采样**：仅第 1 跳与每 20 跳落盘（否则 30 次/分钟 × 3 分钟会刷掉诊断目录轮转上限） |
 

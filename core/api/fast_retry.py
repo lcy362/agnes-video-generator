@@ -20,6 +20,17 @@
         def decide(self, busy_attempt: int, payload: dict) -> float | None:
             \"\"\"返回 None = 走常规忙轨；返回秒数 = 本跳快速模式间隔。\"\"\"
 
+        def on_probe(self, probe: int) -> None:
+            \"\"\"快速模式**每发出一跳**就回调（可选）。
+
+            与 ``decide`` 的区别：decide 只在收到忙信号时才被调用，而连打期间
+            上游可能回非忙响应（非队列 5xx / 多 Key 轮换 429 / 请求超时），
+            那些跳不会进 decide。只靠 decide 同步「已打次数」会让面板上的
+            「已发 N 次」冻结不动，因此 API 层在每跳发包后无条件调用本方法。
+
+            ``probe`` = 本次提交循环累计发出的请求数（含本跳）。
+            \"\"\"
+
         def on_success(self, probe: int = 0) -> None:
             \"\"\"提交成功时回调（用于把 enabled 置 False 并标记 success）。
 

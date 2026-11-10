@@ -462,6 +462,25 @@ class AgnesVideoAPI:
         except (TypeError, ValueError):
             return None
 
+    def _fast_retry_sync_probe(self) -> None:
+        """v8.0：每发出一跳就同步「已打次数」（与响应类型无关）。
+
+        快速模式的次数以前只在 ``_fast_retry_decide()`` 里同步，而 decide 只在
+        收到**忙信号**时才被调用；连打期间一旦遇到非忙响应（非队列 5xx、多 Key
+        轮换的 429、请求超时），那一跳就不会同步次数 → 面板上的「已发 N 次」
+        冻结不动。这里在每次发包后无条件同步一次，钩子内部再做落盘节流。
+        """
+        hook = self.fast_retry_hook
+        if hook is None:
+            return
+        sync = getattr(hook, "on_probe", None)
+        if sync is None:      # 兼容只实现 decide/on_success 的旧钩子
+            return
+        try:
+            sync(self._fast_retry_probes)
+        except Exception as e:  # 计数同步失败绝不打断提交流程
+            logger.debug(f"[FastRetry] hook on_probe() failed: {e}")
+
     def _fast_retry_notify_success(self, probe: int = 0) -> None:
         """提交通知钩子（用于把快速模式标记为 success 并关闭）。
 
@@ -971,6 +990,11 @@ class AgnesVideoAPI:
                         time.monotonic() - req_started, (resp.text or "")[:400],
                     )
 
+                # v8.0：无论上游回什么（忙 / 非忙 / 400 降帧），这一跳都已经发出，
+                # 先同步「已打次数」，避免面板上的计数停在上一次忙信号的值。
+                if fast_mode:
+                    self._fast_retry_sync_probe()
+
                 if resp.status_code == 200:
                     result = resp.json()
                     video_id = result.get("video_id") or result.get("task_id") or result.get("id")
@@ -1235,6 +1259,10 @@ class AgnesVideoAPI:
 
             except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
                         asyncio.TimeoutError) as e:
+                # v8.0：超时/连接失败这一跳也算「已发出」，同步计数后前端才会动
+                # （用 fast_gap 判定：它在本轮循环外定义，不受 try 内异常影响）
+                if fast_gap > 0:
+                    self._fast_retry_sync_probe()
                 # 每次失败都记录（包括中间重试）
                 collect_error_from_exception(
                     "video", "submit_video",
