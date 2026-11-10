@@ -259,3 +259,19 @@ def test_no_hooks_is_zero_regression():
     assert client.key_hint_resolver is None
     assert client.poll_progress_hook is None
     assert client.fast_retry_hook is None
+
+
+def test_key_fingerprint_is_stable_opaque_and_cached():
+    """日志指纹：稳定、不可反推、长度固定，且命中缓存后不再做昂贵哈希。"""
+    from core.api.key_manager import _KEY_FP_CACHE, key_fingerprint
+
+    secret = "sk-abcdefghijklmnopqrstuvwxyz0123"
+    fp = key_fingerprint(secret)
+
+    assert len(fp) == 16
+    assert all(c in "0123456789abcdef" for c in fp)
+    assert secret[:8] not in fp and secret[-4:] not in fp
+    assert key_fingerprint(secret) == fp                 # 稳定
+    assert key_fingerprint(secret + "x") != fp           # 可区分
+    assert key_fingerprint("") == "-"
+    assert secret in _KEY_FP_CACHE                       # 二次调用走缓存

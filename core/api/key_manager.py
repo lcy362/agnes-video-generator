@@ -23,7 +23,6 @@
     get_key_ring().rotate()   # 429 换 Key
 """
 import hashlib
-import hmac
 import itertools
 import logging
 import threading
@@ -37,6 +36,16 @@ logger = logging.getLogger(__name__)
 #: Key 指纹的固定盐（仅用于日志/状态文件中的不可逆标识，不参与鉴权）
 _KEY_FP_SALT = b"agnes-video-generator/key-fingerprint/v1"
 
+#: PBKDF2 迭代次数（与 ``config_routes._KEY_ID_PBKDF2_ITERATIONS`` 对齐，
+#: 单次约 15ms）。静态扫描要求「作用于敏感数据」的哈希必须是计算昂贵型，
+#: HMAC-SHA256 同样会被 ``py/weak-sensitive-data-hashing`` 标记。
+_KEY_FP_ITERATIONS = 100_000
+
+#: key → 指纹缓存：同一把 Key 只做一次昂贵哈希（日志每跳都会调用）。
+#: 只保存在内存（进程内已有明文 Key 池），不落盘、不新增泄漏面。
+_KEY_FP_CACHE: dict = {}
+_KEY_FP_CACHE_MAX = 16
+
 
 def key_fingerprint(key: str) -> str:
     """API Key 的短指纹（HMAC-SHA256 前 16 位十六进制，带固定盐）。
@@ -46,11 +55,12 @@ def key_fingerprint(key: str) -> str:
     （CodeQL ``py/clear-text-logging-sensitive-data``）。指纹不可反推明文，
     同一把 Key 的指纹稳定，足够人眼与多 Key 排查对照。
 
-    为什么用 HMAC 而不是裸 SHA-256：裸哈希直接作用于敏感数据会被
-    ``py/weak-sensitive-data-hashing`` 判为弱哈希；HMAC 是密钥化摘要，
-    语义上正是「不可逆标识」，同时保持确定性与毫秒级开销（高频日志安全）。
+    算法选择：PBKDF2-HMAC-SHA256（10 万次迭代，与配置页的 Key ID 同参数）。
+    静态扫描要求作用于敏感数据的哈希必须是**计算昂贵**型——裸 SHA-256 与
+    HMAC-SHA256 都会被 ``py/weak-sensitive-data-hashing`` 判为弱哈希。
+    指纹只在首次计算，之后命中内存缓存，日志路径上无重复开销。
 
-    兼容性：盐固定为常量，所以同一次部署内指纹稳定；早期版本落盘的
+    兼容性：盐与迭代次数固定，所以同一次部署内指纹稳定；早期版本落盘的
     ``video_key_hints`` 用的是裸 SHA-256，重启后与当前指纹不匹配时会退回
     v7.8 的「404 归属探测」（见 ``AgnesVideoAPI._probe_owner_key``），
     单 Key 场景无影响。
@@ -63,9 +73,16 @@ def key_fingerprint(key: str) -> str:
     """
     if not key:
         return "-"
-    return hmac.new(
-        _KEY_FP_SALT, key.encode("utf-8"), hashlib.sha256
-    ).hexdigest()[:16]
+    cached = _KEY_FP_CACHE.get(key)
+    if cached:
+        return cached
+    fp = hashlib.pbkdf2_hmac(
+        "sha256", key.encode("utf-8"), _KEY_FP_SALT, _KEY_FP_ITERATIONS
+    ).hex()[:16]
+    if len(_KEY_FP_CACHE) >= _KEY_FP_CACHE_MAX:
+        _KEY_FP_CACHE.pop(next(iter(_KEY_FP_CACHE)), None)
+    _KEY_FP_CACHE[key] = fp
+    return fp
 
 
 class KeyRing:
