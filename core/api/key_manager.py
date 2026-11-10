@@ -22,6 +22,7 @@
     key = get_key_ring().next()
     get_key_ring().rotate()   # 429 换 Key
 """
+import hashlib
 import itertools
 import logging
 import threading
@@ -31,6 +32,25 @@ from typing import Optional
 from core.config import get_api_keys
 
 logger = logging.getLogger(__name__)
+
+
+def key_fingerprint(key: str) -> str:
+    """API Key 的短指纹（SHA-256 前 16 位十六进制）。
+
+    日志里需要区分「这一跳用的是哪把 Key」时**只能打印指纹**：明文 Key 的
+    任何片段（首 8 / 尾 4）都属于敏感信息，落进日志即视为泄漏
+    （CodeQL ``py/clear-text-logging-sensitive-data``）。指纹不可反推明文，
+    同一把 Key 的指纹稳定，足够人眼与多 Key 排查对照。
+
+    Args:
+        key: 明文 API Key（可为空）。
+
+    Returns:
+        16 位十六进制指纹；空 key 返回 ``"-"``。
+    """
+    if not key:
+        return "-"
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
 
 
 class KeyRing:

@@ -392,6 +392,34 @@ async def test_fast_mode_logs_every_request_and_response(api, monkeypatch, caplo
     assert ticks["success_probe"] == 3
 
 
+async def test_fast_mode_logs_hide_key_material(api, monkeypatch, caplog):
+    """逐跳日志只打印 Key 指纹，任何明文片段都不得落日志（CodeQL 高危项）。"""
+    caplog.set_level(logging.INFO, logger="core.api.agnes_video")
+    secret = "sk-" + "a1b2c3d4" * 5          # 42 字符，足以触发明文掩码分支
+    monkeypatch.setattr(av, "get_key_ring", lambda: FakeRing((secret,)))
+    _busy_then_success(monkeypatch, busy_times=2)
+    _patch_sleep(monkeypatch)
+
+    class Hook:
+        def decide(self, busy_attempt, payload):
+            return 1.0
+
+        def on_probe(self, probe):
+            return None
+
+        def on_success(self, probe=0):
+            return None
+
+    api.fast_retry_hook = Hook()
+    await api._submit_with_retry({"prompt": "x"}, "t2v")
+
+    text = "\n".join(r.getMessage() for r in caplog.records)
+    assert "key_fp=" in text
+    assert secret not in text
+    assert secret[:8] not in text
+    assert secret[-4:] not in text
+
+
 async def test_fast_mode_counts_non_busy_probes(api, monkeypatch):
     """连打期间遇到非忙 500，这一跳也要计入「已发 N 次」。
 

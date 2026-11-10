@@ -13,7 +13,7 @@ from typing import List, Optional
 import requests
 
 from core.api.error_collector import collect_error, collect_error_from_exception
-from core.api.key_manager import get_key_ring
+from core.api.key_manager import get_key_ring, key_fingerprint
 from core.api.rate_limiter import get_rate_limiter, get_video_submit_limiter
 from core.api.retry_policy import (
     QUEUE_FULL_CODES,
@@ -687,13 +687,14 @@ class AgnesVideoAPI:
                     if resp.status_code == 200:
                         logger.info(
                             f"[KeyBind] Video {video_id[:16]}... 归属 Key 探测命中 "
-                            f"(key=...{k[-4:]}, domain={get_api_root_for_key(k)}, "
+                            f"(key_fp={key_fingerprint(k)}, "
+                            f"domain={get_api_root_for_key(k)}, "
                             f"endpoint={style})"
                         )
                         return k
                 except Exception as e:
                     logger.debug(
-                        f"[KeyBind] owner probe failed for key=...{k[-4:]} "
+                        f"[KeyBind] owner probe failed for key_fp={key_fingerprint(k)} "
                         f"({style}): {e}"
                     )
         logger.warning(
@@ -778,7 +779,11 @@ class AgnesVideoAPI:
             try:
                 # v7.8：10 次才打一行太稀疏（20s 起步 ≈ 200s 静默），改为每 5 次
                 if poll_count % 5 == 0:
-                    logger.info(f"[AgnesVideo] Polling video {video_id[:16]}... (poll #{poll_count + 1}, elapsed {elapsed:.0f}s, key=...{(poll_key or '')[-4:]})")
+                    logger.info(
+                        f"[AgnesVideo] Polling video {video_id[:16]}... "
+                        f"(poll #{poll_count + 1}, elapsed {elapsed:.0f}s, "
+                        f"key_fp={key_fingerprint(poll_key)})"
+                    )
                 # v7.9：端点双轨——已确认可用的只查它；否则本轮按「老网关 → REST」
                 # 逐个试（前者 404 立刻换后者，不 sleep），谁 200 就固定下来。
                 styles = [poll_style] if poll_style else list(_POLL_STYLES)
@@ -967,9 +972,9 @@ class AgnesVideoAPI:
                 # 每一次探测到底发了什么、上游回了什么（常规忙轨保持原有日志量）。
                 if fast_mode:
                     logger.info(
-                        "[FastRetry] probe #%d → POST %s | key=%s | payload=%s",
+                        "[FastRetry] probe #%d → POST %s | key_fp=%s | payload=%s",
                         self._fast_retry_probes, url,
-                        (key[:8] + "***" + key[-4:]) if len(key) > 14 else "***",
+                        key_fingerprint(key),
                         self._fast_retry_payload_brief(payload),
                     )
                 req_started = time.monotonic()

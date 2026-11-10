@@ -6,7 +6,6 @@ BasePipeline 抽象基类 + 四种流水线导出。
 import asyncio
 import concurrent.futures
 import functools
-import hashlib
 import json
 import logging
 import os
@@ -26,7 +25,7 @@ _ENCODING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
 )
 
 from core.api.fast_retry import FAST_RETRY_AVAILABLE_AFTER
-from core.api.key_manager import get_key_ring
+from core.api.key_manager import get_key_ring, key_fingerprint
 from core.async_io import read_text, write_text
 from core.compositor.ffmpeg_tool import probe_duration, resolve_cmd_binary
 from core.compositor.watermark import add_watermark, detect_language
@@ -689,8 +688,13 @@ class BasePipeline(ABC):
 
     @staticmethod
     def _key_fingerprint(key: str) -> str:
-        """Key 指纹：只把哈希写进 task_state.json，不落明文。"""
-        return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+        """Key 指纹：只把哈希写进 task_state.json / 日志，不落明文。
+
+        与 ``core.api.key_manager.key_fingerprint`` 同一实现（SHA-256 前 16 位）。
+        **长度不能改**：已落盘的 ``video_key_hints`` 存的就是这个值，改长度会让
+        resume 时匹配不到（见 docs/plans/v7.8/polling_resilience_PRD.md）。
+        """
+        return key_fingerprint(key)
 
     def _on_task_key_bound(self, video_id: str, key: str) -> None:
         """提交成功时落盘 ``video_id → Key 指纹``（进程重启后仍可恢复）。"""
@@ -708,8 +712,8 @@ class BasePipeline(ABC):
             state.video_key_hints = hints
             self.task_manager.update_state()
             logger.info(
-                "[KeyBind] Task %s: persisted key hint for video %s (key=...%s)",
-                self.task_id, video_id[:16], key[-4:],
+                "[KeyBind] Task %s: persisted key hint for video %s (key_fp=%s)",
+                self.task_id, video_id[:16], fp,
             )
         except Exception as e:
             logger.debug(f"[KeyBind] persist key hint failed: {e}")
@@ -726,8 +730,8 @@ class BasePipeline(ABC):
             for k in get_key_ring().keys:
                 if self._key_fingerprint(k) == fp:
                     logger.info(
-                        "[KeyBind] Task %s: restored submit key for video %s (key=...%s)",
-                        self.task_id, video_id[:16], k[-4:],
+                        "[KeyBind] Task %s: restored submit key for video %s (key_fp=%s)",
+                        self.task_id, video_id[:16], fp,
                     )
                     return k
         except Exception as e:
