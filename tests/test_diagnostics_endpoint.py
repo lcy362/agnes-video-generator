@@ -14,9 +14,9 @@ v6.1 二期 — 任务诊断端点单元测试（PRD FR9 / implementation_plan P
     .venv/bin/python -m pytest tests/test_diagnostics_endpoint.py -v
 """
 
-import sys
-import os
 import json
+import os
+import sys
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,7 +26,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from web.routes import task_routes
-
 
 # ═══════════════════════════════════════════════
 # 1. BaseTaskState 时间戳字段（P4-T1）
@@ -54,13 +53,17 @@ class TestTaskTimestamps:
 
 class TestTaskManagerTimestamps:
     def test_create_sets_timestamps(self, tmp_path, monkeypatch):
+        from core import task_manager as tm_mod
         from core.task_manager import TaskManager
         from models.task import CreativeVideoTask
-        from core import config as cfg
 
-        monkeypatch.setattr(cfg, "get_working_dir", lambda: str(tmp_path))
+        # TaskManager 在模块导入时就绑定了 get_working_dir，必须打桩它自己的符号
+        # （打桩 core.config.get_working_dir 不会生效 → 会写进真实工作区）
+        monkeypatch.setattr(tm_mod, "get_working_dir", lambda: str(tmp_path))
         tm = TaskManager("t_ts", dir_name="t_ts")
         state = tm.create(CreativeVideoTask())
+        # 落盘位置必须在临时目录内（防止再次误写到真实工作区）
+        assert os.path.isdir(os.path.join(str(tmp_path), "t_ts"))
         assert state.created_at  # 非空
         assert state.updated_at  # 非空
         # 落盘后重载仍保留
@@ -68,11 +71,11 @@ class TestTaskManagerTimestamps:
         assert loaded.created_at == state.created_at
 
     def test_update_refreshes_updated_at(self, tmp_path, monkeypatch):
+        from core import task_manager as tm_mod
         from core.task_manager import TaskManager
         from models.task import CreativeVideoTask, StepStatus
-        from core import config as cfg
 
-        monkeypatch.setattr(cfg, "get_working_dir", lambda: str(tmp_path))
+        monkeypatch.setattr(tm_mod, "get_working_dir", lambda: str(tmp_path))
         tm = TaskManager("t_ts2", dir_name="t_ts2")
         state = tm.create(CreativeVideoTask())
         old_created = state.created_at
@@ -122,9 +125,9 @@ class TestErrorTaskId:
 @pytest.fixture
 def diag_client(monkeypatch, tmp_path):
     """挂载 task_routes，并让 TaskManager 指向 tmp_path。"""
-    from core import config as cfg
+    from core import task_manager as tm_mod
 
-    monkeypatch.setattr(cfg, "get_working_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(tm_mod, "get_working_dir", lambda: str(tmp_path))
     # 用真实 TaskManager 落盘一个失败任务
     from core.task_manager import TaskManager
     from models.task import CreativeVideoTask, StepStatus
