@@ -34,12 +34,20 @@ const { loadGallery, startGalleryTimer, stopGalleryTimer } = useGallery()
 
 // ── 视图导航（结构重构：顶部标签 → 左侧导航栏）──
 // 图标为 24×24 stroke path，序号用等宽字体承担「工位编号」的顺序感。
-const NAV = [
+type NavEntry = {
+  key: 'create' | 'simple' | 'list' | 'gallery'
+  labelKey: string
+  num: string
+  d: string
+  /** 新功能标记（对应语言包 tabNewBadge），v8.0 起用于「简单视频」 */
+  isNew?: boolean
+}
+const NAV: NavEntry[] = [
   { key: 'create', labelKey: 'tabCreate', num: '01', d: 'M12 5v14M5 12h14' },
-  { key: 'simple', labelKey: 'tabSimple', num: '02', d: 'M13 3 4.5 13.5H10l-1 7.5 9-11h-5.5L13 3Z' },
+  { key: 'simple', labelKey: 'tabSimple', num: '02', d: 'M13 3 4.5 13.5H10l-1 7.5 9-11h-5.5L13 3Z', isNew: true },
   { key: 'list', labelKey: 'tabList', num: '03', d: 'M4 7h16M4 12h16M4 17h10' },
   { key: 'gallery', labelKey: 'tabGallery', num: '04', d: 'M4 5h16v14H4zM4 15.5l4.5-4.5L12 14.5l3-3L20 15.5' },
-] as const
+]
 
 /** 去掉语言包标签里自带的表情前缀（如「⚡ 一键创作」），图标位置交给 SVG。 */
 function navLabel(key: string): string {
@@ -168,6 +176,7 @@ async function autoReconnectRunningTask() {
             <path :d="n.d" />
           </svg>
           <span class="flex-1 truncate text-start">{{ navLabel(n.labelKey) }}</span>
+          <span v-if="n.isNew" class="chip chip-accent shrink-0">{{ t('tabNewBadge') }}</span>
           <span class="nav-num">{{ n.num }}</span>
         </button>
       </nav>
@@ -303,6 +312,7 @@ async function autoReconnectRunningTask() {
           >
             <span class="mono text-[9px]" :class="appState.view === n.key ? 'text-accent' : ''">{{ n.num }}</span>
             <span>{{ navLabel(n.labelKey) }}</span>
+            <span v-if="n.isNew" class="chip chip-accent shrink-0">{{ t('tabNewBadge') }}</span>
           </button>
         </nav>
 

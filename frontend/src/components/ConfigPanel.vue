@@ -733,8 +733,12 @@ initCollapse()
       <div class="flex min-w-0 items-baseline gap-2.5">
         <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">02</span>
         <span class="shrink-0 text-[12.5px] font-medium text-ink-2">{{ t('modelTitle') }}</span>
-        <span v-if="appState.models.text || appState.models.image || appState.models.video" class="mono truncate text-[10px] text-muted">
-          {{ appState.models.text }} / {{ appState.models.image }} / {{ appState.models.video }}
+        <span
+          v-if="appState.models.text || appState.models.image || appState.models.video"
+          class="mono truncate text-[10px] text-muted"
+          :title="`${t('modelTagText')} ${appState.models.text} · ${t('modelTagImage')} ${appState.models.image} · ${t('modelTagVideo')} ${appState.models.video}`"
+        >
+          {{ t('modelTagText') }} {{ appState.models.text }} · {{ t('modelTagImage') }} {{ appState.models.image }} · {{ t('modelTagVideo') }} {{ appState.models.video }}
         </span>
         <span v-else class="text-muted">—</span>
       </div>

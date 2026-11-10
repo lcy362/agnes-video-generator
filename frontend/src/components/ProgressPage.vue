@@ -311,10 +311,13 @@ onUnmounted(() => {
           <section v-if="taskInfo" class="panel mb-4">
             <button
               class="panel-head collapse-header w-full text-start"
+              :title="taskInfoOpen ? t('ppCollapse') : t('ppExpand')"
+              :aria-label="taskInfoOpen ? t('ppCollapse') : t('ppExpand')"
+              :aria-expanded="taskInfoOpen"
               @click="taskInfoOpen = !taskInfoOpen"
             >
               <span class="panel-title">{{ t('taskInfo') }}</span>
-              <span class="mono text-[11px] text-muted">{{ taskInfoOpen ? '−' : '+' }}</span>
+              <span class="mono text-[11px] text-muted" aria-hidden="true">{{ taskInfoOpen ? '−' : '+' }}</span>
             </button>
 
             <div v-show="taskInfoOpen" class="panel-body space-y-3">
@@ -347,6 +350,9 @@ onUnmounted(() => {
             >
               <button
                 class="panel-head collapse-header w-full text-start"
+                :title="isCollapsed(g.stepKey) ? t('ppExpand') : t('ppCollapse')"
+                :aria-label="isCollapsed(g.stepKey) ? t('ppExpand') : t('ppCollapse')"
+                :aria-expanded="!isCollapsed(g.stepKey)"
                 @click="toggleCollapse(g.stepKey)"
               >
                 <span class="flex min-w-0 items-center gap-2">
@@ -360,7 +366,7 @@ onUnmounted(() => {
                   <span v-if="g.stepKey === checkpointGroup" class="chip chip-accent shrink-0">{{ t('awaitingUser') }}</span>
                   <span class="mono shrink-0 text-[10px] text-muted">{{ g.items.length }}</span>
                 </span>
-                <span class="mono shrink-0 text-[11px] text-muted">{{ isCollapsed(g.stepKey) ? '+' : '−' }}</span>
+                <span class="mono shrink-0 text-[11px] text-muted" aria-hidden="true">{{ isCollapsed(g.stepKey) ? '+' : '−' }}</span>
               </button>
 
               <div v-show="!isCollapsed(g.stepKey)" class="panel-body space-y-2">
