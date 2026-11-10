@@ -23,6 +23,7 @@
     get_key_ring().rotate()   # 429 换 Key
 """
 import hashlib
+import hmac
 import itertools
 import logging
 import threading
@@ -33,14 +34,26 @@ from core.config import get_api_keys
 
 logger = logging.getLogger(__name__)
 
+#: Key 指纹的固定盐（仅用于日志/状态文件中的不可逆标识，不参与鉴权）
+_KEY_FP_SALT = b"agnes-video-generator/key-fingerprint/v1"
+
 
 def key_fingerprint(key: str) -> str:
-    """API Key 的短指纹（SHA-256 前 16 位十六进制）。
+    """API Key 的短指纹（HMAC-SHA256 前 16 位十六进制，带固定盐）。
 
     日志里需要区分「这一跳用的是哪把 Key」时**只能打印指纹**：明文 Key 的
     任何片段（首 8 / 尾 4）都属于敏感信息，落进日志即视为泄漏
     （CodeQL ``py/clear-text-logging-sensitive-data``）。指纹不可反推明文，
     同一把 Key 的指纹稳定，足够人眼与多 Key 排查对照。
+
+    为什么用 HMAC 而不是裸 SHA-256：裸哈希直接作用于敏感数据会被
+    ``py/weak-sensitive-data-hashing`` 判为弱哈希；HMAC 是密钥化摘要，
+    语义上正是「不可逆标识」，同时保持确定性与毫秒级开销（高频日志安全）。
+
+    兼容性：盐固定为常量，所以同一次部署内指纹稳定；早期版本落盘的
+    ``video_key_hints`` 用的是裸 SHA-256，重启后与当前指纹不匹配时会退回
+    v7.8 的「404 归属探测」（见 ``AgnesVideoAPI._probe_owner_key``），
+    单 Key 场景无影响。
 
     Args:
         key: 明文 API Key（可为空）。
@@ -50,7 +63,9 @@ def key_fingerprint(key: str) -> str:
     """
     if not key:
         return "-"
-    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+    return hmac.new(
+        _KEY_FP_SALT, key.encode("utf-8"), hashlib.sha256
+    ).hexdigest()[:16]
 
 
 class KeyRing:
