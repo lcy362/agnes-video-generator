@@ -384,6 +384,9 @@
       padding: 22px 16px 18px;
       background: color-mix(in oklab, var(--color-paper) 72%, var(--color-paper-2));
       border-inline-end: 1px solid var(--color-rule);
+      /* 矮屏（≤720px 高）下支持项目文案会撑高侧栏，允许自身滚动而不挤压导航 */
+      overflow-y: auto;
+      scrollbar-width: thin;
     }
     .nav-item {
       position: relative;
