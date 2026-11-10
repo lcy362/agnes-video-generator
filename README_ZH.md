@@ -133,25 +133,27 @@ Agnes Video Generator 完全免费且开源，**本项目绝不会提供付费�
 
 ## 🎥 Demo
 
-### 1. 创意视频 — 无配音
+以下 3 条来自[官网作品库](https://video.lichuanyang.top/zh/showcase)最新一批（2026-11-09 发布），都是在简单视频模式下一句提示词直出，没有剪辑与合成。
 
-> 暗黑童话 —《青蛙王子》，5 个场景，keyframes 串联，全自动生成。
+### 1. 冷调走廊｜极近怼脸后拉
 
-[![青蛙王子 — 演示视频](https://img.shields.io/badge/▶%20观看演示-FF0050?style=for-the-badge&logo=tiktok&logoColor=white)](https://v.douyin.com/L4F6KdGnD6U/)
+> 起幅是极近怼脸，镜头实拍后拉到半身，冷灰走廊配钴蓝高领毛衣，毛孔与碎发细节都保留。12 秒横版，720P。
 
-### 2. 创意视频 — 带 TTS 配音
+[![冷调走廊 — 演示](https://img.shields.io/badge/%E2%96%B6%20%E5%9C%A8%E5%AE%98%E7%BD%91%E8%A7%82%E7%9C%8B-8A2BE2?style=for-the-badge)](https://video.lichuanyang.top/zh/showcase/ab-01-cold-corridor-face-closeup)
 
-> 同样的《青蛙王子》故事，增加 AI 生成的 TTS 旁白配音和自动字幕。
+### 2. 盛唐夜樱｜古装高髻人像
 
-[![青蛙王子配音版 — 演示](https://img.shields.io/badge/▶%20观看演示-FF0050?style=for-the-badge&logo=tiktok&logoColor=white)](https://v.douyin.com/l2FlbF1Jdz0/)
+> 盛唐高髻与发簪立于夜樱之下，花瓣掠过、灯笼暖光落在脸颊，镜头缓慢横移。6 秒竖版，720P。
 
-### 3. 稿件视频 — 长文转视频
+[![盛唐夜樱 — 演示](https://img.shields.io/badge/%E2%96%B6%20%E5%9C%A8%E5%AE%98%E7%BD%91%E8%A7%82%E7%9C%8B-8A2BE2?style=for-the-badge)](https://video.lichuanyang.top/zh/showcase/ab-03-tang-dynasty-night-sakura)
 
-> 粘贴长文/稿件 → 自动拆段 → 逐段 AI 视频 → 统一 TTS 旁白 + 字幕叠加 → 最终视频。
+### 3. 红色片场｜香水广告
 
-[![稿件视频演示](https://img.shields.io/badge/▶%20观看演示-FF0050?style=for-the-badge&logo=tiktok&logoColor=white)](https://v.douyin.com/eSGE9KENWVU/)
+> 红色片场里的香水广告：喷雾炸开，侧脸与红唇近景，缓慢推进，灯光干净利落。10 秒横版，720P。
 
-<sub>点击在抖音观看</sub>
+[![红色片场 — 演示](https://img.shields.io/badge/%E2%96%B6%20%E5%9C%A8%E5%AE%98%E7%BD%91%E8%A7%82%E7%9C%8B-8A2BE2?style=for-the-badge)](https://video.lichuanyang.top/zh/showcase/ab-12-red-studio-perfume-ad)
+
+<sub>更多作品：[video.lichuanyang.top/showcase](https://video.lichuanyang.top/zh/showcase)</sub>
 
 ## 为什么选择 Agnes Video Generator？
 

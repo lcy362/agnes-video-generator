@@ -141,25 +141,27 @@ If you find this project helpful, here are a few ways to support its continued d
 
 ## 🎥 Demo
 
-### 1. Creative Video — No Narration
+Three clips from the most recent batch on the [official showcase](https://video.lichuanyang.top/en/showcase). Each one was generated from a single prompt in simple video mode — no editing, no compositing.
 
-> A dark-twist fairytale — *The Frog Prince*, 5 scenes, keyframes chaining, fully auto-generated.
+### 1. Cold Corridor — Dolly Back From an Extreme Closeup
 
-[![The Frog Prince — Demo Video](https://img.shields.io/badge/▶%20Watch%20Demo-FF0050?style=for-the-badge&logo=tiktok&logoColor=white)](https://v.douyin.com/L4F6KdGnD6U/)
+> Opens on an extreme facial close-up, then a real dolly-back to a head-and-shoulders frame in a cool grey corridor — pores, flyaway hair and the cobalt turtleneck all hold. 12s, landscape, 720P.
 
-### 2. Creative Video — With TTS Narration
+[![Cold Corridor — Demo](https://img.shields.io/badge/%E2%96%B6%20Watch%20on%20Showcase-8A2BE2?style=for-the-badge)](https://video.lichuanyang.top/en/showcase/ab-01-cold-corridor-face-closeup)
 
-> Same *Frog Prince* story, now with AI-generated TTS narration and auto subtitles.
+### 2. Tang Dynasty Night Sakura — Portrait
 
-[![The Frog Prince with Narration — Demo](https://img.shields.io/badge/▶%20Watch%20Demo-FF0050?style=for-the-badge&logo=tiktok&logoColor=white)](https://v.douyin.com/l2FlbF1Jdz0/)
+> A Tang-dynasty high bun and hairpins under night cherry blossoms: petals drift past, lantern glow lands on the cheek, the camera slides slowly sideways. 6s, portrait, 720P.
 
-### 3. Manuscript Video — Text-to-Video
+[![Tang Dynasty Night Sakura — Demo](https://img.shields.io/badge/%E2%96%B6%20Watch%20on%20Showcase-8A2BE2?style=for-the-badge)](https://video.lichuanyang.top/en/showcase/ab-03-tang-dynasty-night-sakura)
 
-> Paste a long article or script → auto-split into segments → AI video per segment → unified TTS narration + subtitles → final video.
+### 3. Red Studio — Perfume Commercial
 
-[![Manuscript Video Demo](https://img.shields.io/badge/▶%20Watch%20Demo-FF0050?style=for-the-badge&logo=tiktok&logoColor=white)](https://v.douyin.com/eSGE9KENWVU/)
+> A perfume spot in a red studio: the mist sprays, a profile and red lips in close-up, a slow push-in and clean commercial lighting. 10s, landscape, 720P.
 
-<sub>Click to watch on Douyin</sub>
+[![Red Studio — Demo](https://img.shields.io/badge/%E2%96%B6%20Watch%20on%20Showcase-8A2BE2?style=for-the-badge)](https://video.lichuanyang.top/en/showcase/ab-12-red-studio-perfume-ad)
+
+<sub>Browse the full gallery: [video.lichuanyang.top/showcase](https://video.lichuanyang.top/en/showcase)</sub>
 
 ## Why Agnes Video Generator?
 
