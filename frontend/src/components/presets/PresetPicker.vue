@@ -130,17 +130,16 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
       <!-- 下拉选择触发器：仿原生 select，显示当前预设或占位提示，chevron 展开时翻转 -->
       <button
         type="button"
-        class="inline-flex items-center gap-2 rounded-lg glass-input px-3 py-2.5 text-sm cursor-pointer transition
-               hover:border-accent/50"
-        :class="open ? 'border-accent/60 ring-2 ring-accent/25' : ''"
+        class="btn btn-ghost h-9 gap-2"
+        :class="open ? 'border-accent/60' : ''"
         :title="t('presetSelectHint')"
         @click="toggle"
       >
-        <span class="text-xs text-muted shrink-0">{{ t('presetTriggerLabel') }}</span>
-        <span v-if="activeName" class="font-medium text-ink truncate max-w-[9rem]">{{ activeName }}</span>
-        <span v-else class="text-muted truncate max-w-[9rem]">{{ t('presetPlaceholder') }}</span>
+        <span class="mono shrink-0 text-[9.5px] uppercase tracking-[0.1em] text-muted">{{ t('presetTriggerLabel') }}</span>
+        <span v-if="activeName" class="max-w-[9rem] truncate font-medium text-ink">{{ activeName }}</span>
+        <span v-else class="max-w-[9rem] truncate text-muted">{{ t('presetPlaceholder') }}</span>
         <svg
-          class="w-3.5 h-3.5 text-muted shrink-0 transition-transform duration-200"
+          class="h-3.5 w-3.5 shrink-0 text-muted transition-transform duration-200"
           :class="open ? 'rotate-180' : ''"
           viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"
           stroke-linecap="round" stroke-linejoin="round"
@@ -148,7 +147,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
       </button>
       <button
         type="button"
-        class="glass-input rounded-lg w-8 h-9 text-base text-ink cursor-pointer leading-none shrink-0 hover:border-accent/40 transition"
+        class="btn btn-ghost h-9 w-9 shrink-0 px-0 text-[15px] leading-none"
         :title="t('presetSaveAs')"
         @click="saving = !saving"
       >
@@ -157,35 +156,34 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
     </div>
 
     <!-- 保存当前风格为预设 -->
-    <div v-if="saving" class="flex items-center gap-2 mt-2">
+    <div v-if="saving" class="mt-2 flex items-center gap-2">
       <input
         v-model="newName"
-        class="glass-input rounded-lg px-3 py-2 text-sm text-ink placeholder-muted flex-1"
+        class="field flex-1"
         :placeholder="t('presetNamePlaceholder')"
         @keyup.enter="submitSave"
       />
-      <button type="button" class="px-3 py-2 rounded-lg text-sm bg-accent text-accent-ink cursor-pointer" @click="submitSave">
+      <button type="button" class="btn btn-primary btn-sm whitespace-nowrap" @click="submitSave">
         {{ t('presetSaveAs') }}
       </button>
-      <button type="button" class="px-2 py-2 rounded-lg text-sm text-muted cursor-pointer" @click="saving = false">
-        ✕
-      </button>
+      <button type="button" class="btn btn-quiet btn-sm" @click="saving = false">✕</button>
     </div>
 
     <!-- 预设下拉面板 -->
     <div
       v-if="open"
-      class="absolute right-0 z-20 mt-1 w-72 max-h-72 overflow-y-auto glass-card rounded-xl p-2 shadow-xl"
+      class="panel absolute end-0 z-20 mt-1 max-h-72 w-72 overflow-y-auto p-1.5"
+      style="box-shadow: 0 24px 50px -24px rgb(0 0 0 / 0.7)"
     >
       <template v-if="groups.length">
         <div v-for="g in groups" :key="g.category" class="mb-1">
-          <div class="text-xs text-muted px-2 py-1 uppercase tracking-wide">{{ catName(g.category) }}</div>
+          <div class="mono px-2 py-1 text-[9px] uppercase tracking-[0.14em] text-muted">{{ catName(g.category) }}</div>
           <button
             v-for="p in g.items"
             :key="p.id"
             type="button"
-            class="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-sm text-left hover:bg-paper-3 transition"
-            :class="activePreset && activePreset.id === p.id ? 'text-accent font-medium' : 'text-ink'"
+            class="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-start text-[12.5px] transition-colors hover:bg-paper-3"
+            :class="activePreset && activePreset.id === p.id ? 'font-medium text-accent' : 'text-ink-2'"
             :title="p.prompt"
             @click="choose(p)"
           >
@@ -199,14 +197,14 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             </span>
             <span
               v-if="p.kind === 'user'"
-              class="text-muted hover:text-red-400 px-1 shrink-0"
+              class="shrink-0 px-1 text-muted transition-colors hover:text-danger"
               @click.stop="remove(p)"
             >✕</span>
           </button>
         </div>
-        <p class="text-xs text-muted px-2 py-1">{{ t('presetSelectHint') }}</p>
+        <p class="hint px-2 py-1">{{ t('presetSelectHint') }}</p>
       </template>
-      <p v-else class="text-sm text-muted px-2 py-2">{{ t('presetNoPresets') }}</p>
+      <p v-else class="px-2 py-2 text-[12.5px] text-muted">{{ t('presetNoPresets') }}</p>
     </div>
   </div>
 </template>

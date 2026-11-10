@@ -94,53 +94,57 @@ async function toggle() {
 <template>
   <div
     v-if="visible"
-    class="mt-3 rounded-lg border border-accent/30 bg-accent/5 px-3 py-3 space-y-2"
+    class="mt-4 border-t border-rule pt-4"
   >
-    <div class="flex items-start justify-between gap-3">
+    <div class="flex items-start justify-between gap-4">
       <div class="min-w-0">
-        <p class="text-sm font-medium text-ink-2">{{ t('fastRetry.title') }}</p>
-        <p class="mt-1 text-xs text-muted leading-relaxed">{{ hint }}</p>
+        <p class="flex items-center gap-2 text-[12px] font-medium text-ink-2">
+          <span class="h-1.5 w-1.5 rounded-full" style="background: var(--color-accent)"></span>
+          {{ t('fastRetry.title') }}
+        </p>
+        <p class="mt-1 text-[11px] leading-relaxed text-muted">{{ hint }}</p>
       </div>
       <button
         role="switch"
         :aria-checked="enabled"
         :aria-label="t('fastRetry.title')"
         :disabled="submitting"
-        class="relative shrink-0 h-5 w-10 mt-0.5 rounded-full transition-colors disabled:opacity-50"
-        :class="enabled ? 'bg-accent' : 'bg-paper-2/60 border border-rule'"
+        class="relative mt-0.5 h-[18px] w-8 shrink-0 rounded-full border transition-colors disabled:opacity-50"
+        :class="enabled ? 'border-accent bg-accent/25' : 'border-rule-2 bg-paper-3'"
         @click="toggle"
       >
         <span
-          class="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all"
-          :class="enabled ? 'left-5' : 'left-0.5'"
+          class="absolute top-[2px] h-3 w-3 rounded-full transition-all"
+          :class="enabled ? 'bg-accent' : 'bg-muted'"
+          :style="{ insetInlineStart: enabled ? '16px' : '2px' }"
         ></span>
       </button>
     </div>
 
-    <div v-if="!enabled" class="flex flex-wrap items-end gap-3 pt-1">
-      <label class="text-xs text-muted">
-        <span class="block mb-1">{{ t('fastRetry.perMinute') }}</span>
+    <div v-if="!enabled" class="mt-3 flex flex-wrap items-end gap-3">
+      <label>
+        <span class="label">{{ t('fastRetry.perMinute') }}</span>
         <input
           v-model.number="perMinute"
           type="number"
           min="1"
           max="120"
           step="1"
-          class="w-20 glass-input rounded-lg px-2 py-1.5 text-sm"
+          class="field w-20"
         />
       </label>
-      <label class="text-xs text-muted">
-        <span class="block mb-1">{{ t('fastRetry.minutes') }}</span>
+      <label>
+        <span class="label">{{ t('fastRetry.minutes') }}</span>
         <input
           v-model.number="minutes"
           type="number"
           min="1"
           max="30"
-          class="w-20 glass-input rounded-lg px-2 py-1.5 text-sm"
+          class="field w-20"
         />
       </label>
       <button
-        class="text-xs px-3 py-1.5 rounded-lg bg-accent text-accent-ink hover:opacity-90 transition disabled:opacity-50"
+        class="btn btn-primary btn-sm"
         :disabled="submitting"
         @click="toggle"
       >
@@ -148,15 +152,13 @@ async function toggle() {
       </button>
     </div>
 
-    <div v-else class="flex flex-wrap items-center gap-2 text-xs">
+    <div v-else class="mt-3 flex flex-wrap items-center gap-2">
       <!-- 已打次数：后端 attempts 每 1 秒最多落盘一次，快速模式下随 1s 轮询刷新 -->
-      <span
-        class="px-2 py-1 rounded-lg bg-paper-2/40 border border-rule text-ink-2 font-medium tabular-nums"
-      >
+      <span class="chip chip-accent">
         {{ tf('fastRetry.attempts', { n: cfg?.attempts || 0 }) }}
       </span>
       <button
-        class="px-3 py-1.5 rounded-lg bg-paper-2/40 border border-rule text-muted hover:text-ink-2 transition disabled:opacity-50"
+        class="btn btn-ghost btn-sm"
         :disabled="submitting"
         @click="toggle"
       >

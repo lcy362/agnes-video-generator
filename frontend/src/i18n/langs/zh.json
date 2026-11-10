@@ -786,7 +786,7 @@
   "simpleHideSettings": "收起设置",
   "simpleResetPreset": "恢复默认",
   "simpleDraftRestored": "已恢复上次的提示词，其它设置使用默认预设",
-  "simpleKeyMissing": "尚未配置 API Key，请先在页面顶部完成配置",
+  "simpleKeyMissing": "尚未配置 API Key，请在「设置」中完成配置",
   "simpleWaitHint": "免费队列通常 1–3 分钟完成，高峰可能更久；可以离开本页，稍后从任务列表查看",
   "simpleRefImagesLabel": "参考图",
   "simpleRefImagesHint": "可上传多张，按顺序对应提示词中的 <Picture 1>、<Picture 2>…，用于保持角色与风格一致",
@@ -801,5 +801,6 @@
   "simpleAudioUrlInvalid": "参考音频必须是 http(s) 开头的公开链接",
   "ratioLandscape": "横屏",
   "ratioPortrait": "竖屏",
-  "ratioSquare": "方形"
+  "ratioSquare": "方形",
+  "navSettings": "设置"
 }

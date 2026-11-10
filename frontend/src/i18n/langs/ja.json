@@ -793,7 +793,7 @@
   "simpleHideSettings": "設定を閉じる",
   "simpleResetPreset": "既定に戻す",
   "simpleDraftRestored": "前回のプロンプトを復元しました。その他の設定は既定のプリセットです。",
-  "simpleKeyMissing": "API キーが未設定です。ページ上部で設定してください。",
+  "simpleKeyMissing": "API キーが未設定です。サイドバーの「設定」から追加してください。",
   "simpleWaitHint": "無料キューは通常 1〜3 分で完了します（混雑時はより長くかかります）。このページを離れて、後でタスク一覧を確認できます。",
   "simpleRefImagesLabel": "参照画像",
   "simpleRefImagesHint": "複数枚アップロードできます。プロンプト内の <Picture 1>、<Picture 2>… に対応し、人物やスタイルの一貫性を保ちます。",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "参照音声は公開された http(s) URL である必要があります。",
   "ratioLandscape": "横長",
   "ratioPortrait": "縦長",
-  "ratioSquare": "正方形"
+  "ratioSquare": "正方形",
+  "navSettings": "設定"
 }

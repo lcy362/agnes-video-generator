@@ -15,8 +15,13 @@ withDefaults(defineProps<{ size?: 'xs' | 'sm' }>(), { size: 'xs' })
 
 <template>
   <span
-    class="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 font-medium text-amber-400 align-middle whitespace-nowrap"
-    :class="size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-1.5 py-0.5 text-[10px] leading-none'"
+    class="mono inline-flex shrink-0 items-center whitespace-nowrap rounded border align-middle font-medium uppercase tracking-[0.06em]"
+    :class="size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-1.5 py-0.5 text-[9px] leading-none'"
+    style="
+      color: var(--color-warning);
+      border-color: color-mix(in oklab, var(--color-warning) 34%, transparent);
+      background: color-mix(in oklab, var(--color-warning) 8%, transparent);
+    "
     :title="t('experimentalBadgeHint')"
-  >🧪 {{ t('experimentalBadge') }}</span>
+  >{{ t('experimentalBadge') }}</span>
 </template>

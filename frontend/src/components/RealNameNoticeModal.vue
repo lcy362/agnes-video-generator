@@ -41,62 +41,61 @@ onMounted(() => {
     <div
       v-if="visible"
       ref="containerRef"
-      class="fixed inset-0 z-[70] flex items-center justify-center px-4"
+      class="modal-backdrop"
       role="dialog"
       aria-modal="true"
       :aria-label="t('noticeRealNameTitle')"
     >
-      <div class="absolute inset-0 bg-black/50 animate-fade-in" @click="close"></div>
+      <div class="absolute inset-0" @click="close"></div>
 
-      <div class="relative bg-paper rounded-2xl p-5 sm:p-6 max-w-md w-full shadow-2xl border border-rule max-h-[85vh] overflow-y-auto">
-        <div class="flex items-start gap-2.5">
-          <span class="text-lg leading-none pt-0.5" aria-hidden="true">📢</span>
-          <h3 class="text-base font-semibold text-ink leading-snug">{{ t('noticeRealNameTitle') }}</h3>
+      <div class="modal max-h-[85vh] w-full max-w-md overflow-y-auto p-5 sm:p-6">
+        <div class="mb-4">
+          <p class="eyebrow">Notice</p>
+          <h3 class="mt-1.5 text-[14px] font-semibold leading-snug tracking-[-0.01em] text-ink">
+            {{ t('noticeRealNameTitle') }}
+          </h3>
         </div>
 
-        <ul class="mt-4 space-y-3 text-sm text-ink-2 leading-relaxed">
-          <li class="flex gap-2">
-            <span class="shrink-0 pt-0.5" aria-hidden="true">🇨🇳</span>
+        <ul class="space-y-3 text-[12.5px] leading-relaxed text-ink-2">
+          <li class="flex gap-2.5">
+            <span class="mono shrink-0 pt-0.5 text-[9.5px] text-muted/70">01</span>
             <div class="min-w-0">
               <p>{{ t('noticeRealNameBody') }}</p>
               <a
                 :href="CN_CONSOLE"
                 target="_blank"
                 rel="noopener"
-                class="inline-block mt-1 text-accent hover:text-ink transition-colors break-all underline underline-offset-2"
+                class="mono mt-1 inline-block break-all text-[11px] text-accent underline decoration-dotted underline-offset-2 transition-colors hover:text-ink"
               >{{ CN_CONSOLE.replace('https://', '') }} ↗</a>
             </div>
           </li>
 
-          <li class="flex gap-2">
-            <span class="shrink-0 pt-0.5" aria-hidden="true">⚠️</span>
-            <p class="font-medium text-ink-2">{{ t('noticeRealNameFreq') }}</p>
+          <li class="flex gap-2.5">
+            <span class="mono shrink-0 pt-0.5 text-[9.5px] text-muted/70">02</span>
+            <p class="font-medium">{{ t('noticeRealNameFreq') }}</p>
           </li>
 
-          <li class="flex gap-2">
-            <span class="shrink-0 pt-0.5" aria-hidden="true">🌍</span>
+          <li class="flex gap-2.5">
+            <span class="mono shrink-0 pt-0.5 text-[9.5px] text-muted/70">03</span>
             <div class="min-w-0">
               <p>{{ t('noticeRealNameGlobal') }}</p>
               <a
                 :href="GLOBAL_CONSOLE"
                 target="_blank"
                 rel="noopener"
-                class="inline-block mt-1 text-muted hover:text-ink-2 transition-colors break-all underline underline-offset-2"
+                class="mono mt-1 inline-block break-all text-[11px] text-muted underline decoration-dotted underline-offset-2 transition-colors hover:text-ink-2"
               >{{ GLOBAL_CONSOLE.replace('https://', '') }} ↗</a>
             </div>
           </li>
 
-          <li class="flex gap-2 rounded-xl bg-paper-2/60 border border-rule/60 px-3 py-2">
-            <span class="shrink-0 pt-0.5" aria-hidden="true">📉</span>
-            <p class="text-xs leading-relaxed text-ink-2">{{ t('noticeRealNameOutlook') }}</p>
+          <li class="flex gap-2.5 rounded border border-rule bg-paper px-3 py-2">
+            <span class="mono shrink-0 pt-0.5 text-[9.5px] text-muted/70">04</span>
+            <p class="text-[11.5px] leading-relaxed text-muted">{{ t('noticeRealNameOutlook') }}</p>
           </li>
         </ul>
 
-        <div class="flex justify-end mt-5">
-          <button
-            class="px-4 py-2 rounded-lg text-sm font-medium bg-accent text-accent-ink hover:opacity-90 transition"
-            @click="close"
-          >
+        <div class="mt-5 flex justify-end">
+          <button class="btn btn-primary" @click="close">
             {{ t('noticeRealNameGotIt') }}
           </button>
         </div>

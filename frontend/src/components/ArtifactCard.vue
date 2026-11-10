@@ -65,20 +65,20 @@ async function onCopyPath() {
 </script>
 
 <template>
-  <div class="artifact-card flex items-start gap-3 p-3 bg-paper-2/30 rounded-xl border border-rule/40">
-    <span class="text-lg mt-0.5 shrink-0">{{ artifactIcon(art) }}</span>
-    <div class="flex-1 min-w-0">
-      <div class="flex items-center gap-2 mb-1">
-        <span class="text-xs text-ink-2 truncate">{{ artifactLabel(art) }}</span>
-        <span class="text-xs text-muted shrink-0">{{ formatSize(art.size) }}</span>
+  <div class="artifact-card flex items-start gap-3 rounded border border-rule bg-paper px-3 py-2.5">
+    <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-[12px] leading-none text-muted">{{ artifactIcon(art) }}</span>
+    <div class="min-w-0 flex-1">
+      <div class="mb-1 flex items-baseline gap-2">
+        <span class="truncate text-[11.5px] text-ink-2">{{ artifactLabel(art) }}</span>
+        <span class="mono shrink-0 text-[10px] text-muted">{{ formatSize(art.size) }}</span>
       </div>
 
       <!-- 图片预览 -->
       <img
         v-if="art.category === 'image'"
         :src="artifactFileUrl(art)"
-        class="rounded-lg cursor-pointer border border-rule/50"
-        :class="large ? 'w-full max-h-[400px]' : 'max-h-36'"
+        class="cursor-pointer rounded border border-rule"
+        :class="large ? 'max-h-[400px] w-full' : 'max-h-36'"
         loading="lazy"
         @click="openImageModal(artifactFileUrl(art))"
       />
@@ -89,7 +89,7 @@ async function onCopyPath() {
         controls
         playsinline
         preload="metadata"
-        class="w-full rounded-lg border border-rule/50 bg-black"
+        class="w-full rounded border border-rule bg-black"
         :style="large ? 'max-height: 460px' : 'max-height: 260px'"
       ></video>
       <!-- 音频预览 -->
@@ -97,7 +97,7 @@ async function onCopyPath() {
       <!-- 文本 / JSON 预览 -->
       <pre
         v-else
-        class="text-xs text-muted overflow-auto bg-paper/70 p-2 rounded-lg border border-rule/40 cursor-pointer whitespace-pre-wrap"
+        class="cursor-pointer overflow-auto whitespace-pre-wrap rounded border border-rule bg-paper-2 p-2 text-[11px] leading-relaxed text-muted"
         :class="large ? 'max-h-64' : 'max-h-24'"
         @click="onPreviewClick"
       >{{ previewExpanded ? (previewLoading ? t('loading') + '...' : previewText) : t('clickToPreview') }}</pre>
@@ -105,7 +105,7 @@ async function onCopyPath() {
       <!-- 路径复制 -->
       <div
         v-if="(art as any).abs_path || (art as any).path"
-        class="mt-1.5 text-[10px] text-muted font-mono truncate cursor-pointer hover:text-ink-2 transition"
+        class="mono mt-1.5 cursor-pointer truncate text-[10px] text-muted transition-colors hover:text-ink-2"
         :title="t('copy')"
         @click="onCopyPath"
       >{{ (art as any).abs_path || (art as any).path }}</div>
@@ -114,7 +114,7 @@ async function onCopyPath() {
     <!-- 删除 -->
     <button
       v-if="art.deletable && !isRunning"
-      class="text-xs px-2 py-1 bg-red-700/50 hover:bg-red-600 text-red-100 rounded transition shrink-0"
+      class="btn btn-quiet btn-xs shrink-0 text-danger"
       :title="t('delete')"
       @click="confirmDeleteArtifact(art)"
     >

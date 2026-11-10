@@ -793,7 +793,7 @@
   "simpleHideSettings": "Instellingen verbergen",
   "simpleResetPreset": "Standaard herstellen",
   "simpleDraftRestored": "Vorige prompt hersteld; overige instellingen gebruiken de standaardvoorinstelling.",
-  "simpleKeyMissing": "Nog geen API-sleutel geconfigureerd. Stel er een in bovenaan de pagina.",
+  "simpleKeyMissing": "Geen API-sleutel geconfigureerd. Open Instellingen in de zijbalk.",
   "simpleWaitHint": "De gratis wachtrij duurt meestal 1–3 minuten, langer op drukke momenten. U kunt deze pagina verlaten en later de takenlijst bekijken.",
   "simpleRefImagesLabel": "Referentieafbeeldingen",
   "simpleRefImagesHint": "Meerdere afbeeldingen mogelijk; ze komen overeen met <Picture 1>, <Picture 2>… in je prompt voor consistente personages en stijl.",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "Referentie-audio moet een openbare http(s)-URL zijn.",
   "ratioLandscape": "Liggend",
   "ratioPortrait": "Staand",
-  "ratioSquare": "Vierkant"
+  "ratioSquare": "Vierkant",
+  "navSettings": "Instellingen"
 }

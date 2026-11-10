@@ -1,7 +1,7 @@
 import { appState } from '@/store'
 
 // 顶层视图导航 + URL hash 同步（无 vue-router，零后端改动）
-// hash 规则：'#/progress/<taskId>' | '#/list' | '#/gallery' | '#/create'
+// hash 规则：'#/progress/<taskId>' | '#/list' | '#/gallery' | '#/simple' | '#/create'
 
 export function useNavigation() {
   // 打开任务详情页：始终在新标签页打开，原页面（主页）保持不变
@@ -32,12 +32,13 @@ export function useNavigation() {
     location.hash = origin === 'list' ? '#/list' : '#/create'
   }
 
-  function parseHash(): { view: 'create' | 'list' | 'gallery' | 'progress'; taskId?: string } {
+  function parseHash(): { view: 'create' | 'list' | 'gallery' | 'simple' | 'progress'; taskId?: string } {
     const h = location.hash || ''
     const m = h.match(/^#\/progress\/(.+)$/)
     if (m) return { view: 'progress', taskId: decodeURIComponent(m[1]) }
     if (h.startsWith('#/list')) return { view: 'list' }
     if (h.startsWith('#/gallery')) return { view: 'gallery' }
+    if (h.startsWith('#/simple')) return { view: 'simple' }
     return { view: 'create' }
   }
 

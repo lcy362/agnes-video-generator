@@ -11,15 +11,17 @@ import AnchorForm from './forms/AnchorForm.vue'
 import PoetryForm from './forms/PoetryForm.vue'
 import ExperimentalBadge from './shared/ExperimentalBadge.vue'
 import { JIMENG_FAQ_PATH, JIMENG_GUIDE_PATH, siteUrl } from '@/utils/siteLinks'
+import { stripEmoji } from '@/utils/text'
 
 const { trackEvent } = useGa()
 
+// 图标为 24×24 stroke path（与左侧导航同一套线宽），避免表情符号在不同系统下的观感差异
 const taskTypes = [
-  { key: 'simple', icon: '🎬🖼️', label: 'ttSimple' },
-  { key: 'creative', icon: '🎥', label: 'ttCreative' },
-  { key: 'manuscript', icon: '📝', label: 'ttManuscript' },
-  { key: 'anchor', icon: '🎙️', label: 'ttAnchor' },
-  { key: 'poetry', icon: '📜', label: 'ttPoetry' },
+  { key: 'simple', icon: 'M3 5h13v14H3zM16 10.5 21 8v8l-5-2.5z', label: 'ttSimple' },
+  { key: 'creative', icon: 'M3 9h18M3 9l2-4h14l2 4v10H3zM8 5v4M15 5v4', label: 'ttCreative' },
+  { key: 'manuscript', icon: 'M6 3h9l4 4v14H6zM15 3v4h4M9 12h7M9 16h7', label: 'ttManuscript' },
+  { key: 'anchor', icon: 'M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7', label: 'ttAnchor' },
+  { key: 'poetry', icon: 'M20 4c-6 .5-11 3.5-13 8.5L4 20l7.5-3c5-2 8-6.5 8.5-13zM8 16l5.5-5.5', label: 'ttPoetry' },
 ]
 
 // v6.0/6.1 手动模式：暂停点选项（按任务类型）
@@ -135,125 +137,141 @@ function selectExecMode(mode: 'auto' | 'manual' | 'external') {
 
 <template>
   <div>
-    <!-- v6.0 执行模式条（创建面板全局，PRD §6.1） -->
-    <div class="glass-card rounded-2xl p-4 mb-4">
-      <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-        <span class="text-sm font-medium text-accent">{{ t('execMode') }}</span>
-        <div class="flex gap-2">
+    <!-- v6.0 执行模式（创建面板全局，PRD §6.1） -->
+    <div class="sec-title">{{ t('execMode') }}</div>
+    <div class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div class="seg">
+        <button class="seg-item" :class="appState.execMode === 'auto' ? 'is-active' : ''" @click="selectExecMode('auto')">
+          {{ stripEmoji(t('execAuto')) }}
+        </button>
+        <button
+          class="seg-item"
+          :class="appState.execMode === 'manual' ? 'is-active' : ''"
+          :disabled="!manualSupported"
+          :title="!manualSupported ? t('manualUnsupported') : ''"
+          @click="selectExecMode('manual')"
+        >
+          {{ stripEmoji(t('execManual')) }}
+        </button>
+        <!-- v7.6 即梦协作仍在试验阶段：气泡放在按钮外侧，避免选中态（accent 底）
+             与气泡的琥珀色撞在一起看不清 -->
+        <span class="inline-flex items-center gap-1.5">
           <button
-            class="px-4 py-2 rounded-lg text-sm font-medium transition border"
-            :class="appState.execMode === 'auto' ? 'bg-accent text-accent-ink border-accent' : 'bg-paper-2/50 border-rule text-ink-2 hover:border-accent/40'"
-            @click="selectExecMode('auto')"
-          >
-            {{ t('execAuto') }}
-          </button>
-          <button
-            class="px-4 py-2 rounded-lg text-sm font-medium transition border"
-            :class="appState.execMode === 'manual' ? 'bg-accent text-accent-ink border-accent' : 'bg-paper-2/50 border-rule text-ink-2 hover:border-accent/40'"
+            class="seg-item"
+            :class="appState.execMode === 'external' ? 'is-active' : ''"
             :disabled="!manualSupported"
             :title="!manualSupported ? t('manualUnsupported') : ''"
-            @click="selectExecMode('manual')"
+            @click="selectExecMode('external')"
           >
-            {{ t('execManual') }}
+            {{ stripEmoji(t('execMode.external')) }}
           </button>
-          <!-- v7.6 即梦协作仍在试验阶段：气泡放在按钮外侧，避免选中态（accent 底）
-               与气泡的琥珀色撞在一起看不清 -->
-          <span class="inline-flex items-center gap-1.5">
-            <button
-              class="px-4 py-2 rounded-lg text-sm font-medium transition border"
-              :class="appState.execMode === 'external' ? 'bg-accent text-accent-ink border-accent' : 'bg-paper-2/50 border-rule text-ink-2 hover:border-accent/40'"
-              :disabled="!manualSupported"
-              :title="!manualSupported ? t('manualUnsupported') : ''"
-              @click="selectExecMode('external')"
-            >
-              {{ t('execMode.external') }}
-            </button>
-            <ExperimentalBadge v-if="externalExperimental" />
-          </span>
-        </div>
-        <span class="text-xs text-muted">{{ t('execModeHint') }}</span>
+          <ExperimentalBadge v-if="externalExperimental" />
+        </span>
       </div>
+      <p class="hint flex-1 basis-64">{{ t('execModeHint') }}</p>
+    </div>
 
-      <!-- v7.6 外部素材模式：工具下拉 + 音频来源 + 提示 -->
-      <div v-if="appState.execMode === 'external' && manualSupported" class="mt-3 flex flex-wrap items-end gap-x-6 gap-y-3">
+    <!-- v7.6 外部素材模式：工具下拉 + 音频来源 + 提示 -->
+    <div v-if="appState.execMode === 'external' && manualSupported" class="panel mb-6">
+      <div class="panel-body grid gap-5 sm:grid-cols-3">
         <div>
-          <label class="flex items-center gap-1.5 text-xs text-muted mb-1">
+          <label class="label flex items-center gap-1.5">
             {{ t('execMode.provider') }}
             <ExperimentalBadge v-if="externalExperimental" />
           </label>
-          <select v-model="appState.providerSelected" class="glass-input rounded-lg px-3 py-2 text-sm text-ink min-w-48">
+          <select v-model="appState.providerSelected" class="field">
             <option v-for="p in appState.providers" :key="p.id" :value="p.id">{{ p.icon }} {{ p.name }}</option>
           </select>
         </div>
         <div>
-          <label class="block text-xs text-muted mb-1">{{ t('execMode.audio_source') }}</label>
+          <span class="label">{{ t('execMode.audio_source') }}</span>
           <div class="flex flex-col gap-1.5">
-            <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
-              <input v-model="appState.externalAudioSource" type="radio" name="ext_audio_source" value="video" class="text-accent" />
+            <label class="flex items-center gap-2 text-[12.5px] text-ink-2 cursor-pointer">
+              <input v-model="appState.externalAudioSource" type="radio" name="ext_audio_source" value="video" class="check" />
               <span>{{ t('execMode.audio_source.video') }}</span>
             </label>
-            <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
-              <input v-model="appState.externalAudioSource" type="radio" name="ext_audio_source" value="project" class="text-accent" />
+            <label class="flex items-center gap-2 text-[12.5px] text-ink-2 cursor-pointer">
+              <input v-model="appState.externalAudioSource" type="radio" name="ext_audio_source" value="project" class="check" />
               <span>{{ t('execMode.audio_source.project') }}</span>
             </label>
           </div>
         </div>
         <div>
-          <label class="block text-xs text-muted mb-1">{{ t('execMode.subtitle_source') }}</label>
+          <span class="label">{{ t('execMode.subtitle_source') }}</span>
           <div class="flex flex-col gap-1.5">
-            <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
-              <input v-model="appState.externalSubtitleSource" type="radio" name="ext_subtitle_source" value="narration" class="text-accent" />
+            <label class="flex items-center gap-2 text-[12.5px] text-ink-2 cursor-pointer">
+              <input v-model="appState.externalSubtitleSource" type="radio" name="ext_subtitle_source" value="narration" class="check" />
               <span>{{ t('execMode.subtitle_source.narration') }}</span>
             </label>
-            <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
-              <input v-model="appState.externalSubtitleSource" type="radio" name="ext_subtitle_source" value="dialogue" class="text-accent" />
+            <label class="flex items-center gap-2 text-[12.5px] text-ink-2 cursor-pointer">
+              <input v-model="appState.externalSubtitleSource" type="radio" name="ext_subtitle_source" value="dialogue" class="check" />
               <span>{{ t('execMode.subtitle_source.dialogue') }}</span>
             </label>
           </div>
         </div>
-        <p class="text-xs text-muted max-w-2xl basis-full">{{ t('execMode.external_hint') }}</p>
+        <p class="hint sm:col-span-3">{{ t('execMode.external_hint') }}</p>
         <!-- 官网新增的即梦说明与常见问题（语言前缀随 UI 语言切换） -->
-        <div class="basis-full flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-          <a :href="providerGuideHref" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">📖 {{ t('experimentalGuideLink') }}</a>
-          <span class="text-ink/10 select-none">·</span>
-          <a :href="providerFaqHref" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">❓ {{ t('experimentalFaqLink') }}</a>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] sm:col-span-3">
+          <a :href="providerGuideHref" target="_blank" rel="noopener" class="text-accent transition-colors hover:text-ink">{{ t('experimentalGuideLink') }}</a>
+          <a :href="providerFaqHref" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('experimentalFaqLink') }}</a>
         </div>
-      </div>
-
-      <!-- 手动模式：暂停点多选（PRD §6.1） -->
-      <div v-if="appState.execMode === 'manual' && manualSupported" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span class="text-xs text-muted">{{ t('pausePoints') }}:</span>
-        <label v-for="p in currentPausePoints" :key="p.key" class="flex items-center gap-1.5 text-sm text-ink-2 cursor-pointer">
-          <input type="checkbox" class="rounded bg-paper-2 border-rule" :checked="appState.pausePoints.includes(p.key)" @change="togglePausePoint(p.key)" />
-          <span>{{ t(p.label) }}</span>
-        </label>
-        <span class="text-xs text-muted">{{ t('pausePointsHint') }}</span>
-      </div>
-      <!-- 不支持的类型提示 -->
-      <div v-else-if="appState.execMode === 'manual'" class="mt-3 text-xs text-amber-400">
-        {{ t('manualUnsupported') }}
       </div>
     </div>
 
-    <!-- Task Type Tabs -->
-    <div class="flex gap-2 mb-4">
+    <!-- 手动模式：暂停点多选（PRD §6.1） -->
+    <div v-if="appState.execMode === 'manual' && manualSupported" class="panel mb-6">
+      <div class="panel-body">
+        <span class="label">{{ t('pausePoints') }}</span>
+        <div class="flex flex-wrap gap-1.5">
+          <label
+            v-for="p in currentPausePoints"
+            :key="p.key"
+            class="inline-flex cursor-pointer items-center gap-1.5 rounded border px-2.5 py-1 text-[11.5px] transition-colors"
+            :class="appState.pausePoints.includes(p.key)
+              ? 'border-accent/40 bg-accent/10 text-accent'
+              : 'border-rule bg-paper text-ink-2 hover:border-rule-2'"
+          >
+            <input
+              type="checkbox"
+              class="check"
+              :checked="appState.pausePoints.includes(p.key)"
+              @change="togglePausePoint(p.key)"
+            />
+            <span>{{ t(p.label) }}</span>
+          </label>
+        </div>
+        <p class="hint mt-2.5">{{ t('pausePointsHint') }}</p>
+      </div>
+    </div>
+    <!-- 不支持的类型提示 -->
+    <div v-else-if="appState.execMode === 'manual'" class="mb-6 flex items-start gap-2 text-[11.5px] text-warning">
+      <span class="mt-1.5 h-1 w-1 shrink-0 rounded-full" style="background: var(--color-warning)"></span>
+      {{ t('manualUnsupported') }}
+    </div>
+
+    <!-- 任务类型 -->
+    <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
       <button
         v-for="tt in taskTypes"
         :key="tt.key"
-        class="ttype-btn flex-1 px-4 py-3 rounded-xl text-sm font-medium transition text-center"
-        :class="appState.currentTaskType === tt.key ? 'tab-active' : 'tab-inactive'"
+        type="button"
+        class="type-card"
+        :class="appState.currentTaskType === tt.key ? 'is-active' : ''"
+        :aria-pressed="appState.currentTaskType === tt.key"
         @click="switchTaskType(tt.key)"
       >
-        <span class="text-lg">{{ tt.icon }}</span><br /><span>{{ t(tt.label) }}</span>
+        <svg class="tt-icon h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path :d="tt.icon" />
+        </svg>
+        <span class="tt-name">{{ t(tt.label) }}</span>
       </button>
     </div>
 
     <!-- 官网引导 -->
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4 text-xs text-muted">
-      <span class="text-muted">💡</span>
-      <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="hover:text-accent transition-colors">🎯 {{ t('formTipTips') }}</a>
-      <span class="text-ink/10 select-none">·</span>
-      <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="hover:text-accent transition-colors">🧠 {{ t('formTipModels') }}</a>
+    <div class="mt-5 mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted">
+      <span class="mono text-[10px] uppercase tracking-[0.14em]">Tips</span>
+      <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="transition-colors hover:text-accent">{{ stripEmoji(t('formTipTips')) }}</a>
+      <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="transition-colors hover:text-accent">{{ stripEmoji(t('formTipModels')) }}</a>
     </div>
 
     <!-- 6 种任务表单 -->

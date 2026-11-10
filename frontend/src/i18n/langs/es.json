@@ -793,7 +793,7 @@
   "simpleHideSettings": "Ocultar ajustes",
   "simpleResetPreset": "Restablecer",
   "simpleDraftRestored": "Se restauró tu prompt anterior; los demás ajustes usan el preajuste predeterminado.",
-  "simpleKeyMissing": "Aún no hay clave API configurada. Configúrala en la parte superior de la página.",
+  "simpleKeyMissing": "No hay clave API configurada. Abre Ajustes en la barra lateral.",
   "simpleWaitHint": "La cola gratuita suele tardar 1–3 minutos, más en horas punta. Puedes salir de esta página y revisar la lista de tareas más tarde.",
   "simpleRefImagesLabel": "Imágenes de referencia",
   "simpleRefImagesHint": "Sube varias imágenes; se corresponden con <Picture 1>, <Picture 2>… en el prompt para mantener personajes y estilo.",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "El audio de referencia debe ser una URL http(s) pública.",
   "ratioLandscape": "Horizontal",
   "ratioPortrait": "Vertical",
-  "ratioSquare": "Cuadrado"
+  "ratioSquare": "Cuadrado",
+  "navSettings": "Ajustes"
 }

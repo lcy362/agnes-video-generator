@@ -191,68 +191,60 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="border-t border-red-800/60 pt-3 mt-3">
+  <div class="border-t border-rule pt-3">
     <!-- 收起态：低强调提示行（可点击展开） -->
     <button
       v-if="!open"
       type="button"
-      class="text-xs text-muted hover:text-accent transition inline-flex items-center gap-1"
+      class="inline-flex items-center gap-1.5 text-[11.5px] text-muted transition-colors hover:text-accent"
       @click="toggle"
     >
-      {{ t('fbCollapsedHint') }} <span>▸</span>
+      {{ t('fbCollapsedHint') }}
     </button>
 
     <!-- 展开态：完整反馈区 -->
     <div v-else class="space-y-3">
       <!-- 引导语：确定性故障 / 重试次数超阈值切换 -->
-      <p class="text-xs leading-relaxed" :class="deterministic ? 'text-amber-400' : 'text-muted'">
+      <p class="text-[11.5px] leading-relaxed" :class="deterministic ? 'text-warning' : 'text-muted'">
         {{ deterministic ? t('fbDeterministicHint') : t('fbExpandedHint').replace('{n}', String(props.retryCount)) }}
       </p>
 
       <!-- 诊断信息预览（可折叠） -->
-      <div class="rounded-lg border border-red-800/50 overflow-hidden">
+      <div class="overflow-hidden rounded border border-rule">
         <button
           type="button"
-          class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-red-900/20 transition"
+          class="collapse-header flex w-full items-center gap-2 px-3 py-2 text-start transition-colors hover:bg-paper-3/50"
           @click="diagOpen = !diagOpen"
         >
-          <span class="text-xs transition-transform" :class="diagOpen ? 'rotate-90' : ''">▸</span>
-          <span class="text-xs text-red-300 font-medium">{{ t('fbDiagTitle') }}</span>
-          <span v-if="reportLoading" class="ml-auto text-xs text-muted animate-pulse">…</span>
+          <span class="mono text-[10px] text-muted">{{ diagOpen ? '−' : '+' }}</span>
+          <span class="text-[11.5px] font-medium text-ink-2">{{ t('fbDiagTitle') }}</span>
+          <span v-if="reportLoading" class="ms-auto text-[11px] text-muted">…</span>
         </button>
         <div v-show="diagOpen" class="px-3 pb-3">
-          <pre class="text-[11px] text-muted whitespace-pre-wrap break-words bg-paper-2/40 rounded-md p-2 max-h-64 overflow-auto">{{ report || t('fbDiagLoading') }}</pre>
+          <pre class="mono max-h-64 overflow-auto whitespace-pre-wrap break-words rounded border border-rule bg-paper p-2 text-[10.5px] leading-relaxed text-muted">{{ report || t('fbDiagLoading') }}</pre>
         </div>
       </div>
 
       <!-- 操作按钮 -->
       <div class="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          class="text-xs px-3 py-1.5 bg-red-900/50 border border-red-800 text-red-200 rounded-lg transition hover:bg-red-900/80"
-          @click="onCopy"
-        >
-          📋 {{ t('fbCopy') }}
+        <button type="button" class="btn btn-ghost btn-sm" @click="onCopy">
+          {{ t('fbCopy') }}
         </button>
         <a
           :href="FAQ_URL"
           target="_blank"
           rel="noopener"
-          class="text-xs px-3 py-1.5 bg-paper-2/40 border border-rule text-ink-2 rounded-lg transition hover:bg-paper-2/70"
+          class="btn btn-ghost btn-sm"
         >
-          ❓ {{ t('fbFaq') }}
+          {{ t('fbFaq') }}
         </a>
-        <button
-          type="button"
-          class="text-xs px-3 py-1.5 bg-accent text-accent-ink rounded-lg transition hover:opacity-90"
-          @click="onGithub"
-        >
-          🐛 {{ t('fbGithub') }}
+        <button type="button" class="btn btn-primary btn-sm" @click="onGithub">
+          {{ t('fbGithub') }}
         </button>
         <button
           v-if="deterministic"
           type="button"
-          class="text-xs px-2 py-1 text-muted underline underline-offset-2 hover:text-ink-2 transition"
+          class="btn btn-quiet btn-sm text-accent"
           @click="$emit('retry')"
         >
           ↻ {{ t('fbRetryBtn') }}
@@ -260,7 +252,7 @@ onMounted(async () => {
       </div>
 
       <!-- 隐私提示 -->
-      <p class="text-[11px] text-muted/70">🔒 {{ t('fbPrivacyHint') }}</p>
+      <p class="text-[10.5px] leading-relaxed text-muted/80">{{ t('fbPrivacyHint') }}</p>
     </div>
   </div>
 </template>

@@ -793,7 +793,7 @@
   "simpleHideSettings": "Sembunyikan pengaturan",
   "simpleResetPreset": "Kembalikan default",
   "simpleDraftRestored": "Prompt sebelumnya dipulihkan; pengaturan lain memakai preset default.",
-  "simpleKeyMissing": "API key belum dikonfigurasi. Atur di bagian atas halaman.",
+  "simpleKeyMissing": "Kunci API belum dikonfigurasi. Buka Pengaturan di bilah samping untuk menambahkannya.",
   "simpleWaitHint": "Antrean gratis biasanya selesai dalam 1–3 menit, lebih lama saat sibuk. Anda bisa meninggalkan halaman ini dan memeriksa daftar tugas nanti.",
   "simpleRefImagesLabel": "Gambar referensi",
   "simpleRefImagesHint": "Unggah beberapa gambar; gambar dipetakan ke <Picture 1>, <Picture 2>… di prompt untuk menjaga konsistensi karakter dan gaya.",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "Audio referensi harus berupa URL http(s) publik.",
   "ratioLandscape": "Lanskap",
   "ratioPortrait": "Potret",
-  "ratioSquare": "Persegi"
+  "ratioSquare": "Persegi",
+  "navSettings": "Pengaturan"
 }

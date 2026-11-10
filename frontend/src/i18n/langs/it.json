@@ -793,7 +793,7 @@
   "simpleHideSettings": "Nascondi impostazioni",
   "simpleResetPreset": "Ripristina",
   "simpleDraftRestored": "Prompt precedente ripristinato; le altre impostazioni usano il preset predefinito.",
-  "simpleKeyMissing": "Nessuna chiave API configurata. Configurala nella parte superiore della pagina.",
+  "simpleKeyMissing": "Nessuna chiave API configurata. Apri Impostazioni nella barra laterale.",
   "simpleWaitHint": "La coda gratuita richiede di solito 1–3 minuti, più a lungo nelle ore di punta. Puoi lasciare questa pagina e controllare l'elenco attività più tardi.",
   "simpleRefImagesLabel": "Immagini di riferimento",
   "simpleRefImagesHint": "Carica più immagini; corrispondono a <Picture 1>, <Picture 2>… nel prompt per mantenere personaggi e stile coerenti.",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "L'audio di riferimento deve essere un URL http(s) pubblico.",
   "ratioLandscape": "Orizzontale",
   "ratioPortrait": "Verticale",
-  "ratioSquare": "Quadrato"
+  "ratioSquare": "Quadrato",
+  "navSettings": "Impostazioni"
 }

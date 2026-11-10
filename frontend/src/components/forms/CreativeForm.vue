@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { t, currentLang } from '@/i18n'
+import { stripEmoji } from '@/utils/text'
 import { appState } from '@/store'
 import { useVoice } from '@/composables/useVoice'
 import { useTaskSubmit, collectAudioSubtitleFields } from '@/composables/useTaskSubmit'
@@ -204,160 +205,172 @@ async function submitCreative() {
 
 <template>
   <div>
-    <div class="flex items-center gap-2 mb-4 text-xs text-muted">
-      <span class="text-muted">💡</span>
-      <a href="https://video.lichuanyang.top/guides/prompt-examples-creative" target="_blank" rel="noopener" class="hover:text-accent transition-colors">{{ t('exampleLinkCreative') }}</a>
+    <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted">
+      <a href="https://video.lichuanyang.top/guides/prompt-examples-creative" target="_blank" rel="noopener" class="transition-colors hover:text-accent">{{ stripEmoji(t('exampleLinkCreative')) }}</a>
     </div>
 
-    <div class="glass-card rounded-2xl p-6 mb-4">
-      <h2 class="text-lg font-semibold text-accent mb-4">{{ t('creativeSettings') }}</h2>
+    <section class="panel mb-4">
+      <header class="panel-head">
+        <h2 class="panel-title">{{ t('creativeSettings') }}</h2>
+      </header>
 
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('taskName') }}</label>
-        <input v-model="form.name" :placeholder="t('taskNamePlaceholder')" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted" />
-      </div>
-
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('ideaLabel') }} (idea) <span class="text-red-400">*</span></label>
-        <textarea v-model="form.idea" rows="4" :placeholder="t('ideaPlaceholder')" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted"></textarea>
-      </div>
-
-      <!-- Scene Config -->
-      <div class="mb-4 p-4 rounded-xl bg-paper-2/30 border border-rule/50">
-        <h3 class="text-sm font-medium text-accent mb-3">{{ t('sceneConfig') }}</h3>
-        <div class="mb-4">
-          <label class="block text-sm text-muted mb-2">{{ t('durationSource') }}</label>
-          <div class="flex gap-2">
-            <label class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-paper-2/50 border border-rule cursor-pointer hover:border-blue-500/30 transition">
-              <input v-model="form.durationSource" type="radio" value="manual" class="text-accent" />
-              <span class="text-sm text-ink-2">{{ t('sourceManual') }}</span>
-            </label>
-            <label class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-paper-2/50 border border-rule cursor-pointer hover:border-blue-500/30 transition">
-              <input v-model="form.durationSource" type="radio" value="prompt" class="text-accent" />
-              <span class="text-sm text-ink-2">{{ t('sourcePrompt') }}</span>
-            </label>
-          </div>
-          <p class="text-xs text-muted mt-1.5">{{ form.durationSource === 'manual' ? t('sourceManualHint') : t('sourcePromptHint') }}</p>
+      <div class="panel-body space-y-4">
+        <div>
+          <label class="label">{{ t('taskName') }}</label>
+          <input v-model="form.name" :placeholder="t('taskNamePlaceholder')" class="field" />
         </div>
 
-        <div v-if="form.durationSource === 'manual'">
-          <div class="mb-3">
-            <label class="block text-xs text-muted mb-1">{{ t('sceneCount') }}</label>
-            <input v-model.number="form.sceneCount" type="number" min="1" max="30" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-ink" />
+        <div>
+          <label class="label">{{ t('ideaLabel') }} <span class="text-danger">*</span></label>
+          <textarea v-model="form.idea" rows="4" :placeholder="t('ideaPlaceholder')" class="field"></textarea>
+        </div>
+
+        <!-- Scene Config -->
+        <div class="subpanel">
+          <h3 class="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{{ t('sceneConfig') }}</h3>
+
+          <div class="mb-4">
+            <span class="label">{{ t('durationSource') }}</span>
+            <div class="grid grid-cols-2 gap-2">
+              <label
+                class="flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-[12.5px] transition-colors"
+                :class="form.durationSource === 'manual' ? 'border-accent/40 bg-accent/10 text-ink' : 'border-rule bg-paper-2 text-ink-2 hover:border-rule-2'"
+              >
+                <input v-model="form.durationSource" type="radio" value="manual" class="check" />
+                <span>{{ t('sourceManual') }}</span>
+              </label>
+              <label
+                class="flex cursor-pointer items-center gap-2 rounded border px-3 py-2 text-[12.5px] transition-colors"
+                :class="form.durationSource === 'prompt' ? 'border-accent/40 bg-accent/10 text-ink' : 'border-rule bg-paper-2 text-ink-2 hover:border-rule-2'"
+              >
+                <input v-model="form.durationSource" type="radio" value="prompt" class="check" />
+                <span>{{ t('sourcePrompt') }}</span>
+              </label>
+            </div>
+            <p class="hint mt-1.5">{{ form.durationSource === 'manual' ? t('sourceManualHint') : t('sourcePromptHint') }}</p>
           </div>
-          <div class="mb-3">
-            <label class="block text-xs text-muted mb-1.5">{{ t('durationMode') }}</label>
-            <div class="flex gap-2 mb-2">
-              <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
-                <input v-model="form.uniform" type="radio" :value="true" class="text-accent" />
-                <span>{{ t('uniformDuration') }}</span>
-              </label>
-              <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
-                <input v-model="form.uniform" type="radio" :value="false" class="text-accent" />
-                <span>{{ t('independentDuration') }}</span>
-              </label>
+
+          <div v-if="form.durationSource === 'manual'" class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label class="label">{{ t('sceneCount') }}</label>
+              <input v-model.number="form.sceneCount" type="number" min="1" max="30" class="field" />
             </div>
-            <div v-if="form.uniform">
-              <input v-model.number="form.uniformDuration" type="number" min="2" max="30" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-ink" />
-              <span class="text-xs text-muted ml-1">{{ t('seconds') }}</span>
-            </div>
-            <div v-else class="space-y-2">
-              <div v-for="i in form.sceneCount" :key="i" class="flex items-center gap-2 mb-1.5">
-                <span class="text-xs text-muted w-12">{{ t('scene_') }}{{ i }}</span>
-                <input v-model.number="form.independentDurations[i - 1]" type="number" min="2" max="30" class="w-20 glass-input rounded-lg px-3 py-1.5 text-sm text-ink" />
-                <span class="text-xs text-muted">{{ t('seconds') }}</span>
+            <div>
+              <span class="label">{{ t('durationMode') }}</span>
+              <div class="mb-2 flex gap-4">
+                <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
+                  <input v-model="form.uniform" type="radio" :value="true" class="check" />
+                  <span>{{ t('uniformDuration') }}</span>
+                </label>
+                <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
+                  <input v-model="form.uniform" type="radio" :value="false" class="check" />
+                  <span>{{ t('independentDuration') }}</span>
+                </label>
+              </div>
+              <div v-if="form.uniform" class="flex items-center gap-2">
+                <input v-model.number="form.uniformDuration" type="number" min="2" max="30" class="field w-24" />
+                <span class="hint">{{ t('seconds') }}</span>
+              </div>
+              <div v-else class="max-h-56 space-y-1.5 overflow-y-auto pe-1">
+                <div v-for="i in form.sceneCount" :key="i" class="flex items-center gap-2">
+                  <span class="mono w-10 text-[11px] text-muted">{{ i }}</span>
+                  <input v-model.number="form.independentDurations[i - 1]" type="number" min="2" max="30" class="field w-20" />
+                  <span class="hint">{{ t('seconds') }}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('visualStyle') }}</label>
-        <div class="flex items-center gap-2">
-          <input v-model="form.style" class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted" />
-          <PresetPicker v-model="form.style" />
+        <div>
+          <label class="label">{{ t('visualStyle') }}</label>
+          <div class="flex items-center gap-2">
+            <input v-model="form.style" class="field flex-1" />
+            <PresetPicker v-model="form.style" />
+          </div>
+          <p class="hint mt-1.5 flex items-center gap-1.5">
+            <span class="inline-block h-1 w-1 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>
+            {{ t('stylePresetHint') }}
+          </p>
         </div>
-        <p class="mt-1.5 text-xs text-muted flex items-center gap-1">
-          <span class="inline-block w-1 h-1 rounded-full bg-accent/70 shrink-0" aria-hidden="true"></span>
-          {{ t('stylePresetHint') }}
-        </p>
       </div>
-    </div>
+    </section>
 
     <!-- Advanced Config -->
-    <div class="glass-card rounded-2xl p-6 mb-4">
-      <h2 class="text-lg font-semibold text-accent mb-4">{{ t('advancedSettings') }}</h2>
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-        <div>
-          <label class="block text-sm text-muted mb-1.5">{{ t('chainingMode') }}</label>
-          <select v-model="form.chaining" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
-            <option value="keyframes">{{ t('modeKeyframes') }}</option>
-            <option value="ti2vid">{{ t('modeTi2vid') }}</option>
-            <option value="none">{{ t('modeNone') }}</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm text-muted mb-1.5">{{ t('resolution') }}</label>
-          <select v-model="form.resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
-            <option value="768x1152">{{ t('resPortrait') }}</option>
-            <option value="1280x720">{{ t('resLandscape') }}</option>
-            <option value="1024x1024">{{ t('resSquare') }}</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Reference Image -->
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('referenceImage') }}</label>
-        <div class="flex items-center gap-4">
-          <label class="cursor-pointer px-4 py-2.5 glass-input rounded-lg text-sm transition inline-block hover:border-blue-500/30">
-            <span>{{ t('chooseImage') }}</span>
-            <input type="file" accept="image/*" class="hidden" @change="onRefImageChange" />
-          </label>
-          <span class="text-sm text-muted">{{ form.refName || t('notSelected') }}</span>
-        </div>
-        <p class="text-xs text-muted mt-2">{{ t('refDescription') }}</p>
-      </div>
-
-      <!-- End Frames -->
-      <div class="mb-4">
-        <div class="flex items-center justify-between mb-3">
-          <label class="text-sm text-muted">{{ t('customEndFrames') }}</label>
-          <div class="flex gap-3">
-            <label class="flex items-center gap-2 text-sm text-muted cursor-pointer" :class="appState.execMode === 'external' ? 'opacity-50 cursor-not-allowed' : ''">
-              <input v-model="form.useEndFrames" type="checkbox" class="rounded bg-paper-2 border-rule" :disabled="appState.execMode === 'external'" @change="toggleEndFrames" />
-              <span>{{ t('enableCustomEndFrames') }}</span>
-            </label>
-            <label class="flex items-center gap-2 text-sm text-muted cursor-pointer" :class="appState.execMode === 'external' ? 'opacity-50 cursor-not-allowed' : ''">
-              <input v-model="form.genEndFromRef" type="checkbox" class="rounded bg-paper-2 border-rule" :disabled="appState.execMode === 'external'" @change="toggleEndFrameMode" />
-              <span>{{ t('genEndFramesFromRef') }}</span>
-            </label>
+    <section class="panel mb-4">
+      <header class="panel-head">
+        <h2 class="panel-title">{{ t('advancedSettings') }}</h2>
+      </header>
+      <div class="panel-body space-y-5">
+        <div class="grid grid-cols-2 gap-4 md:grid-cols-3">
+          <div>
+            <label class="label">{{ t('chainingMode') }}</label>
+            <select v-model="form.chaining" class="field">
+              <option value="keyframes">{{ t('modeKeyframes') }}</option>
+              <option value="ti2vid">{{ t('modeTi2vid') }}</option>
+              <option value="none">{{ t('modeNone') }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="label">{{ t('resolution') }}</label>
+            <select v-model="form.resolution" class="field">
+              <option value="768x1152">{{ t('resPortrait') }}</option>
+              <option value="1280x720">{{ t('resLandscape') }}</option>
+              <option value="1024x1024">{{ t('resSquare') }}</option>
+            </select>
           </div>
         </div>
-        <div v-if="form.useEndFrames" class="space-y-2">
-          <p class="text-xs text-muted mb-2">{{ t('endFrameDesc') }}</p>
-          <div class="space-y-2">
-            <div v-for="i in form.sceneCount" :key="i" class="flex items-center gap-3 mb-2">
-              <span class="text-xs text-muted w-16">{{ t('scene_') }} {{ i }}</span>
-              <input type="file" accept="image/*" class="end-frame-file flex-1 text-sm text-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-paper-3 file:text-ink-2 hover:file:bg-paper-3" @change="onEndFrameChange($event, i - 1)" />
+
+        <!-- Reference Image -->
+        <div>
+          <label class="label">{{ t('referenceImage') }}</label>
+          <div class="flex items-center gap-3">
+            <label class="btn btn-ghost shrink-0">
+              <span>{{ t('chooseImage') }}</span>
+              <input type="file" accept="image/*" class="hidden" @change="onRefImageChange" />
+            </label>
+            <span class="truncate text-[11.5px] text-muted">{{ form.refName || t('notSelected') }}</span>
+          </div>
+          <p class="hint mt-1.5">{{ t('refDescription') }}</p>
+        </div>
+
+        <!-- End Frames -->
+        <div class="border-t border-rule/60 pt-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <span class="label mb-0">{{ t('customEndFrames') }}</span>
+            <div class="flex flex-wrap gap-4">
+              <label class="flex cursor-pointer items-center gap-2 text-[12px] text-ink-2" :class="appState.execMode === 'external' ? 'cursor-not-allowed opacity-50' : ''">
+                <input v-model="form.useEndFrames" type="checkbox" class="check" :disabled="appState.execMode === 'external'" @change="toggleEndFrames" />
+                <span>{{ t('enableCustomEndFrames') }}</span>
+              </label>
+              <label class="flex cursor-pointer items-center gap-2 text-[12px] text-ink-2" :class="appState.execMode === 'external' ? 'cursor-not-allowed opacity-50' : ''">
+                <input v-model="form.genEndFromRef" type="checkbox" class="check" :disabled="appState.execMode === 'external'" @change="toggleEndFrameMode" />
+                <span>{{ t('genEndFramesFromRef') }}</span>
+              </label>
+            </div>
+          </div>
+          <div v-if="form.useEndFrames" class="mt-3 space-y-1.5">
+            <p class="hint mb-2">{{ t('endFrameDesc') }}</p>
+            <div v-for="i in form.sceneCount" :key="i" class="flex items-center gap-3">
+              <span class="mono w-8 shrink-0 text-[11px] text-muted">{{ i }}</span>
+              <input type="file" accept="image/*" class="end-frame-file field file-field" @change="onEndFrameChange($event, i - 1)" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Scene Reference Images (v5.0 优化 5) -->
+        <div class="border-t border-rule/60 pt-4">
+          <label class="label">{{ t('sceneReferenceImages') }}</label>
+          <p class="hint mb-2">{{ t('sceneRefDesc') }}</p>
+          <div class="space-y-1.5">
+            <div v-for="i in form.sceneCount" :key="i" class="flex items-center gap-3">
+              <span class="mono w-8 shrink-0 text-[11px] text-muted">{{ i }}</span>
+              <input type="file" accept="image/*" class="scene-ref-file field file-field" @change="onSceneRefChange($event, i - 1)" />
             </div>
           </div>
         </div>
       </div>
-
-      <!-- Scene Reference Images (v5.0 优化 5) -->
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('sceneReferenceImages') }}</label>
-        <p class="text-xs text-muted mb-2">{{ t('sceneRefDesc') }}</p>
-        <div class="space-y-2">
-          <div v-for="i in form.sceneCount" :key="i" class="flex items-center gap-3 mb-2">
-            <span class="text-xs text-muted w-16">{{ t('scene_') }} {{ i }}</span>
-            <input type="file" accept="image/*" class="scene-ref-file flex-1 text-sm text-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-paper-3 file:text-ink-2 hover:file:bg-paper-3" @change="onSceneRefChange($event, i - 1)" />
-          </div>
-        </div>
-      </div>
-    </div>
+    </section>
 
     <!-- Audio & Subtitle -->
     <SubtitleConfig ref="subtitleRef" task="c" :with-style="true" :external="appState.execMode === 'external'" />
@@ -365,7 +378,7 @@ async function submitCreative() {
     <WatermarkToggle />
 
     <button
-      class="w-full py-3.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn"
+      class="btn btn-primary btn-block"
       :disabled="submitting"
       @click="submitCreative"
     >

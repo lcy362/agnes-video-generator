@@ -65,57 +65,44 @@ function onLocate(item: Item) {
 
 function iconFor(state: Item['state']): string {
   if (state === 'done') return '✓'
-  if (state === 'running') return '◉'
-  if (state === 'awaiting') return '⏸'
-  return '○'
-}
-
-function clsFor(state: Item['state']): string {
-  if (state === 'done') return 'text-green-400'
-  if (state === 'running') return 'text-accent'
-  if (state === 'awaiting') return 'text-amber-400'
-  return 'text-muted'
+  if (state === 'awaiting') return '!'
+  return ''
 }
 </script>
 
 <template>
-  <div v-if="!props.horizontal" class="glass-card rounded-2xl p-4">
-    <div class="text-xs text-muted mb-3">{{ t('ppStages') }}</div>
-    <div class="space-y-0.5">
+  <div v-if="!props.horizontal">
+    <p class="eyebrow mb-2.5">{{ t('ppStages') }}</p>
+    <div class="tl">
       <button
         v-for="item in items"
         :key="item.key"
-        class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-sm transition"
-        :class="[
-          item.state === 'awaiting' ? 'bg-amber-500/10 border border-amber-500/30' : 'hover:bg-paper-2/40 border border-transparent',
-          item.state === 'running' ? 'bg-accent/5 border border-accent/20' : '',
-        ]"
+        class="tl-item"
+        :class="'is-' + item.state"
         @click="onLocate(item)"
       >
-        <span
-          class="w-4 text-center shrink-0"
-          :class="[clsFor(item.state), item.state === 'running' ? 'animate-pulse' : '']"
-        >{{ iconFor(item.state) }}</span>
-        <span class="truncate" :class="item.state === 'awaiting' ? 'text-amber-400 font-medium' : ''">{{ item.label }}</span>
-        <span v-if="item.state === 'awaiting'" class="ml-auto text-[10px] text-amber-400 shrink-0">{{ t('ppWaiting') }}</span>
+        <span class="tl-dot" :class="item.state === 'running' ? 'animate-pulse-dot' : ''">{{ iconFor(item.state) }}</span>
+        <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
+        <span v-if="item.state === 'awaiting'" class="mono shrink-0 text-[9px] tracking-[0.08em]">{{ t('ppWaiting') }}</span>
       </button>
     </div>
   </div>
 
   <!-- 移动端：横向滚动胶囊 -->
-  <div v-else class="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+  <div v-else class="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-2">
     <button
       v-for="item in items"
       :key="item.key"
-      class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap border transition"
+      class="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded border px-2.5 py-1 text-[11px] transition-colors"
       :class="[
-        item.state === 'awaiting' ? 'bg-amber-500/10 border-amber-500/40 text-amber-400' : 'bg-paper/50 border-rule/60 text-ink-2',
-        item.state === 'running' ? 'border-accent/40 text-accent' : '',
-        item.state === 'done' ? 'text-green-400' : '',
+        item.state === 'awaiting' ? 'border-accent/40 bg-accent/10 text-accent' : '',
+        item.state === 'running' ? 'border-accent/30 text-accent' : '',
+        item.state === 'done' ? 'border-rule text-ink-2' : '',
+        item.state === 'pending' ? 'border-rule text-muted' : '',
       ]"
       @click="onLocate(item)"
     >
-      <span :class="item.state === 'running' ? 'animate-pulse' : ''">{{ iconFor(item.state) }}</span>
+      <span class="text-[9px] leading-none">{{ iconFor(item.state) }}</span>
       <span>{{ item.label }}</span>
     </button>
   </div>

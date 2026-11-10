@@ -12,6 +12,7 @@ import CheckpointDetail from './CheckpointDetail.vue'
 import FeedbackPanel from './FeedbackPanel.vue'
 import FastRetryPanel from './FastRetryPanel.vue'
 import { isDeterministicError, isLocalNetworkError } from '@/utils/feedback'
+import { stripEmoji } from '@/utils/text'
 
 const {
   progressPct,
@@ -198,195 +199,231 @@ onUnmounted(() => {
   <div class="progress-page min-h-screen">
     <ProgressHeader />
 
-    <div class="max-w-6xl mx-auto px-4 py-6 lg:flex lg:gap-6">
-      <!-- 左侧：支持项目卡片（置顶，与首页一致）+ 环节状态列表（宽屏） -->
-      <aside class="hidden lg:block w-[240px] shrink-0">
-        <div class="sticky top-[120px]">
-          <div class="sidebar-card">
-            <div class="stitle">{{ t('adSupportTitle') }}</div>
-            <p class="text-muted text-xs leading-relaxed mb-2">{{ t('adSupportDesc') }}</p>
-            <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener">{{ t('adStar') }}</a>
-            <p class="text-muted text-xs px-1 -mt-0.5 mb-1">{{ t('adStarDesc') }}</p>
-            <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" class="wrap">{{ t('adSkewStar') }}</a>
-            <p class="text-muted text-xs px-1 -mt-0.5 mb-1">{{ t('adSkewStarDesc') }}</p>
-            <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">{{ t('adAdblock') }}</a>
-            <p class="text-muted text-xs px-1 -mt-0.5 mb-1">{{ t('adAdblockDesc') }}</p>
-            <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">{{ t('adClick') }}</a>
-            <p class="text-muted text-xs px-1 -mt-0.5 mb-1">{{ t('adClickDesc') }}</p>
-            <p class="text-muted text-xs mt-2 leading-relaxed">{{ t('adThanks') }}</p>
+    <div class="mx-auto w-full max-w-content px-4 py-6 lg:px-10">
+      <div class="lg:flex lg:gap-9">
+        <!-- 左侧：环节时间线（宽屏）+ 支持项目 -->
+        <aside class="hidden w-[220px] shrink-0 lg:block">
+          <div class="sticky top-24 space-y-6">
+            <StepTimeline @locate="scrollToStep" />
+            <div class="sidebar-card">
+              <div class="stitle">{{ t('adSupportTitle') }}</div>
+              <p class="mb-2 text-[11px] leading-relaxed text-muted">{{ t('adSupportDesc') }}</p>
+              <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener">{{ stripEmoji(t('adStar')) }}</a>
+              <p class="-mt-0.5 mb-1 px-1 text-[10.5px] leading-relaxed text-muted">{{ t('adStarDesc') }}</p>
+              <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" class="wrap">{{ stripEmoji(t('adSkewStar')) }}</a>
+              <p class="-mt-0.5 mb-1 px-1 text-[10.5px] leading-relaxed text-muted">{{ t('adSkewStarDesc') }}</p>
+              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">{{ stripEmoji(t('adAdblock')) }}</a>
+              <p class="-mt-0.5 mb-1 px-1 text-[10.5px] leading-relaxed text-muted">{{ t('adAdblockDesc') }}</p>
+              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">{{ stripEmoji(t('adClick')) }}</a>
+              <p class="-mt-0.5 mb-1 px-1 text-[10.5px] leading-relaxed text-muted">{{ t('adClickDesc') }}</p>
+              <p class="mt-2 text-[10.5px] leading-relaxed text-muted">{{ t('adThanks') }}</p>
+            </div>
           </div>
-          <StepTimeline @locate="scrollToStep" />
-        </div>
-      </aside>
+        </aside>
 
-      <!-- 主工作台 -->
-      <main class="flex-1 min-w-0">
-        <!-- 移动端环节胶囊条 -->
-        <div class="lg:hidden mb-4">
-          <StepTimeline horizontal @locate="scrollToStep" />
-        </div>
-
-        <!-- 状态区 -->
-        <div class="glass-card rounded-2xl p-5 mb-4">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm text-muted">{{ t('progress') }}</span>
-            <span class="text-sm text-accent font-medium">{{ progressPct }}%</span>
-          </div>
-          <div class="w-full bg-paper-2/50 rounded-full h-2.5 overflow-hidden">
-            <div class="bg-accent h-2.5 rounded-full transition-all duration-500" :style="{ width: progressPct + '%' }"></div>
+        <!-- 主工作台 -->
+        <main class="min-w-0 flex-1">
+          <!-- 移动端环节条 -->
+          <div class="mb-4 lg:hidden">
+            <StepTimeline horizontal @locate="scrollToStep" />
           </div>
 
-          <!-- 失败信息 -->
-          <div v-if="taskFailed" class="mt-4 p-4 bg-red-950 border border-red-800 rounded-lg space-y-2">
-            <p class="text-red-400 font-medium">{{ t('genFailed') }}</p>
-            <p class="text-muted text-xs">{{ failedMessage || t('genFailedMsg') }}</p>
-            <!-- v7.3：队列满/上游 503 时的错峰重试建议（按浏览者所在时区换算，不同时区看到各自本地时间） -->
-            <p v-if="retryWindowHint" class="text-xs text-accent leading-relaxed">{{ retryWindowHint }}</p>
-            <!-- v6.1 问题反馈：重试引导（偶发故障优先断点续传自愈，多次失败再上报） -->
-            <div class="pt-2 border-t border-red-800/60 space-y-2">
-              <!-- 引导文案：网络/域名类 → 自查环境；确定性故障 → 建议直接反馈；其余 → 断点续传自愈 -->
-              <p class="text-xs leading-relaxed" :class="retryIneffective ? 'text-amber-400' : 'text-muted'">
-                {{ networkError ? t('fbNetworkHint') : deterministicError ? t('fbDeterministicHint') : t('fbRetryHint') }}
-              </p>
-              <div class="flex items-center gap-3 flex-wrap">
-                <button
-                  class="text-xs px-3 py-1.5 transition rounded-lg"
-                  :class="retryIneffective ? 'bg-paper-2/40 border border-rule text-muted hover:text-ink-2' : 'bg-accent text-accent-ink hover:opacity-90'"
-                  @click="onRetryTask"
+          <!-- 状态区：控制台式（大百分比 + 发丝进度条） -->
+          <section class="panel mb-4">
+            <div class="panel-body">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="eyebrow">{{ t('progress') }}</p>
+                  <p class="metric mt-2.5 text-[44px] text-ink">
+                    {{ progressPct }}<span class="ms-0.5 text-[15px] tracking-normal text-muted">%</span>
+                  </p>
+                </div>
+                <span
+                  class="chip"
+                  :class="taskFailed ? 'chip-danger' : resultVideoVisible ? 'chip-success' : 'chip-warning'"
                 >
-                  ↻ {{ t('fbRetryBtn') }}
-                </button>
-                <span v-if="retryCount > 0" class="text-xs text-muted">{{ t('fbRetriedN').replace('{n}', String(retryCount)) }}</span>
+                  {{ taskFailed ? t('statusFailed') : resultVideoVisible ? t('statusCompleted') : t('statusRunning') }}
+                </span>
               </div>
-              <!-- v6.1 问题反馈：反馈区（渐进展开 + 复制 + FAQ + GitHub Issue） -->
-              <FeedbackPanel
-                v-if="appState.progressTaskId"
-                :task-id="appState.progressTaskId"
-                :task-type="appState.currentTaskType || 'creative'"
-                :mode="taskInfo?.mode"
-                :failed-step="reportFailedStep"
-                :error-message="failedMessage || ''"
-                :retry-count="retryCount"
-                :configs="feedbackConfigs"
-                @retry="onRetryTask"
-              />
-            </div>
-          </div>
-          <!-- 进度消息（HTML 渲染，来自后端安全文案） -->
-          <div v-else class="mt-4 text-sm text-muted" v-html="progressMessage"></div>
 
-          <!-- v7.7 快速重试：连续 2 次 503 后出现开关（提交成功/到期自动消失或收起） -->
-          <FastRetryPanel v-if="!taskFailed" />
+              <div class="meter mt-4">
+                <div class="meter-fill" :style="{ width: progressPct + '%' }"></div>
+              </div>
 
-          <!-- 1.7：连接异常横幅（连续轮询失败 N 次后展示） -->
-          <div v-if="connectionLost" class="mt-3 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-400">
-            {{ t('connLost') }}
-          </div>
-        </div>
+              <!-- 失败信息 -->
+              <div v-if="taskFailed" class="mt-5 border-t border-rule pt-4">
+                <p class="flex items-center gap-2 text-[12.5px] font-medium text-danger">
+                  <span class="h-1.5 w-1.5 rounded-full" style="background: var(--color-danger)"></span>
+                  {{ t('genFailed') }}
+                </p>
+                <p class="mt-2 text-[11.5px] leading-relaxed text-muted">{{ failedMessage || t('genFailedMsg') }}</p>
+                <!-- v7.3：队列满/上游 503 时的错峰重试建议（按浏览者所在时区换算，不同时区看到各自本地时间） -->
+                <p v-if="retryWindowHint" class="mt-2 text-[11.5px] leading-relaxed text-accent">{{ retryWindowHint }}</p>
+                <!-- v6.1 问题反馈：重试引导（偶发故障优先断点续传自愈，多次失败再上报） -->
+                <div class="mt-3 border-t border-rule pt-3">
+                  <!-- 引导文案：网络/域名类 → 自查环境；确定性故障 → 建议直接反馈；其余 → 断点续传自愈 -->
+                  <p class="text-[11.5px] leading-relaxed" :class="retryIneffective ? 'text-warning' : 'text-muted'">
+                    {{ networkError ? t('fbNetworkHint') : deterministicError ? t('fbDeterministicHint') : t('fbRetryHint') }}
+                  </p>
+                  <div class="mt-2.5 flex flex-wrap items-center gap-3">
+                    <button
+                      class="btn btn-sm"
+                      :class="retryIneffective ? 'btn-ghost' : 'btn-primary'"
+                      @click="onRetryTask"
+                    >
+                      ↻ {{ t('fbRetryBtn') }}
+                    </button>
+                    <span v-if="retryCount > 0" class="mono text-[10.5px] text-muted">{{ t('fbRetriedN').replace('{n}', String(retryCount)) }}</span>
+                  </div>
+                  <!-- v6.1 问题反馈：反馈区（渐进展开 + 复制 + FAQ + GitHub Issue） -->
+                  <FeedbackPanel
+                    v-if="appState.progressTaskId"
+                    class="mt-3"
+                    :task-id="appState.progressTaskId"
+                    :task-type="appState.currentTaskType || 'creative'"
+                    :mode="taskInfo?.mode"
+                    :failed-step="reportFailedStep"
+                    :error-message="failedMessage || ''"
+                    :retry-count="retryCount"
+                    :configs="feedbackConfigs"
+                    @retry="onRetryTask"
+                  />
+                </div>
+              </div>
+              <!-- 进度消息（HTML 渲染，来自后端安全文案） -->
+              <div v-else class="mt-3 text-[12.5px] leading-relaxed text-ink-2" v-html="progressMessage"></div>
 
-        <!-- 任务信息（用户输入提示词 + 各项配置，v6.1） -->
-        <div v-if="taskInfo" class="glass-card rounded-2xl mb-4 overflow-hidden">
-          <button class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-paper-2/30 transition" @click="taskInfoOpen = !taskInfoOpen">
-            <span class="text-sm transition-transform" :class="taskInfoOpen ? 'rotate-90' : ''">▸</span>
-            <span class="text-sm font-medium text-ink-2">{{ t('taskInfo') }}</span>
-            <span class="ml-auto text-xs text-muted">{{ taskInfoOpen ? t('ppCollapse') : t('ppExpand') }}</span>
-          </button>
+              <!-- v7.7 快速重试：连续 2 次 503 后出现开关（提交成功/到期自动消失或收起） -->
+              <FastRetryPanel v-if="!taskFailed" />
 
-          <div v-show="taskInfoOpen" class="px-4 pb-4 space-y-3">
-            <!-- 输入提示词 -->
-            <div v-for="f in taskInputs" :key="f.field" class="space-y-1">
-              <div class="text-xs text-muted">{{ t(f.label) }}</div>
-              <p class="text-sm text-ink-2 bg-paper-2/30 rounded-lg px-3 py-2 whitespace-pre-wrap break-words leading-relaxed">
-                {{ taskInfo[f.field] || '—' }}
-              </p>
-            </div>
-
-            <!-- 关键配置 -->
-            <div v-if="taskConfigs.length" class="flex flex-wrap gap-x-6 gap-y-2 pt-1">
-              <div v-for="c in taskConfigs" :key="c.field" class="flex items-center gap-1.5 text-xs">
-                <span class="text-muted">{{ t(c.label) }}:</span>
-                <span class="text-ink-2 font-mono">{{ c.fmt ? c.fmt(taskInfo[c.field]) : (taskInfo[c.field] || '—') }}</span>
+              <!-- 1.7：连接异常横幅（连续轮询失败 N 次后展示） -->
+              <div
+                v-if="connectionLost"
+                class="mt-3 flex items-start gap-2 rounded border px-3 py-2 text-[11.5px] leading-relaxed text-danger"
+                style="border-color: color-mix(in oklab, var(--color-danger) 30%, transparent); background: color-mix(in oklab, var(--color-danger) 8%, transparent)"
+              >
+                {{ t('connLost') }}
               </div>
             </div>
-          </div>
-        </div>
+          </section>
 
-        <!-- 产物流：逐步追加（按环节分组，已完成折叠） -->
-        <div v-if="artifactsAreaVisible" class="space-y-3">
-          <div
-            v-for="g in orderedGroups"
-            :id="'artifact-group-' + g.stepKey"
-            :key="g.stepKey"
-            class="artifact-group glass-card rounded-2xl overflow-hidden"
-            :class="g.stepKey === checkpointGroup ? 'border-amber-500/40 ring-1 ring-amber-500/20' : ''"
-          >
+          <!-- 任务信息（用户输入提示词 + 各项配置，v6.1） -->
+          <section v-if="taskInfo" class="panel mb-4">
             <button
-              class="w-full flex items-center gap-3 px-4 py-3 text-left transition hover:bg-paper-2/30"
-              :class="g.stepKey === checkpointGroup ? 'bg-amber-500/5' : ''"
-              @click="toggleCollapse(g.stepKey)"
+              class="panel-head collapse-header w-full text-start"
+              @click="taskInfoOpen = !taskInfoOpen"
             >
-              <span class="text-sm transition-transform" :class="isCollapsed(g.stepKey) ? '' : 'rotate-90'">▸</span>
-              <span class="text-sm font-medium" :class="g.stepKey === checkpointGroup ? 'text-amber-400' : 'text-ink-2'">{{ t(stepLabelMap[g.stepKey] || g.stepKey) }}</span>
-              <span v-if="g.stepKey === checkpointGroup" class="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 shrink-0">⏸ {{ t('awaitingUser') }}</span>
-              <span class="text-xs text-muted">{{ g.items.length }} 项</span>
-              <span class="ml-auto text-xs text-muted">{{ isCollapsed(g.stepKey) ? t('ppExpand') : t('ppCollapse') }}</span>
+              <span class="panel-title">{{ t('taskInfo') }}</span>
+              <span class="mono text-[11px] text-muted">{{ taskInfoOpen ? '−' : '+' }}</span>
             </button>
 
-            <div v-show="!isCollapsed(g.stepKey)" class="px-4 pb-4 space-y-2" :class="g.stepKey === checkpointGroup ? 'px-5 pb-5' : ''">
-              <ArtifactCard v-for="art in g.items" :key="art.artifact_id" :art="art" :large="g.stepKey === checkpointGroup" />
+            <div v-show="taskInfoOpen" class="panel-body space-y-3">
+              <!-- 输入提示词 -->
+              <div v-for="f in taskInputs" :key="f.field">
+                <p class="label">{{ t(f.label) }}</p>
+                <p class="whitespace-pre-wrap break-words rounded border border-rule bg-paper px-3 py-2 text-[12px] leading-relaxed text-ink-2">
+                  {{ taskInfo[f.field] || '—' }}
+                </p>
+              </div>
+
+              <!-- 关键配置 -->
+              <div v-if="taskConfigs.length" class="flex flex-wrap gap-x-5 gap-y-1.5 border-t border-rule pt-3">
+                <div v-for="c in taskConfigs" :key="c.field" class="flex items-baseline gap-1.5 text-[11px]">
+                  <span class="text-muted">{{ t(c.label) }}</span>
+                  <span class="mono text-ink-2">{{ c.fmt ? c.fmt(taskInfo[c.field]) : (taskInfo[c.field] || '—') }}</span>
+                </div>
+              </div>
             </div>
+          </section>
+
+          <!-- 产物流：逐步追加（按环节分组，已完成折叠） -->
+          <div v-if="artifactsAreaVisible" class="space-y-3">
+            <section
+              v-for="g in orderedGroups"
+              :id="'artifact-group-' + g.stepKey"
+              :key="g.stepKey"
+              class="artifact-group panel"
+              :class="g.stepKey === checkpointGroup ? 'border-accent/50' : ''"
+            >
+              <button
+                class="panel-head collapse-header w-full text-start"
+                @click="toggleCollapse(g.stepKey)"
+              >
+                <span class="flex min-w-0 items-center gap-2">
+                  <span
+                    class="h-1.5 w-1.5 shrink-0 rounded-full"
+                    :style="{ background: g.stepKey === checkpointGroup ? 'var(--color-accent)' : 'var(--color-success)' }"
+                  ></span>
+                  <span class="truncate text-[12.5px] font-medium" :class="g.stepKey === checkpointGroup ? 'text-accent' : 'text-ink-2'">
+                    {{ t(stepLabelMap[g.stepKey] || g.stepKey) }}
+                  </span>
+                  <span v-if="g.stepKey === checkpointGroup" class="chip chip-accent shrink-0">{{ t('awaitingUser') }}</span>
+                  <span class="mono shrink-0 text-[10px] text-muted">{{ g.items.length }}</span>
+                </span>
+                <span class="mono shrink-0 text-[11px] text-muted">{{ isCollapsed(g.stepKey) ? '+' : '−' }}</span>
+              </button>
+
+              <div v-show="!isCollapsed(g.stepKey)" class="panel-body space-y-2">
+                <ArtifactCard v-for="art in g.items" :key="art.artifact_id" :art="art" :large="g.stepKey === checkpointGroup" />
+              </div>
+            </section>
           </div>
-        </div>
 
-        <!-- 暂停审查区：紧跟最新产物（就近操作） -->
-        <CheckpointDetail
-          v-if="awaitingCheckpoint && appState.currentTaskId"
-          :task-id="appState.currentTaskId"
-          :checkpoint="awaitingCheckpoint"
-        />
-
-        <!-- 结果：视频任务出 <video>，图片任务（simple_image）出 <img> -->
-        <div v-if="resultVideoVisible" class="mt-4 p-4 glass-card rounded-2xl">
-          <p class="text-green-400 text-sm font-medium mb-2">{{ resultIsImage ? t('imgComplete') : t('videoComplete') }}</p>
-          <img
-            v-if="resultIsImage"
-            :src="resultVideoSrc"
-            class="w-full rounded-lg max-h-[70vh] object-contain cursor-zoom-in"
-            @click="openImageModal(resultVideoSrc)"
+          <!-- 暂停审查区：紧跟最新产物（就近操作） -->
+          <CheckpointDetail
+            v-if="awaitingCheckpoint && appState.currentTaskId"
+            :task-id="appState.currentTaskId"
+            :checkpoint="awaitingCheckpoint"
           />
-          <video v-else :src="resultVideoSrc" controls class="w-full rounded-lg max-h-96"></video>
-          <div v-if="!resultIsImage" class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-xs">
-            <span>🎉</span>
-            <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">{{ t('doneTipTiktok') }}</a>
-            <span class="text-ink/10 select-none">·</span>
-            <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('doneTipMore') }}</a>
-          </div>
-        </div>
 
-        <!-- 官网导流资源（更多资源链接，与主页一致） -->
-        <div class="mt-8 border-t border-rule/30 pt-6 text-center">
-          <p class="text-xs text-muted mb-3">{{ t('moreResources') }}</p>
-          <div class="flex justify-center flex-wrap gap-x-5 gap-y-2 text-xs">
-            <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('projectHome') }}</a>
-            <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">{{ t('onlineDemo') }}</a>
-            <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('usageGuide') }}</a>
-            <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('promptTips') }}</a>
-            <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('faqTitle') }}</a>
-            <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('modelOverview') }}</a>
-            <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('apiCall') }}</a>
-            <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('apiDocs') }}</a>
-            <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('appScenarios') }}</a>
-            <a href="https://video.lichuanyang.top/zh/guides/free-ai-tools" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('agentMoreTools') }}</a>
-            <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('flintLinkLabel') }}</a>
-            <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">📖 GitHub</a>
-          </div>
-        </div>
-      </main>
+          <!-- 结果：视频任务出 <video>，图片任务（simple_image）出 <img> -->
+          <section v-if="resultVideoVisible" class="panel mt-4">
+            <header class="panel-head">
+              <p class="panel-title">
+                <span class="h-1.5 w-1.5 rounded-full" style="background: var(--color-success)"></span>
+                {{ resultIsImage ? t('imgComplete') : t('videoComplete') }}
+              </p>
+            </header>
+            <div class="panel-body">
+              <img
+                v-if="resultIsImage"
+                :src="resultVideoSrc"
+                class="max-h-[70vh] w-full cursor-zoom-in rounded-lg object-contain"
+                @click="openImageModal(resultVideoSrc)"
+              />
+              <video v-else :src="resultVideoSrc" controls class="w-full rounded-lg max-h-96"></video>
+              <div v-if="!resultIsImage" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px]">
+                <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-accent transition-colors hover:text-ink">{{ t('doneTipTiktok') }}</a>
+                <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('doneTipMore') }}</a>
+              </div>
+            </div>
+          </section>
+
+          <!-- 官网导流资源（更多资源链接，与主页一致） -->
+          <footer class="mt-10 border-t border-rule/60 pt-6">
+            <p class="eyebrow mb-3">{{ t('moreResources') }}</p>
+            <div class="flex flex-wrap gap-x-5 gap-y-2 text-[11.5px]">
+              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('projectHome') }}</a>
+              <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-accent transition-colors hover:text-ink">{{ t('onlineDemo') }}</a>
+              <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('usageGuide') }}</a>
+              <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('promptTips') }}</a>
+              <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('faqTitle') }}</a>
+              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('modelOverview') }}</a>
+              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('apiCall') }}</a>
+              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('apiDocs') }}</a>
+              <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('appScenarios') }}</a>
+              <a href="https://video.lichuanyang.top/zh/guides/free-ai-tools" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('agentMoreTools') }}</a>
+              <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('flintLinkLabel') }}</a>
+              <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">GitHub</a>
+            </div>
+          </footer>
+        </main>
+      </div>
     </div>
 
     <!-- 图片放大弹窗 -->
-    <div v-if="imageModalUrl" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 cursor-pointer" @click="closeImageModal">
-      <img :src="imageModalUrl" class="max-w-[90vw] max-h-[90vh] rounded-lg" />
+    <div v-if="imageModalUrl" class="modal-backdrop cursor-pointer" @click="closeImageModal">
+      <img :src="imageModalUrl" class="max-h-[90vh] max-w-[90vw] rounded-lg" />
     </div>
   </div>
 </template>

@@ -786,7 +786,7 @@
   "simpleHideSettings": "Hide settings",
   "simpleResetPreset": "Reset to default",
   "simpleDraftRestored": "Restored your previous prompt; other settings use the default preset.",
-  "simpleKeyMissing": "No API key configured yet. Please configure one at the top of the page.",
+  "simpleKeyMissing": "No API key configured yet. Open Settings to add one.",
   "simpleWaitHint": "The free queue usually finishes in 1–3 minutes, longer at peak times. You can leave this page and check the task list later.",
   "simpleRefImagesLabel": "Reference images",
   "simpleRefImagesHint": "Upload multiple images; they map to <Picture 1>, <Picture 2>… in your prompt to keep characters and style consistent.",
@@ -801,5 +801,6 @@
   "simpleAudioUrlInvalid": "Reference audio must be a public http(s) URL.",
   "ratioLandscape": "Landscape",
   "ratioPortrait": "Portrait",
-  "ratioSquare": "Square"
+  "ratioSquare": "Square",
+  "navSettings": "Settings"
 }

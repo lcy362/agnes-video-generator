@@ -7,6 +7,7 @@
 > - 手动模式（v6.0）：`docs/public/manual_mode_guide.md`（用户指南）+ `docs/plans/v6.0/manual_mode_PRD.md`（方案）+ `docs/plans/v6.0/implementation_plan.md`（实施路线图，含分阶段状态）
 > - 问题反馈（v6.1）：`docs/plans/v6.1/issue_feedback_PRD.md`（方案）+ `docs/plans/v6.1/implementation_plan.md`（实施路线图）；前端反馈区 `frontend/src/components/FeedbackPanel.vue` + `frontend/src/utils/feedback.ts`；诊断端点 `GET /api/tasks/{id}/diagnostics`
 > - 架构/技术栈：`docs/public/architecture.md`
+> - 前端视觉体系（改 UI 前必读）：`docs/dev/design_system.md`（token、`.panel/.btn/.field/.chip` 组件层、布局骨架、禁止项）
 > - API 端点：`docs/public/api.md`
 > - 流水线产物逻辑：`docs/dev/pipeline_products.md`（权威参考）
 > - 大版本回归：`docs/dev/regression_test_plan.md`（含场景矩阵、命令、报告）

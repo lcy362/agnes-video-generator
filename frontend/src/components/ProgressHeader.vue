@@ -24,13 +24,13 @@ const typeLabelKey: Record<string, string> = {
 }
 
 const statusInfo = computed(() => {
-  if (taskFailed.value) return { key: 'statusFailed', cls: 'text-red-400 bg-red-950/60 border-red-800/60' }
-  if (needsResume.value) return { key: 'statusNeedsResume', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/30' }
-  if (awaitingCheckpoint.value) return { key: 'statusAwaitingUser', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/30' }
-  if (appState.isTaskRunning || progressPct.value > 0 && progressPct.value < 100) {
-    return { key: 'statusRunning', cls: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' }
+  if (taskFailed.value) return { key: 'statusFailed', cls: 'chip-danger' }
+  if (needsResume.value) return { key: 'statusNeedsResume', cls: 'chip-warning' }
+  if (awaitingCheckpoint.value) return { key: 'statusAwaitingUser', cls: 'chip-accent' }
+  if (appState.isTaskRunning || (progressPct.value > 0 && progressPct.value < 100)) {
+    return { key: 'statusRunning', cls: 'chip-warning' }
   }
-  return { key: 'statusCompleted', cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' }
+  return { key: 'statusCompleted', cls: 'chip-success' }
 })
 
 function onBack() {
@@ -55,59 +55,66 @@ async function onSwitchAuto() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 bg-paper border-b border-rule/40">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
-      <button
-        class="flex items-center gap-1 text-sm text-ink-2 hover:text-accent transition rounded-lg px-2 py-1 -ml-2"
-        @click="onBack"
-      >
-        <span class="text-lg leading-none">←</span>
-        <span class="text-xs">{{ t('progressBack') }}</span>
+  <header
+    class="sticky top-0 z-40 border-b border-rule/60"
+    style="background: color-mix(in oklab, var(--color-paper) 90%, transparent); backdrop-filter: blur(12px)"
+  >
+    <div class="mx-auto flex w-full max-w-content items-center gap-2 px-4 py-2.5 lg:px-10">
+      <button class="btn btn-quiet h-8 shrink-0 gap-1.5 px-2" @click="onBack">
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 6l-6 6 6 6" />
+        </svg>
+        <span class="hidden text-[11.5px] sm:inline">{{ t('progressBack') }}</span>
       </button>
 
       <a
         href="#"
-        class="flex items-center gap-1 text-sm text-accent hover:text-ink transition rounded-lg px-2 py-1"
+        class="btn btn-quiet h-8 shrink-0 gap-1.5 px-2"
         @click.prevent="onHome"
       >
-        <span class="text-lg leading-none">🏠</span>
-        <span class="text-xs">{{ t('goHome') }}</span>
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />
+        </svg>
+        <span class="hidden text-[11.5px] sm:inline">{{ t('goHome') }}</span>
       </a>
 
-      <div class="flex items-center gap-2 min-w-0">
-        <span class="text-xs px-2 py-0.5 rounded-full bg-accent/15 text-accent shrink-0">
+      <span class="mx-0.5 hidden h-4 w-px shrink-0 bg-rule sm:block"></span>
+
+      <div class="flex min-w-0 items-center gap-2">
+        <span class="chip chip-accent shrink-0">
           {{ t(typeLabelKey[appState.currentTaskType] || '') || appState.currentTaskType }}
         </span>
-        <span class="text-sm font-medium truncate text-ink">{{ t('task_') }}: {{ taskId }}</span>
-        <span v-if="dirName" class="text-xs text-muted font-mono truncate hidden md:inline">{{ dirName }}</span>
+        <span class="truncate text-[11.5px] text-ink-2">
+          <span class="text-muted">{{ t('task_') }}</span>
+          <span class="mono ms-1">{{ taskId }}</span>
+        </span>
+        <span v-if="dirName" class="mono hidden truncate text-[10.5px] text-muted md:inline">{{ dirName }}</span>
       </div>
 
-      <div class="ml-auto flex items-center gap-2 shrink-0">
-        <LangSwitcher compact />
-        <span class="text-xs px-2.5 py-1 rounded-full border" :class="statusInfo.cls">
-          {{ t(statusInfo.key) }}
-        </span>
+      <div class="ms-auto flex shrink-0 items-center gap-1.5">
+        <span class="chip" :class="statusInfo.cls">{{ t(statusInfo.key) }}</span>
         <button
           v-if="needsResume"
-          class="text-xs px-3 py-1.5 bg-accent text-accent-ink rounded-lg transition"
+          class="btn btn-primary btn-sm"
           @click="onResume"
         >
-          ▶ {{ t('resumeTaskBtn') }}
+          {{ t('resumeTaskBtn') }}
         </button>
         <button
           v-if="awaitingCheckpoint"
-          class="text-xs px-3 py-1.5 border border-rule text-ink-2 rounded-lg transition hover:border-accent/40"
+          class="btn btn-ghost btn-sm"
           @click="onSwitchAuto"
         >
-          ⚡ {{ t('switchToAuto') }}
+          {{ t('switchToAuto') }}
         </button>
         <button
           v-if="appState.isTaskRunning"
-          class="text-xs px-3 py-1.5 bg-red-700/80 hover:bg-red-600 text-red-100 rounded-lg transition"
+          class="btn btn-danger btn-sm"
           @click="onStop"
         >
           {{ t('stopTask') }}
         </button>
+        <LangSwitcher compact />
       </div>
     </div>
   </header>

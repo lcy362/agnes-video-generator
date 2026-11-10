@@ -356,66 +356,67 @@ function artLabel(a: any): string {
 </script>
 
 <template>
-  <div class="mt-4 p-4 bg-paper/30 rounded-2xl border border-amber-500/30">
-    <div class="flex items-center justify-between mb-3">
-      <h3 class="text-sm font-semibold text-amber-400">
-        ⏸ {{ t('awaitingUser') }} · {{ t('checkpointTitle') }}: {{ checkpointLabel }}
+  <div class="mt-4 rounded border border-accent/40 bg-paper-2 p-4">
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <h3 class="flex items-center gap-2 text-[12.5px] font-semibold text-accent">
+        <span class="h-1.5 w-1.5 rounded-full" style="background: var(--color-accent)"></span>
+        {{ t('awaitingUser') }} · {{ t('checkpointTitle') }}: {{ checkpointLabel }}
       </h3>
-      <div class="flex gap-2">
-        <button class="text-xs px-2.5 py-1.5 bg-accent text-accent-ink rounded-lg transition" @click="regen" :disabled="confirming">
+      <div class="flex gap-1.5">
+        <button class="btn btn-ghost btn-sm" @click="regen" :disabled="confirming">
           {{ t('regenCurrent') }}
         </button>
-        <button class="text-xs px-2.5 py-1.5 border border-rule text-ink-2 rounded-lg transition hover:border-accent/40" @click="switchToAutoAndRun">
-          ⚡ {{ t('switchToAuto') }}
+        <button class="btn btn-ghost btn-sm" @click="switchToAutoAndRun">
+          {{ t('switchToAuto') }}
         </button>
       </div>
     </div>
 
-    <p class="text-xs text-muted mb-3">{{ t('awaitingUserTip') }}</p>
+    <p class="hint mb-3">{{ t('awaitingUserTip') }}</p>
 
     <!-- 统一继续按钮：无论是否修改，均走同一 approve 逻辑（自动收集当前通道的修改产物） -->
-    <div class="flex items-center justify-center mb-4">
+    <div class="mb-4 flex flex-wrap items-center justify-center gap-3">
       <button
-        class="text-sm px-6 py-2 bg-emerald-600 text-white rounded-lg transition hover:bg-emerald-500 disabled:opacity-50 shadow-sm"
+        class="btn btn-primary px-6"
         :disabled="confirming"
         @click="continueTask"
       >
         {{ confirming ? t('submitting') : t('continueConfirm') }}
       </button>
-      <span class="text-xs text-muted ml-3">{{ t('continueNoChangeHint') }}</span>
+      <span class="hint">{{ t('continueNoChangeHint') }}</span>
     </div>
 
     <!-- 卡片：AI / 自己 / Agent / 在线编辑 +（v7.6）外部工具协作。
          外部素材模式的 videos 检查点仅保留「协作」卡片（其余方式无实际产物可改）。 -->
     <div class="grid grid-cols-1 gap-3 mb-4" :class="collabPrimary ? 'md:grid-cols-1' : (collabHint ? 'md:grid-cols-5' : 'md:grid-cols-4')">
-      <button v-if="!collabPrimary && aiModifiableArts.length" class="p-3 rounded-xl border text-left transition" :class="activeCard === 'ai' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40'" @click="activeCard = 'ai'">
+      <button v-if="!collabPrimary && aiModifiableArts.length" class="rounded border p-3 text-left transition" :class="activeCard === 'ai' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'" @click="activeCard = 'ai'">
         <div class="text-sm font-medium text-ink-2">{{ t('handleAi') }}</div>
         <div class="text-xs text-muted mt-0.5">{{ t('handleAiDesc') }}</div>
       </button>
-      <button v-if="!collabPrimary" class="p-3 rounded-xl border text-left transition" :class="activeCard === 'self' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40'" @click="activeCard = 'self'">
+      <button v-if="!collabPrimary" class="rounded border p-3 text-left transition" :class="activeCard === 'self' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'" @click="activeCard = 'self'">
         <div class="text-sm font-medium text-ink-2">{{ t('handleSelf') }}</div>
         <div class="text-xs text-muted mt-0.5">{{ t('handleSelfDesc') }}</div>
       </button>
-      <div v-if="!collabPrimary" class="p-3 rounded-xl border transition flex flex-col" :class="activeCard === 'agent' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40'">
+      <div v-if="!collabPrimary" class="p-3 rounded-xl border transition flex flex-col" :class="activeCard === 'agent' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'">
         <button class="text-left" @click="activeCard = 'agent'">
           <div class="text-sm font-medium text-ink-2">{{ t('handleAgent') }}</div>
           <div class="text-xs text-muted mt-0.5">{{ t('handleAgentDesc') }}</div>
         </button>
-        <a :href="moreToolsHref" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[10px] text-accent hover:text-ink transition-colors mt-1.5">🔗 {{ t('agentMoreTools') }}</a>
+        <a :href="moreToolsHref" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[10px] text-accent hover:text-ink transition-colors mt-1.5">{{ t('agentMoreTools') }}</a>
         <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[10px] text-accent hover:text-ink transition-colors mt-1.5">{{ t('handleAgentFlint') }}</a>
       </div>
-      <button v-if="!collabPrimary" class="p-3 rounded-xl border text-left transition"
+      <button v-if="!collabPrimary" class="rounded border p-3 text-left transition"
         :class="editableTextArts.length
-          ? (activeCard === 'edit' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40')
+          ? (activeCard === 'edit' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2')
           : 'border-rule/40 bg-paper-2/20 opacity-45 cursor-not-allowed'"
         :disabled="!editableTextArts.length"
         @click="activeCard = 'edit'">
         <div class="text-sm font-medium" :class="editableTextArts.length ? 'text-ink-2' : 'text-muted'">{{ t('handleEdit') }}</div>
         <div class="text-xs text-muted mt-0.5">{{ t('handleEditDesc') }}</div>
-        <div v-if="!editableTextArts.length" class="text-[10px] text-muted mt-1">🚫 {{ t('editTextOnly') }}</div>
+        <div v-if="!editableTextArts.length" class="text-[10px] text-muted mt-1">{{ t('editTextOnly') }}</div>
       </button>
       <!-- v7.6 外部素材模式：外部工具协作（仅 external_hint 非空时展示） -->
-      <button v-if="collabHint" class="p-3 rounded-xl border text-left transition" :class="activeCard === 'collab' ? 'border-accent bg-accent/10' : 'border-rule bg-paper-2/30 hover:border-accent/40'" @click="activeCard = 'collab'">
+      <button v-if="collabHint" class="rounded border p-3 text-left transition" :class="activeCard === 'collab' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'" @click="activeCard = 'collab'">
         <div class="flex flex-wrap items-center gap-1.5 text-sm font-medium text-ink-2">
           <span>{{ collabProvider.icon }} {{ t('checkpoint.collab.title').replace('{name}', collabProvider.name || '') }}</span>
           <ExperimentalBadge v-if="collabExperimental" />
@@ -427,10 +428,10 @@ function artLabel(a: any): string {
     <!-- 通道 1 面板 -->
     <div v-if="activeCard === 'ai' && aiModifiableArts.length" class="space-y-3">
       <div>
-        <label class="block text-xs text-muted mb-1">{{ t('aiModifyRequest') }}</label>
-        <textarea v-model="aiRequest" rows="2" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink resize-y" :placeholder="t('aiModifyRequestPlaceholder')"></textarea>
+        <label class="label">{{ t('aiModifyRequest') }}</label>
+        <textarea v-model="aiRequest" rows="2" class="field" :placeholder="t('aiModifyRequestPlaceholder')"></textarea>
       </div>
-      <button class="text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition disabled:opacity-50" :disabled="aiLoading" @click="runAiModify">
+      <button class="btn btn-primary btn-sm" :disabled="aiLoading" @click="runAiModify">
         {{ aiLoading ? t('aiModifyApplying') : t('aiModifyStart') }}
       </button>
       <!-- 影响预计算展示（修改前提示） -->
@@ -449,19 +450,19 @@ function artLabel(a: any): string {
         </div>
         <div v-if="!aiResult.isImage" class="space-y-2">
           <div>
-            <label class="block text-xs text-muted mb-1">{{ t('originalContent') }}</label>
+            <label class="label">{{ t('originalContent') }}</label>
             <pre class="text-xs bg-paper-2 rounded px-2 py-1.5 max-h-32 overflow-auto whitespace-pre-wrap break-all text-ink-2">{{ aiResult.originText }}</pre>
           </div>
           <div>
-            <label class="block text-xs text-muted mb-1">{{ t('aiModifyRequest') }}</label>
-            <textarea v-model="aiResult.new_content" rows="5" class="w-full glass-input rounded-lg px-3 py-2 text-xs text-ink resize-y" :placeholder="t('editPlaceholder')"></textarea>
+            <label class="label">{{ t('aiModifyRequest') }}</label>
+            <textarea v-model="aiResult.new_content" rows="5" class="field" :placeholder="t('editPlaceholder')"></textarea>
           </div>
         </div>
         <div v-else class="grid grid-cols-2 gap-2">
           <img :src="aiResult.originUrl" class="rounded-lg border border-rule/60 max-h-40 object-contain w-full" :alt="t('originalContent')" />
           <img :src="aiResult.new_content" class="rounded-lg border border-emerald-400/40 max-h-40 object-contain w-full" :alt="t('aiModifyResult')" />
         </div>
-        <button class="w-full text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition disabled:opacity-50" :disabled="confirming" @click="applyAiAndContinue">
+        <button class="w-full btn btn-primary btn-sm" :disabled="confirming" @click="applyAiAndContinue">
           {{ confirming ? t('aiModifyApplying') : t('applyAndContinue') }}
         </button>
       </div>
@@ -499,15 +500,15 @@ function artLabel(a: any): string {
             <!-- 官网新增的即梦说明与常见问题（含 503 处理），语言前缀随 UI 语言切换 -->
             <a :href="collabGuideHref" target="_blank" rel="noopener"
                class="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 glass-input rounded-lg transition hover:border-accent/40">
-              📖 {{ t('experimentalGuideLink') }}
+              {{ t('experimentalGuideLink') }}
             </a>
             <a :href="collabFaqHref" target="_blank" rel="noopener"
                class="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 glass-input rounded-lg transition hover:border-accent/40">
-              ❓ {{ t('experimentalFaqLink') }}
+              {{ t('experimentalFaqLink') }}
             </a>
             <a v-if="collabProvider.url" :href="collabProvider.url" target="_blank" rel="noopener"
                class="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 glass-input rounded-lg transition hover:border-accent/40">
-              🔗 {{ tf('checkpoint.collab.open_tool', { name: collabProviderName }) }}
+              {{ tf('checkpoint.collab.open_tool', { name: collabProviderName }) }}
             </a>
           </div>
         </div>
@@ -517,10 +518,10 @@ function artLabel(a: any): string {
         </button>
       </div>
       <div v-if="collabHint.fill_guide" class="rounded-lg bg-paper/50 border border-rule/60 p-3 space-y-1">
-        <p class="text-xs font-medium text-ink-2">📖 {{ t('checkpoint.collab.guide_label') }}</p>
+        <p class="text-xs font-medium text-ink-2">{{ t('checkpoint.collab.guide_label') }}</p>
         <p class="text-xs text-muted whitespace-pre-wrap">{{ collabHint.fill_guide }}</p>
       </div>
-      <p v-if="collabHint.notes" class="text-xs text-muted whitespace-pre-wrap">ℹ️ {{ collabHint.notes }}</p>
+      <p v-if="collabHint.notes" class="text-xs text-muted whitespace-pre-wrap">{{ collabHint.notes }}</p>
 
       <!-- 批量导入（仅 references / videos 检查点） -->
       <div v-if="canImport" class="pt-2 border-t border-rule/40 space-y-2">
@@ -566,7 +567,7 @@ function artLabel(a: any): string {
       <p class="text-xs text-muted">{{ t('handleEditDesc') }}</p>
       <div v-if="editableTextArts.length" class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
         <span v-for="a in editableTextArts" :key="a.artifact_id" class="text-ink-2">
-          📄 {{ artLabel(a) }}
+          {{ artLabel(a) }}
         </span>
       </div>
       <p v-else class="text-xs text-amber-400">{{ t('noEditableText') }}</p>
@@ -577,14 +578,14 @@ function artLabel(a: any): string {
   </div>
 
   <!-- 在线编辑弹窗 -->
-  <div v-if="editModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" @click.self="closeEditModal">
-    <div class="w-full max-w-3xl max-h-[85vh] flex flex-col glass-card rounded-2xl overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-3 border-b border-rule/50 bg-paper-2/50">
-        <h3 class="text-sm font-semibold text-ink-2">✏️ {{ t('editModalTitle') }} · {{ checkpointLabel }}</h3>
-        <button class="text-xs px-2.5 py-1.5 border border-rule text-ink-2 rounded-lg transition hover:border-accent/40" @click="closeEditModal">{{ t('close') }}</button>
+  <div v-if="editModalOpen" class="modal-backdrop" @click.self="closeEditModal">
+    <div class="modal flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden">
+      <div class="flex items-center justify-between gap-3 border-b border-rule px-5 py-3">
+        <h3 class="text-[13px] font-semibold tracking-[-0.01em] text-ink">{{ t('editModalTitle') }} · {{ checkpointLabel }}</h3>
+        <button class="btn btn-ghost btn-sm" @click="closeEditModal">{{ t('close') }}</button>
       </div>
 
-      <div class="flex-1 overflow-auto p-5 space-y-5">
+      <div class="flex-1 space-y-4 overflow-auto p-5">
         <div v-if="editLoading" class="text-sm text-muted text-center py-10">{{ t('loading') }}...</div>
 
         <div v-for="a in editArts" :key="a.artifact_id" class="rounded-xl border border-rule/60 p-4 space-y-3">

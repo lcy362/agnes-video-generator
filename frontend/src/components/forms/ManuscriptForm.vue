@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
 import { t } from '@/i18n'
+import { stripEmoji } from '@/utils/text'
 import { appState } from '@/store'
 import { useVoice } from '@/composables/useVoice'
 import { useTaskSubmit, collectAudioSubtitleFields } from '@/composables/useTaskSubmit'
@@ -66,41 +67,44 @@ async function submitManuscript() {
 
 <template>
   <div>
-    <div class="flex items-center gap-2 mb-4 text-xs text-muted">
-      <span class="text-muted">💡</span>
-      <a href="https://video.lichuanyang.top/guides/prompt-examples-manuscript" target="_blank" rel="noopener" class="hover:text-accent transition-colors">{{ t('exampleLinkManuscript') }}</a>
+    <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted">
+      <a href="https://video.lichuanyang.top/guides/prompt-examples-manuscript" target="_blank" rel="noopener" class="transition-colors hover:text-accent">{{ stripEmoji(t('exampleLinkManuscript')) }}</a>
     </div>
 
-    <div class="glass-card rounded-2xl p-6 mb-4">
-      <h2 class="text-lg font-semibold text-accent mb-4">{{ t('manuscriptSettings') }}</h2>
+    <section class="panel mb-4">
+      <header class="panel-head">
+        <h2 class="panel-title">{{ t('manuscriptSettings') }}</h2>
+      </header>
 
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('taskName') }}</label>
-        <input v-model="form.name" :placeholder="t('taskNamePlaceholder')" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted" />
-      </div>
+      <div class="panel-body space-y-4">
+        <div>
+          <label class="label">{{ t('taskName') }}</label>
+          <input v-model="form.name" :placeholder="t('taskNamePlaceholder')" class="field" />
+        </div>
 
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('manuscriptText') }} <span class="text-red-400">*</span></label>
-        <textarea v-model="form.text" rows="10" :placeholder="t('manuscriptPlaceholder')" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted font-mono"></textarea>
-        <p class="text-xs text-muted mt-1">{{ t('charCount') }}: {{ charCount }}</p>
-      </div>
+        <div>
+          <label class="label">{{ t('manuscriptText') }} <span class="text-danger">*</span></label>
+          <textarea v-model="form.text" rows="10" :placeholder="t('manuscriptPlaceholder')" class="field font-mono"></textarea>
+          <p class="hint mt-1.5"><span class="mono">{{ charCount }}</span> {{ t('charCount') }}</p>
+        </div>
 
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('resolution') }}</label>
-        <select v-model="form.resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
-          <option value="768x1152">{{ t('resPortrait') }}</option>
-          <option value="1280x720">{{ t('resLandscape') }}</option>
-          <option value="1024x1024">{{ t('resSquare') }}</option>
-        </select>
+        <div class="max-w-64">
+          <label class="label">{{ t('resolution') }}</label>
+          <select v-model="form.resolution" class="field">
+            <option value="768x1152">{{ t('resPortrait') }}</option>
+            <option value="1280x720">{{ t('resLandscape') }}</option>
+            <option value="1024x1024">{{ t('resSquare') }}</option>
+          </select>
+        </div>
       </div>
-    </div>
+    </section>
 
     <SubtitleConfig ref="subtitleRef" task="m" :with-style="true" :external="appState.execMode === 'external'" />
 
     <WatermarkToggle />
 
     <button
-      class="w-full py-3.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn"
+      class="btn btn-primary btn-block"
       :disabled="submitting"
       @click="submitManuscript"
     >

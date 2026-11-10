@@ -58,26 +58,24 @@ defineExpose({
 
 <template>
   <!-- Audio Config -->
-  <div class="glass-card rounded-2xl p-6 mb-4">
-    <div class="collapse-header flex items-center justify-between" @click="toggleCollapse('audio')">
-      <h2 class="text-lg font-semibold text-accent">{{ t('audioConfig') }}</h2>
-      <span class="text-muted text-xs">{{ collapsed.audio ? '▶' : '▼' }}</span>
-    </div>
-    <div v-show="!collapsed.audio" class="mt-4">
-      <div class="flex items-center gap-3 mb-4">
-        <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
-          <input v-model="audioEnabled" type="checkbox" class="rounded bg-paper-2 border-rule" />
-          <span>{{ t('enableNarration') }}</span>
-        </label>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+  <section class="panel mb-4">
+    <button type="button" class="panel-head collapse-header w-full text-start" @click="toggleCollapse('audio')">
+      <h2 class="panel-title">{{ t('audioConfig') }}</h2>
+      <span class="mono text-[11px] text-muted">{{ collapsed.audio ? '+' : '−' }}</span>
+    </button>
+    <div v-show="!collapsed.audio" class="panel-body">
+      <label class="mb-4 flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
+        <input v-model="audioEnabled" type="checkbox" class="check" />
+        <span>{{ t('enableNarration') }}</span>
+      </label>
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <label class="block text-sm text-muted mb-1.5">{{ t('voiceRole') }}</label>
+          <label class="label">{{ t('voiceRole') }}</label>
           <VoiceSelector :task="task" />
         </div>
         <div>
-          <label class="block text-sm text-muted mb-1.5">{{ t('speechRate') }}</label>
-          <select v-model="rate" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
+          <label class="label">{{ t('speechRate') }}</label>
+          <select v-model="rate" class="field">
             <option value="-30%">{{ t('rateSlow') }}</option>
             <option value="-15%">-15%</option>
             <option value="+0%">{{ t('rateNormal') }}</option>
@@ -87,79 +85,77 @@ defineExpose({
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
   <!-- Subtitle Config -->
-  <div class="glass-card rounded-2xl p-6 mb-4">
-    <div class="collapse-header flex items-center justify-between" @click="toggleCollapse('subtitle')">
-      <h2 class="text-lg font-semibold text-accent">{{ t('subtitleConfig') }}</h2>
-      <span class="text-muted text-xs">{{ collapsed.subtitle ? '▶' : '▼' }}</span>
-    </div>
-    <div v-show="!collapsed.subtitle" class="mt-4">
-      <div class="flex items-center gap-3 mb-4">
-        <label class="flex items-center gap-2 text-sm text-ink-2 cursor-pointer">
-          <input v-model="subtitleEnabled" type="checkbox" class="rounded bg-paper-2 border-rule" />
-          <span>{{ t('enableSubtitle') }}</span>
-        </label>
-      </div>
+  <section class="panel mb-4">
+    <button type="button" class="panel-head collapse-header w-full text-start" @click="toggleCollapse('subtitle')">
+      <h2 class="panel-title">{{ t('subtitleConfig') }}</h2>
+      <span class="mono text-[11px] text-muted">{{ collapsed.subtitle ? '+' : '−' }}</span>
+    </button>
+    <div v-show="!collapsed.subtitle" class="panel-body">
+      <label class="mb-4 flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
+        <input v-model="subtitleEnabled" type="checkbox" class="check" />
+        <span>{{ t('enableSubtitle') }}</span>
+      </label>
 
       <template v-if="withStyle">
-        <div class="border-t border-rule/40 pt-4">
-          <div class="mb-4">
-            <label class="block text-sm text-muted mb-1.5">{{ t('subStyleMode') }}</label>
-            <select v-model="styleMode" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink">
+        <div class="border-t border-rule/60 pt-4">
+          <div class="mb-4 max-w-64">
+            <label class="label">{{ t('subStyleMode') }}</label>
+            <select v-model="styleMode" class="field">
               <option value="fixed">{{ t('subStyleFixed') }}</option>
               <option value="llm">{{ t('subStyleLLM') }}</option>
             </select>
           </div>
 
           <div v-if="styleMode === 'fixed'">
-            <p class="text-sm text-muted mb-3">{{ t('subtitleStyle') }}</p>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <p class="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{{ t('subtitleStyle') }}</p>
+            <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
               <div>
-                <label class="block text-xs text-muted mb-1">{{ t('subFont') }}</label>
-                <input v-model="style.font" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink" />
+                <label class="label">{{ t('subFont') }}</label>
+                <input v-model="style.font" class="field" />
               </div>
               <div>
-                <label class="block text-xs text-muted mb-1">{{ t('subColor') }}</label>
-                <input v-model="style.color" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink" />
+                <label class="label">{{ t('subColor') }}</label>
+                <input v-model="style.color" class="field" />
               </div>
               <div>
-                <label class="block text-xs text-muted mb-1">{{ t('subSize') }}</label>
-                <input v-model.number="style.fontsize" type="number" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink" />
+                <label class="label">{{ t('subSize') }}</label>
+                <input v-model.number="style.fontsize" type="number" class="field" />
               </div>
               <div>
-                <label class="block text-xs text-muted mb-1">{{ t('subPosition') }}</label>
-                <select v-model="style.position" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink">
+                <label class="label">{{ t('subPosition') }}</label>
+                <select v-model="style.position" class="field">
                   <option value="bottom">{{ t('posBottom') }}</option>
                   <option value="top">{{ t('posTop') }}</option>
                 </select>
               </div>
             </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+            <div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
               <div>
-                <label class="block text-xs text-muted mb-1">{{ t('subStrokeColor') }}</label>
-                <input v-model="style.stroke_color" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink" />
+                <label class="label">{{ t('subStrokeColor') }}</label>
+                <input v-model="style.stroke_color" class="field" />
               </div>
               <div>
-                <label class="block text-xs text-muted mb-1">{{ t('subStrokeWidth') }}</label>
-                <input v-model.number="style.stroke_width" type="number" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink" />
+                <label class="label">{{ t('subStrokeWidth') }}</label>
+                <input v-model.number="style.stroke_width" type="number" class="field" />
               </div>
               <div>
-                <label class="block text-xs text-muted mb-1">{{ t('subBgColor') }}</label>
-                <input v-model="style.bg_color" class="w-full glass-input rounded px-2 py-1.5 text-xs text-ink" />
+                <label class="label">{{ t('subBgColor') }}</label>
+                <input v-model="style.bg_color" class="field" />
               </div>
             </div>
           </div>
 
           <div v-else>
-            <label class="block text-sm text-muted mb-1.5">{{ t('subStyleHints') }}</label>
-            <textarea v-model="style.hints" rows="3" class="w-full glass-input rounded-lg px-3 py-2 text-sm text-ink placeholder-muted" :placeholder="t('subStyleHintsPlaceholder')"></textarea>
-            <p class="text-xs text-muted mt-1">{{ t('subStyleHintsHint') }}</p>
+            <label class="label">{{ t('subStyleHints') }}</label>
+            <textarea v-model="style.hints" rows="3" class="field" :placeholder="t('subStyleHintsPlaceholder')"></textarea>
+            <p class="hint mt-1.5">{{ t('subStyleHintsHint') }}</p>
           </div>
         </div>
       </template>
-      <p v-else class="text-xs text-muted">{{ t('poetrySubtitleFixed') }}</p>
+      <p v-else class="hint">{{ t('poetrySubtitleFixed') }}</p>
     </div>
-  </div>
+  </section>
 </template>

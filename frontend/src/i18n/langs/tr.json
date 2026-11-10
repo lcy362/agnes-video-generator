@@ -793,7 +793,7 @@
   "simpleHideSettings": "Ayarları gizle",
   "simpleResetPreset": "Varsayılana dön",
   "simpleDraftRestored": "Önceki istem geri yüklendi; diğer ayarlar varsayılan ön ayarı kullanır.",
-  "simpleKeyMissing": "Henüz API anahtarı yapılandırılmadı. Sayfanın üstünden ayarlayın.",
+  "simpleKeyMissing": "API anahtarı yapılandırılmadı. Kenar çubuğundaki Ayarlar bölümünü açın.",
   "simpleWaitHint": "Ücretsiz kuyruk genellikle 1–3 dakikada tamamlanır, yoğun saatlerde daha uzun sürer. Bu sayfadan ayrılıp görev listesine daha sonra bakabilirsiniz.",
   "simpleRefImagesLabel": "Referans görseller",
   "simpleRefImagesHint": "Birden fazla görsel yükleyin; istemdeki <Picture 1>, <Picture 2>… ile eşleşerek karakter ve stil tutarlılığı sağlar.",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "Referans ses herkese açık bir http(s) URL'si olmalıdır.",
   "ratioLandscape": "Yatay",
   "ratioPortrait": "Dikey",
-  "ratioSquare": "Kare"
+  "ratioSquare": "Kare",
+  "navSettings": "Ayarlar"
 }

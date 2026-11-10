@@ -793,7 +793,7 @@
   "simpleHideSettings": "Masquer les réglages",
   "simpleResetPreset": "Rétablir",
   "simpleDraftRestored": "Prompt précédent restauré ; les autres réglages utilisent le préréglage par défaut.",
-  "simpleKeyMissing": "Aucune clé API configurée. Configurez-la en haut de la page.",
+  "simpleKeyMissing": "Aucune clé API configurée. Ouvrez les Paramètres dans la barre latérale.",
   "simpleWaitHint": "La file gratuite prend généralement 1 à 3 minutes, plus longtemps aux heures de pointe. Vous pouvez quitter cette page et consulter la liste des tâches plus tard.",
   "simpleRefImagesLabel": "Images de référence",
   "simpleRefImagesHint": "Importez plusieurs images ; elles correspondent à <Picture 1>, <Picture 2>… dans le prompt pour garder personnages et style cohérents.",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "L'audio de référence doit être une URL http(s) publique.",
   "ratioLandscape": "Paysage",
   "ratioPortrait": "Portrait",
-  "ratioSquare": "Carré"
+  "ratioSquare": "Carré",
+  "navSettings": "Paramètres"
 }

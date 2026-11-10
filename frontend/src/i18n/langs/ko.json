@@ -793,7 +793,7 @@
   "simpleHideSettings": "설정 접기",
   "simpleResetPreset": "기본값 복원",
   "simpleDraftRestored": "이전 프롬프트를 복원했습니다. 나머지 설정은 기본 프리셋을 사용합니다.",
-  "simpleKeyMissing": "API 키가 설정되지 않았습니다. 페이지 상단에서 설정하세요.",
+  "simpleKeyMissing": "API 키가 설정되지 않았습니다. 사이드바의 설정에서 추가하세요.",
   "simpleWaitHint": "무료 대기열은 보통 1~3분 걸리며 혼잡할 때는 더 오래 걸립니다. 이 페이지를 떠나 나중에 작업 목록에서 확인할 수 있습니다.",
   "simpleRefImagesLabel": "참조 이미지",
   "simpleRefImagesHint": "여러 장을 업로드할 수 있으며 프롬프트의 <Picture 1>, <Picture 2>…에 순서대로 대응해 캐릭터와 스타일 일관성을 유지합니다.",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "참조 오디오는 공개 http(s) URL이어야 합니다.",
   "ratioLandscape": "가로",
   "ratioPortrait": "세로",
-  "ratioSquare": "정사각형"
+  "ratioSquare": "정사각형",
+  "navSettings": "설정"
 }

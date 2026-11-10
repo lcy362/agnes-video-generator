@@ -793,7 +793,7 @@
   "simpleHideSettings": "ซ่อนการตั้งค่า",
   "simpleResetPreset": "คืนค่าเริ่มต้น",
   "simpleDraftRestored": "กู้คืนพรอมป์ก่อนหน้าแล้ว การตั้งค่าอื่นใช้ค่าเริ่มต้น",
-  "simpleKeyMissing": "ยังไม่ได้ตั้งค่า API key กรุณาตั้งค่าที่ด้านบนของหน้า",
+  "simpleKeyMissing": "ยังไม่ได้ตั้งค่า API key เปิดการตั้งค่าที่แถบด้านข้างเพื่อเพิ่ม",
   "simpleWaitHint": "คิวฟรีมักเสร็จใน 1–3 นาที ช่วงพีคอาจนานกว่านั้น คุณออกจากหน้านี้แล้วกลับมาดูในรายการงานได้",
   "simpleRefImagesLabel": "ภาพอ้างอิง",
   "simpleRefImagesHint": "อัปโหลดได้หลายภาพ โดยเรียงตาม <Picture 1>, <Picture 2>… ในพรอมป์เพื่อรักษาความสม่ำเสมอของตัวละครและสไตล์",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "เสียงอ้างอิงต้องเป็น URL http(s) ที่เข้าถึงได้สาธารณะ",
   "ratioLandscape": "แนวนอน",
   "ratioPortrait": "แนวตั้ง",
-  "ratioSquare": "สี่เหลี่ยมจัตุรัส"
+  "ratioSquare": "สี่เหลี่ยมจัตุรัส",
+  "navSettings": "การตั้งค่า"
 }

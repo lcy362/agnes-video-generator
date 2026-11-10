@@ -793,7 +793,7 @@
   "simpleHideSettings": "सेटिंग्स छिपाएँ",
   "simpleResetPreset": "डिफ़ॉल्ट पर लौटें",
   "simpleDraftRestored": "पिछला प्रॉम्प्ट बहाल हुआ; अन्य सेटिंग्स डिफ़ॉल्ट प्रीसेट पर हैं।",
-  "simpleKeyMissing": "API कुंजी कॉन्फ़िगर नहीं है। कृपया पृष्ठ के शीर्ष पर सेट करें।",
+  "simpleKeyMissing": "API कुंजी कॉन्फ़िगर नहीं है। साइडबार में सेटिंग्स खोलें।",
   "simpleWaitHint": "मुफ़्त कतार आमतौर पर 1–3 मिनट में पूरी होती है, व्यस्त समय में अधिक। आप यह पृष्ठ छोड़कर बाद में कार्य सूची देख सकते हैं।",
   "simpleRefImagesLabel": "संदर्भ चित्र",
   "simpleRefImagesHint": "कई चित्र अपलोड करें; ये प्रॉम्प्ट में <Picture 1>, <Picture 2>… से मेल खाते हैं और पात्र व शैली एकरूप रखते हैं।",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "संदर्भ ऑडियो सार्वजनिक http(s) URL होना चाहिए।",
   "ratioLandscape": "लैंडस्केप",
   "ratioPortrait": "पोर्ट्रेट",
-  "ratioSquare": "वर्ग"
+  "ratioSquare": "वर्ग",
+  "navSettings": "सेटिंग्स"
 }

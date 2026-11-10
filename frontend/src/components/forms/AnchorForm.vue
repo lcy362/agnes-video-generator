@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
 import { t } from '@/i18n'
+import { stripEmoji } from '@/utils/text'
 import { appState } from '@/store'
 import { useVoice } from '@/composables/useVoice'
 import { useTaskSubmit, collectAudioSubtitleFields } from '@/composables/useTaskSubmit'
@@ -82,69 +83,80 @@ async function submitAnchor() {
 
 <template>
   <div>
-    <div class="flex items-center gap-2 mb-4 text-xs text-muted">
-      <span class="text-muted">💡</span>
-      <a href="https://video.lichuanyang.top/guides/prompt-examples-anchor" target="_blank" rel="noopener" class="hover:text-accent transition-colors">{{ t('exampleLinkAnchor') }}</a>
+    <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted">
+      <a href="https://video.lichuanyang.top/guides/prompt-examples-anchor" target="_blank" rel="noopener" class="transition-colors hover:text-accent">{{ stripEmoji(t('exampleLinkAnchor')) }}</a>
     </div>
 
-    <div class="glass-card rounded-2xl p-6 mb-4">
-      <h2 class="text-lg font-semibold text-accent mb-4">{{ t('anchorSettings') }}</h2>
+    <section class="panel mb-4">
+      <header class="panel-head">
+        <h2 class="panel-title">{{ t('anchorSettings') }}</h2>
+      </header>
 
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('anchorPrompt') }}</label>
-        <textarea v-model="form.prompt" rows="3" :placeholder="t('anchorPromptPlaceholder')" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted"></textarea>
-      </div>
-
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('anchorRefImage') }}</label>
-        <div class="flex items-center gap-4">
-          <label class="cursor-pointer px-4 py-2.5 glass-input rounded-lg text-sm transition inline-block hover:border-blue-500/30">
-            <span>{{ t('chooseImage') }}</span>
-            <input type="file" accept="image/*" class="hidden" @change="onRefImageChange" />
-          </label>
-          <span class="text-sm text-muted">{{ form.refName || t('notSelected') }}</span>
+      <div class="panel-body space-y-4">
+        <div>
+          <label class="label">{{ t('anchorPrompt') }}</label>
+          <textarea v-model="form.prompt" rows="3" :placeholder="t('anchorPromptPlaceholder')" class="field"></textarea>
         </div>
-        <p class="text-xs text-muted mt-1">{{ t('anchorRefImageHint') }}</p>
-      </div>
 
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('scriptText') }} <span class="text-red-400">*</span></label>
-        <textarea v-model="form.script" rows="8" :placeholder="t('scriptTextPlaceholder')" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted font-mono"></textarea>
-        <p class="text-xs text-muted mt-1">{{ t('charCount') }}: {{ charCount }}</p>
-      </div>
+        <div>
+          <label class="label">{{ t('anchorRefImage') }}</label>
+          <div class="flex items-center gap-3">
+            <label class="btn btn-ghost shrink-0">
+              <span>{{ t('chooseImage') }}</span>
+              <input type="file" accept="image/*" class="hidden" @change="onRefImageChange" />
+            </label>
+            <span class="truncate text-[11.5px] text-muted">{{ form.refName || t('notSelected') }}</span>
+          </div>
+          <p class="hint mt-1.5">{{ t('anchorRefImageHint') }}</p>
+        </div>
 
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('resolution') }}</label>
-        <select v-model="form.resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
-          <option value="768x1344">{{ t('resPortraitHD') }}</option>
-          <option value="1280x720">{{ t('resLandscape') }}</option>
-          <option value="1024x1024">{{ t('resSquare') }}</option>
-        </select>
+        <div>
+          <label class="label">{{ t('scriptText') }} <span class="text-danger">*</span></label>
+          <textarea v-model="form.script" rows="8" :placeholder="t('scriptTextPlaceholder')" class="field font-mono"></textarea>
+          <p class="hint mt-1.5"><span class="mono">{{ charCount }}</span> {{ t('charCount') }}</p>
+        </div>
+
+        <div class="max-w-64">
+          <label class="label">{{ t('resolution') }}</label>
+          <select v-model="form.resolution" class="field">
+            <option value="768x1344">{{ t('resPortraitHD') }}</option>
+            <option value="1280x720">{{ t('resLandscape') }}</option>
+            <option value="1024x1024">{{ t('resSquare') }}</option>
+          </select>
+        </div>
       </div>
-    </div>
+    </section>
 
     <!-- Audio Source (Anchor only) -->
-    <div class="glass-card rounded-2xl p-6 mb-4">
-      <div class="mb-4 p-3 bg-paper-2/50 rounded-lg border border-rule">
-        <label class="block text-sm text-muted mb-2">{{ t('audioSource') }}</label>
-        <div class="flex flex-col gap-2">
-          <label class="flex items-start gap-3 cursor-pointer group">
-            <input v-model="form.audioSource" type="radio" name="a_audio_source" value="post_stitch" class="mt-0.5 accent-blue-500" />
-            <div>
-              <span class="text-sm text-ink-2 group-hover:text-ink transition">{{ t('audioPostStitch') }}</span>
-              <p class="text-xs text-muted mt-0.5">{{ t('audioPostStitchDesc') }}</p>
-            </div>
+    <section class="panel mb-4">
+      <header class="panel-head">
+        <h2 class="panel-title">{{ t('audioSource') }}</h2>
+      </header>
+      <div class="panel-body">
+        <div class="grid gap-2 sm:grid-cols-2">
+          <label
+            class="flex cursor-pointer items-start gap-3 rounded border px-3 py-2.5 transition-colors"
+            :class="form.audioSource === 'post_stitch' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'"
+          >
+            <input v-model="form.audioSource" type="radio" name="a_audio_source" value="post_stitch" class="check mt-0.5" />
+            <span class="min-w-0">
+              <span class="block text-[12.5px] text-ink">{{ t('audioPostStitch') }}</span>
+              <span class="mt-0.5 block text-[11px] leading-relaxed text-muted">{{ t('audioPostStitchDesc') }}</span>
+            </span>
           </label>
-          <label class="flex items-start gap-3 cursor-pointer group">
-            <input v-model="form.audioSource" type="radio" name="a_audio_source" value="model" class="mt-0.5 accent-blue-500" />
-            <div>
-              <span class="text-sm text-ink-2 group-hover:text-ink transition">{{ t('audioModel') }}</span>
-              <p class="text-xs text-muted mt-0.5">{{ t('audioModelDesc') }}</p>
-            </div>
+          <label
+            class="flex cursor-pointer items-start gap-3 rounded border px-3 py-2.5 transition-colors"
+            :class="form.audioSource === 'model' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'"
+          >
+            <input v-model="form.audioSource" type="radio" name="a_audio_source" value="model" class="check mt-0.5" />
+            <span class="min-w-0">
+              <span class="block text-[12.5px] text-ink">{{ t('audioModel') }}</span>
+              <span class="mt-0.5 block text-[11px] leading-relaxed text-muted">{{ t('audioModelDesc') }}</span>
+            </span>
           </label>
         </div>
       </div>
-    </div>
+    </section>
 
     <!-- Audio & Subtitle（model 模式禁用音频） -->
     <div :class="{ 'opacity-40 pointer-events-none': form.audioSource === 'model' }">
@@ -154,7 +166,7 @@ async function submitAnchor() {
     <WatermarkToggle />
 
     <button
-      class="w-full py-3.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn"
+      class="btn btn-primary btn-block"
       :disabled="submitting"
       @click="submitAnchor"
     >

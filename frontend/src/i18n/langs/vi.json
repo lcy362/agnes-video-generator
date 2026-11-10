@@ -793,7 +793,7 @@
   "simpleHideSettings": "Ẩn cài đặt",
   "simpleResetPreset": "Khôi phục mặc định",
   "simpleDraftRestored": "Đã khôi phục câu lệnh trước đó; các cài đặt khác dùng mặc định.",
-  "simpleKeyMissing": "Chưa cấu hình API key. Vui lòng cấu hình ở đầu trang.",
+  "simpleKeyMissing": "Chưa cấu hình API key. Mở Cài đặt ở thanh bên để thêm.",
   "simpleWaitHint": "Hàng đợi miễn phí thường xong trong 1–3 phút, lâu hơn vào giờ cao điểm. Bạn có thể rời trang và xem lại danh sách tác vụ sau.",
   "simpleRefImagesLabel": "Ảnh tham chiếu",
   "simpleRefImagesHint": "Có thể tải nhiều ảnh; chúng tương ứng <Picture 1>, <Picture 2>… trong câu lệnh để giữ nhân vật và phong cách nhất quán.",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "Âm thanh tham chiếu phải là URL http(s) công khai.",
   "ratioLandscape": "Ngang",
   "ratioPortrait": "Dọc",
-  "ratioSquare": "Vuông"
+  "ratioSquare": "Vuông",
+  "navSettings": "Cài đặt"
 }

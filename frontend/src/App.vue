@@ -9,7 +9,9 @@ import { useTasks } from '@/composables/useTasks'
 import { useProgress } from '@/composables/useProgress'
 import { useNavigation } from '@/composables/useNavigation'
 import { useGallery } from '@/composables/useGallery'
+import { useModalA11y } from '@/composables/useModalA11y'
 import { appState } from '@/store'
+import { stripEmoji } from '@/utils/text'
 import ConfigPanel from '@/components/ConfigPanel.vue'
 import CreatePanel from '@/components/CreatePanel.vue'
 import SimplePanel from '@/components/SimplePanel.vue'
@@ -30,6 +32,20 @@ const { loadTaskList, startTaskListTimer, stopTaskListTimer } = useTasks()
 const { parseHash } = useNavigation()
 const { loadGallery, startGalleryTimer, stopGalleryTimer } = useGallery()
 
+// ── 视图导航（结构重构：顶部标签 → 左侧导航栏）──
+// 图标为 24×24 stroke path，序号用等宽字体承担「工位编号」的顺序感。
+const NAV = [
+  { key: 'create', labelKey: 'tabCreate', num: '01', d: 'M12 5v14M5 12h14' },
+  { key: 'simple', labelKey: 'tabSimple', num: '02', d: 'M13 3 4.5 13.5H10l-1 7.5 9-11h-5.5L13 3Z' },
+  { key: 'list', labelKey: 'tabList', num: '03', d: 'M4 7h16M4 12h16M4 17h10' },
+  { key: 'gallery', labelKey: 'tabGallery', num: '04', d: 'M4 5h16v14H4zM4 15.5l4.5-4.5L12 14.5l3-3L20 15.5' },
+] as const
+
+/** 去掉语言包标签里自带的表情前缀（如「⚡ 一键创作」），图标位置交给 SVG。 */
+function navLabel(key: string): string {
+  return stripEmoji(t(key))
+}
+
 function switchMainTab(tab: 'create' | 'list' | 'simple' | 'gallery') {
   appState.view = tab
   location.hash =
@@ -46,6 +62,10 @@ function switchMainTab(tab: 'create' | 'list' | 'simple' | 'gallery') {
   }
 }
 
+// ── 系统配置抽屉（原创建页顶部的 4 个配置面板，逻辑与挂载时机不变）──
+const settingsOpen = ref(false)
+const { containerRef: settingsRef } = useModalA11y(settingsOpen, () => (settingsOpen.value = false))
+
 const isConfigLoaded = ref(false)
 
 onMounted(async () => {
@@ -61,6 +81,11 @@ onMounted(async () => {
     if (parsed.view === 'gallery') {
       loadGallery()
       startGalleryTimer()
+    }
+    // 直达/刷新 #/list 时同步拉起任务列表轮询（原先只有点标签才会加载，刷新会误显示空列表）
+    if (parsed.view === 'list') {
+      loadTaskList()
+      startTaskListTimer()
     }
   }
 
@@ -119,148 +144,217 @@ async function autoReconnectRunningTask() {
 <template>
   <ProgressPage v-if="appState.view === 'progress'" />
 
-  <div v-else class="flex justify-center gap-3 px-4">
-    <!-- Left sidebar -->
-    <aside class="hidden lg:block sticky top-[120px] self-start w-[130px] shrink-0 mt-8">
-      <div class="sidebar-card">
-        <div class="stitle">{{ t('adSupportTitle') }}</div>
-        <p class="text-muted text-xs leading-relaxed mb-2">{{ t('adSupportDesc') }}</p>
-        <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener">{{ t('adStar') }}</a>
-        <p class="text-muted text-xs px-1 -mt-0.5 mb-1">{{ t('adStarDesc') }}</p>
-        <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" class="wrap">{{ t('adSkewStar') }}</a>
-        <p class="text-muted text-xs px-1 -mt-0.5 mb-1">{{ t('adSkewStarDesc') }}</p>
-        <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">{{ t('adAdblock') }}</a>
-        <p class="text-muted text-xs px-1 -mt-0.5 mb-1">{{ t('adAdblockDesc') }}</p>
-        <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">{{ t('adClick') }}</a>
-        <p class="text-muted text-xs px-1 -mt-0.5 mb-1">{{ t('adClickDesc') }}</p>
-        <p class="text-muted text-xs mt-2 leading-relaxed">{{ t('adThanks') }}</p>
-      </div>
-    </aside>
-
-    <!-- Main content -->
-    <div class="max-w-4xl flex-1 min-w-0 py-8">
-      <!-- Header -->
-      <div class="text-center mb-10">
-        <div class="flex items-center justify-end gap-1 mb-5">
-          <button
-            class="flex items-center gap-1.5 px-2.5 py-2 text-sm text-ink-2 hover:text-ink hover:bg-paper-2 rounded-lg transition-colors"
-            :title="themeLabel"
-            :aria-label="themeLabel"
-            @click="cycleTheme"
-          >
-            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" :d="themeIcon"></path>
-            </svg>
-            <span class="text-xs whitespace-nowrap">{{ themeLabel }}</span>
-          </button>
-          <LangSwitcher />
-        </div>
-        <h1 class="text-2xl sm:text-4xl font-bold text-ink px-2" style="position: relative; z-index: 0">Agnes Video Generator</h1>
-        <p class="text-muted mt-2 text-sm tracking-wide px-2">{{ t('subtitle') }}</p>
+  <div v-else class="min-h-screen">
+    <!-- ══ 桌面：左侧固定导航 ══ -->
+    <aside class="rail hidden lg:flex">
+      <div class="pb-6">
+        <p class="eyebrow">Agnes · Workbench</p>
+        <p class="mt-2.5 text-[14px] font-semibold leading-tight tracking-[-0.01em] text-ink">
+          Video Generator
+        </p>
       </div>
 
-      <!-- Resource links（窄屏可换行） -->
-      <nav class="flex justify-center items-center gap-x-4 gap-y-1.5 flex-wrap mb-8 text-xs tracking-wide">
-        <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="flex items-center gap-1 text-accent hover:text-ink transition-colors">🎬 Demo</a>
-        <span class="text-ink/5 select-none">·</span>
-        <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="flex items-center gap-1 text-muted hover:text-ink-2 transition-colors">🏠 Home</a>
-        <span class="text-ink/5 select-none">·</span>
-        <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="flex items-center gap-1 text-muted hover:text-ink-2 transition-colors">📖 Guides</a>
-        <span class="text-ink/5 select-none">·</span>
-        <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="flex items-center gap-1 text-muted hover:text-ink-2 transition-colors">❓ FAQ</a>
-        <span class="text-ink/5 select-none">·</span>
-        <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="flex items-center gap-1 text-muted hover:text-ink-2 transition-colors">📖 GitHub</a>
+      <nav class="flex flex-col gap-0.5" :aria-label="navLabel('tabCreate')">
+        <button
+          v-for="n in NAV"
+          :key="n.key"
+          type="button"
+          class="nav-item"
+          :class="appState.view === n.key ? 'is-active' : ''"
+          :aria-current="appState.view === n.key ? 'page' : undefined"
+          @click="switchMainTab(n.key)"
+        >
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path :d="n.d" />
+          </svg>
+          <span class="flex-1 truncate text-start">{{ navLabel(n.labelKey) }}</span>
+          <span class="nav-num">{{ n.num }}</span>
+        </button>
       </nav>
 
-      <!-- Config Panel -->
-      <ConfigPanel />
-
-      <!-- Main Tabs -->
-      <div class="flex gap-2 mb-6">
-        <button
-          class="px-5 py-2.5 rounded-lg text-sm font-medium transition"
-          :class="appState.view === 'create' ? 'tab-active' : 'tab-inactive'"
-          @click="switchMainTab('create')"
-        >
-          {{ t('tabCreate') }}
-        </button>
-        <button
-          class="px-5 py-2.5 rounded-lg text-sm font-medium transition"
-          :class="appState.view === 'list' ? 'tab-active' : 'tab-inactive'"
-          @click="switchMainTab('list')"
-        >
-          {{ t('tabList') }}
-        </button>
-        <button
-          class="px-5 py-2.5 rounded-lg text-sm font-medium transition"
-          :class="appState.view === 'gallery' ? 'tab-active' : 'tab-inactive'"
-          @click="switchMainTab('gallery')"
-        >
-          {{ t('tabGallery') }}
-        </button>
-        <button
-          class="px-5 py-2.5 rounded-lg text-sm font-medium transition"
-          :class="appState.view === 'simple' ? 'tab-active' : 'tab-inactive'"
-          @click="switchMainTab('simple')"
-        >
-          {{ t('tabSimple') }} <span class="tab-badge">{{ t('tabNewBadge') }}</span>
-        </button>
-      </div>
-
-      <!-- Create Panel -->
-      <div v-show="appState.view === 'create'">
-        <CreatePanel />
-      </div>
-
-      <!-- Simple Panel -->
-      <div v-show="appState.view === 'simple'">
-        <SimplePanel @go-list="switchMainTab('list')" />
-      </div>
-
-      <!-- List Panel -->
-      <div v-show="appState.view === 'list'">
-        <TaskListPanel />
-      </div>
-
-      <!-- Gallery Panel (P1, 只读) -->
-      <div v-show="appState.view === 'gallery'">
-        <GalleryPanel />
-      </div>
-
-      <!-- Footer -->
-      <footer class="text-center pb-8">
-        <div class="border-t border-rule/30 pt-8 mt-4">
-          <p class="text-xs text-muted mb-3">{{ t('moreResources') }}</p>
-          <div class="flex justify-center flex-wrap gap-x-5 gap-y-2 text-xs">
-            <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('projectHome') }}</a>
-            <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-accent hover:text-ink transition-colors">{{ t('onlineDemo') }}</a>
-            <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('usageGuide') }}</a>
-            <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('faqTitle') }}</a>
-            <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('apiDocs') }}</a>
-            <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('appScenarios') }}</a>
-            <a href="https://video.lichuanyang.top/zh/guides/free-ai-tools" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('agentMoreTools') }}</a>
-            <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">{{ t('flintLinkLabel') }}</a>
-            <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-muted hover:text-ink-2 transition-colors">📖 GitHub</a>
-          </div>
-          <!-- v7.0 U8：暴露应用版本，便于判断「模型档位未适配是否因版本过旧」 -->
-          <p v-if="appState.appVersion" class="text-xs text-muted/70 mt-3">{{ t('footerVersion') }} v{{ appState.appVersion }}</p>
+      <div class="mt-auto">
+        <div class="border-t border-rule/60 pt-3">
+          <button type="button" class="nav-item" @click="settingsOpen = true">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.4-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.4l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4Z" />
+            </svg>
+            <span class="flex-1 truncate text-start">{{ t('navSettings') }}</span>
+            <span
+              v-if="!appState.apiKeySource"
+              class="h-1.5 w-1.5 shrink-0 rounded-full"
+              style="background: var(--color-warning)"
+              aria-hidden="true"
+            ></span>
+          </button>
         </div>
-      </footer>
-    </div>
 
-    <!-- Right sidebar -->
-    <aside class="hidden lg:block sticky top-[120px] self-start w-[115px] shrink-0 mt-8">
-      <div class="sidebar-card">
-        <div class="stitle">{{ t('quickLinks') }}</div>
-        <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener">{{ t('onlineDemo') }}</a>
-        <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener">{{ t('promptTips') }}</a>
-        <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener">{{ t('modelOverview') }}</a>
-        <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener">{{ t('apiCall') }}</a>
-        <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener">{{ t('faqTitle') }}</a>
-        <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener">{{ t('apiDocs') }}</a>
-        <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener">{{ t('appScenarios') }}</a>
+        <div class="mt-4 border-t border-rule/60 pt-4">
+          <p class="eyebrow px-2.5">{{ t('adSupportTitle') }}</p>
+          <a
+            href="https://github.com/lcy362/agnes-video-generator"
+            target="_blank"
+            rel="noopener"
+            class="mt-2 flex items-center gap-2 rounded px-2.5 py-1.5 text-[11.5px] text-muted transition-colors hover:text-ink-2"
+          >{{ stripEmoji(t('adStar')) }}</a>
+          <a
+            href="https://video.lichuanyang.top"
+            target="_blank"
+            rel="noopener"
+            class="flex items-center gap-2 rounded px-2.5 py-1.5 text-[11.5px] text-muted transition-colors hover:text-ink-2"
+          >{{ stripEmoji(t('adAdblock')) }}</a>
+          <p class="px-2.5 pt-2 text-[11px] leading-relaxed text-muted/70">{{ t('adThanks') }}</p>
+        </div>
       </div>
     </aside>
+
+    <!-- ══ 主内容区 ══ -->
+    <div class="lg:ms-[236px]">
+      <!-- 移动端顶栏 -->
+      <div
+        class="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-rule/60 px-4 lg:hidden"
+        style="height: 52px; background: color-mix(in oklab, var(--color-paper) 88%, transparent); backdrop-filter: blur(12px)"
+      >
+        <div class="min-w-0">
+          <p class="eyebrow leading-none">Agnes · Workbench</p>
+          <p class="mt-1 truncate text-[12.5px] font-semibold text-ink">Video Generator</p>
+        </div>
+        <div class="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            class="btn btn-quiet h-8 w-8 px-0"
+            :title="t('navSettings')"
+            :aria-label="t('navSettings')"
+            @click="settingsOpen = true"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M4 7h8M16 7h4M4 17h4M12 17h8" />
+              <circle cx="14" cy="7" r="2" />
+              <circle cx="10" cy="17" r="2" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <main class="mx-auto w-full max-w-content px-4 py-6 sm:px-7 lg:px-10 lg:py-9">
+        <!-- 页头 -->
+        <header class="mb-6 flex items-start justify-between gap-4 border-b border-rule/60 pb-5">
+          <div class="min-w-0">
+            <h1 class="text-[21px] font-semibold leading-[1.15] tracking-[-0.025em] text-ink sm:text-[25px]">
+              Agnes Video Generator
+            </h1>
+            <p class="mt-1.5 text-[12.5px] tracking-wide text-muted">{{ t('subtitle') }}</p>
+          </div>
+          <div class="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              class="btn btn-quiet h-8 gap-1.5 px-2"
+              :title="themeLabel"
+              :aria-label="themeLabel"
+              @click="cycleTheme"
+            >
+              <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" :d="themeIcon"></path>
+              </svg>
+              <span class="hidden text-[11.5px] whitespace-nowrap sm:inline">{{ themeLabel }}</span>
+            </button>
+            <LangSwitcher />
+          </div>
+        </header>
+
+        <!-- 移动端横向导航 -->
+        <nav class="mb-5 flex gap-1.5 overflow-x-auto pb-1 lg:hidden" :aria-label="navLabel('tabCreate')">
+          <button
+            v-for="n in NAV"
+            :key="n.key"
+            type="button"
+            class="flex shrink-0 items-center gap-1.5 rounded border px-3 py-1.5 text-[12.5px] transition-colors"
+            :class="appState.view === n.key ? 'border-rule-2 bg-paper-3 text-ink' : 'border-rule text-muted'"
+            :aria-current="appState.view === n.key ? 'page' : undefined"
+            @click="switchMainTab(n.key)"
+          >
+            <span class="mono text-[9px]" :class="appState.view === n.key ? 'text-accent' : ''">{{ n.num }}</span>
+            <span>{{ navLabel(n.labelKey) }}</span>
+          </button>
+        </nav>
+
+        <!-- 创建 -->
+        <div v-show="appState.view === 'create'">
+          <CreatePanel />
+        </div>
+
+        <!-- 一键创作 -->
+        <div v-show="appState.view === 'simple'">
+          <SimplePanel @go-list="switchMainTab('list')" />
+        </div>
+
+        <!-- 任务列表 -->
+        <div v-show="appState.view === 'list'">
+          <TaskListPanel />
+        </div>
+
+        <!-- 产物画廊 -->
+        <div v-show="appState.view === 'gallery'">
+          <GalleryPanel />
+        </div>
+
+        <!-- 页脚：资源索引 -->
+        <footer class="mt-12 border-t border-rule/60 pt-6">
+          <p class="eyebrow mb-3">{{ t('moreResources') }}</p>
+          <div class="flex flex-wrap gap-x-5 gap-y-2 text-[11.5px]">
+            <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('projectHome') }}</a>
+            <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-accent transition-colors hover:text-ink">{{ t('onlineDemo') }}</a>
+            <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('usageGuide') }}</a>
+            <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('faqTitle') }}</a>
+            <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('apiDocs') }}</a>
+            <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('appScenarios') }}</a>
+            <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('flintLinkLabel') }}</a>
+            <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">GitHub</a>
+          </div>
+          <!-- v7.0 U8：暴露应用版本，便于判断「模型档位未适配是否因版本过旧」 -->
+          <p v-if="appState.appVersion" class="mono mt-4 text-[10.5px] tracking-wide text-muted/70">
+            {{ t('footerVersion') }} v{{ appState.appVersion }}
+          </p>
+        </footer>
+      </main>
+    </div>
+
+    <!-- ══ 系统配置抽屉 ══ -->
+    <div v-if="settingsOpen" class="drawer-backdrop" @click="settingsOpen = false"></div>
+    <div
+      v-show="settingsOpen"
+      ref="settingsRef"
+      class="drawer"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('navSettings')"
+    >
+      <div class="drawer-head">
+        <div class="min-w-0">
+          <p class="eyebrow">System</p>
+          <h2 class="mt-1 text-[15px] font-semibold tracking-[-0.01em] text-ink">{{ t('navSettings') }}</h2>
+        </div>
+        <button
+          type="button"
+          class="btn btn-quiet h-8 w-8 px-0 text-[15px]"
+          :aria-label="t('close')"
+          @click="settingsOpen = false"
+        >✕</button>
+      </div>
+      <div class="drawer-body">
+        <!-- 首次使用：Key 未配置时给出显式入口提示 -->
+        <div
+          v-if="!appState.apiKeySource"
+          class="mb-4 flex items-start gap-2 rounded border px-3 py-2.5"
+          style="border-color: color-mix(in oklab, var(--color-warning) 30%, transparent); background: color-mix(in oklab, var(--color-warning) 8%, transparent)"
+        >
+          <span class="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full" style="background: var(--color-warning)"></span>
+          <p class="text-[11.5px] leading-relaxed text-warning">{{ t('simpleKeyMissing') }}</p>
+        </div>
+        <ConfigPanel />
+      </div>
+    </div>
   </div>
 
   <!-- Voice Picker Modal -->

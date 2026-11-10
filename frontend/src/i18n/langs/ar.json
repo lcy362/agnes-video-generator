@@ -793,7 +793,7 @@
   "simpleHideSettings": "إخفاء الإعدادات",
   "simpleResetPreset": "إعادة التعيين",
   "simpleDraftRestored": "تمت استعادة الموجّه السابق؛ الإعدادات الأخرى تستخدم الإعداد الافتراضي.",
-  "simpleKeyMissing": "لم يتم إعداد مفتاح API بعد. يرجى إعداده أعلى الصفحة.",
+  "simpleKeyMissing": "لم يتم إعداد مفتاح API. افتح الإعدادات في الشريط الجانبي.",
   "simpleWaitHint": "عادةً يكتمل الطابور المجاني خلال 1–3 دقائق، وقد يطول في أوقات الذروة. يمكنك مغادرة الصفحة والتحقق من قائمة المهام لاحقًا.",
   "simpleRefImagesLabel": "صور مرجعية",
   "simpleRefImagesHint": "يمكن رفع عدة صور؛ ترتبط بـ <Picture 1> و<Picture 2>… في الموجّه للحفاظ على ثبات الشخصيات والأسلوب.",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "يجب أن يكون الصوت المرجعي رابط http(s) عامًا.",
   "ratioLandscape": "أفقي",
   "ratioPortrait": "عمودي",
-  "ratioSquare": "مربع"
+  "ratioSquare": "مربع",
+  "navSettings": "الإعدادات"
 }

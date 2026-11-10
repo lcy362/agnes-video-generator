@@ -793,7 +793,7 @@
   "simpleHideSettings": "Ocultar configurações",
   "simpleResetPreset": "Restaurar padrão",
   "simpleDraftRestored": "Prompt anterior restaurado; os demais ajustes usam a predefinição padrão.",
-  "simpleKeyMissing": "Nenhuma chave de API configurada. Configure-a no topo da página.",
+  "simpleKeyMissing": "Nenhuma chave de API configurada. Abra Configurações na barra lateral.",
   "simpleWaitHint": "A fila gratuita geralmente leva 1–3 minutos, mais em horários de pico. Você pode sair desta página e verificar a lista de tarefas depois.",
   "simpleRefImagesLabel": "Imagens de referência",
   "simpleRefImagesHint": "Envie várias imagens; elas correspondem a <Picture 1>, <Picture 2>… no prompt para manter personagens e estilo.",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "O áudio de referência deve ser uma URL http(s) pública.",
   "ratioLandscape": "Paisagem",
   "ratioPortrait": "Retrato",
-  "ratioSquare": "Quadrado"
+  "ratioSquare": "Quadrado",
+  "navSettings": "Configurações"
 }

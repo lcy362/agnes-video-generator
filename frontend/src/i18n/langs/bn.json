@@ -793,7 +793,7 @@
   "simpleHideSettings": "সেটিংস লুকান",
   "simpleResetPreset": "ডিফল্টে ফিরুন",
   "simpleDraftRestored": "আগের প্রম্পট পুনরুদ্ধার হয়েছে; বাকি সেটিংস ডিফল্ট প্রিসেটে আছে।",
-  "simpleKeyMissing": "API কী কনফিগার করা হয়নি। পৃষ্ঠার উপরে সেট করুন।",
+  "simpleKeyMissing": "API কী কনফিগার করা হয়নি। সাইডবারে সেটিংস খুলুন।",
   "simpleWaitHint": "ফ্রি সারি সাধারণত ১–৩ মিনিটে শেষ হয়, ব্যস্ত সময়ে বেশি সময় লাগে। আপনি এই পৃষ্ঠা ছেড়ে পরে কাজের তালিকা দেখতে পারেন।",
   "simpleRefImagesLabel": "রেফারেন্স ছবি",
   "simpleRefImagesHint": "একাধিক ছবি আপলোড করুন; এগুলো প্রম্পটের <Picture 1>, <Picture 2>… এর সাথে মিলে চরিত্র ও স্টাইল একরকম রাখে।",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "রেফারেন্স অডিও প্রকাশ্য http(s) URL হতে হবে।",
   "ratioLandscape": "ল্যান্ডস্কেপ",
   "ratioPortrait": "পোর্ট্রেট",
-  "ratioSquare": "বর্গ"
+  "ratioSquare": "বর্গ",
+  "navSettings": "সেটিংস"
 }

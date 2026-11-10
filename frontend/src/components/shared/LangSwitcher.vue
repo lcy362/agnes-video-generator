@@ -18,8 +18,8 @@ const root = ref<HTMLElement | null>(null)
 
 const triggerClass = computed(() =>
   props.compact
-    ? 'flex items-center gap-1 px-1.5 py-1 text-xs text-ink-2 hover:text-ink hover:bg-paper-2 rounded-lg transition-colors'
-    : 'flex items-center gap-1 px-2 py-2 text-sm text-ink-2 hover:text-ink hover:bg-paper-2 rounded-lg transition-colors',
+    ? 'btn btn-quiet h-8 shrink-0 gap-1 px-1.5 text-[11.5px]'
+    : 'btn btn-quiet h-8 shrink-0 gap-1.5 px-2 text-[11.5px]',
 )
 
 // 语言名映射（label 形如 "🇨🇳 中文"）+ 地区分组（与官网 langGroups 一致）

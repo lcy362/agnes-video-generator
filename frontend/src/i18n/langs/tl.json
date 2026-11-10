@@ -793,7 +793,7 @@
   "simpleHideSettings": "Itago ang mga setting",
   "simpleResetPreset": "Ibalik sa default",
   "simpleDraftRestored": "Naibalik ang nakaraang prompt; ibang setting ay default preset.",
-  "simpleKeyMissing": "Wala pang naka-configure na API key. I-set up ito sa itaas ng pahina.",
+  "simpleKeyMissing": "Wala pang naka-configure na API key. Buksan ang Mga setting sa sidebar.",
   "simpleWaitHint": "Karaniwang natatapos ang libreng pila sa 1–3 minuto, mas matagal kapag abala. Maaari kang umalis sa pahinang ito at tingnan ang listahan ng gawain mamaya.",
   "simpleRefImagesLabel": "Mga reference na larawan",
   "simpleRefImagesHint": "Mag-upload ng maraming larawan; tumutugma ang mga ito sa <Picture 1>, <Picture 2>… sa prompt upang mapanatili ang karakter at estilo.",
@@ -808,5 +808,6 @@
   "simpleAudioUrlInvalid": "Ang reference na audio ay dapat pampublikong http(s) URL.",
   "ratioLandscape": "Landscape",
   "ratioPortrait": "Portrait",
-  "ratioSquare": "Parisukat"
+  "ratioSquare": "Parisukat",
+  "navSettings": "Mga setting"
 }

@@ -4,7 +4,35 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+        sans: [
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI',
+          'PingFang SC',
+          'Hiragino Sans GB',
+          'Microsoft YaHei',
+          'system-ui',
+          'sans-serif',
+        ],
+        mono: [
+          'SF Mono',
+          'ui-monospace',
+          'JetBrains Mono',
+          'Menlo',
+          'Consolas',
+          'Liberation Mono',
+          'monospace',
+        ],
+      },
+      borderRadius: {
+        // 新体系：圆角收敛，最大 12px
+        DEFAULT: '8px',
+        lg: '12px',
+        xl: '12px',
+        '2xl': '12px',
+      },
+      maxWidth: {
+        content: '960px',
       },
     },
   },

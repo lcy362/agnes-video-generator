@@ -24,12 +24,12 @@ function loadList() {
   void loadTaskList()
 }
 
-const statusColors: Record<string, string> = {
-  completed: 'text-emerald-400',
-  running: 'text-yellow-400',
-  failed: 'text-red-400',
-  pending: 'text-muted',
-  queued: 'text-accent',
+const statusChip: Record<string, string> = {
+  completed: 'chip-success',
+  running: 'chip-warning',
+  failed: 'chip-danger',
+  pending: '',
+  queued: 'chip-accent',
 }
 
 const statusLabelKey: Record<string, string> = {
@@ -81,67 +81,68 @@ function onMainBtn(task: TaskListItem) {
 </script>
 
 <template>
-  <div class="space-y-3">
-    <p v-if="!tasks.length" class="text-muted text-sm">{{ t('noTasks') }}</p>
-    <div
-      v-for="task in tasks"
-      :key="task.task_id"
-      class="glass-card rounded-xl p-4 flex items-center justify-between"
-    >
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2 mb-1">
-          <span class="text-xs px-2 py-0.5 rounded-full bg-accent/15 text-accent">
-            {{ t(typeLabelKey[task.task_type || ''] || '') || task.task_type }}
-          </span>
-          <p class="text-sm font-medium truncate">{{ task.creative_name || task.task_id }}</p>
-          <!-- v6.0 模式徽标 -->
-          <span v-if="task.awaiting_user" class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
-            {{ t('awaitingUser') }}
-          </span>
-          <span v-else-if="task.current_mode === 'manual'" class="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">
-            ✋ {{ t('execManual') }}
-          </span>
+  <div>
+    <p v-if="!tasks.length" class="panel px-4 py-12 text-center text-[12.5px] text-muted">
+      {{ t('noTasks') }}
+    </p>
+
+    <div v-else class="panel overflow-hidden">
+      <div
+        v-for="(task, i) in tasks"
+        :key="task.task_id"
+        class="flex flex-wrap items-center gap-x-4 gap-y-2.5 px-4 py-3 transition-colors hover:bg-paper-3/40"
+        :class="i > 0 ? 'border-t border-rule' : ''"
+      >
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="chip chip-accent">{{ t(typeLabelKey[task.task_type || ''] || '') || task.task_type }}</span>
+            <p class="truncate text-[13px] font-medium text-ink">{{ task.creative_name || task.task_id }}</p>
+            <!-- v6.0 模式徽标 -->
+            <span v-if="task.awaiting_user" class="chip chip-warning">{{ t('awaitingUser') }}</span>
+            <span v-else-if="task.current_mode === 'manual'" class="chip">{{ t('execManual') }}</span>
+          </div>
+          <p class="mono mt-1 text-[10.5px] tracking-wide text-muted/80">{{ task.task_id }}{{ taskExtra(task) }}</p>
+          <p v-if="taskDesc(task)" class="mt-1 line-clamp-1 max-w-lg text-[11.5px] text-muted">{{ taskDesc(task) }}</p>
         </div>
-        <p class="text-xs text-muted mt-0.5">{{ task.task_id }}{{ taskExtra(task) }}</p>
-        <p v-if="taskDesc(task)" class="text-xs text-muted mt-1 truncate max-w-xs">{{ taskDesc(task) }}</p>
-      </div>
-      <div class="flex items-center gap-3 ml-3">
-        <span class="text-xs" :class="statusColors[task.status || ''] || 'text-muted'">
-          {{ t(statusLabelKey[task.status || ''] || '') || task.status }}
-        </span>
-        <!-- v6.0 运行时切换（已完成/失败任务不显示） -->
-        <button
-          v-if="task.current_mode && !isCompleted(task) && task.status !== 'failed' && task.task_type !== 'simple' && task.task_type !== 'image'"
-          class="text-xs px-2.5 py-1.5 rounded-lg transition border border-rule text-ink-2 hover:border-accent/40"
-          :title="t(task.current_mode === 'manual' ? 'switchToAuto' : 'switchToManual')"
-          @click="toggleMode(task)"
-        >
-          {{ task.current_mode === 'manual' ? t('switchToAuto') : t('switchToManual') }}
-        </button>
-        <button
-          v-if="!isCompleted(task) && !isRunning(task)"
-          class="text-xs px-3 py-1.5 bg-paper-3 hover:bg-paper-3 rounded-lg transition"
-          @click="viewTask(task.task_id)"
-        >
-          {{ t('btnView') }}
-        </button>
-        <button class="text-xs px-3 py-1.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-lg transition" @click="onMainBtn(task)">
-          {{ mainBtnLabel(task) }}
-        </button>
-        <button
-          v-if="isRunning(task)"
-          class="text-xs px-3 py-1.5 bg-red-700 hover:bg-red-600 text-red-100 rounded-lg transition"
-          @click="stopTaskById(task.task_id)"
-        >
-          {{ t('btnStop') }}
-        </button>
-        <button
-          v-if="!isRunning(task)"
-          class="text-xs px-3 py-1.5 bg-red-900/60 hover:bg-red-700 text-red-200 rounded-lg transition"
-          @click="deleteTaskById(task.task_id)"
-        >
-          {{ t('deleteTask') }}
-        </button>
+
+        <div class="flex shrink-0 flex-wrap items-center gap-2">
+          <span class="chip" :class="statusChip[task.status || ''] || ''">
+            {{ t(statusLabelKey[task.status || ''] || '') || task.status }}
+          </span>
+          <!-- v6.0 运行时切换（已完成/失败任务不显示） -->
+          <button
+            v-if="task.current_mode && !isCompleted(task) && task.status !== 'failed' && task.task_type !== 'simple' && task.task_type !== 'image'"
+            class="btn btn-ghost btn-xs"
+            :title="t(task.current_mode === 'manual' ? 'switchToAuto' : 'switchToManual')"
+            @click="toggleMode(task)"
+          >
+            {{ task.current_mode === 'manual' ? t('switchToAuto') : t('switchToManual') }}
+          </button>
+          <button
+            v-if="!isCompleted(task) && !isRunning(task)"
+            class="btn btn-ghost btn-xs"
+            @click="viewTask(task.task_id)"
+          >
+            {{ t('btnView') }}
+          </button>
+          <button class="btn btn-secondary btn-xs" @click="onMainBtn(task)">
+            {{ mainBtnLabel(task) }}
+          </button>
+          <button
+            v-if="isRunning(task)"
+            class="btn btn-danger btn-xs"
+            @click="stopTaskById(task.task_id)"
+          >
+            {{ t('btnStop') }}
+          </button>
+          <button
+            v-if="!isRunning(task)"
+            class="btn btn-quiet btn-xs text-muted transition-colors hover:text-danger"
+            @click="deleteTaskById(task.task_id)"
+          >
+            {{ t('deleteTask') }}
+          </button>
+        </div>
       </div>
     </div>
   </div>

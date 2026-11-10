@@ -2,54 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
-  /* ── Hallmark · genre: atmospheric · theme: Midnight (custom) · design-system: design.md ──
-   * theme-modes: dark (:root 默认) / light ([data-theme='light'] 同族反转) · toggle: system/light/dark
-   * 与官网 video-website token 体系完全一致，双主题共用 */
+  /* ── Agnes Workbench · visual system ────────────────────────────────────────
+   * genre: instrument panel / screening bay · theme: Midnight (warm neutral + amber)
+   * theme-modes: dark (:root 默认) / light ([data-theme='light'] 同族反转)
+   * 设计语言：纸感近黑底 + 发丝级分隔线 + 单一琥珀强调色 + 等宽字体承载元数据。
+   * 规则：圆角 ≤12px；不使用投影（弹窗/抽屉除外）；不使用渐变按钮与发光。
+   * 组件层见文件下半部（.panel / .btn / .field / .chip / .nav-item / .tl-* 等）。
+   * ────────────────────────────────────────────────────────────────────────── */
 
   :root {
-    --color-paper:    oklch(13% 0.012 55);
-    --color-paper-2:  oklch(17% 0.014 55);
-    --color-paper-3:  oklch(22% 0.016 55);
-    --color-ink:      oklch(94% 0.008 65);
-    --color-ink-2:    oklch(78% 0.012 60);
-    --color-muted:    oklch(64% 0.014 60);
-    --color-rule:     oklch(30% 0.014 55);
-    --color-accent:   oklch(80% 0.14 75);
-    --color-accent-ink: oklch(20% 0.05 75);
-    --color-focus:    oklch(82% 0.16 75);
-    --color-danger:   oklch(66% 0.19 27);
-    --color-success:  oklch(80% 0.13 152);
+    /* 表面：三级纸面，靠明度区分层级，不靠阴影 */
+    --color-paper:    oklch(15% 0.008 60);
+    --color-paper-2:  oklch(19% 0.009 60);
+    --color-paper-3:  oklch(24% 0.010 60);
+    /* 文字：四级，muted 用于元数据 */
+    --color-ink:      oklch(96% 0.004 75);
+    --color-ink-2:    oklch(84% 0.007 70);
+    --color-muted:    oklch(63% 0.010 65);
+    /* 线：发丝级，rule-2 用于可交互控件描边 */
+    --color-rule:     oklch(27% 0.010 60);
+    --color-rule-2:   oklch(34% 0.012 60);
+    /* 强调：琥珀，只用于主操作 / 进行中 / 选中 */
+    --color-accent:   oklch(80% 0.135 72);
+    --color-accent-ink: oklch(16% 0.028 72);
+    --color-focus:    oklch(84% 0.15 72);
+    --color-danger:   oklch(66% 0.17 25);
+    --color-success:  oklch(75% 0.10 155);
     --color-warning:  oklch(80% 0.13 75);
+
+    /* 运动：短、克制，只做透明度与描边过渡 */
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --dur-micro: 120ms; --dur-short: 220ms; --dur-long: 420ms;
+    --dur-micro: 120ms; --dur-short: 200ms; --dur-long: 320ms;
+
+    /* 几何 */
+    --r-xs: 3px;
+    --r-sm: 5px;
+    --r: 8px;
+    --r-lg: 12px;
+    --rail-w: 236px;
+
+    /* 字体 */
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
+    --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
   }
 
-  /* 亮色——同族反转：hue 55 暖灰家族 + accent 加深保证对比度（与官网一致） */
+  /* 亮色——同族反转：hue 60~70 暖灰家族 + accent 加深保证对比度 */
   [data-theme='light'] {
-    --color-paper:    oklch(97% 0.008 60);
-    --color-paper-2:  oklch(100% 0.004 60);
-    --color-paper-3:  oklch(93% 0.01 60);
-    --color-ink:      oklch(22% 0.016 55);
-    --color-ink-2:    oklch(43% 0.016 55);
-    --color-muted:    oklch(55% 0.016 55);
-    --color-rule:     oklch(87% 0.012 60);
-    --color-accent:   oklch(52% 0.13 75);
-    --color-accent-ink: oklch(98% 0.008 75);
-    --color-focus:    oklch(48% 0.15 75);
-    --color-danger:   oklch(50% 0.19 27);
-    --color-success:  oklch(50% 0.13 152);
-    --color-warning:  oklch(52% 0.13 75);
+    --color-paper:    oklch(96.5% 0.006 70);
+    --color-paper-2:  oklch(99.6% 0.002 70);
+    --color-paper-3:  oklch(93% 0.008 70);
+    --color-ink:      oklch(18% 0.012 60);
+    --color-ink-2:    oklch(32% 0.012 60);
+    --color-muted:    oklch(44% 0.012 60);
+    --color-rule:     oklch(86% 0.008 70);
+    --color-rule-2:   oklch(76% 0.010 70);
+    --color-accent:   oklch(58% 0.13 68);
+    --color-accent-ink: oklch(99% 0.004 70);
+    --color-focus:    oklch(55% 0.14 68);
+    --color-danger:   oklch(52% 0.18 27);
+    --color-success:  oklch(48% 0.11 155);
+    --color-warning:  oklch(56% 0.13 70);
   }
 
-  /* ── Base Animations（fade only，atmospheric）── */
+  /* ── Base ── */
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--color-ink);
+    background:
+      radial-gradient(ellipse 60% 34% at 50% -6%, color-mix(in oklab, var(--color-accent) 5%, transparent), transparent 68%),
+      var(--color-paper);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ── Animations（atmospheric：只淡入，不做位移） ── */
   @keyframes spin { to { transform: rotate(360deg); } }
   .animate-spin { animation: spin 1s linear infinite; }
-  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
-  .animate-pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.35} }
+  .animate-pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
   @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-  .animate-fade-in { animation: fadeIn 0.42s var(--ease-out) forwards; }
+  .animate-fade-in { animation: fadeIn 0.28s var(--ease-out) forwards; }
 
-  /* ── 3.4 可访问性：弱化动态效果偏好 → 关闭动画/过渡 ── */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
@@ -59,268 +95,594 @@
     }
   }
 
-  /* 3.4：键盘焦点可见性（配合 focus trap） */
+  /* 键盘焦点可见性（配合 modal focus trap） */
   :focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: var(--r-xs);
   }
 
-  /* ── Card Surface（paper-2 + rule 边框，无玻璃、无 glow）── */
+  /* 滚动条 / 选区 */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--color-rule-2); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); background-clip: content-box; }
+  ::selection { background: color-mix(in oklab, var(--color-accent) 26%, transparent); color: var(--color-ink); }
+
+  pre { white-space: pre-wrap; word-break: break-word; }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     组件层
+     ══════════════════════════════════════════════════════════════════════════ */
+  @layer components {
+
+    /* ── 表面 ── */
+    .panel {
+      background: var(--color-paper-2);
+      border: 1px solid var(--color-rule);
+      border-radius: var(--r);
+    }
+    .panel-flat {
+      background: transparent;
+      border: 1px solid var(--color-rule);
+      border-radius: var(--r);
+    }
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 44px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--color-rule);
+    }
+    .panel-body { padding: 16px; }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.005em;
+      color: var(--color-ink);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    /* 嵌套子面板：更深的底，用于「模型选择」「素材区」等分组 */
+    .subpanel {
+      background: var(--color-paper);
+      border: 1px solid var(--color-rule);
+      border-radius: var(--r-sm);
+      padding: 12px;
+    }
+
+    /* ── 标题层级 ── */
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+    }
+    /* 区块标题：等宽序号 + 小字标题 + 向右延伸的发丝线 */
+    .sec-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+    }
+    .sec-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--color-rule);
+    }
+    .sec-num {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--color-accent);
+      letter-spacing: 0.04em;
+    }
+    .label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 11.5px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      color: var(--color-muted);
+    }
+    .hint { font-size: 11px; line-height: 1.65; color: var(--color-muted); }
+    .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+    /* ── 表单 ── */
+    .field {
+      width: 100%;
+      min-height: 36px;
+      padding: 7px 10px;
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--color-ink);
+      background: var(--color-paper);
+      border: 1px solid var(--color-rule-2);
+      border-radius: var(--r-sm);
+      transition: border-color var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out);
+    }
+    .field::placeholder { color: color-mix(in oklab, var(--color-muted) 78%, transparent); }
+    .field:hover:not(:disabled) { border-color: color-mix(in oklab, var(--color-rule-2) 60%, var(--color-ink-2)); }
+    .field:focus {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 14%, transparent);
+    }
+    .field:disabled { opacity: 0.45; cursor: not-allowed; }
+    textarea.field { resize: vertical; min-height: 72px; }
+    select.field {
+      cursor: pointer;
+      appearance: none;
+      padding-inline-end: 28px;
+      background-image: linear-gradient(45deg, transparent 50%, var(--color-muted) 50%), linear-gradient(135deg, var(--color-muted) 50%, transparent 50%);
+      background-position: calc(100% - 15px) 15px, calc(100% - 10px) 15px;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+    }
+    [dir='rtl'] select.field { background-position: 15px 15px, 10px 15px; }
+
+    /* 复选框 / 单选：统一为琥珀色，去掉浏览器默认的蓝 */
+    .check {
+      width: 14px; height: 14px;
+      accent-color: var(--color-accent);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* ── 按钮 ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 34px;
+      padding: 0 14px;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      border: 1px solid transparent;
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: background-color var(--dur-short) var(--ease-out), border-color var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out);
+    }
+    .btn:disabled { opacity: 0.42; cursor: not-allowed; }
+    .btn-primary {
+      background: var(--color-accent);
+      color: var(--color-accent-ink);
+      font-weight: 600;
+    }
+    .btn-primary:hover:not(:disabled) { background: color-mix(in oklab, var(--color-accent) 86%, white 14%); }
+    .btn-secondary {
+      background: var(--color-paper-3);
+      border-color: var(--color-rule-2);
+      color: var(--color-ink-2);
+    }
+    .btn-secondary:hover:not(:disabled) { color: var(--color-ink); border-color: var(--color-muted); }
+    .btn-ghost {
+      background: transparent;
+      border-color: var(--color-rule-2);
+      color: var(--color-ink-2);
+    }
+    .btn-ghost:hover:not(:disabled) { background: var(--color-paper-3); color: var(--color-ink); }
+    .btn-quiet {
+      background: transparent;
+      border-color: transparent;
+      color: var(--color-muted);
+      padding: 0 8px;
+    }
+    .btn-quiet:hover:not(:disabled) { background: var(--color-paper-3); color: var(--color-ink); }
+    .btn-danger {
+      background: transparent;
+      border-color: color-mix(in oklab, var(--color-danger) 38%, transparent);
+      color: var(--color-danger);
+    }
+    .btn-danger:hover:not(:disabled) { background: color-mix(in oklab, var(--color-danger) 12%, transparent); }
+    .btn-sm { height: 27px; padding: 0 10px; font-size: 11.5px; }
+    .btn-xs { height: 23px; padding: 0 8px; font-size: 11px; border-radius: var(--r-xs); }
+    .btn-block { width: 100%; height: 42px; font-size: 13.5px; letter-spacing: 0.02em; }
+
+    /* ── 徽标 / 胶囊 ── */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 21px;
+      padding: 0 7px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--color-ink-2);
+      background: var(--color-paper-3);
+      border: 1px solid var(--color-rule);
+      border-radius: var(--r-xs);
+      white-space: nowrap;
+    }
+    .chip-accent {
+      color: var(--color-accent);
+      background: color-mix(in oklab, var(--color-accent) 10%, transparent);
+      border-color: color-mix(in oklab, var(--color-accent) 34%, transparent);
+    }
+    .chip-danger {
+      color: var(--color-danger);
+      background: color-mix(in oklab, var(--color-danger) 10%, transparent);
+      border-color: color-mix(in oklab, var(--color-danger) 32%, transparent);
+    }
+    .chip-success {
+      color: var(--color-success);
+      background: color-mix(in oklab, var(--color-success) 10%, transparent);
+      border-color: color-mix(in oklab, var(--color-success) 30%, transparent);
+    }
+    .chip-warning {
+      color: var(--color-warning);
+      background: color-mix(in oklab, var(--color-warning) 10%, transparent);
+      border-color: color-mix(in oklab, var(--color-warning) 32%, transparent);
+    }
+
+    /* ── 分段控件（执行模式 / 生成类型） ── */
+    .seg {
+      display: inline-flex;
+      /* 多语言长标签（德语 Externe Assets 等）在窄屏不得压缩按钮本身：
+         整段控件自身可横向滚动，按钮保持单行 */
+      flex: 0 0 auto;
+      max-width: 100%;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding: 3px;
+      gap: 2px;
+      background: var(--color-paper);
+      border: 1px solid var(--color-rule);
+      border-radius: var(--r-sm);
+    }
+    .seg::-webkit-scrollbar { display: none; }
+    .seg-item {
+      flex: 0 0 auto;
+      white-space: nowrap;
+      height: 30px;
+      padding: 0 14px;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--color-muted);
+      background: transparent;
+      border: 0;
+      border-radius: var(--r-xs);
+      cursor: pointer;
+      transition: color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+    }
+    .seg-item:hover:not(:disabled) { color: var(--color-ink-2); }
+    .seg-item.is-active {
+      color: var(--color-accent-ink);
+      background: var(--color-accent);
+      font-weight: 600;
+    }
+    .seg-item:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── 侧边导航 ── */
+    .rail {
+      position: fixed;
+      inset-block: 0;
+      inset-inline-start: 0;
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      width: var(--rail-w);
+      padding: 22px 16px 18px;
+      background: color-mix(in oklab, var(--color-paper) 72%, var(--color-paper-2));
+      border-inline-end: 1px solid var(--color-rule);
+    }
+    .nav-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-muted);
+      text-align: start;
+      background: transparent;
+      border: 0;
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+    }
+    .nav-item:hover { color: var(--color-ink); background: var(--color-paper-2); }
+    .nav-item .nav-num {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      letter-spacing: 0.06em;
+      color: color-mix(in oklab, var(--color-muted) 70%, transparent);
+    }
+    .nav-item .nav-icon { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.85; }
+    .nav-item.is-active {
+      color: var(--color-ink);
+      background: var(--color-paper-2);
+    }
+    .nav-item.is-active::before {
+      content: '';
+      position: absolute;
+      inset-inline-start: 0;
+      top: 7px;
+      bottom: 7px;
+      width: 2px;
+      border-radius: 2px;
+      background: var(--color-accent);
+    }
+    .nav-item.is-active .nav-num { color: var(--color-accent); }
+    .nav-item.is-active .nav-icon { opacity: 1; color: var(--color-accent); }
+
+    /* ── 任务类型卡 ── */
+    .type-card {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 11px 12px;
+      text-align: start;
+      background: var(--color-paper-2);
+      border: 1px solid var(--color-rule);
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+    }
+    .type-card:hover { border-color: var(--color-rule-2); background: var(--color-paper-3); }
+    .type-card.is-active {
+      background: color-mix(in oklab, var(--color-accent) 7%, var(--color-paper-2));
+      border-color: color-mix(in oklab, var(--color-accent) 46%, transparent);
+    }
+    .type-card.is-active::after {
+      content: '';
+      position: absolute;
+      inset-block: 10px;
+      inset-inline-start: 0;
+      width: 2px;
+      border-radius: 2px;
+      background: var(--color-accent);
+    }
+    .type-card .tt-icon { color: var(--color-muted); }
+    .type-card.is-active .tt-icon { color: var(--color-accent); }
+    .type-card .tt-name {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--color-ink-2);
+      line-height: 1.3;
+    }
+    .type-card.is-active .tt-name { color: var(--color-ink); }
+
+    /* ── 时间线 ── */
+    .tl { position: relative; display: flex; flex-direction: column; gap: 1px; }
+    .tl::before {
+      content: '';
+      position: absolute;
+      inset-block: 16px;
+      inset-inline-start: 17px;
+      width: 1px;
+      background: var(--color-rule);
+    }
+    .tl-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      width: 100%;
+      padding: 7px 8px;
+      font-size: 12.5px;
+      color: var(--color-muted);
+      text-align: start;
+      background: transparent;
+      border: 0;
+      border-radius: var(--r-xs);
+      cursor: pointer;
+      transition: color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+    }
+    .tl-item:hover { color: var(--color-ink-2); background: var(--color-paper-2); }
+    .tl-item:disabled { cursor: default; }
+    .tl-dot {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 12px;
+      height: 12px;
+      font-size: 8px;
+      line-height: 1;
+      border: 1px solid var(--color-rule-2);
+      border-radius: 50%;
+      background: var(--color-paper);
+      color: var(--color-muted);
+      flex-shrink: 0;
+    }
+    .tl-item.is-done .tl-dot { border-color: color-mix(in oklab, var(--color-success) 60%, transparent); color: var(--color-success); }
+    .tl-item.is-done { color: var(--color-ink-2); }
+    .tl-item.is-running .tl-dot { border-color: var(--color-accent); color: var(--color-accent); background: color-mix(in oklab, var(--color-accent) 16%, transparent); }
+    .tl-item.is-running { color: var(--color-ink); }
+    .tl-item.is-awaiting .tl-dot { border-color: var(--color-warning); color: var(--color-warning); background: color-mix(in oklab, var(--color-warning) 16%, transparent); }
+    .tl-item.is-awaiting { color: var(--color-warning); }
+
+    /* ── 进度计量 ── */
+    .meter {
+      position: relative;
+      height: 2px;
+      width: 100%;
+      background: var(--color-rule);
+      overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%;
+      background: var(--color-accent);
+      transition: width var(--dur-long) var(--ease-out);
+    }
+    .metric {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+
+    /* ── 抽屉（系统配置） ── */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      background: color-mix(in oklab, black 52%, transparent);
+      animation: fadeIn 0.18s var(--ease-out);
+    }
+    .drawer {
+      position: fixed;
+      inset-block: 0;
+      inset-inline-end: 0;
+      z-index: 71;
+      display: flex;
+      flex-direction: column;
+      width: min(560px, 100vw);
+      background: var(--color-paper);
+      border-inline-start: 1px solid var(--color-rule);
+      box-shadow: -30px 0 70px -40px rgb(0 0 0 / 0.7);
+      animation: fadeIn 0.2s var(--ease-out);
+    }
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--color-rule);
+      flex-shrink: 0;
+    }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 18px 20px 28px; }
+
+    /* ── 弹窗 ── */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: color-mix(in oklab, black 58%, transparent);
+      animation: fadeIn 0.16s var(--ease-out);
+    }
+    .modal {
+      position: relative;
+      width: 100%;
+      background: var(--color-paper-2);
+      border: 1px solid var(--color-rule-2);
+      border-radius: var(--r-lg);
+      box-shadow: 0 40px 90px -40px rgb(0 0 0 / 0.85);
+      animation: fadeIn 0.18s var(--ease-out);
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     兼容层：旧类名映射到新体系（避免遗漏点样式断裂）
+     ══════════════════════════════════════════════════════════════════════════ */
   .glass-card {
     background: var(--color-paper-2);
     border: 1px solid var(--color-rule);
-    transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+    border-radius: var(--r);
   }
-  .glass-card:hover {
-    border-color: color-mix(in oklab, var(--color-accent) 30%, var(--color-rule));
-    background: var(--color-paper-3);
-    transform: translateY(-1px);
+  .glass-input {
+    background: var(--color-paper);
+    border: 1px solid var(--color-rule-2);
+    transition: border-color var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out);
   }
-
-  /* ── Primary Button（琥珀金填充，无渐变无 glow）── */
+  .glass-input:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 14%, transparent); }
   .glow-btn {
-    position: relative;
-    overflow: hidden;
     background: var(--color-accent);
     color: var(--color-accent-ink);
     font-weight: 600;
-    transition: transform var(--dur-micro) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+    transition: background-color var(--dur-short) var(--ease-out);
   }
-  .glow-btn:hover:not(:disabled) {
-    background: color-mix(in oklab, var(--color-accent) 90%, white 10%);
-    transform: translateY(-1px);
-  }
-  .glow-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* ── Input ── */
-  .glass-input {
-    background: var(--color-paper);
-    border: 1px solid var(--color-rule);
-    transition: border-color var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
-  }
-  .glass-input:focus {
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 30%, transparent);
-    background: var(--color-paper);
-  }
-
-  /* ── Tabs（选中 = accent 面，非渐变）── */
+  .glow-btn:hover:not(:disabled) { background: color-mix(in oklab, var(--color-accent) 86%, white 14%); }
+  .glow-btn:disabled { opacity: 0.45; cursor: not-allowed; }
   .tab-active {
-    background: color-mix(in oklab, var(--color-accent) 15%, var(--color-paper-3));
-    border: 1px solid color-mix(in oklab, var(--color-accent) 50%, transparent);
-    color: var(--color-accent);
+    background: color-mix(in oklab, var(--color-accent) 8%, var(--color-paper-2));
+    border: 1px solid color-mix(in oklab, var(--color-accent) 40%, transparent);
+    color: var(--color-ink);
   }
   .tab-inactive {
     background: var(--color-paper-2);
     color: var(--color-muted);
     border: 1px solid var(--color-rule);
   }
-  .tab-inactive:hover {
-    background: var(--color-paper-3);
-    border-color: var(--color-rule);
-    color: var(--color-ink-2);
-  }
-
+  .tab-inactive:hover { background: var(--color-paper-3); border-color: var(--color-rule-2); color: var(--color-ink-2); }
   .tab-badge {
     display: inline-block;
     margin-left: 6px;
-    padding: 0 6px;
-    border-radius: 999px;
-    font-size: 10px;
+    padding: 0 5px;
+    border-radius: var(--r-xs);
+    font-family: var(--font-mono);
+    font-size: 9px;
     line-height: 1.7;
-    vertical-align: middle;
-    background: var(--color-paper);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: color-mix(in oklab, var(--color-accent) 12%, transparent);
     color: var(--color-accent);
-    border: 1px solid color-mix(in oklab, var(--color-accent) 45%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-accent) 32%, transparent);
   }
-
-  /* ── Progress Bar（accent 纯色）── */
-  .progress-glow {
-    background: var(--color-accent);
-  }
-
-  /* ── Step Connector ── */
+  .progress-glow { background: var(--color-accent); }
   .step-line { transition: all var(--dur-long) var(--ease-out); }
-
-  /* ── Collapse ── */
   .collapse-header { cursor: pointer; user-select: none; }
-  .collapse-body { overflow: hidden; transition: max-height 0.3s var(--ease-in-out, cubic-bezier(0.65,0,0.35,1)); }
+  .collapse-body { overflow: hidden; transition: max-height 0.3s var(--ease-out); }
 
-  /* ── Misc ── */
-  pre { white-space: pre-wrap; word-break: break-all; }
-
-  /* ── Scrollbar ── */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--color-rule); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
-
-  /* ── Selection ── */
-  ::selection { background: color-mix(in oklab, var(--color-accent) 28%, transparent); color: var(--color-ink); }
-
-  /* ── Voice Selector Chip ── */
-  .voice-selector {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 0.625rem 0.75rem;
-    border-radius: 0.5rem;
-    background: var(--color-paper);
-    border: 1px solid var(--color-rule);
-    cursor: pointer;
-    transition: all var(--dur-short) var(--ease-out);
-    text-align: left;
-  }
-  .voice-selector:hover { border-color: color-mix(in oklab, var(--color-accent) 50%, var(--color-rule)); background: var(--color-paper-3); }
-  .voice-selector:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 30%, transparent); }
-  .vs-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-  .vs-name { font-size: 0.875rem; color: var(--color-ink-2); font-weight: 500; line-height: 1.2; }
-  .vs-desc { font-size: 0.72rem; color: var(--color-muted); line-height: 1.2; margin-top: 2px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .vs-arrow { color: var(--color-muted); font-size: 0.7rem; flex-shrink: 0; }
-
-  /* ── Voice Picker Modal ── */
-  .vp-overlay {
-    position: fixed; inset: 0; z-index: 1000;
-    background: rgba(0,0,0,0.7);
-    display: flex; align-items: center; justify-content: center;
-    padding: 1rem;
-  }
-  .vp-modal {
-    width: 100%; max-width: 720px; max-height: 88vh;
-    display: flex; flex-direction: column;
-    background: var(--color-paper-2);
-    border: 1px solid var(--color-rule);
-    border-radius: 1rem;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-    overflow: hidden;
-  }
-  .vp-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 1rem 1.25rem; border-bottom: 1px solid var(--color-rule);
-  }
-  .vp-header h3 { font-size: 1rem; font-weight: 600; color: var(--color-ink); }
-  .vp-close { background: none; border: none; color: var(--color-muted); font-size: 1.25rem; cursor: pointer; line-height: 1; }
-  .vp-close:hover { color: var(--color-ink); }
-  .vp-search { padding: 0.75rem 1.25rem 0.25rem; }
-  .vp-search input {
-    width: 100%; padding: 0.55rem 0.85rem; border-radius: 0.5rem;
-    background: var(--color-paper); border: 1px solid var(--color-rule);
-    color: var(--color-ink); font-size: 0.85rem;
-  }
-  .vp-search input:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 30%, transparent); }
-  .vp-tabs {
-    display: flex; gap: 0.4rem; padding: 0.6rem 1.25rem; overflow-x: auto;
-    border-bottom: 1px solid var(--color-rule); flex-shrink: 0;
-  }
-  .vp-tab {
-    flex-shrink: 0; padding: 0.35rem 0.8rem; border-radius: 999px;
-    font-size: 0.78rem; cursor: pointer; white-space: nowrap;
-    background: var(--color-paper-2); color: var(--color-muted);
-    border: 1px solid var(--color-rule); transition: all var(--dur-short) var(--ease-out);
-  }
-  .vp-tab:hover { background: var(--color-paper-3); color: var(--color-ink-2); }
-  .vp-tab.active { background: color-mix(in oklab, var(--color-accent) 15%, var(--color-paper-3)); color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 50%, transparent); }
-  .vp-count { font-size: 0.72rem; color: var(--color-muted); margin-left: 4px; }
-  .vp-grid {
-    flex: 1; overflow-y: auto; padding: 1rem 1.25rem;
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 0.6rem;
-  }
-  .vp-card {
-    position: relative; padding: 0.7rem 0.8rem; border-radius: 0.6rem;
-    background: var(--color-paper); border: 1px solid var(--color-rule);
-    cursor: pointer; transition: all var(--dur-short) var(--ease-out);
-  }
-  .vp-card:hover { border-color: color-mix(in oklab, var(--color-accent) 40%, var(--color-rule)); background: var(--color-paper-3); }
-  .vp-card.selected { border-color: var(--color-accent); box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 40%, transparent); }
-  .vp-card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-  .vp-card-name { font-size: 0.85rem; font-weight: 600; color: var(--color-ink); }
-  .vp-card-region { font-size: 0.7rem; color: var(--color-muted); }
-  .vp-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.4rem; }
-  .vp-tag {
-    font-size: 0.65rem; padding: 0.1rem 0.45rem; border-radius: 999px;
-    background: color-mix(in oklab, var(--color-accent) 12%, transparent); color: var(--color-accent); border: 1px solid color-mix(in oklab, var(--color-accent) 20%, transparent);
-  }
-  .vp-tag.gender-female { background: color-mix(in oklab, var(--color-danger) 12%, transparent); color: var(--color-danger); border-color: color-mix(in oklab, var(--color-danger) 20%, transparent); }
-  .vp-tag.gender-male { background: color-mix(in oklab, var(--color-accent) 12%, transparent); color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 20%, transparent); }
-  .vp-preview-btn {
-    margin-top: 0.5rem; width: 100%; padding: 0.35rem; border-radius: 0.4rem;
-    background: var(--color-paper-2); border: 1px solid var(--color-rule);
-    color: var(--color-ink-2); font-size: 0.72rem; cursor: pointer; display: flex;
-    align-items: center; justify-content: center; gap: 0.35rem; transition: all var(--dur-short) var(--ease-out);
-  }
-  .vp-preview-btn:hover { background: color-mix(in oklab, var(--color-accent) 15%, transparent); color: var(--color-accent); }
-  .vp-preview-btn.playing { background: color-mix(in oklab, var(--color-accent) 25%, transparent); color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 50%, transparent); }
-  .vp-preview-btn.loading { opacity: 0.7; cursor: wait; }
-  .vp-selection {
-    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
-    padding: 0.85rem 1.25rem; border-top: 1px solid var(--color-rule);
-    background: var(--color-paper); flex-shrink: 0;
-  }
-  .vp-current { font-size: 0.8rem; color: var(--color-muted); min-width: 0; }
-  .vp-current b { color: var(--color-ink-2); font-weight: 500; }
-  .vp-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
-  .vp-btn {
-    padding: 0.5rem 1rem; border-radius: 0.5rem; font-size: 0.8rem; cursor: pointer; border: none; transition: all var(--dur-short) var(--ease-out);
-  }
-  .vp-btn-cancel { background: var(--color-paper-3); color: var(--color-ink-2); border: 1px solid var(--color-rule); }
-  .vp-btn-cancel:hover { background: var(--color-paper-3); color: var(--color-ink); }
-  .vp-btn-confirm { background: var(--color-accent); color: var(--color-accent-ink); font-weight: 600; }
-  .vp-btn-confirm:hover { filter: brightness(1.05); transform: translateY(-1px); }
-  .vp-warning {
-    margin: 0 1.25rem 0.5rem; padding: 0.6rem 0.8rem; border-radius: 0.5rem;
-    background: color-mix(in oklab, var(--color-warning) 12%, transparent); border: 1px solid color-mix(in oklab, var(--color-warning) 30%, transparent);
-    color: var(--color-warning); font-size: 0.76rem; line-height: 1.4;
-  }
-  .vp-empty { grid-column: 1 / -1; text-align: center; color: var(--color-muted); font-size: 0.85rem; padding: 2rem 0; }
-
-  /* ── Mobile: fullscreen modal ── */
-  @media (max-width: 640px) {
-    .vp-modal { max-width: 100%; max-height: 100vh; height: 100vh; border-radius: 0; }
-    .vp-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-
-  /* ── Sidebars (lg+) ── */
+  /* ── Legacy：侧栏卡片（进度页/创建页旧结构保留可用） ── */
   .sidebar-card {
     background: var(--color-paper-2);
     border: 1px solid var(--color-rule);
-    border-radius: 0.75rem;
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
-    font-size: 0.75rem;
+    border-radius: var(--r-sm);
+    padding: 12px;
+    font-size: 11.5px;
   }
-  .sidebar-card:hover { border-color: color-mix(in oklab, var(--color-accent) 20%, var(--color-rule)); }
   .sidebar-card a {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.3rem 0.25rem;
+    gap: 6px;
+    padding: 4px 2px;
     color: var(--color-muted);
     text-decoration: none;
+    border-radius: var(--r-xs);
     transition: color var(--dur-short) var(--ease-out);
-    border-radius: 0.25rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .sidebar-card a:hover { color: var(--color-ink-2); background: var(--color-paper-3); }
-  .sidebar-card a.wrap { white-space: normal; overflow: visible; text-overflow: clip; align-items: flex-start; line-height: 1.35; }
+  .sidebar-card a:hover { color: var(--color-ink-2); }
+  .sidebar-card a.wrap { white-space: normal; overflow: visible; text-overflow: clip; align-items: flex-start; line-height: 1.4; }
   .sidebar-card .stitle {
-    font-size: 0.7rem;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
     font-weight: 600;
-    color: var(--color-muted);
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.4rem;
-    padding-bottom: 0.4rem;
+    color: var(--color-muted);
     border-bottom: 1px solid var(--color-rule);
-    /* 长标题（英文/俄文等）允许换行，避免溢出卡片；emoji 与文字间可断行 */
     overflow-wrap: anywhere;
   }
 
-  /* ── Design tokens 工具类（Tailwind CDN 不识别自定义 token，手动补齐）── */
+  /* ══════════════════════════════════════════════════════════════════════════
+     Design tokens 工具类（Tailwind JIT 不识别自定义 token，手动补齐）
+     ══════════════════════════════════════════════════════════════════════════ */
   .text-ink { color: var(--color-ink); }
   .text-ink-2 { color: var(--color-ink-2); }
   .text-muted { color: var(--color-muted); }
@@ -337,21 +699,31 @@
   .hover\:bg-paper-2:hover { background-color: var(--color-paper-2); }
   .hover\:bg-paper-3:hover { background-color: var(--color-paper-3); }
   .border-rule { border-color: var(--color-rule); }
+  .border-rule-2 { border-color: var(--color-rule-2); }
   .border-rule\/30 { border-color: color-mix(in oklab, var(--color-rule) 30%, transparent); }
   .border-rule\/40 { border-color: color-mix(in oklab, var(--color-rule) 40%, transparent); }
-  /* 透明度变体工具（Tailwind JIT 不识别自定义 token 的 /n 修饰符，手动补齐） */
+  .border-rule\/50 { border-color: color-mix(in oklab, var(--color-rule) 50%, transparent); }
+  .border-rule\/60 { border-color: color-mix(in oklab, var(--color-rule) 60%, transparent); }
+  /* 透明度变体工具 */
   .bg-paper\/30 { background-color: color-mix(in oklab, var(--color-paper) 30%, transparent); }
   .bg-paper\/50 { background-color: color-mix(in oklab, var(--color-paper) 50%, transparent); }
+  .bg-paper\/60 { background-color: color-mix(in oklab, var(--color-paper) 60%, transparent); }
   .bg-paper\/70 { background-color: color-mix(in oklab, var(--color-paper) 70%, transparent); }
+  .bg-paper-2\/20 { background-color: color-mix(in oklab, var(--color-paper-2) 20%, transparent); }
   .bg-paper-2\/30 { background-color: color-mix(in oklab, var(--color-paper-2) 30%, transparent); }
   .bg-paper-2\/40 { background-color: color-mix(in oklab, var(--color-paper-2) 40%, transparent); }
   .bg-paper-2\/50 { background-color: color-mix(in oklab, var(--color-paper-2) 50%, transparent); }
+  .bg-paper-2\/60 { background-color: color-mix(in oklab, var(--color-paper-2) 60%, transparent); }
+  .bg-paper-3\/50 { background-color: color-mix(in oklab, var(--color-paper-3) 50%, transparent); }
+  .bg-paper-3\/60 { background-color: color-mix(in oklab, var(--color-paper-3) 60%, transparent); }
+  .bg-paper-3\/70 { background-color: color-mix(in oklab, var(--color-paper-3) 70%, transparent); }
   .bg-accent\/5 { background-color: color-mix(in oklab, var(--color-accent) 5%, transparent); }
   .bg-accent\/10 { background-color: color-mix(in oklab, var(--color-accent) 10%, transparent); }
   .bg-accent\/15 { background-color: color-mix(in oklab, var(--color-accent) 15%, transparent); }
   .hover\:bg-paper-2\/40:hover { background-color: color-mix(in oklab, var(--color-paper-2) 40%, transparent); }
-  .border-accent\/40 { border-color: color-mix(in oklab, var(--color-accent) 40%, transparent); }
   .border-accent\/20 { border-color: color-mix(in oklab, var(--color-accent) 20%, transparent); }
+  .border-accent\/40 { border-color: color-mix(in oklab, var(--color-accent) 40%, transparent); }
+  .border-accent\/50 { border-color: color-mix(in oklab, var(--color-accent) 50%, transparent); }
   /* 状态色透明度变体（Tailwind 默认色 + /n，JIT 未生成的补齐） */
   .bg-amber-500\/10 { background-color: color-mix(in srgb, #f59e0b 10%, transparent); }
   .bg-amber-500\/20 { background-color: color-mix(in srgb, #f59e0b 20%, transparent); }
@@ -361,8 +733,12 @@
   .border-yellow-500\/30 { border-color: color-mix(in srgb, #eab308 30%, transparent); }
   .bg-emerald-500\/10 { background-color: color-mix(in srgb, #10b981 10%, transparent); }
   .border-emerald-500\/30 { border-color: color-mix(in srgb, #10b981 30%, transparent); }
+  .bg-red-950 { background-color: #450a0a; }
+  .border-red-800 { border-color: #991b1b; }
   .bg-red-950\/60 { background-color: color-mix(in srgb, #450a0a 60%, transparent); }
   .border-red-800\/60 { border-color: color-mix(in srgb, #991b1b 60%, transparent); }
+  .bg-red-900\/50 { background-color: color-mix(in srgb, #7f1d1d 50%, transparent); }
+  .bg-red-900\/60 { background-color: color-mix(in srgb, #7f1d1d 60%, transparent); }
   .bg-red-700\/50 { background-color: color-mix(in srgb, #b91c1c 50%, transparent); }
   .bg-red-700\/80 { background-color: color-mix(in srgb, #b91c1c 80%, transparent); }
   .text-danger { color: var(--color-danger); }
@@ -375,44 +751,67 @@
   [data-theme='light'] .text-green-300,
   [data-theme='light'] .text-emerald-400 { color: var(--color-success); }
   [data-theme='light'] .text-red-400,
-  [data-theme='light'] .text-red-500 { color: var(--color-danger); }
+  [data-theme='light'] .text-red-500,
+  [data-theme='light'] .text-red-300 { color: var(--color-danger); }
   [data-theme='light'] .text-yellow-400,
-  [data-theme='light'] .text-amber-400 { color: var(--color-warning); }
+  [data-theme='light'] .text-amber-400,
+  [data-theme='light'] .text-amber-300 { color: var(--color-warning); }
+  [data-theme='light'] .bg-red-950,
+  [data-theme='light'] .bg-red-950\/60 { background-color: color-mix(in oklab, var(--color-danger) 7%, var(--color-paper-2)); }
+  [data-theme='light'] .border-red-800,
+  [data-theme='light'] .border-red-800\/60,
+  [data-theme='light'] .border-red-800\/50 { border-color: color-mix(in oklab, var(--color-danger) 26%, transparent); }
 
-  /* ── 语言切换下拉面板（参考官网 nav lang switcher：分栏 + 分组 + 勾选）── */
+  /* 文件选择器：把原生 file input 收进按钮形态 */
+  input[type='file'].file-field {
+    width: 100%;
+    font-size: 11.5px;
+    color: var(--color-muted);
+  }
+  input[type='file'].file-field::file-selector-button {
+    margin-inline-end: 10px;
+    padding: 5px 10px;
+    font-family: inherit;
+    font-size: 11.5px;
+    color: var(--color-ink-2);
+    background: var(--color-paper-3);
+    border: 1px solid var(--color-rule-2);
+    border-radius: var(--r-xs);
+    cursor: pointer;
+    transition: color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+  }
+  input[type='file'].file-field::file-selector-button:hover {
+    color: var(--color-ink);
+    background: color-mix(in oklab, var(--color-accent) 14%, var(--color-paper-3));
+  }
+
+  /* ── 语言切换下拉面板（分栏 + 分组 + 勾选）── */
   .lang-menu {
     position: absolute;
     inset-inline-end: 0;
     top: 100%;
     z-index: 50;
-    margin-top: 0.5rem;
-    /* 窄屏收缩到视口内，桌面维持官网的 26rem 三栏宽度 */
+    margin-top: 6px;
     width: min(26rem, calc(100vw - 2rem));
     max-height: 70vh;
     overflow-y: auto;
-    padding: 0.25rem 0;
+    padding: 4px 0;
     background: var(--color-paper-2);
-    -webkit-backdrop-filter: blur(20px);
-    backdrop-filter: blur(20px);
-    border: 1px solid var(--color-rule);
-    border-radius: 0.75rem;
-    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.14), 0 8px 10px -6px rgb(0 0 0 / 0.12);
+    border: 1px solid var(--color-rule-2);
+    border-radius: var(--r);
+    box-shadow: 0 24px 50px -24px rgb(0 0 0 / 0.7);
     columns: 2;
-    animation: fadeIn 0.18s var(--ease-out);
+    animation: fadeIn 0.16s var(--ease-out);
   }
-  @media (min-width: 640px) {
-    .lang-menu { columns: 3; }
-  }
-  .lang-group {
-    break-inside: avoid;
-    margin-bottom: 0.25rem;
-  }
+  @media (min-width: 640px) { .lang-menu { columns: 3; } }
+  .lang-group { break-inside: avoid; margin-bottom: 2px; }
   .lang-group-title {
-    padding: 0.5rem 0.75rem 0.125rem;
-    font-size: 0.6875rem;
+    padding: 7px 10px 3px;
+    font-family: var(--font-mono);
+    font-size: 9px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.14em;
     color: var(--color-muted);
   }
   .lang-item {
@@ -420,9 +819,9 @@
     width: 100%;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.875rem;
+    gap: 8px;
+    padding: 5px 10px;
+    font-size: 12.5px;
     text-align: start;
     color: var(--color-ink-2);
     background: none;
@@ -434,3 +833,129 @@
   .lang-item.is-active { color: var(--color-ink); }
   .lang-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lang-check { flex-shrink: 0; color: var(--color-accent); }
+
+  /* ── Voice Selector Chip ── */
+  .voice-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 10px;
+    border-radius: var(--r-sm);
+    background: var(--color-paper);
+    border: 1px solid var(--color-rule-2);
+    cursor: pointer;
+    text-align: start;
+    transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+  }
+  .voice-selector:hover { border-color: color-mix(in oklab, var(--color-accent) 50%, var(--color-rule-2)); background: var(--color-paper-3); }
+  .voice-selector:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 14%, transparent); }
+  .vs-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  .vs-name { font-size: 13px; color: var(--color-ink); font-weight: 500; line-height: 1.25; }
+  .vs-desc { font-size: 11px; color: var(--color-muted); line-height: 1.25; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vs-arrow { color: var(--color-muted); font-size: 10px; flex-shrink: 0; }
+
+  /* ── Voice Picker Modal ── */
+  .vp-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: color-mix(in oklab, black 62%, transparent);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    animation: fadeIn 0.16s var(--ease-out);
+  }
+  .vp-modal {
+    width: 100%; max-width: 760px; max-height: 88vh;
+    display: flex; flex-direction: column;
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-rule-2);
+    border-radius: var(--r-lg);
+    box-shadow: 0 40px 90px -40px rgb(0 0 0 / 0.85);
+    overflow: hidden;
+  }
+  .vp-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--color-rule);
+  }
+  .vp-header h3 { font-size: 13px; font-weight: 600; color: var(--color-ink); letter-spacing: 0.01em; }
+  .vp-close { background: none; border: none; color: var(--color-muted); font-size: 15px; cursor: pointer; line-height: 1; padding: 4px; border-radius: var(--r-xs); }
+  .vp-close:hover { color: var(--color-ink); background: var(--color-paper-3); }
+  .vp-search { padding: 12px 18px 8px; }
+  .vp-search input {
+    width: 100%; padding: 7px 10px; border-radius: var(--r-sm);
+    background: var(--color-paper); border: 1px solid var(--color-rule-2);
+    color: var(--color-ink); font-size: 13px;
+  }
+  .vp-search input:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 14%, transparent); }
+  .vp-tabs {
+    display: flex; gap: 4px; padding: 8px 18px; overflow-x: auto;
+    border-bottom: 1px solid var(--color-rule); flex-shrink: 0;
+  }
+  .vp-tabs::-webkit-scrollbar { height: 0; }
+  .vp-tab {
+    flex-shrink: 0; padding: 4px 10px; border-radius: var(--r-xs);
+    font-size: 11.5px; cursor: pointer; white-space: nowrap;
+    background: transparent; color: var(--color-muted);
+    border: 1px solid transparent; transition: all var(--dur-short) var(--ease-out);
+  }
+  .vp-tab:hover { color: var(--color-ink-2); background: var(--color-paper-3); }
+  .vp-tab.active { background: color-mix(in oklab, var(--color-accent) 10%, transparent); color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 32%, transparent); }
+  .vp-count { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-muted); margin-left: 4px; }
+  .vp-grid {
+    flex: 1; overflow-y: auto; padding: 14px 18px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px;
+  }
+  .vp-card {
+    position: relative; padding: 10px 11px; border-radius: var(--r-sm);
+    background: var(--color-paper); border: 1px solid var(--color-rule);
+    cursor: pointer; transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+  }
+  .vp-card:hover { border-color: var(--color-rule-2); background: var(--color-paper-3); }
+  .vp-card.selected { border-color: color-mix(in oklab, var(--color-accent) 60%, transparent); box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 26%, transparent); }
+  .vp-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .vp-card-name { font-size: 12.5px; font-weight: 600; color: var(--color-ink); }
+  .vp-card-region { font-size: 10.5px; color: var(--color-muted); }
+  .vp-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .vp-tag {
+    font-size: 10px; padding: 1px 6px; border-radius: var(--r-xs);
+    background: var(--color-paper-3); color: var(--color-muted); border: 1px solid var(--color-rule);
+  }
+  .vp-tag.gender-female { color: var(--color-ink-2); }
+  .vp-tag.gender-male { color: var(--color-ink-2); }
+  .vp-preview-btn {
+    margin-top: 8px; width: 100%; padding: 5px; border-radius: var(--r-xs);
+    background: transparent; border: 1px solid var(--color-rule);
+    color: var(--color-muted); font-size: 11px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; gap: 5px;
+    transition: color var(--dur-short) var(--ease-out), border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+  }
+  .vp-preview-btn:hover { color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 40%, transparent); background: color-mix(in oklab, var(--color-accent) 8%, transparent); }
+  .vp-preview-btn.playing { color: var(--color-accent); border-color: color-mix(in oklab, var(--color-accent) 50%, transparent); background: color-mix(in oklab, var(--color-accent) 14%, transparent); }
+  .vp-preview-btn.loading { opacity: 0.6; cursor: wait; }
+  .vp-selection {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 18px; border-top: 1px solid var(--color-rule);
+    background: var(--color-paper); flex-shrink: 0;
+  }
+  .vp-current { font-size: 11.5px; color: var(--color-muted); min-width: 0; }
+  .vp-current b { color: var(--color-ink-2); font-weight: 500; }
+  .vp-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .vp-btn {
+    height: 30px; padding: 0 14px; border-radius: var(--r-xs); font-size: 12px; cursor: pointer; border: 1px solid transparent;
+    transition: background-color var(--dur-short) var(--ease-out), border-color var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out);
+  }
+  .vp-btn-cancel { background: transparent; color: var(--color-ink-2); border-color: var(--color-rule-2); }
+  .vp-btn-cancel:hover { background: var(--color-paper-3); color: var(--color-ink); }
+  .vp-btn-confirm { background: var(--color-accent); color: var(--color-accent-ink); font-weight: 600; }
+  .vp-btn-confirm:hover { background: color-mix(in oklab, var(--color-accent) 86%, white 14%); }
+  .vp-warning {
+    margin: 0 18px 8px; padding: 8px 10px; border-radius: var(--r-xs);
+    background: color-mix(in oklab, var(--color-warning) 10%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-warning) 28%, transparent);
+    color: var(--color-warning); font-size: 11px; line-height: 1.5;
+  }
+  .vp-empty { grid-column: 1 / -1; text-align: center; color: var(--color-muted); font-size: 12.5px; padding: 32px 0; }
+
+  @media (max-width: 640px) {
+    .vp-modal { max-width: 100%; max-height: 100vh; height: 100vh; border-radius: 0; }
+    .vp-grid { grid-template-columns: repeat(2, 1fr); }
+  }

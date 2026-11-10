@@ -157,102 +157,111 @@ async function submitPoetry() {
 
 <template>
   <div>
-    <div class="glass-card rounded-2xl p-6 mb-4">
-      <h2 class="text-lg font-semibold text-accent mb-4">{{ t('poetrySettings') }}</h2>
+    <section class="panel mb-4">
+      <header class="panel-head">
+        <h2 class="panel-title">{{ t('poetrySettings') }}</h2>
+      </header>
 
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('taskName') }}</label>
-        <input v-model="form.name" :placeholder="t('taskNamePlaceholder')" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted" />
-      </div>
-
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('poemLabel') }} <span class="text-red-400">*</span></label>
-        <textarea v-model="form.poem" rows="5" :placeholder="t('poemPlaceholder')" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted"></textarea>
-        <p class="text-xs text-muted mt-1.5">{{ t('poemHint') }}</p>
-      </div>
-
-      <!-- Scene config -->
-      <div class="mb-4 p-4 rounded-xl bg-paper-2/30 border border-rule/50">
-        <h3 class="text-sm font-medium text-accent mb-3">{{ t('sceneConfig') }}</h3>
-        <p class="text-xs text-muted mb-3">{{ t('sourceManualHint') }}</p>
-        <div class="mb-3">
-          <label class="block text-xs text-muted mb-1">{{ t('sceneCount') }}</label>
-          <input v-model.number="form.sceneCount" type="number" min="1" max="30" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-ink" />
+      <div class="panel-body space-y-4">
+        <div>
+          <label class="label">{{ t('taskName') }}</label>
+          <input v-model="form.name" :placeholder="t('taskNamePlaceholder')" class="field" />
         </div>
-        <div class="mb-3">
-          <label class="block text-xs text-muted mb-1.5">{{ t('durationMode') }}</label>
-          <div class="flex gap-2 mb-2">
-            <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
-              <input v-model="form.uniform" type="radio" :value="true" class="text-accent" />
-              <span>{{ t('uniformDuration') }}</span>
-            </label>
-            <label class="flex items-center gap-2 text-sm text-muted cursor-pointer">
-              <input v-model="form.uniform" type="radio" :value="false" class="text-accent" />
-              <span>{{ t('independentDuration') }}</span>
-            </label>
-          </div>
-          <div v-if="form.uniform">
-            <input v-model.number="form.uniformDuration" type="number" min="2" max="30" class="w-24 glass-input rounded-lg px-3 py-2 text-sm text-ink" />
-            <span class="text-xs text-muted ml-1">{{ t('seconds') }}</span>
-          </div>
-          <div v-else class="space-y-2">
-            <div v-for="i in form.sceneCount" :key="i" class="flex items-center gap-2 mb-1.5">
-              <span class="text-xs text-muted w-12">{{ t('scene_') }}{{ i }}</span>
-              <input v-model.number="form.independentDurations[i - 1]" type="number" min="2" max="30" class="w-20 glass-input rounded-lg px-3 py-1.5 text-sm text-ink" />
-              <span class="text-xs text-muted">{{ t('seconds') }}</span>
+
+        <div>
+          <label class="label">{{ t('poemLabel') }} <span class="text-danger">*</span></label>
+          <textarea v-model="form.poem" rows="5" :placeholder="t('poemPlaceholder')" class="field"></textarea>
+          <p class="hint mt-1.5">{{ t('poemHint') }}</p>
+        </div>
+
+        <!-- Scene config -->
+        <div class="subpanel">
+          <h3 class="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{{ t('sceneConfig') }}</h3>
+          <p class="hint mb-3">{{ t('sourceManualHint') }}</p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label class="label">{{ t('sceneCount') }}</label>
+              <input v-model.number="form.sceneCount" type="number" min="1" max="30" class="field" />
+            </div>
+            <div>
+              <span class="label">{{ t('durationMode') }}</span>
+              <div class="mb-2 flex gap-4">
+                <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
+                  <input v-model="form.uniform" type="radio" :value="true" class="check" />
+                  <span>{{ t('uniformDuration') }}</span>
+                </label>
+                <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
+                  <input v-model="form.uniform" type="radio" :value="false" class="check" />
+                  <span>{{ t('independentDuration') }}</span>
+                </label>
+              </div>
+              <div v-if="form.uniform" class="flex items-center gap-2">
+                <input v-model.number="form.uniformDuration" type="number" min="2" max="30" class="field w-24" />
+                <span class="hint">{{ t('seconds') }}</span>
+              </div>
+              <div v-else class="max-h-56 space-y-1.5 overflow-y-auto pe-1">
+                <div v-for="i in form.sceneCount" :key="i" class="flex items-center gap-2">
+                  <span class="mono w-8 text-[11px] text-muted">{{ i }}</span>
+                  <input v-model.number="form.independentDurations[i - 1]" type="number" min="2" max="30" class="field w-20" />
+                  <span class="hint">{{ t('seconds') }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('scenePromptsOptional') }}</label>
-        <textarea v-model="form.scenePrompts" rows="3" :placeholder="t('scenePromptsPlaceholder')" class="w-full glass-input rounded-lg px-4 py-2.5 text-sm resize-y text-ink placeholder-muted"></textarea>
-        <p class="text-xs text-muted mt-1.5">{{ t('scenePromptsHint') }}</p>
-        <p class="text-xs text-muted mt-1.5 font-mono bg-paper-2/40 rounded px-2 py-1">{{ t('scenePromptsExample') }}</p>
-        <div class="mt-3 p-3 rounded-lg bg-paper-2/40 border border-rule/50">
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-ink-2 font-medium">{{ t('scenePromptTool') }}</span>
-            <button type="button" class="text-xs text-accent hover:text-accent" @click="togglePoetryPrompt">{{ t('showPrompt') }}</button>
-          </div>
-          <div v-if="promptPanelVisible" class="mt-2">
-            <p class="text-xs text-muted mb-1.5">{{ t('scenePromptToolHint') }}</p>
-            <pre class="text-[11px] text-ink-2 whitespace-pre-wrap bg-paper/60 rounded p-2 max-h-40 overflow-auto">{{ promptSystem }}</pre>
-            <pre class="text-[11px] text-muted whitespace-pre-wrap bg-paper/60 rounded p-2 mt-1 max-h-40 overflow-auto">{{ promptUser }}</pre>
-            <button type="button" class="mt-2 w-full text-xs text-accent bg-accent/15 hover:bg-accent/25 rounded px-3 py-1.5 transition" @click="copyPoetryPromptWithPoem">
-              {{ copyBtnText || t('copyPromptWithPoem') }}
-            </button>
+        <div>
+          <label class="label">{{ t('scenePromptsOptional') }}</label>
+          <textarea v-model="form.scenePrompts" rows="3" :placeholder="t('scenePromptsPlaceholder')" class="field"></textarea>
+          <p class="hint mt-1.5">{{ t('scenePromptsHint') }}</p>
+          <p class="mono mt-2 rounded border border-rule bg-paper px-2.5 py-1.5 text-[11px] leading-relaxed text-muted">{{ t('scenePromptsExample') }}</p>
+
+          <div class="mt-3 rounded border border-rule bg-paper px-3 py-2">
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-[11.5px] font-medium text-ink-2">{{ t('scenePromptTool') }}</span>
+              <button type="button" class="btn btn-quiet btn-xs text-accent" @click="togglePoetryPrompt">{{ t('showPrompt') }}</button>
+            </div>
+            <div v-if="promptPanelVisible" class="mt-2 space-y-1.5">
+              <p class="hint">{{ t('scenePromptToolHint') }}</p>
+              <pre class="max-h-40 overflow-auto rounded border border-rule bg-paper-2 p-2 text-[11px] text-ink-2">{{ promptSystem }}</pre>
+              <pre class="max-h-40 overflow-auto rounded border border-rule bg-paper-2 p-2 text-[11px] text-muted">{{ promptUser }}</pre>
+              <button type="button" class="btn btn-secondary btn-sm w-full" @click="copyPoetryPromptWithPoem">
+                {{ copyBtnText || t('copyPromptWithPoem') }}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="mb-4">
-        <label class="block text-sm text-muted mb-1.5">{{ t('visualStyle') }}</label>
-        <div class="flex items-center gap-2">
-          <input v-model="form.style" class="flex-1 glass-input rounded-lg px-4 py-2.5 text-sm text-ink placeholder-muted" />
-          <PresetPicker v-model="form.style" />
+        <div>
+          <label class="label">{{ t('visualStyle') }}</label>
+          <div class="flex items-center gap-2">
+            <input v-model="form.style" class="field flex-1" />
+            <PresetPicker v-model="form.style" />
+          </div>
+          <p class="hint mt-1.5 flex items-center gap-1.5">
+            <span class="inline-block h-1 w-1 shrink-0 rounded-full bg-accent" aria-hidden="true"></span>
+            {{ t('stylePresetHint') }}
+          </p>
         </div>
-        <p class="mt-1.5 text-xs text-muted flex items-center gap-1">
-          <span class="inline-block w-1 h-1 rounded-full bg-accent/70 shrink-0" aria-hidden="true"></span>
-          {{ t('stylePresetHint') }}
-        </p>
       </div>
-    </div>
+    </section>
 
     <!-- Advanced Config -->
-    <div class="glass-card rounded-2xl p-6 mb-4">
-      <h2 class="text-lg font-semibold text-accent mb-4">{{ t('advancedSettings') }}</h2>
-      <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-        <div>
-          <label class="block text-sm text-muted mb-1.5">{{ t('resolution') }}</label>
-          <select v-model="form.resolution" class="w-full glass-input rounded-lg px-3 py-2.5 text-sm text-ink">
+    <section class="panel mb-4">
+      <header class="panel-head">
+        <h2 class="panel-title">{{ t('advancedSettings') }}</h2>
+      </header>
+      <div class="panel-body">
+        <div class="max-w-64">
+          <label class="label">{{ t('resolution') }}</label>
+          <select v-model="form.resolution" class="field">
             <option value="768x1152">{{ t('resPortrait') }}</option>
             <option value="1280x720">{{ t('resLandscape') }}</option>
             <option value="1024x1024">{{ t('resSquare') }}</option>
           </select>
         </div>
       </div>
-    </div>
+    </section>
 
     <!-- Audio & Subtitle（诗词仅开关） -->
     <SubtitleConfig ref="subtitleRef" task="p" :with-style="false" :external="appState.execMode === 'external'" />
@@ -260,7 +269,7 @@ async function submitPoetry() {
     <WatermarkToggle />
 
     <button
-      class="w-full py-3.5 bg-accent text-accent-ink hover:bg-accent/90 rounded-xl text-base font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed glow-btn"
+      class="btn btn-primary btn-block"
       :disabled="submitting"
       @click="submitPoetry"
     >
