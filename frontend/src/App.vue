@@ -113,6 +113,14 @@ onMounted(async () => {
     if (cfg.agnes_domain) {
       appState.agnesDomain = cfg.agnes_domain
     }
+    // v8.0：快速重试全局设置（设置页开关 + 频率；缺失时保持默认关闭）
+    if (cfg.fast_retry) {
+      appState.fastRetrySettings = {
+        auto: !!cfg.fast_retry.auto,
+        per_minute: cfg.fast_retry.per_minute || 30,
+        minutes: cfg.fast_retry.minutes || 3,
+      }
+    }
     await loadModels()
     isConfigLoaded.value = true
   } catch (e) {

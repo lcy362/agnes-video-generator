@@ -25,6 +25,7 @@
 > - 下个大版本计划（v8.0）：`docs/plans/v8.0/README.md`（🟡 进行中：UI 重构 + 简单视频模式功能优化；方向二 P0+P1 已实施，见 `docs/plans/v8.0/simple_video_PRD.md` / `system_design.md` / `implementation_plan.md`，`8.0` 为计划代号非已发版本号）
 >   - 简单视频一键预设：`core/config.py::SIMPLE_DEFAULT_PRESET`（免费 `agnes-video-2.5-flash` / 文生视频 / 5s / **16:9** / 720P），经 `GET /api/models` 的 `simple_default` 下发；默认任务类型 `simple` 并由前端 `localStorage('wb_task_type')` 记忆
 >   - 官方接口能力：原生首尾帧 `first_frame`/`last_frame`、参考图 `images`（Flash ≤5 / 2.5 ≤8）、参考音频 `audios`（≤3，公开 URL）；参数表见 `docs/dev/agnes_video_upstream_behavior.md` §9.5
+>   - 快速重试自动模式：`docs/plans/v8.0/fast_retry_auto_PRD.md`（设置页全局 `auto` + 频率 → 到条件自动连打；任务页「以后自动」= 一次性 or 永久；手动关闭只在本次生效 `auto_off`）；配置读写 `core/config.py::get_fast_retry_config/set_fast_retry_config`，端点 `GET /api/config.fast_retry` + `POST /api/config/fast-retry` + `POST /api/tasks/{id}/fast-retry?remember=true`；单测 `tests/test_fast_retry.py`，回归 `docs/dev/regression_test_plan.md` §十七 `FR*`
 > - 优化路线图：`docs/plans/v6.0/optimization_roadmap.md`（合并版，现行唯一路线图，计划 v6 版本线内完成；已取代并废弃 `docs/plans/v5.0/optimization_roadmap.md`）
 > - 待调研存档：`docs/plans/optimization-research/README.md`
 > - 发版规范：`docs/dev/release_process.md`（版本号规则 + 新增内容规范 + 发布流程）

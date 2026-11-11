@@ -140,6 +140,8 @@ class FastRetryConfig(BaseModel):
     状态机（字段全部有默认值，旧 task_state.json 加载自动补齐）::
 
         available=False → 连续 2 次忙信号（503/队列满）后 available=True
+        v8.0 自动分支：设置页开启「自动快速重试」且本任务未手动关过
+                      → enabled=True, auto=True（不需要用户点开关）
         available=True + 用户开启 → enabled=True, started_at=now
         enabled=True 且未超时 → 每次忙信号按 60/per_minute 秒连打
         提交成功 → enabled=False, finished_reason="success"
@@ -149,6 +151,11 @@ class FastRetryConfig(BaseModel):
     与项目既有两轨重试的关系：**只替换忙轨的等待节奏**，不改判定、不改次数
     上限、不改令牌桶配置。快速模式期间不消耗常规忙轨次数（否则 15 次额度
     会在 y 分钟内被烧光），到期后原样回到常规忙轨继续。
+
+    v8.0 新增两个字段用于「自动模式」的可观测性：
+    - ``auto``：本次快速模式是自动触发的（展示「自动」标记，参数来自全局设置）；
+    - ``auto_off``：用户在本任务内手动关过 → 本轮不再自动开启（避免「关了又
+      自己打开」）；续传视为新一轮，由 resume 一并清零。
     """
 
     available: bool = False            # 连续 2 次忙信号后置 True（前端据此显示开关）
@@ -159,6 +166,8 @@ class FastRetryConfig(BaseModel):
     attempts: int = 0                  # 快速模式期间已发出的请求次数（含成功那跳）
     started_at: str = ""               # 开启时刻（本地 ISO，与 created_at 同格式）
     finished_reason: str = ""          # "" | success | expired | disabled
+    auto: bool = False                 # v8.0：本次由全局设置自动开启
+    auto_off: bool = False             # v8.0：本任务内用户手动关过 → 不再自动开启
 
     @property
     def interval_seconds(self) -> float:

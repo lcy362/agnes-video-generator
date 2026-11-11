@@ -418,6 +418,11 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "快速重试已开启：每分钟 {x} 次，持续 {y} 分钟。提交成功或到期后自动恢复常规重试。",
         "en": "Fast retry enabled: {x} attempts/min for {y} min. Normal retry resumes on success or expiry.",
     },
+    # v8.0：设置页开启「自动快速重试」后，到条件由系统直接开启（非用户点击）
+    "progress.video.fast_retry.auto": {
+        "zh": "已按设置自动开启快速重试：每分钟 {x} 次，持续 {y} 分钟。提交成功或到期后自动恢复常规重试。",
+        "en": "Fast retry started automatically per your settings: {x} attempts/min for {y} min. Normal retry resumes on success or expiry.",
+    },
     "progress.video.fast_retry.expired": {
         "zh": "快速重试已到期（{y} 分钟），已恢复常规重试节奏。",
         "en": "Fast retry expired after {y} min; normal retry cadence resumed.",

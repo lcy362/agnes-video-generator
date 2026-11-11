@@ -422,6 +422,54 @@ async function toggleWatermark(enabled: boolean) {
   }
 }
 
+// ── 快速重试全局设置（v8.0）──
+// 开启后任何任务连续 2 次队列忙信号都会**自动**进入快速重试，不必再点进度页开关；
+// 未开启时进度页仍保留手动开关（并可选「以后自动」）。
+const fastRetryAuto = ref(false)
+const fastRetryPerMinute = ref(30)
+const fastRetryMinutes = ref(3)
+const fastRetrySaveStatus = ref<'idle' | 'ok' | 'error'>('idle')
+
+function syncFastRetrySettings() {
+  const s = appState.fastRetrySettings
+  fastRetryAuto.value = !!s.auto
+  fastRetryPerMinute.value = s.per_minute || 30
+  fastRetryMinutes.value = s.minutes || 3
+}
+
+async function saveFastRetrySettings(): Promise<boolean> {
+  const x = Math.max(1, Math.min(120, Math.round(Number(fastRetryPerMinute.value) || 1)))
+  const y = Math.max(1, Math.min(30, Math.round(Number(fastRetryMinutes.value) || 1)))
+  try {
+    const r = await api.saveFastRetryConfig({ auto: fastRetryAuto.value, perMinute: x, minutes: y })
+    if (!r?.ok) {
+      fastRetrySaveStatus.value = 'error'
+      showToast(r?.detail || t('fastRetry.failed'), 4000)
+      return false
+    }
+    const next = r.fast_retry || { auto: fastRetryAuto.value, per_minute: x, minutes: y }
+    appState.fastRetrySettings = {
+      auto: !!next.auto,
+      per_minute: next.per_minute || x,
+      minutes: next.minutes || y,
+    }
+    syncFastRetrySettings()
+    trackEvent('config_action', {
+      action: 'save_fast_retry',
+      auto: fastRetryAuto.value ? 'on' : 'off',
+      per_minute: String(fastRetryPerMinute.value),
+    })
+    fastRetrySaveStatus.value = 'ok'
+    setTimeout(() => (fastRetrySaveStatus.value = 'idle'), 2000)
+    showToast(t('fastRetry.autoSaved'), 2500)
+    return true
+  } catch (e) {
+    fastRetrySaveStatus.value = 'error'
+    showToast(t('fastRetry.failed'), 4000)
+    return false
+  }
+}
+
 // ── 工作区 ──
 const isRegression = computed(() => appState.workingDirSource === 'regression')
 
@@ -526,6 +574,12 @@ export function useConfig() {
     domainErrorMsg,
     saveDomain,
     toggleWatermark,
+    fastRetryAuto,
+    fastRetryPerMinute,
+    fastRetryMinutes,
+    fastRetrySaveStatus,
+    syncFastRetrySettings,
+    saveFastRetrySettings,
     isRegression,
     wsDisplayName,
     renderWorkspaces,

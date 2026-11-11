@@ -11,9 +11,14 @@
  *
  * 与既有逻辑的关系：本面板只是把用户的意愿写进任务状态，实际节奏由
  * `core/api/agnes_video.py` 的提交循环读取；未开启时行为与升级前一致。
+ *
+ * v8.0：新增「以后自动开启」勾选——勾上后本次参数同时写入设置页的全局设置
+ * （`auto=True`），此后所有任务到条件都会自动快速重试；若设置页已经开启自动，
+ * 这里只提示、不再询问，避免出现两份互相矛盾的开关。
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { t, tf } from '@/i18n'
+import { appState } from '@/store'
 import { useProgress } from '@/composables/useProgress'
 
 const { fastRetry, setFastRetryMode } = useProgress()
@@ -22,6 +27,10 @@ const { fastRetry, setFastRetryMode } = useProgress()
 const perMinute = ref(30)
 const minutes = ref(3)
 const submitting = ref(false)
+// v8.0：「以后自动」——勾选后本次参数写入设置页的全局设置，此后到条件自动开启
+const remember = ref(false)
+// 设置页已开启自动模式时，这里不再询问「以后自动」（已经是自动）
+const autoGlobal = computed(() => !!appState.fastRetrySettings.auto)
 // 剩余时间用本地时钟每秒重算（后端只给 started_at + minutes，不额外轮询）
 const now = ref(Date.now())
 let timer: ReturnType<typeof setInterval> | null = null
@@ -84,7 +93,12 @@ async function toggle() {
     const v = Number(perMinute.value)
     const rate = Number.isFinite(v) && v > 0 ? v : 1
     const perMinuteValue = Math.max(1, Math.min(120, Math.round(rate)))
-    await setFastRetryMode(!enabled.value, perMinuteValue, minutes.value)
+    await setFastRetryMode(
+      !enabled.value,
+      perMinuteValue,
+      minutes.value,
+      !enabled.value && remember.value && !autoGlobal.value,
+    )
   } finally {
     submitting.value = false
   }
@@ -152,11 +166,38 @@ async function toggle() {
       </button>
     </div>
 
+    <!-- v8.0：一次性执行 vs 永久自动（设置页已开启自动时不再显示该选项） -->
+    <template v-if="!enabled">
+      <div v-if="!autoGlobal" class="mt-2 flex items-start justify-between gap-3">
+        <span class="min-w-0">
+          <span class="block text-[11.5px] font-medium text-ink-2">{{ t('fastRetry.rememberLabel') }}</span>
+          <span class="mt-0.5 block text-[11px] leading-relaxed text-muted">{{ t('fastRetry.rememberHint') }}</span>
+        </span>
+        <button
+          type="button"
+          role="switch"
+          :aria-checked="remember"
+          :aria-label="t('fastRetry.rememberLabel')"
+          class="relative mt-0.5 h-[18px] w-8 shrink-0 rounded-full border transition-colors"
+          :class="remember ? 'border-accent bg-accent/25' : 'border-rule-2 bg-paper-3'"
+          @click="remember = !remember"
+        >
+          <span
+            class="absolute top-[2px] h-3 w-3 rounded-full transition-all"
+            :class="remember ? 'bg-accent' : 'bg-muted'"
+            :style="{ insetInlineStart: remember ? '16px' : '2px' }"
+          ></span>
+        </button>
+      </div>
+      <p v-else class="hint mt-1">{{ t('fastRetry.autoGlobalOn') }}</p>
+    </template>
+
     <div v-else class="mt-3 flex flex-wrap items-center gap-2">
       <!-- 已打次数：后端 attempts 每 1 秒最多落盘一次，快速模式下随 1s 轮询刷新 -->
       <span class="chip chip-accent">
         {{ tf('fastRetry.attempts', { n: cfg?.attempts || 0 }) }}
       </span>
+      <span v-if="cfg?.auto" class="chip">{{ t('fastRetry.autoBadge') }}</span>
       <button
         class="btn btn-ghost btn-sm"
         :disabled="submitting"

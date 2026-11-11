@@ -1066,6 +1066,81 @@ def set_watermark_config(enabled: bool = None, language: str = None):
 
 
 # ═══════════════════════════════════════════════════
+# 快速重试模式 · 全局设置（v8.0）
+# ═══════════════════════════════════════════════════
+
+#: 默认不自动开启：保持 v7.7 的行为（连续 2 次忙信号后由用户手动点开关）。
+DEFAULT_FAST_RETRY_AUTO = False
+
+
+def get_fast_retry_config() -> dict:
+    """返回「快速重试模式」的全局设置（设置页里的那一份）。
+
+    与任务级 ``BaseTaskState.fast_retry`` 的分工：
+    - 本设置**跨任务**生效——``auto=True`` 时任何任务连续 2 次忙信号
+      （503 / 队列满）都会自动进入快速重试，无需用户在进度页点开关；
+    - 任务级状态仍记录本次开启的参数、已打次数、收尾原因。
+
+    Returns:
+        ``{"auto": bool, "per_minute": int, "minutes": int}``；
+        ``per_minute`` / ``minutes`` 未显式配置时回退环境变量默认值
+        （``AGNES_FAST_RETRY_PER_MINUTE`` / ``AGNES_FAST_RETRY_MINUTES``）。
+    """
+    # 延迟导入：core.config ↔ core.api 存在循环依赖（core.api.__init__ 会
+    # 导入 agnes_video 等，后者反向 import core.config），顶层导入会炸。
+    from core.api.fast_retry import clamp_params
+
+    settings = get_settings()
+    raw = load_config().get("fast_retry") or {}
+    x, y = clamp_params(
+        raw.get("per_minute", settings.agnes_fast_retry_per_minute),
+        raw.get("minutes", settings.agnes_fast_retry_minutes),
+    )
+    return {
+        "auto": bool(raw.get("auto", DEFAULT_FAST_RETRY_AUTO)),
+        "per_minute": x,
+        "minutes": y,
+    }
+
+
+def set_fast_retry_config(
+    auto: bool = None, per_minute: int = None, minutes: int = None
+) -> dict:
+    """写入快速重试的全局设置（``None`` = 保留原值）。
+
+    Args:
+        auto: 是否「到条件自动开启」。
+        per_minute: 每分钟重试次数（1–120，越界自动收敛）。
+        minutes: 持续分钟数（1–30，越界自动收敛）。
+
+    Returns:
+        写入后的完整设置（``{"auto", "per_minute", "minutes"}``）。
+    """
+    from core.api.fast_retry import clamp_params
+
+    settings = get_settings()
+    config = load_config()
+    cur = config.get("fast_retry") or {}
+    x, y = clamp_params(
+        per_minute if per_minute is not None
+        else cur.get("per_minute", settings.agnes_fast_retry_per_minute),
+        minutes if minutes is not None
+        else cur.get("minutes", settings.agnes_fast_retry_minutes),
+    )
+    entry = {
+        "auto": (
+            bool(auto) if auto is not None
+            else bool(cur.get("auto", DEFAULT_FAST_RETRY_AUTO))
+        ),
+        "per_minute": x,
+        "minutes": y,
+    }
+    config["fast_retry"] = entry
+    save_config(config)
+    return dict(entry)
+
+
+# ═══════════════════════════════════════════════════
 # 视频参数预设（D7）
 # ═══════════════════════════════════════════════════
 

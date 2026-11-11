@@ -30,6 +30,23 @@ from core.pipelines import _PipelineFastRetryHook
 from models.task import SimpleVideoTask, StepStatus
 
 
+@pytest.fixture(autouse=True)
+def _isolate_global_auto(monkeypatch):
+    """默认关闭「设置页自动快速重试」，避免读到开发机真实 config.json。
+
+    v8.0 起钩子的 ``decide()`` 会读全局设置（``auto=True`` 时到条件直接开跑）。
+    单测必须与开发机配置隔离，否则本地开了自动模式后这些用例会莫名失败。
+    需要验证自动行为的用例自行再 monkeypatch 成开启状态。
+    """
+    import core.pipelines as pipelines_mod
+
+    monkeypatch.setattr(
+        pipelines_mod, "get_fast_retry_config",
+        lambda: {"auto": False, "per_minute": 30, "minutes": 3},
+        raising=False,
+    )
+
+
 class FakeResponse:
     """最小化 requests.Response 桩。"""
 
@@ -647,3 +664,147 @@ class TestFastRetryEndpoint:
         assert state.fast_retry.attempts == 0
         assert state.fast_retry.started_at == ""
         assert state.fast_retry.finished_reason == ""
+
+
+# ── v8.0：设置页「自动快速重试」────────────────────────────────────────
+
+
+def _auto_on(monkeypatch, per_minute: int = 60, minutes: int = 5) -> None:
+    """把全局设置桩成「已开启自动模式」。"""
+    import core.pipelines as pipelines_mod
+
+    monkeypatch.setattr(
+        pipelines_mod, "get_fast_retry_config",
+        lambda: {"auto": True, "per_minute": per_minute, "minutes": minutes},
+        raising=False,
+    )
+
+
+def test_auto_starts_at_threshold_without_user_click(monkeypatch):
+    """设置页开启自动 → 第 2 次忙信号直接进入快速模式，不需要用户点开关。"""
+    _auto_on(monkeypatch, per_minute=60, minutes=5)
+    state = _state()
+    p = FakePipeline(state)
+    hook = _PipelineFastRetryHook(p)
+
+    assert hook.decide(0, BUSY) is None          # 第 1 次：仍走慢速
+    assert state.fast_retry.enabled is False
+
+    gap = hook.decide(1, BUSY)                   # 第 2 次：自动开跑
+    assert gap == pytest.approx(1.0)             # 60 次/分钟 → 1s
+    assert state.fast_retry.enabled is True
+    assert state.fast_retry.auto is True
+    assert state.fast_retry.available is True    # 面板仍据此显示
+    assert state.fast_retry.per_minute == 60
+    assert state.fast_retry.minutes == 5
+    assert state.fast_retry.started_at
+    assert p.emits[-1][0] == "progress.video.fast_retry.auto"
+    assert p.task_manager.saved == 1
+
+
+def test_auto_respects_manual_disable_in_same_task(monkeypatch):
+    """用户在本任务内手动关过（auto_off）→ 自动模式不得把它重新拉起。"""
+    _auto_on(monkeypatch)
+    state = _state(auto_off=True)
+    p = FakePipeline(state)
+    hook = _PipelineFastRetryHook(p)
+
+    assert hook.decide(0, BUSY) is None
+    assert hook.decide(1, BUSY) is None
+    assert state.fast_retry.enabled is False
+    assert state.fast_retry.auto is False
+    assert p.emits[-1][0] == "progress.video.fast_retry.available"
+
+
+def test_auto_expiry_resets_counter_for_cooldown(monkeypatch):
+    """自动模式到期后清零连续计数：需要重新累计 2 次忙信号才会再次开启。"""
+    _auto_on(monkeypatch)
+    started = (datetime.now() - timedelta(minutes=6)).isoformat(timespec="seconds")
+    state = _state(
+        enabled=True, auto=True, per_minute=60, minutes=5,
+        started_at=started, available=True, consecutive_busy=4,
+    )
+    p = FakePipeline(state)
+    hook = _PipelineFastRetryHook(p)
+
+    assert hook.decide(0, BUSY) is None
+    assert state.fast_retry.enabled is False
+    assert state.fast_retry.auto is False
+    assert state.fast_retry.consecutive_busy == 0
+    assert state.fast_retry.finished_reason == "expired"
+
+
+def test_global_settings_persist_and_clamp(tmp_path, monkeypatch):
+    """全局设置读写：默认关闭；越界参数收敛；未传字段保留原值。"""
+    import core.config as config_mod
+
+    monkeypatch.setattr(config_mod, "CONFIG_DIR", str(tmp_path))
+    monkeypatch.setattr(config_mod, "CONFIG_FILE", str(tmp_path / "config.json"))
+
+    assert config_mod.get_fast_retry_config()["auto"] is False
+
+    entry = config_mod.set_fast_retry_config(auto=True, per_minute=999, minutes=0)
+    assert entry == {"auto": True, "per_minute": 120, "minutes": 1}
+    assert config_mod.get_fast_retry_config() == entry
+
+    # 只改 auto，x / y 保持上一次的值
+    again = config_mod.set_fast_retry_config(auto=False)
+    assert again == {"auto": False, "per_minute": 120, "minutes": 1}
+
+
+class TestFastRetryRemember:
+    """任务页「以后自动」：一次性开启 + 顺手把 x/y 记进全局设置。"""
+
+    def _client(self, monkeypatch, state):
+        return TestFastRetryEndpoint()._client(monkeypatch, state)
+
+    def test_remember_writes_global_auto(self, monkeypatch):
+        import core.config as config_mod
+
+        saved = {}
+
+        def fake_set(auto=None, per_minute=None, minutes=None):
+            saved.update({"auto": auto, "per_minute": per_minute, "minutes": minutes})
+            return {"auto": True, "per_minute": per_minute, "minutes": minutes}
+
+        monkeypatch.setattr(config_mod, "set_fast_retry_config", fake_set, raising=False)
+        monkeypatch.setattr(
+            config_mod, "get_fast_retry_config",
+            lambda: {"auto": True, "per_minute": 20, "minutes": 2}, raising=False,
+        )
+        state = _state(available=True, consecutive_busy=2)
+        client, _ = self._client(monkeypatch, state)
+
+        r = client.post(
+            "/api/tasks/t_fast/fast-retry",
+            data={"enabled": "true", "per_minute": "20", "minutes": "2",
+                  "remember": "true"},
+        )
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["fast_retry"]["enabled"] is True
+        assert body["fast_retry"]["auto"] is False        # 本次是用户手动开启
+        assert body["fast_retry"]["auto_off"] is False
+        assert body["fast_retry_settings"]["auto"] is True
+        assert saved == {"auto": True, "per_minute": 20, "minutes": 2}
+
+    def test_disable_sets_auto_off_to_suppress_auto(self, monkeypatch):
+        """手动关闭 → auto_off=True（本轮不再被自动模式重新拉起）。"""
+        import core.config as config_mod
+
+        monkeypatch.setattr(
+            config_mod, "get_fast_retry_config",
+            lambda: {"auto": True, "per_minute": 30, "minutes": 3}, raising=False,
+        )
+        state = _state(enabled=True, auto=True, available=True, per_minute=60,
+                       minutes=3, started_at=datetime.now().isoformat(timespec="seconds"))
+        client, _ = self._client(monkeypatch, state)
+
+        r = client.post("/api/tasks/t_fast/fast-retry", data={"enabled": "false"})
+
+        assert r.status_code == 200
+        assert state.fast_retry.enabled is False
+        assert state.fast_retry.auto is False
+        assert state.fast_retry.auto_off is True
+        assert state.fast_retry.finished_reason == "disabled"

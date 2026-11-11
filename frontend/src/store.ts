@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import type { TaskType, VoiceCatalog, Workspace } from './types'
+import type { FastRetrySettings, TaskType, VoiceCatalog, Workspace } from './types'
 
 // ── v8.0：记住上次选择的任务类型（默认 simple，让文生视频真正「打开即用」）──
 const TASK_TYPE_STORAGE_KEY = 'wb_task_type'
@@ -48,6 +48,8 @@ export const appState = reactive({
   activeWorkspace: '' as string,
   workingDirSource: 'config' as string,
   watermarkEnabled: false,
+  // v8.0：快速重试全局设置（设置页控制「到条件自动开启」+ 频率）
+  fastRetrySettings: { auto: false, per_minute: 30, minutes: 3 } as FastRetrySettings,
   agnesDomain: 'com' as string,
   models: { text: '', image: '', video: '', text_provider: '' },
   modelListCache: { text: [] as string[], image: [] as string[], video: [] as string[] },

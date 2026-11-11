@@ -294,16 +294,24 @@ function unmountProgressPage() {
 }
 
 // v7.7 快速重试模式：开启 / 关闭（参数范围与「是否已可开启」由后端校验）
-async function setFastRetryMode(enabled: boolean, perMinute?: number, minutes?: number) {
+// v8.0：remember=true = 「以后自动」——后端同时写入设置页的全局 auto + 参数
+async function setFastRetryMode(
+  enabled: boolean,
+  perMinute?: number,
+  minutes?: number,
+  remember = false,
+) {
   const taskId = appState.currentTaskId
   if (!taskId) return
   try {
-    const d = await api.setFastRetry(taskId, { enabled, perMinute, minutes })
+    const d = await api.setFastRetry(taskId, { enabled, perMinute, minutes, remember })
     if (d?.detail) {
       showToast(t('fastRetry.failed') + ': ' + d.detail, 4000)
       return
     }
     if (d?.fast_retry) fastRetry.value = d.fast_retry
+    // 「以后自动」生效后同步设置页状态（避免下次打开设置页仍显示关闭）
+    if (d?.fast_retry_settings) appState.fastRetrySettings = d.fast_retry_settings
     // 立即刷新一次，避免等 30s 轮询才看到「已开启 / 已关闭」
     await pollTaskProgress(taskId)
     // 开关切换后重排轮询：开启 → 1s 实时；关闭/到期 → 回到 30s

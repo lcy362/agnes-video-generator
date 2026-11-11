@@ -286,7 +286,8 @@ async def resume_task(task_id: str):
         # 就会立刻显示快速重试开关——那是上一轮留下的残留，不是本轮的真实状态。
         cfg = getattr(state, "fast_retry", None)
         if cfg is not None and (
-            cfg.available or cfg.enabled or cfg.consecutive_busy or cfg.attempts or cfg.started_at
+            cfg.available or cfg.enabled or cfg.consecutive_busy or cfg.attempts
+            or cfg.started_at or cfg.auto or cfg.auto_off
         ):
             cfg.available = False
             cfg.enabled = False
@@ -294,6 +295,10 @@ async def resume_task(task_id: str):
             cfg.attempts = 0
             cfg.started_at = ""
             cfg.finished_reason = ""
+            # v8.0：新一轮重置「自动」标记与「本任务内已手动关闭」抑制，
+            # 否则上一轮关过自动模式的任务续传后也不会再自动开启。
+            cfg.auto = False
+            cfg.auto_off = False
             try:
                 tm.update_state()
             except Exception as e:
@@ -341,25 +346,33 @@ async def set_fast_retry(
     enabled: bool = Form(...),
     per_minute: int = Form(0),
     minutes: int = Form(0),
+    remember: bool = Form(False),
 ):
-    """开关「快速重试模式」（v7.7）。
+    """开关「快速重试模式」（v7.7 / v8.0 增加 remember）。
 
     背景：视频提交连续遇到 2 次队列繁忙（503 ``video_queue_full``）后，任务状态
     里 ``fast_retry.available`` 置 True，前端进度页据此显示开关。用户开启后，
     提交循环按 ``60/per_minute`` 秒连打（不占共享视频提交桶、不消耗常规忙轨
     次数），提交成功或到达 ``minutes`` 分钟后自动恢复正常节奏。
 
-    隔离性：本端点只改任务状态里的 ``fast_retry`` 字段；未开启时（或任务类型
-    没有该字段时）行为与升级前完全一致，不影响 ``retry_policy`` 的两轨判定。
+    v8.0：``remember=True``（用户勾了「以后自动」）时，同时把本次的 x / y 写进
+    **全局设置**并打开 ``auto``——此后任何任务连续 2 次忙信号都会自动进入快速
+    重试，不用再点开关。不带该参数时行为与 v7.7 完全一致（只影响本次任务）。
+
+    隔离性：本端点只改任务状态里的 ``fast_retry`` 字段（+ 可选的全局设置）；
+    未开启时（或任务类型没有该字段时）行为与升级前完全一致，不影响
+    ``retry_policy`` 的两轨判定。
 
     Args:
         task_id: 任务 id。
         enabled: True 开启 / False 关闭。
         per_minute: 每分钟重试次数 x（0 = 用 ``AGNES_FAST_RETRY_PER_MINUTE``）。
         minutes: 持续分钟数 y（0 = 用 ``AGNES_FAST_RETRY_MINUTES``）。
+        remember: 仅 ``enabled=True`` 有意义：把本次参数记为「以后自动」。
 
     Returns:
-        ``{"ok": True, "task_id": ..., "fast_retry": {...最新状态...}}``
+        ``{"ok": True, "task_id": ..., "fast_retry": {...最新状态...},
+            "fast_retry_settings": {...全局设置...}}``
     """
     from core.api.fast_retry import (
         FAST_RETRY_MAX_MINUTES,
@@ -367,7 +380,7 @@ async def set_fast_retry(
         FAST_RETRY_MIN_MINUTES,
         FAST_RETRY_MIN_PER_MINUTE,
     )
-    from core.config import get_settings
+    from core.config import get_fast_retry_config, get_settings, set_fast_retry_config
 
     dir_name = helpers.find_dir_name(task_id)
     # 运行中优先复用流水线的 TaskManager：它的 _state 就是流水线正在写的那一份，
@@ -409,6 +422,8 @@ async def set_fast_retry(
                 detail=translate("fast_retry.not_available", None),
             )
         cfg.enabled = True
+        cfg.auto = False          # 用户手动开启 → 不标自动（与钩子的自动分支区分）
+        cfg.auto_off = False      # 重新开启即恢复「自动模式」资格
         cfg.per_minute = x
         cfg.minutes = y
         cfg.attempts = 0          # 每轮开启重新计数（面板展示「已发 N 次」）
@@ -418,8 +433,20 @@ async def set_fast_retry(
         msg_key, msg_params = "progress.video.fast_retry.active", {
             "x": x, "y": y,
         }
+        if remember:
+            # 「永久自动」：本次参数写进全局设置并打开 auto，此后所有任务
+            # 到条件直接自动开启（设置页也可单独调整）。
+            set_fast_retry_config(auto=True, per_minute=x, minutes=y)
+            logger.info(
+                "[FastRetry] Global auto enabled via task %s (x=%d/min y=%dmin)",
+                safe_log(task_id), x, y,
+            )
     else:
         cfg.enabled = False
+        # 用户手动关闭后，本轮任务不再被「自动模式」重新拉起；续传视为新一轮，
+        # 会由 resume 的 reset 逻辑一并清零。
+        cfg.auto_off = True
+        cfg.auto = False
         cfg.finished_reason = "disabled"
         msg_key, msg_params = "progress.video.fast_retry.disabled", {}
 
@@ -434,10 +461,15 @@ async def set_fast_retry(
         pipeline._emit_fast_retry(msg_key, msg_params)
 
     logger.info(
-        "[FastRetry] Task %s: enabled=%s x=%d/min y=%dmin",
-        safe_log(task_id), enabled, x, y,
+        "[FastRetry] Task %s: enabled=%s x=%d/min y=%dmin remember=%s",
+        safe_log(task_id), enabled, x, y, remember,
     )
-    return {"ok": True, "task_id": task_id, "fast_retry": cfg.model_dump()}
+    return {
+        "ok": True,
+        "task_id": task_id,
+        "fast_retry": cfg.model_dump(),
+        "fast_retry_settings": get_fast_retry_config(),
+    }
 
 
 @router.post("/api/tasks/{task_id}/mode")

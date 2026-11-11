@@ -56,6 +56,12 @@ const {
   domainErrorMsg,
   saveDomain,
   toggleWatermark,
+  fastRetryAuto,
+  fastRetryPerMinute,
+  fastRetryMinutes,
+  fastRetrySaveStatus,
+  syncFastRetrySettings,
+  saveFastRetrySettings,
   isRegression,
   wsDisplayName,
   renderWorkspaces,
@@ -136,12 +142,13 @@ const collapsed = reactive<Record<string, boolean>>({
   apikey: true,
   model: true,
   workspace: true,
+  retry: true,
   privacy: true,
 })
 
 function initCollapse() {
   const prefs = getCollapsePrefs()
-  const keys = ['apikey', 'model', 'workspace', 'privacy']
+  const keys = ['apikey', 'model', 'workspace', 'retry', 'privacy']
   keys.forEach((k) => {
     const manual = prefs[k + '_manual']
     if (manual !== undefined) {
@@ -391,6 +398,8 @@ function openEditProvider(p: any) {
 
 loadTextProviders()
 initCollapse()
+// v8.0：把 /api/config.fast_retry 回填到设置页表单（App 启动时已拉取）
+syncFastRetrySettings()
 </script>
 
 <template>
@@ -952,6 +961,83 @@ initCollapse()
     </div>
   </div>
 
+  <!-- 快速重试（v8.0：到条件自动开启 + 频率） -->
+  <div class="panel mb-4 overflow-hidden">
+    <div
+      v-if="collapsed.retry"
+      class="panel-head collapse-header cursor-pointer"
+      role="button"
+      tabindex="0"
+      :aria-expanded="!collapsed.retry"
+      @click="toggleConfigPanel('retry')"
+    >
+      <div class="flex min-w-0 items-baseline gap-2.5">
+        <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">04</span>
+        <span class="shrink-0 text-[12.5px] font-medium text-ink-2">{{ t('fastRetry.settingsTitle') }}</span>
+        <span class="truncate text-[10.5px] text-muted">
+          {{ fastRetryAuto
+            ? tf('fastRetry.autoOnShort', { x: fastRetryPerMinute, y: fastRetryMinutes })
+            : t('fastRetry.autoOffShort') }}
+        </span>
+      </div>
+      <span class="mono text-[11px] text-muted">＋</span>
+    </div>
+    <div v-else class="px-4 pb-4 pt-3.5">
+      <div class="mb-3 flex items-center justify-between gap-3 border-b border-rule pb-3">
+        <h2 class="panel-title">
+          <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">04</span>
+          {{ t('fastRetry.settingsTitle') }}
+        </h2>
+        <div class="flex items-center gap-1">
+          <span class="chip" :class="fastRetryAuto ? 'chip-success' : ''">
+            {{ fastRetryAuto
+              ? tf('fastRetry.autoOnShort', { x: fastRetryPerMinute, y: fastRetryMinutes })
+              : t('fastRetry.autoOffShort') }}
+          </span>
+          <button class="btn btn-quiet btn-xs" @click="toggleConfigPanel('retry')">−</button>
+        </div>
+      </div>
+
+      <label class="flex cursor-pointer select-none items-start gap-3">
+        <input v-model="fastRetryAuto" type="checkbox" class="check mt-0.5" />
+        <span>
+          <span class="block text-[12.5px] font-medium text-ink">{{ t('fastRetry.autoLabel') }}</span>
+          <span class="mt-0.5 block text-[11px] leading-relaxed text-muted">{{ t('fastRetry.autoHint') }}</span>
+        </span>
+      </label>
+
+      <div class="mt-3 flex flex-wrap items-end gap-3">
+        <label>
+          <span class="label">{{ t('fastRetry.perMinute') }}</span>
+          <input
+            v-model.number="fastRetryPerMinute"
+            type="number"
+            min="1"
+            max="120"
+            step="1"
+            class="field w-24"
+          />
+        </label>
+        <label>
+          <span class="label">{{ t('fastRetry.minutes') }}</span>
+          <input
+            v-model.number="fastRetryMinutes"
+            type="number"
+            min="1"
+            max="30"
+            step="1"
+            class="field w-24"
+          />
+        </label>
+        <button class="btn btn-primary btn-sm" @click="saveFastRetrySettings">{{ t('save') }}</button>
+        <span v-if="fastRetrySaveStatus === 'ok'" class="text-[11.5px] text-success">
+          {{ t('fastRetry.autoSaved') }}
+        </span>
+      </div>
+      <p class="hint mt-2">{{ t('fastRetry.autoScope') }}</p>
+    </div>
+  </div>
+
   <!-- 隐私设置（3.4：GA4 配置开关） -->
   <div class="panel mb-4 overflow-hidden">
     <div
@@ -963,7 +1049,7 @@ initCollapse()
       @click="toggleConfigPanel('privacy')"
     >
       <div class="flex min-w-0 items-baseline gap-2.5">
-        <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">04</span>
+        <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">05</span>
         <span class="shrink-0 text-[12.5px] font-medium text-ink-2">{{ t('privacyTitle') }}</span>
         <span class="truncate text-[10.5px] text-muted">
           {{ gaOptOut ? t('gaStatOff') : t('gaStatOn') }}
@@ -974,7 +1060,7 @@ initCollapse()
     <div v-else class="px-4 pb-4 pt-3.5">
       <div class="mb-3 flex items-center justify-between gap-3 border-b border-rule pb-3">
         <h2 class="panel-title">
-          <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">04</span>
+          <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">05</span>
           {{ t('privacyTitle') }}
         </h2>
         <div class="flex items-center gap-1">

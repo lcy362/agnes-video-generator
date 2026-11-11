@@ -43,6 +43,16 @@ export interface FastRetryState {
   attempts?: number
   started_at?: string
   finished_reason?: '' | 'success' | 'expired' | 'disabled' | string
+  // v8.0：本次是否由「设置页自动快速重试」触发 / 用户本轮是否手动关过
+  auto?: boolean
+  auto_off?: boolean
+}
+
+// v8.0：快速重试全局设置（设置页 → /api/config.fast_retry）
+export interface FastRetrySettings {
+  auto: boolean
+  per_minute: number
+  minutes: number
 }
 
 export interface UpstreamError {

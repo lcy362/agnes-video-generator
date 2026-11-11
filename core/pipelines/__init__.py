@@ -29,7 +29,7 @@ from core.api.key_manager import get_key_ring, key_fingerprint
 from core.async_io import read_text, write_text
 from core.compositor.ffmpeg_tool import probe_duration, resolve_cmd_binary
 from core.compositor.watermark import add_watermark, detect_language
-from core.config import get_watermark_config
+from core.config import get_fast_retry_config, get_watermark_config
 from core.i18n_backend import translate
 from core.task_manager import TaskManager
 from models.task import AudioConfig, BaseTaskState, StepStatus, SubtitleConfig
@@ -204,10 +204,14 @@ class _PipelineFastRetryHook:
 
     - 未开启：累计连续忙信号，达到 ``FAST_RETRY_AVAILABLE_AFTER``（2 次）后
       置 ``available=True`` 并落盘 → 前端进度页出现开关；返回 None（常规节奏）。
+    - v8.0 自动分支：设置页开启「自动快速重试」（``auto=True``）且用户本轮
+      没手动关过（``auto_off=False``）→ 到条件**直接**开启并发起第一跳，不再
+      等用户点开关；参数取全局设置的 x / y，``cfg.auto`` 标记来源。
     - 已开启且未到期：返回 ``interval_seconds``（60/x），由 API 层按该间隔
       连打，且**不占用**常规忙轨次数与视频提交令牌桶。
     - 已开启但到期：置 ``enabled=False, finished_reason="expired"`` 后返回
-      None，API 层原样回到常规忙轨继续。
+      None，API 层原样回到常规忙轨继续（连续计数清零，需要重新累计 2 次
+      忙信号才会再次进入，天然形成冷却）。
 
     状态读写都在流水线协程内（单写者）；用户点开关的 HTTP 请求侧走
     ``pipeline.task_manager`` 同一实例，因此不会出现两份缓存互相覆盖落盘。
@@ -229,23 +233,32 @@ class _PipelineFastRetryHook:
 
         if not cfg.enabled:
             cfg.consecutive_busy += 1
-            if cfg.consecutive_busy >= FAST_RETRY_AVAILABLE_AFTER and not cfg.available:
-                cfg.available = True
-                p._save_fast_retry()
-                p._emit_fast_retry(
-                    "progress.video.fast_retry.available",
-                    {
-                        "n": cfg.consecutive_busy,
-                        "status": payload.get("status") or "",
-                        "code": payload.get("code") or "",
-                    },
-                )
-                logger.info(
-                    "[FastRetry] Task %s: available after %d consecutive busy signals "
-                    "(HTTP %s · %s), waiting for user to enable",
-                    p.task_id, cfg.consecutive_busy,
-                    payload.get("status"), payload.get("code") or "-",
-                )
+            if cfg.consecutive_busy >= FAST_RETRY_AVAILABLE_AFTER:
+                # v8.0：设置页开了「自动快速重试」→ 到条件直接开跑。
+                # ``auto_off`` 表示用户在本任务里手动关过，本轮不再自动打开
+                # （否则用户一关就被自动重新开启，体验很差）。
+                auto = None if cfg.auto_off else self._auto_params()
+                if auto is not None:
+                    return self._start_fast_retry(
+                        cfg, auto[0], auto[1], auto_started=True, payload=payload
+                    )
+                if not cfg.available:
+                    cfg.available = True
+                    p._save_fast_retry()
+                    p._emit_fast_retry(
+                        "progress.video.fast_retry.available",
+                        {
+                            "n": cfg.consecutive_busy,
+                            "status": payload.get("status") or "",
+                            "code": payload.get("code") or "",
+                        },
+                    )
+                    logger.info(
+                        "[FastRetry] Task %s: available after %d consecutive busy signals "
+                        "(HTTP %s · %s), waiting for user to enable",
+                        p.task_id, cfg.consecutive_busy,
+                        payload.get("status"), payload.get("code") or "-",
+                    )
             return None
 
         # 已打次数同步（用户要在面板看到「已发 N 次」实时跳动）：
@@ -259,7 +272,11 @@ class _PipelineFastRetryHook:
         limit = max(1, int(cfg.minutes or 1)) * 60
         if elapsed is None or elapsed >= limit:
             cfg.enabled = False
+            cfg.auto = False
             cfg.finished_reason = "expired"
+            # 清零连续计数：到期后需要重新累计 2 次忙信号才会再次自动开启，
+            # 避免「到期即重开」在自动模式下变成无缝连打。
+            cfg.consecutive_busy = 0
             p._save_fast_retry()
             p._emit_fast_retry(
                 "progress.video.fast_retry.expired", {"y": int(cfg.minutes or 1)}
@@ -270,6 +287,66 @@ class _PipelineFastRetryHook:
                 p.task_id, f"{elapsed:.0f}s" if elapsed is not None else "unknown", limit,
             )
             return None
+        return cfg.interval_seconds
+
+    @staticmethod
+    def _auto_params() -> Optional[tuple]:
+        """读设置页的全局自动配置：未开启（或读取失败）返回 None。
+
+        Returns:
+            ``(per_minute, minutes)`` 或 ``None``。
+        """
+        try:
+            cfg = get_fast_retry_config()
+        except Exception as e:  # 配置损坏绝不打断重试链路
+            logger.debug(f"[FastRetry] read global settings failed: {e}")
+            return None
+        if not cfg.get("auto"):
+            return None
+        try:
+            return int(cfg.get("per_minute") or 30), int(cfg.get("minutes") or 3)
+        except (TypeError, ValueError):
+            return None
+
+    def _start_fast_retry(
+        self, cfg, per_minute: int, minutes: int, *,
+        auto_started: bool, payload: Optional[dict] = None,
+    ) -> float:
+        """统一入口：把本次快速模式写进任务状态并返回首跳间隔。
+
+        Args:
+            cfg: 任务状态的 ``fast_retry`` 配置。
+            per_minute: 每分钟次数 x。
+            minutes: 持续分钟数 y。
+            auto_started: True = 由全局设置自动触发（消息与标记都区分来源）。
+            payload: 触发本次开启的忙信号（仅用于日志）。
+
+        Returns:
+            本跳的快速模式间隔（秒）。
+        """
+        p = self._pipeline
+        cfg.available = True          # 面板据 available / enabled 显示
+        cfg.enabled = True
+        cfg.auto = auto_started
+        cfg.per_minute = int(per_minute)
+        cfg.minutes = int(minutes)
+        cfg.attempts = 0              # 每轮开启重新计数（面板「已发 N 次」）
+        cfg.started_at = datetime.now().isoformat(timespec="seconds")
+        cfg.finished_reason = ""
+        self._last_attempts_save = 0.0   # 首跳立即落盘
+        p._save_fast_retry()
+        p._emit_fast_retry(
+            "progress.video.fast_retry.auto" if auto_started
+            else "progress.video.fast_retry.active",
+            {"x": cfg.per_minute, "y": cfg.minutes},
+        )
+        logger.info(
+            "[FastRetry] Task %s: started %s x=%d/min y=%dmin "
+            "(HTTP %s · %s)",
+            p.task_id, "automatically" if auto_started else "by user",
+            cfg.per_minute, cfg.minutes,
+            (payload or {}).get("status"), (payload or {}).get("code") or "-",
+        )
         return cfg.interval_seconds
 
     def _sync_attempts(self, cfg, probe) -> None:
@@ -325,6 +402,7 @@ class _PipelineFastRetryHook:
         changed = bool(was_enabled or cfg.available or cfg.consecutive_busy or probe)
         cfg.consecutive_busy = 0
         cfg.available = False
+        cfg.auto = False
         if probe:
             cfg.attempts = int(probe)
         if was_enabled:

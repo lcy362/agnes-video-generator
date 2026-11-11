@@ -37,6 +37,7 @@ from core.config import (
     get_api_keys,
     get_api_keys_source,
     get_api_keys_with_sources,
+    get_fast_retry_config,
     get_selected_models,
     get_selected_text_provider,
     get_simple_default_preset,
@@ -52,6 +53,7 @@ from core.config import (
     set_api_key_domains,
     set_api_key_enabled,
     set_api_keys,
+    set_fast_retry_config,
     set_selected_models,
     set_selected_text_provider,
     set_watermark_config,
@@ -90,6 +92,8 @@ async def get_config():
         "models": get_selected_models(),
         "agnes_domain": get_agnes_domain(),
         "agnes_domains": list(AGNES_DOMAIN_MAP.keys()),
+        # v8.0：快速重试模式全局设置（auto=到条件自动开启，无需用户在任务页点）
+        "fast_retry": get_fast_retry_config(),
     }
     return data
 
@@ -657,6 +661,63 @@ async def save_watermark_config(enabled: bool = Form(False)):
     """Save watermark toggle."""
     set_watermark_config(enabled=enabled)
     return {"ok": True, "enabled": enabled}
+
+
+@router.post("/api/config/fast-retry")
+async def save_fast_retry_config(
+    auto: bool = Form(False),
+    per_minute: int = Form(0),
+    minutes: int = Form(0),
+):
+    """保存「快速重试模式」全局设置（v8.0）。
+
+    设置页的这份配置**跨任务**生效：``auto=True`` 时，任何任务连续 2 次视频
+    队列忙信号（503 / 队列满）都会自动进入快速重试，不需要用户在进度页点开关；
+    ``per_minute`` / ``minutes`` 决定自动模式的节奏与持续时长。
+
+    与任务级开关的关系：任务页仍可临时开/关，且「手动关闭」只在本次运行内
+    生效（``fast_retry.auto_off``）；续传视为新一轮，会重新遵守本设置。
+
+    Args:
+        auto: 是否到条件自动开启。
+        per_minute: 每分钟次数 x（0 = 保留原值；越界自动收敛到 1–120）。
+        minutes: 持续分钟数 y（0 = 保留原值；越界自动收敛到 1–30）。
+
+    Returns:
+        ``{"ok": True, "fast_retry": {"auto", "per_minute", "minutes"}}``
+    """
+    from core.api.fast_retry import (
+        FAST_RETRY_MAX_MINUTES,
+        FAST_RETRY_MAX_PER_MINUTE,
+        FAST_RETRY_MIN_MINUTES,
+        FAST_RETRY_MIN_PER_MINUTE,
+    )
+
+    if per_minute and not (
+        FAST_RETRY_MIN_PER_MINUTE <= per_minute <= FAST_RETRY_MAX_PER_MINUTE
+    ):
+        raise HTTPException(status_code=422, detail=translate(
+            "fast_retry.invalid_range", None,
+            xmin=FAST_RETRY_MIN_PER_MINUTE, xmax=FAST_RETRY_MAX_PER_MINUTE,
+            ymin=FAST_RETRY_MIN_MINUTES, ymax=FAST_RETRY_MAX_MINUTES,
+        ))
+    if minutes and not (FAST_RETRY_MIN_MINUTES <= minutes <= FAST_RETRY_MAX_MINUTES):
+        raise HTTPException(status_code=422, detail=translate(
+            "fast_retry.invalid_range", None,
+            xmin=FAST_RETRY_MIN_PER_MINUTE, xmax=FAST_RETRY_MAX_PER_MINUTE,
+            ymin=FAST_RETRY_MIN_MINUTES, ymax=FAST_RETRY_MAX_MINUTES,
+        ))
+
+    entry = set_fast_retry_config(
+        auto=auto,
+        per_minute=per_minute or None,
+        minutes=minutes or None,
+    )
+    logger.info(
+        "[FastRetry] Global settings saved: auto=%s x=%d/min y=%dmin",
+        entry["auto"], entry["per_minute"], entry["minutes"],
+    )
+    return {"ok": True, "fast_retry": entry}
 
 
 @router.post("/api/config/domain")
