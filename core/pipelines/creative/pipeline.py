@@ -251,7 +251,7 @@ class CreativeVideoPipeline(
         # 人物板复用现有角色参考图（必须在板块准备之后写入：_prepare_ref_plates
         # 会按 character_images 重置该字段）
         character_path = getattr(self, "_character_ref_path", "") or ""
-        if character_path and os.path.exists(character_path):
+        if character_path and os.path.exists(character_path) and not state.character_plate:
             state.character_plate = [character_path]
             self.task_manager.update_state(character_plate=[character_path])
 

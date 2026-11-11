@@ -533,7 +533,11 @@ class MultiScenePipeline(BasePipeline):
         state.character_plate = uploaded_character[:2]
         state.style_plate = uploaded_style[:2]
 
-        if not state.style_plate:
+        # v7.6 外部素材模式：板块图同样由外部工具产出（references 检查点导入），
+        # 本项目不调用 Agnes 图像模型；用户已上传的图仍作为板块使用。
+        external = self._is_external()
+
+        if not state.style_plate and not external:
             raw_style = (style or "").strip()
             prompt = (
                 f"Style reference only — medium, color grading and lighting: {raw_style}. "
@@ -546,7 +550,10 @@ class MultiScenePipeline(BasePipeline):
             if path:
                 state.style_plate = [path]
 
-        if with_character and not state.character_plate and _PERSON_HINT_RE.search(text or ""):
+        if (
+            with_character and not external
+            and not state.character_plate and _PERSON_HINT_RE.search(text or "")
+        ):
             appearance = ""
             screenwriter = getattr(self, "screenwriter", None)
             if screenwriter is not None:
@@ -604,6 +611,11 @@ class MultiScenePipeline(BasePipeline):
         state = self._state
         scenes = list(getattr(state, "scenes", []) or [])
         if not scenes:
+            return
+        # v7.6 外部素材模式：首/尾帧由外部工具产出、经 references 检查点导入，
+        # 本项目不调用 Agnes 画帧（导入后的文件同样满足路径 K 的提交条件）。
+        if self._is_external():
+            logger.info("[MultiScene] link shot frames: SKIP (external asset mode)")
             return
         generator = self._ensure_image_generator()
         limit = get_max_ref_images(getattr(generator, "i2i_model", ""), media="image")

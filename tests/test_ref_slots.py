@@ -216,6 +216,20 @@ class TestImageApiTruncation:
         """图片接口超限只截断并留痕，不抛异常。"""
         from core.api import agnes_image
 
+        # 隔离 KeyRing / 限速器：CI 无 AGNES_API_KEY 时二者都会抛错
+        class _Ring(list):
+            def __init__(self):
+                super().__init__(["k"])
+
+            def next(self):
+                return self[0]
+
+        class _Limiter:
+            async def acquire_async(self):
+                return None
+
+        monkeypatch.setattr(agnes_image, "get_key_ring", lambda: _Ring())
+        monkeypatch.setattr(agnes_image, "get_rate_limiter", lambda: _Limiter())
         api = agnes_image.AgnesImageAPI(api_key="k")
         captured = {}
 
