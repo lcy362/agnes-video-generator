@@ -2,6 +2,7 @@
 import { ref, reactive, computed } from 'vue'
 import { t } from '@/i18n'
 import { stripEmoji } from '@/utils/text'
+import { siteUrl } from '@/utils/siteLinks'
 import { appState } from '@/store'
 import { useVoice } from '@/composables/useVoice'
 import { useTaskSubmit, collectAudioSubtitleFields } from '@/composables/useTaskSubmit'
@@ -84,7 +85,8 @@ async function submitAnchor() {
 <template>
   <div>
     <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted">
-      <a href="https://video.lichuanyang.top/guides/prompt-examples-anchor" target="_blank" rel="noopener" class="transition-colors hover:text-accent">{{ stripEmoji(t('exampleLinkAnchor')) }}</a>
+      <!-- v8.0：模式示例统一指到官网新版示例页（/showcase，带 UI 语言前缀） -->
+      <a :href="siteUrl('/showcase')" target="_blank" rel="noopener" class="transition-colors hover:text-accent">{{ stripEmoji(t('exampleLinkAnchor')) }}</a>
     </div>
 
     <section class="panel mb-4">

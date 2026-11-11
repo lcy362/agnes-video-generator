@@ -11,8 +11,8 @@ import ArtifactCard from './ArtifactCard.vue'
 import CheckpointDetail from './CheckpointDetail.vue'
 import FeedbackPanel from './FeedbackPanel.vue'
 import FastRetryPanel from './FastRetryPanel.vue'
+import SupportFeedbackPanel from '@/components/shared/SupportFeedbackPanel.vue'
 import { isDeterministicError, isLocalNetworkError } from '@/utils/feedback'
-import { stripEmoji } from '@/utils/text'
 
 const {
   progressPct,
@@ -206,17 +206,7 @@ onUnmounted(() => {
           <div class="sticky top-24 space-y-6">
             <StepTimeline @locate="scrollToStep" />
             <div class="sidebar-card">
-              <div class="stitle">{{ t('adSupportTitle') }}</div>
-              <p class="mb-2 text-[11px] leading-relaxed text-muted">{{ t('adSupportDesc') }}</p>
-              <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener">{{ stripEmoji(t('adStar')) }}</a>
-              <p class="-mt-0.5 mb-1 px-1 text-[10.5px] leading-relaxed text-muted">{{ t('adStarDesc') }}</p>
-              <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" class="wrap">{{ stripEmoji(t('adSkewStar')) }}</a>
-              <p class="-mt-0.5 mb-1 px-1 text-[10.5px] leading-relaxed text-muted">{{ t('adSkewStarDesc') }}</p>
-              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">{{ stripEmoji(t('adAdblock')) }}</a>
-              <p class="-mt-0.5 mb-1 px-1 text-[10.5px] leading-relaxed text-muted">{{ t('adAdblockDesc') }}</p>
-              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener">{{ stripEmoji(t('adClick')) }}</a>
-              <p class="-mt-0.5 mb-1 px-1 text-[10.5px] leading-relaxed text-muted">{{ t('adClickDesc') }}</p>
-              <p class="mt-2 text-[10.5px] leading-relaxed text-muted">{{ t('adThanks') }}</p>
+              <SupportFeedbackPanel />
             </div>
           </div>
         </aside>

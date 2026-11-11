@@ -23,6 +23,7 @@ import Toast from '@/components/Toast.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 import RealNameNoticeModal from '@/components/RealNameNoticeModal.vue'
 import LangSwitcher from '@/components/shared/LangSwitcher.vue'
+import SupportFeedbackPanel from '@/components/shared/SupportFeedbackPanel.vue'
 
 const { themeIcon, themeLabel, cycleTheme } = useTheme()
 const { visible: toastVisible, message: toastMessage, type: toastType } = useToast()
@@ -206,48 +207,9 @@ async function autoReconnectRunningTask() {
           </button>
         </div>
 
+        <!-- 支持作者（上）+ 问题反馈（下）：共用组件，进度页侧栏同款 -->
         <div class="mt-4 border-t border-rule/60 pt-4">
-          <p class="eyebrow px-2.5">{{ t('adSupportTitle') }}</p>
-          <p class="mt-1.5 px-2.5 text-[10.5px] leading-relaxed text-muted/75">{{ t('adSupportDesc') }}</p>
-          <div class="mt-2.5 space-y-2.5">
-            <div>
-              <a
-                href="https://github.com/lcy362/agnes-video-generator"
-                target="_blank"
-                rel="noopener"
-                class="block rounded px-2.5 text-[11.5px] text-muted transition-colors hover:text-ink-2"
-              >{{ stripEmoji(t('adStar')) }}</a>
-              <p class="px-2.5 text-[10.5px] leading-snug text-muted/75">{{ t('adStarDesc') }}</p>
-            </div>
-            <div>
-              <a
-                href="https://github.com/lcy362/flint"
-                target="_blank"
-                rel="noopener"
-                class="block rounded px-2.5 text-[11.5px] text-muted transition-colors hover:text-ink-2 break-words"
-              >{{ stripEmoji(t('adSkewStar')) }}</a>
-              <p class="px-2.5 text-[10.5px] leading-snug text-muted/75">{{ t('adSkewStarDesc') }}</p>
-            </div>
-            <div>
-              <a
-                href="https://video.lichuanyang.top"
-                target="_blank"
-                rel="noopener"
-                class="block rounded px-2.5 text-[11.5px] text-muted transition-colors hover:text-ink-2"
-              >{{ stripEmoji(t('adAdblock')) }}</a>
-              <p class="px-2.5 text-[10.5px] leading-snug text-muted/75">{{ t('adAdblockDesc') }}</p>
-            </div>
-            <div>
-              <a
-                href="https://video.lichuanyang.top"
-                target="_blank"
-                rel="noopener"
-                class="block rounded px-2.5 text-[11.5px] text-muted transition-colors hover:text-ink-2"
-              >{{ stripEmoji(t('adClick')) }}</a>
-              <p class="px-2.5 text-[10.5px] leading-snug text-muted/75">{{ t('adClickDesc') }}</p>
-            </div>
-          </div>
-          <p class="mt-3 px-2.5 text-[10.5px] leading-relaxed text-muted/70">{{ t('adThanks') }}</p>
+          <SupportFeedbackPanel />
         </div>
       </div>
     </aside>

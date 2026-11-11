@@ -2,6 +2,7 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { t } from '@/i18n'
 import { stripEmoji } from '@/utils/text'
+import { siteUrl } from '@/utils/siteLinks'
 import { appState } from '@/store'
 import { useGa } from '@/composables/useGa'
 import { useVideoModelCaps, MODE_API_TO_V25, MODE_V25_TO_API } from '@/composables/useVideoModelCaps'
@@ -386,8 +387,9 @@ async function submitImage() {
           {{ stripEmoji(t('subModeImage')) }}
         </button>
       </div>
+      <!-- v8.0：模式示例统一指到官网新版示例页（/showcase，带 UI 语言前缀） -->
       <a
-        href="https://video.lichuanyang.top/guides/prompt-examples-simple"
+        :href="siteUrl('/showcase')"
         target="_blank"
         rel="noopener"
         class="ms-auto text-[11.5px] text-muted transition-colors hover:text-accent"
