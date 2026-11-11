@@ -25,16 +25,24 @@
 import hashlib
 import itertools
 import logging
+import os
+import secrets
 import threading
 import time
 from typing import Optional
 
-from core.config import get_api_keys
+from core.config import CONFIG_DIR, get_api_keys
 
 logger = logging.getLogger(__name__)
 
-#: Key 指纹的固定盐（仅用于日志/状态文件中的不可逆标识，不参与鉴权）
-_KEY_FP_SALT = b"agnes-video-generator/key-fingerprint/v1"
+#: Key 指纹盐文件：首次计算指纹时随机生成并持久化到配置目录（0600）。
+#: 盐本身不是秘密，但**必须不可预测**（python:S2053）：写死的常量会被判为
+#: 「可预测盐」。随机化后同一安装内指纹保持稳定（``video_key_hints`` 依赖它
+#: 做 Key 归属回查），仅在配置目录丢失/切换时变化。
+_KEY_FP_SALT_FILE = os.path.join(CONFIG_DIR, "key_fingerprint_salt")
+_KEY_FP_SALT_BYTES = 32
+_KEY_FP_SALT: Optional[bytes] = None
+_KEY_FP_SALT_LOCK = threading.Lock()
 
 #: PBKDF2 迭代次数（与 ``config_routes._KEY_ID_PBKDF2_ITERATIONS`` 对齐，
 #: 单次约 15ms）。静态扫描要求「作用于敏感数据」的哈希必须是计算昂贵型，
@@ -47,22 +55,72 @@ _KEY_FP_CACHE: dict = {}
 _KEY_FP_CACHE_MAX = 16
 
 
+def _load_or_create_salt() -> bytes:
+    """读取本安装的指纹盐；不存在时用 ``secrets`` 生成并落盘。
+
+    只读文件系统或落盘失败时退化为**进程内随机盐**：指纹仍然不可预测，
+    代价是重启后与已落盘的 ``video_key_hints`` 不匹配，回退到 v7.8 的
+    「404 归属探测」。
+
+    Returns:
+        至少 16 字节的随机盐。
+    """
+    try:
+        with open(_KEY_FP_SALT_FILE, "rb") as fh:
+            salt = fh.read(_KEY_FP_SALT_BYTES)
+        if len(salt) >= 16:
+            return salt
+    except OSError:
+        pass
+
+    salt = secrets.token_bytes(_KEY_FP_SALT_BYTES)
+    try:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        fd = os.open(_KEY_FP_SALT_FILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        # 并发首启：另一进程已写入，读取它的值以保证进程间指纹一致
+        try:
+            with open(_KEY_FP_SALT_FILE, "rb") as fh:
+                return fh.read(_KEY_FP_SALT_BYTES) or salt
+        except OSError:
+            return salt
+    except OSError:
+        logger.debug("[KeyFp] fingerprint salt is not persistable; using a process-local salt")
+        return salt
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(salt)
+    return salt
+
+
+def _fingerprint_salt() -> bytes:
+    """返回本安装的指纹盐（首次调用时惰性生成，之后复用内存值）。"""
+    global _KEY_FP_SALT
+    if _KEY_FP_SALT is not None:
+        return _KEY_FP_SALT
+    with _KEY_FP_SALT_LOCK:
+        if _KEY_FP_SALT is None:
+            _KEY_FP_SALT = _load_or_create_salt()
+    return _KEY_FP_SALT
+
+
 def key_fingerprint(key: str) -> str:
-    """API Key 的短指纹（HMAC-SHA256 前 16 位十六进制，带固定盐）。
+    """API Key 的短指纹（PBKDF2-HMAC-SHA256 前 16 位十六进制，带随机盐）。
 
     日志里需要区分「这一跳用的是哪把 Key」时**只能打印指纹**：明文 Key 的
     任何片段（首 8 / 尾 4）都属于敏感信息，落进日志即视为泄漏
     （CodeQL ``py/clear-text-logging-sensitive-data``）。指纹不可反推明文，
     同一把 Key 的指纹稳定，足够人眼与多 Key 排查对照。
 
-    算法选择：PBKDF2-HMAC-SHA256（10 万次迭代，与配置页的 Key ID 同参数）。
-    静态扫描要求作用于敏感数据的哈希必须是**计算昂贵**型——裸 SHA-256 与
-    HMAC-SHA256 都会被 ``py/weak-sensitive-data-hashing`` 判为弱哈希。
-    指纹只在首次计算，之后命中内存缓存，日志路径上无重复开销。
+    算法选择：PBKDF2-HMAC-SHA256（10 万次迭代，与配置页的 Key ID 同参数）
+    ＋**每安装随机盐**（首次使用时生成并写入配置目录）。静态扫描要求作用于
+    敏感数据的哈希必须是计算昂贵型——裸 SHA-256 与 HMAC-SHA256 都会被
+    ``py/weak-sensitive-data-hashing`` 判为弱哈希；盐则必须不可预测，写死
+    常量会被 ``python:S2053`` 判为漏洞。指纹只在首次计算，之后命中内存缓存，
+    日志路径上无重复开销。
 
-    兼容性：盐与迭代次数固定，所以同一次部署内指纹稳定；早期版本落盘的
-    ``video_key_hints`` 用的是裸 SHA-256，重启后与当前指纹不匹配时会退回
-    v7.8 的「404 归属探测」（见 ``AgnesVideoAPI._probe_owner_key``），
+    兼容性：盐随安装持久化，所以同一安装内指纹稳定；早期版本落盘的
+    ``video_key_hints`` 用的是裸 SHA-256（或固定盐），与当前指纹不匹配时会
+    退回 v7.8 的「404 归属探测」（见 ``AgnesVideoAPI._probe_owner_key``），
     单 Key 场景无影响。
 
     Args:
@@ -77,7 +135,7 @@ def key_fingerprint(key: str) -> str:
     if cached:
         return cached
     fp = hashlib.pbkdf2_hmac(
-        "sha256", key.encode("utf-8"), _KEY_FP_SALT, _KEY_FP_ITERATIONS
+        "sha256", key.encode("utf-8"), _fingerprint_salt(), _KEY_FP_ITERATIONS
     ).hex()[:16]
     if len(_KEY_FP_CACHE) >= _KEY_FP_CACHE_MAX:
         _KEY_FP_CACHE.pop(next(iter(_KEY_FP_CACHE)), None)

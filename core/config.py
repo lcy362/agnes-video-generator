@@ -1089,10 +1089,13 @@ DURATION_FRAME_MAP = {
 # 模型选择配置（v5.0 新增：文本 / 图像 / 视频模型）
 # ═══════════════════════════════════════════════════
 
+#: 免费视频模型标识（默认模型 / 分辨率强制档 / 能力元数据三处共用）
+VIDEO_MODEL_FLASH = "agnes-video-2.5-flash"
+
 # 各类型 Agnes 模型默认值（与三个 API 客户端的默认 model 对齐）
 DEFAULT_TEXT_MODEL = "agnes-3.0-flash"
 DEFAULT_IMAGE_MODEL = "agnes-image-2.5-flash"
-DEFAULT_VIDEO_MODEL = "agnes-video-2.5-flash"
+DEFAULT_VIDEO_MODEL = VIDEO_MODEL_FLASH
 
 DEFAULT_MODELS = {
     "text": DEFAULT_TEXT_MODEL,
@@ -1333,7 +1336,7 @@ def normalize_video_size(size: Optional[str], model: str = "") -> str:
     value = VIDEO_LEGACY_SIZE_MAP.get(value, value)
     if not value or value not in VIDEO_25_SIZES:
         value = "720P"
-    if model == "agnes-video-2.5-flash":
+    if model == VIDEO_MODEL_FLASH:
         return "720P"
     return value
 
@@ -1369,7 +1372,7 @@ VIDEO_MODEL_CAPABILITIES = {
             "en": "Paid model. 720P/1080P/1K/2K, 4–12s, keyframes and image/audio reference; no negative prompt.",
         },
     },
-    "agnes-video-2.5-flash": {  # 免费新版（限时免费）
+    VIDEO_MODEL_FLASH: {  # 免费新版（限时免费）
         "label": "Video 2.5 Flash",
         "price": "free",
         "price_text": {"zh": "免费（限时）", "en": "Free (limited time)"},

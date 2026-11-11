@@ -1393,35 +1393,72 @@ class AgnesVideoAPI:
         调用方若混传，本方法按「keyframe > reference > text」取舍，保证不触发
         上游 400（前端/路由层另有显式校验）。
         """
-        # 时长：duration(秒) → seconds 字符串（4–12，超界截断）
-        secs = int(duration) if duration else 5
-        seconds = str(max(4, min(secs, 12)))
-        # 分辨率：官方枚举归一（旧 960P → 1080P；flash 强制 720P）
-        size = normalize_video_size(kwargs.get("video_size"), self.model)
-        aspect_ratio = self._width_height_to_aspect_ratio(width, height)
+        payload = self._build_v25_payload(
+            prompt, duration, width, height, seed, kwargs.get("video_size"),
+        )
+        resolved_refs, resolved_first, resolved_last, audios = await self._resolve_v25_media(
+            reference_image_paths, first_frame, last_frame,
+            reference_audio_urls, width, height,
+        )
+        mode_desc = self._apply_v25_mode(
+            payload, resolved_refs, resolved_first, resolved_last, audios,
+        )
 
+        logger.info(f"[AgnesVideo] {mode_desc}: {prompt[:80]}...")
+        video_id = await self._submit_with_retry(payload, mode_desc, progress_callback)
+        logger.info(f"[AgnesVideo] Video submitted: {video_id[:20]}...")
+        return video_id
+
+    @staticmethod
+    def _normalize_seconds(duration: Optional[int]) -> str:
+        """秒数 → 官方 seconds 字符串（4–12，缺省 5，超界截断）。"""
+        secs = int(duration) if duration else 5
+        return str(max(4, min(secs, 12)))
+
+    def _build_v25_payload(
+        self,
+        prompt: str,
+        duration: Optional[int],
+        width: int,
+        height: int,
+        seed: Optional[int],
+        video_size: Optional[str],
+    ) -> dict:
+        """构造 2.5 协议的基础负载（mode 由 ``_apply_v25_mode`` 后续决定）。"""
         payload: dict = {
             "model": self.model,
             "prompt": prompt,
             "mode": "text",
-            "seconds": seconds,
-            "size": size,
-            "aspect_ratio": aspect_ratio,
+            "seconds": self._normalize_seconds(duration),
+            # 分辨率：官方枚举归一（旧 960P → 1080P；flash 强制 720P）
+            "size": normalize_video_size(video_size, self.model),
+            "aspect_ratio": self._width_height_to_aspect_ratio(width, height),
         }
         if seed is not None:
             payload["seed"] = seed
+        return payload
+
+    async def _resolve_v25_media(
+        self,
+        reference_image_paths: List[str],
+        first_frame: Optional[str],
+        last_frame: Optional[str],
+        reference_audio_urls: Optional[List[str]],
+        width: int,
+        height: int,
+    ) -> tuple:
+        """解析 2.5 协议素材：参考图 + 首尾帧 + 参考音频。
+
+        Returns:
+            ``(resolved_refs, resolved_first, resolved_last, audios)``。
+        """
 
         async def _resolve(src: str) -> str:
             """本地图片 → 归一化 → 公开 URL（与既有参考图链路一致）。"""
             norm = await asyncio.to_thread(normalize_reference_path, src, width, height)
             return await self._resolve_image_ref(norm)
 
-        # 参考图（reference 模式，多图）
-        resolved_refs: List[str] = []
-        for p in reference_image_paths:
-            if p:
-                resolved_refs.append(await _resolve(p))
-        # 首尾帧（keyframe 模式，原生字段）
+        resolved_refs: List[str] = [await _resolve(p) for p in reference_image_paths if p]
         resolved_first = await _resolve(first_frame) if first_frame else ""
         resolved_last = await _resolve(last_frame) if last_frame else ""
         # 参考音频（仅接受公开 http(s) URL；本地文件上传通道暂不支持音频）
@@ -1429,47 +1466,110 @@ class AgnesVideoAPI:
             u.strip() for u in (reference_audio_urls or [])
             if isinstance(u, str) and u.strip().startswith(("http://", "https://"))
         ][:3]
+        return resolved_refs, resolved_first, resolved_last, audios
 
-        # 原生 keyframe 开关（默认开）。关闭后回落 v6.2.1 的 reference 多图降级，
-        # 便于上游若仍存在「keyframe 固定 704×704」问题时一键回退。
-        native_keyframe = os.environ.get("AGNES_KEYFRAME_NATIVE", "1").strip().lower() not in (
+    @staticmethod
+    def _native_keyframe_enabled() -> bool:
+        """原生 keyframe 开关（默认开）。
+
+        关闭后回落 v6.2.1 的 reference 多图降级，便于上游若仍存在
+        「keyframe 固定 704×704」问题时一键回退。
+        """
+        return os.environ.get("AGNES_KEYFRAME_NATIVE", "1").strip().lower() not in (
             "0", "false", "off", "no",
         )
-        max_refs = 5 if self.model == "agnes-video-2.5-flash" else 8
 
+    def _apply_v25_mode(
+        self,
+        payload: dict,
+        resolved_refs: List[str],
+        resolved_first: str,
+        resolved_last: str,
+        audios: List[str],
+    ) -> str:
+        """按「keyframe > reference > text」写入 mode 与素材，返回日志描述。"""
+        native_keyframe = self._native_keyframe_enabled()
         if (resolved_first or resolved_last) and native_keyframe:
-            payload["mode"] = "keyframe"
-            if resolved_first:
-                payload["first_frame"] = resolved_first
-            if resolved_last:
-                payload["last_frame"] = resolved_last
-            mode_desc = (
-                "keyframe (first+last)" if resolved_first and resolved_last
-                else ("keyframe (first)" if resolved_first else "keyframe (last)")
-            )
-        elif resolved_first or resolved_last or resolved_refs or audios:
-            payload["mode"] = "reference"
-            images = resolved_refs
-            if not native_keyframe:
-                # 降级路径：首尾帧并入参考图（旧行为），输出遵循 aspect_ratio
-                images = [x for x in (resolved_first, resolved_last) if x] + images
-            if images:
-                payload["images"] = images[:max_refs]
-            if audios:
-                payload["audios"] = audios
-            descs = []
-            if images:
-                descs.append(f"{len(images)} image(s)")
-            if audios:
-                descs.append(f"{len(audios)} audio(s)")
-            mode_desc = "reference (" + ", ".join(descs) + ")"
-        else:
-            mode_desc = "text-to-video"
+            return self._apply_keyframe_payload(payload, resolved_first, resolved_last)
+        if not (resolved_first or resolved_last or resolved_refs or audios):
+            return "text-to-video"
+        return self._apply_reference_payload(
+            payload, resolved_refs, resolved_first, resolved_last, audios, native_keyframe,
+        )
 
-        logger.info(f"[AgnesVideo] {mode_desc}: {prompt[:80]}...")
-        video_id = await self._submit_with_retry(payload, mode_desc, progress_callback)
-        logger.info(f"[AgnesVideo] Video submitted: {video_id[:20]}...")
-        return video_id
+    @staticmethod
+    def _apply_keyframe_payload(payload: dict, first: str, last: str) -> str:
+        """原生 keyframe 模式：只提交 first_frame / last_frame。"""
+        payload["mode"] = "keyframe"
+        if first:
+            payload["first_frame"] = first
+        if last:
+            payload["last_frame"] = last
+        if first and last:
+            return "keyframe (first+last)"
+        if first:
+            return "keyframe (first)"
+        return "keyframe (last)"
+
+    def _apply_reference_payload(
+        self,
+        payload: dict,
+        resolved_refs: List[str],
+        resolved_first: str,
+        resolved_last: str,
+        audios: List[str],
+        native_keyframe: bool,
+    ) -> str:
+        """reference 模式：images / audios（keyframe 关闭时首尾帧并入参考图）。"""
+        payload["mode"] = "reference"
+        max_refs = 5 if self.model == "agnes-video-2.5-flash" else 8
+        images = resolved_refs
+        if not native_keyframe:
+            # 降级路径：首尾帧并入参考图（旧行为），输出遵循 aspect_ratio
+            images = [x for x in (resolved_first, resolved_last) if x] + images
+        if images:
+            payload["images"] = images[:max_refs]
+        if audios:
+            payload["audios"] = audios
+        descs = []
+        if images:
+            descs.append(f"{len(images)} image(s)")
+        if audios:
+            descs.append(f"{len(audios)} audio(s)")
+        return "reference (" + ", ".join(descs) + ")"
+
+    def _resolve_pinned_key(self, video_id: str, key: Optional[str]) -> Optional[str]:
+        """确定轮询使用的 Key：显式指定 → 内存绑定 → 状态文件指纹回查。"""
+        pinned_key = key or self._task_keys.get(video_id)
+        if pinned_key is None and self.key_hint_resolver is not None:
+            try:
+                pinned_key = self.key_hint_resolver(video_id)
+            except Exception as e:
+                logger.debug(f"[KeyBind] hint resolver failed: {e}")
+        return pinned_key
+
+    @staticmethod
+    def _extract_video_url(final: dict) -> str:
+        """从完成任务负载中取成品地址（兼容 2.0 / 2.5 / REST 端点结构）。
+
+        v7.9：REST 端点（``/v1/videos/{id}``）把成品地址放在 ``metadata.url``。
+        """
+        video_url = (
+            final.get("remixed_from_video_id")
+            or final.get("video_url")
+            or final.get("url")
+        )
+        if video_url:
+            return video_url
+        data = final.get("data", {})
+        if isinstance(data, dict):
+            video_url = data.get("video_url") or data.get("url")
+        if video_url:
+            return video_url
+        meta = final.get("metadata")
+        if isinstance(meta, dict):
+            return meta.get("url") or meta.get("video_url") or ""
+        return ""
 
     async def wait_for_video(self, video_id: str, progress_callback=None,
                              key: str | None = None) -> VideoOutput:
@@ -1486,34 +1586,15 @@ class AgnesVideoAPI:
         # 1.2：轮询总超时可经 AGNES_VIDEO_POLL_TIMEOUT 配置（3.5 RuntimeSettings 收敛）
         from core.config import get_settings
         settings = get_settings()
-        poll_timeout = settings.agnes_video_poll_timeout
         # v7.8：优先内存绑定 → 其次按任务状态里的 Key 指纹恢复（进程重启/resume）
-        pinned_key = key or self._task_keys.get(video_id)
-        if pinned_key is None and self.key_hint_resolver is not None:
-            try:
-                pinned_key = self.key_hint_resolver(video_id)
-            except Exception as e:
-                logger.debug(f"[KeyBind] hint resolver failed: {e}")
+        pinned_key = self._resolve_pinned_key(video_id, key)
         final = await self._poll_task(
             video_id, progress_callback=progress_callback,
-            max_poll_duration=poll_timeout,
+            max_poll_duration=settings.agnes_video_poll_timeout,
             key=pinned_key,
         )
 
-        video_url = (
-            final.get("remixed_from_video_id")
-            or final.get("video_url")
-            or final.get("url")
-        )
-        if not video_url:
-            data = final.get("data", {})
-            if isinstance(data, dict):
-                video_url = data.get("video_url") or data.get("url")
-        if not video_url:
-            # v7.9：REST 端点（/v1/videos/{id}）把成品地址放在 metadata.url
-            meta = final.get("metadata")
-            if isinstance(meta, dict):
-                video_url = meta.get("url") or meta.get("video_url")
+        video_url = self._extract_video_url(final)
         if not video_url:
             raise RuntimeError(f"Agnes video: no URL in completed task: {final}")
 

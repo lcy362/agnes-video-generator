@@ -1,6 +1,6 @@
 # SonarCloud 分析工作流（提交代码 → Sonar 分析）
 
-> 最近更新：2026-09-01
+> 最近更新：2026-11-11
 > 本文档描述**从 push 代码到 SonarCloud 完成分析**的完整链路、触发条件、
 > 关键配置与故障排查。配套文件：
 > - 工作流定义：`.github/workflows/test.yml`
@@ -159,6 +159,17 @@
 > 再物化成**长度只由常量 `_MAX_SCENE_COUNT`（30）决定**的占位列表；同时把
 > `end_frame_indices_json` 的解析收拢为 `_parse_end_frame_indices()`，与
 > `scene_count` 共用同一常量上界。补 2 条回归测试（越界 422 / 上界 29 正常落盘）。
+>
+> **2026-11-11 修复记录**（v8.0 收尾批次引入）：门禁 `new_security_rating = 4`
+> 判红，1 个 `python:S2053`（Make this salt unpredictable，CRITICAL）。链路：
+> `core/api/key_manager.py::key_fingerprint` 把模块级常量 `_KEY_FP_SALT` 当作
+> PBKDF2 盐 → 静态扫描判定「盐可预测」。修复：改为**每安装随机盐**——首次调用
+> `secrets.token_bytes(32)` 生成，以 0600 原子写入 `<CONFIG_DIR>/key_fingerprint_salt`
+> （`O_CREAT|O_EXCL`，并发首启读回先写入者的值），只读文件系统退化为进程内随机盐。
+> 盐随安装持久化，因此指纹跨重启稳定，`video_key_hints` 的回查语义不变。
+> 同批次一并清理 v8.0 新代码的 12 条代码味道（S3776 ×4 / S8415 ×4 / S107 /
+> S1192 / S3358 / S5869），涉及 `simple_video.py`、`agnes_video.py`、
+> `task_creation_routes.py`、`config.py`。
 
 ---
 

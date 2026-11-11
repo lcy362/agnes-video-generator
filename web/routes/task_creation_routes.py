@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from PIL import Image
 
 from core.async_io import write_bytes
@@ -299,52 +299,52 @@ async def _save_upload_file(
     return upload_path
 
 
-@router.post("/api/tasks/simple")
-async def create_simple_task(
-    prompt: str = Form(...),
-    mode: str = Form(SIMPLE_DEFAULT_PRESET["mode"]),
-    duration: int = Form(SIMPLE_DEFAULT_PRESET["duration"]),
-    video_width: int = Form(SIMPLE_DEFAULT_PRESET["video_width"]),
-    video_height: int = Form(SIMPLE_DEFAULT_PRESET["video_height"]),
-    seed: Optional[int] = Form(None),
-    negative_prompt: Optional[str] = Form(None),
-    system_prompt: str = Form(""),
-    # ── 旧字段（历史前端/API 调用兼容）──
-    reference_image: UploadFile = File(None),
-    end_frame_image: UploadFile = File(None),
-    # ── v8.0：对齐官方最新接口 ──
-    reference_images: List[UploadFile] = File(None),  # reference：多图（≤5/≤8）
-    first_frame_image: UploadFile = File(None),      # keyframe：首帧
-    last_frame_image: UploadFile = File(None),       # keyframe：尾帧
-    reference_audio_urls: str = Form(""),            # reference：音频公开 URL（换行/逗号分隔，≤3）
-    video_size: Optional[str] = Form(None),
-):
-    """创建简单视频任务（类型 1）。
+#: 简单视频支持的生成模式（v8.0 对齐官方 2.5 协议）
+_SIMPLE_VALID_MODES = {"t2v", "i2v", "ti2vid", "keyframes"}
 
-    v8.0：只传 prompt 即走一键预设（免费 2.5-flash / 5s / 16:9 / 720P）；
-    其余参数按官方 2.5 协议（mode/seconds/size/aspect_ratio + 模式专用素材）透传。
+#: 前端模式 → 任务模型枚举（校验通过后才会取值，缺省为文生视频）
+_SIMPLE_MODE_MAP = {
+    "i2v": VideoMode.I2V,
+    "ti2vid": VideoMode.TI2VID,
+    "keyframes": VideoMode.KEYFRAMES,
+}
+
+
+class _SimpleTaskExtras:
+    """简单视频的兼容/扩展表单字段。
+
+    放进 ``Depends()`` 只为保持路由签名精简（S107）：字段名与原路由参数
+    完全一致，multipart 契约不变。``reference_image`` / ``end_frame_image``
+    是 v8.0 之前的旧字段，仍需继续接受。
     """
-    api_key = get_api_key()
-    if not api_key:
-        raise HTTPException(status_code=400, detail=api_key_missing_msg())
 
-    # P7: 参数校验
-    _VALID_MODES = {"t2v", "i2v", "ti2vid", "keyframes"}
-    if mode not in _VALID_MODES:
+    def __init__(
+        self,
+        reference_image: UploadFile = File(None),
+        end_frame_image: UploadFile = File(None),
+        reference_audio_urls: str = Form(""),
+        video_size: Optional[str] = Form(None),
+    ):
+        self.reference_image = reference_image
+        self.end_frame_image = end_frame_image
+        self.reference_audio_urls = reference_audio_urls
+        self.video_size = video_size
+
+
+def _validate_simple_params(mode: str, duration: int, prompt: str) -> None:
+    """校验简单视频的模式 / 时长 / prompt 长度，非法时抛 422。"""
+    if mode not in _SIMPLE_VALID_MODES:
         raise HTTPException(
             status_code=422,
-            detail=translate("validation.mode_invalid", None, options=_VALID_MODES, current=mode),
+            detail=translate("validation.mode_invalid", None, options=_SIMPLE_VALID_MODES, current=mode),
         )
     # v6.2：2.5 系列（当前唯一在线的视频模型）时长档位为 4–12 秒
-    valid_durations = VIDEO_25_DURATIONS
-    if duration not in valid_durations:
+    if duration not in VIDEO_25_DURATIONS:
         raise HTTPException(
             status_code=422,
             detail=translate(
-                "validation.duration_invalid",
-                None,
-                options=sorted(valid_durations),
-                current=duration,
+                "validation.duration_invalid", None,
+                options=sorted(VIDEO_25_DURATIONS), current=duration,
             ),
         )
     if len(prompt) > 5000:
@@ -353,17 +353,27 @@ async def create_simple_task(
             detail=translate("validation.prompt_too_long", None),
         )
 
-    # ── v8.0：素材解析与「模式 ↔ 素材」一致性校验 ──
-    video_model = get_selected_models()["video"]
+
+def _split_audio_urls(raw: str) -> List[str]:
+    """拆分参考音频 URL（换行 / 逗号 / 分号 / 空白分隔）。"""
+    return [u.strip() for u in re.split(r"[,，;；\s]+", raw or "") if u.strip()]
+
+
+def _resolve_simple_media(
+    reference_images: List[UploadFile],
+    reference_audio_urls: str,
+    video_model: str,
+) -> tuple:
+    """解析并校验简单视频素材（数量上限 / 音频协议），非法时抛 422。
+
+    Returns:
+        ``(ref_files, audio_urls)``。
+    """
     caps = get_video_model_capabilities().get(video_model, {})
     max_ref_images = int(caps.get("max_ref_images") or 5)
     max_ref_audios = int(caps.get("max_ref_audios") or 3)
-
     ref_files = [f for f in (reference_images or []) if f and f.filename]
-    audio_urls = [
-        u for u in re.split(r"[\n,，;；\s]+", reference_audio_urls or "") if u.strip()
-    ]
-    audio_urls = [u.strip() for u in audio_urls]
+    audio_urls = _split_audio_urls(reference_audio_urls)
 
     if len(ref_files) > max_ref_images:
         raise HTTPException(
@@ -386,6 +396,82 @@ async def create_simple_task(
             status_code=422,
             detail=translate("validation.ref_audio_url_invalid", None),
         )
+    return ref_files, audio_urls
+
+
+async def _save_simple_uploads(
+    state: SimpleVideoTask,
+    task_id: str,
+    upload_dir: str,
+    ref_files: List[UploadFile],
+    first_frame_image: UploadFile,
+    last_frame_image: UploadFile,
+    extras: _SimpleTaskExtras,
+) -> None:
+    """落盘参考图 / 首尾帧（UUID 命名，避免客户端文件名路径穿越）。"""
+    saved_refs: List[str] = []
+    for idx, f in enumerate(ref_files):
+        saved_refs.append(await _save_upload_file(f, upload_dir, f"{task_id}_ref{idx}"))
+    if extras.reference_image and extras.reference_image.filename:
+        state.reference_image = await _save_upload_file(
+            extras.reference_image, upload_dir, f"{task_id}_ref",
+        )
+        if not saved_refs:
+            saved_refs = [state.reference_image]
+    if saved_refs:
+        state.reference_images = saved_refs
+    # v8.0：keyframe 原生首/尾帧
+    if first_frame_image and first_frame_image.filename:
+        state.first_frame_image = await _save_upload_file(
+            first_frame_image, upload_dir, f"{task_id}_first",
+        )
+    if last_frame_image and last_frame_image.filename:
+        state.last_frame_image = await _save_upload_file(
+            last_frame_image, upload_dir, f"{task_id}_last",
+        )
+    # 旧 keyframes 尾帧字段（历史前端仍可能只传这一个）
+    if extras.end_frame_image and extras.end_frame_image.filename:
+        state.end_frame_image = await _save_upload_file(
+            extras.end_frame_image, upload_dir, f"{task_id}_end",
+        )
+
+
+@router.post(
+    "/api/tasks/simple",
+    responses={
+        400: {"description": "缺少 API Key 或上传文件不可读"},
+        422: {"description": "生成参数或素材组合不合法"},
+    },
+)
+async def create_simple_task(
+    prompt: str = Form(...),
+    mode: str = Form(SIMPLE_DEFAULT_PRESET["mode"]),
+    duration: int = Form(SIMPLE_DEFAULT_PRESET["duration"]),
+    video_width: int = Form(SIMPLE_DEFAULT_PRESET["video_width"]),
+    video_height: int = Form(SIMPLE_DEFAULT_PRESET["video_height"]),
+    seed: Optional[int] = Form(None),
+    negative_prompt: Optional[str] = Form(None),
+    system_prompt: str = Form(""),
+    reference_images: List[UploadFile] = File(None),
+    first_frame_image: UploadFile = File(None),
+    last_frame_image: UploadFile = File(None),
+    extras: _SimpleTaskExtras = Depends(),
+):
+    """创建简单视频任务（类型 1）。
+
+    v8.0：只传 prompt 即走一键预设（免费 2.5-flash / 5s / 16:9 / 720P）；
+    其余参数按官方 2.5 协议（mode/seconds/size/aspect_ratio + 模式专用素材）透传。
+    """
+    api_key = get_api_key()
+    if not api_key:
+        raise HTTPException(status_code=400, detail=api_key_missing_msg())
+
+    _validate_simple_params(mode, duration, prompt)
+
+    video_model = get_selected_models()["video"]
+    ref_files, audio_urls = _resolve_simple_media(
+        reference_images, extras.reference_audio_urls, video_model,
+    )
     # 官方模式互斥：keyframe 不允许 images/audios。
     # 注：i2v/keyframes 缺素材不在后端硬拒——旧 API 调用方（含历史测试/脚本）依赖
     # 「无图也能建任务」；「选了图生视频却没传图」的拦截放在前端表单，既保证正常
@@ -397,23 +483,16 @@ async def create_simple_task(
         )
 
     # 清晰度归一到官方枚举（旧 960P → 1080P；flash 强制 720P）
-    video_size = normalize_video_size(video_size, video_model)
+    video_size = normalize_video_size(extras.video_size, video_model)
 
     task_id = uuid.uuid4().hex[:12]
     dir_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_id}"
-
-    # 映射模式
-    video_mode = VideoMode.T2V
-    if mode in ("i2v", "ti2vid"):
-        video_mode = VideoMode.I2V if mode == "i2v" else VideoMode.TI2VID
-    elif mode == "keyframes":
-        video_mode = VideoMode.KEYFRAMES
 
     state = SimpleVideoTask(
         task_id=task_id,
         creative_name=f"simple_{task_id}",
         prompt=prompt,
-        mode=video_mode,
+        mode=_SIMPLE_MODE_MAP.get(mode, VideoMode.T2V),
         duration=duration,
         video_width=video_width,
         video_height=video_height,
@@ -426,26 +505,13 @@ async def create_simple_task(
         ui_language=get_current_lang(),
     )
 
-    upload_dir = helpers.get_upload_dir()
     # 处理参考图上传（L4: 用 UUID 替代客户端文件名，避免路径穿越）
     # v8.0：reference 多图；旧单图字段同时回填，保证 pipeline 兼容两条入口
-    saved_refs: List[str] = []
-    for idx, f in enumerate(ref_files):
-        saved_refs.append(await _save_upload_file(f, upload_dir, f"{task_id}_ref{idx}"))
-    if reference_image and reference_image.filename:
-        state.reference_image = await _save_upload_file(reference_image, upload_dir, f"{task_id}_ref")
-        if not saved_refs:
-            saved_refs = [state.reference_image]
-    if saved_refs:
-        state.reference_images = saved_refs
-    # v8.0：keyframe 原生首/尾帧
-    if first_frame_image and first_frame_image.filename:
-        state.first_frame_image = await _save_upload_file(first_frame_image, upload_dir, f"{task_id}_first")
-    if last_frame_image and last_frame_image.filename:
-        state.last_frame_image = await _save_upload_file(last_frame_image, upload_dir, f"{task_id}_last")
-    # 旧 keyframes 尾帧字段（历史前端仍可能只传这一个）
-    if end_frame_image and end_frame_image.filename:
-        state.end_frame_image = await _save_upload_file(end_frame_image, upload_dir, f"{task_id}_end")
+    upload_dir = helpers.get_upload_dir()
+    await _save_simple_uploads(
+        state, task_id, upload_dir, ref_files,
+        first_frame_image, last_frame_image, extras,
+    )
 
     pipeline = deps.create_pipeline_for_type(TaskType.SIMPLE, api_key, task_id, dir_name)
     app_state.active_pipelines[task_id] = pipeline
@@ -456,7 +522,6 @@ async def create_simple_task(
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     logger.info(f"[Simple] Task created: {task_id}, mode={mode}, duration={duration}s (queued)")
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
-
 
 @router.post("/api/tasks/creative")
 async def create_creative_task(

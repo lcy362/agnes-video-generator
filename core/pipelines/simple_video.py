@@ -132,54 +132,18 @@ class SimpleVideoPipeline(BasePipeline):
             logger.info("[Simple] Video already exists, skipping")
             return video_path
 
-        # 尝试从 task.json 恢复（resume 场景）
-        saved_video_id = self._load_task_json(self.working_dir)
-        if saved_video_id:
-            logger.info(f"[Simple] Resuming from saved task.json video_id: {saved_video_id}")
-            self._state.video_id = saved_video_id
-            self.task_manager.update_state(video_id=saved_video_id)
-            await self._emit("video_gen", "running", self._t("progress.simple.resume_polling", vid=saved_video_id[:16]), _PROGRESS_WAIT)
-            video_output = await self.video_api.wait_for_video(saved_video_id)
-            await video_output.save(video_path)
-            return video_path
+        resumed_path = await self._resume_saved_video(video_path)
+        if resumed_path:
+            return resumed_path
 
-        # 也检查 state 中的 video_id（旧版 resume 兼容）
-        if self._state.video_id:
-            logger.info(f"[Simple] Resuming from state video_id: {self._state.video_id}")
-            self._save_task_json(self.working_dir, {"video_id": self._state.video_id})
-            await self._emit("video_gen", "running", self._t("progress.simple.resume_polling", vid=self._state.video_id[:16]), _PROGRESS_WAIT)
-            video_output = await self.video_api.wait_for_video(self._state.video_id)
-            await video_output.save(video_path)
-            return video_path
-
-        # 构建素材（v8.0：区分 keyframe 首尾帧 / reference 多图 / 参考音频）
-        state = self._state
-        ref_images: List[str] = list(getattr(state, "reference_images", None) or [])
-        first_frame = getattr(state, "first_frame_image", "") or ""
-        last_frame = getattr(state, "last_frame_image", "") or ""
-        audio_urls = list(getattr(state, "reference_audio_urls", None) or [])
-
-        if state.mode == VideoMode.KEYFRAMES:
-            # 历史 keyframes 任务把首尾帧存在 reference_image / end_frame_image
-            first_frame = first_frame or state.reference_image or ""
-            last_frame = last_frame or state.end_frame_image or ""
-            # 官方规则：keyframe 不允许 images/audios，素材互斥
-            ref_images, audio_urls = [], []
-        elif state.mode in (VideoMode.I2V, VideoMode.TI2VID):
-            # 图生视频只走 reference(images)，不混入首尾帧
-            first_frame, last_frame = "", ""
-            if not ref_images and state.reference_image:
-                ref_images = [state.reference_image]
-        # t2v：保持「有素材则自动按 reference 处理」的旧行为（兼容旧 API 调用）
-
-        await self._emit("video_gen", "running", self._t("progress.simple.submitting", mode=self._state.mode), _PROGRESS_SUBMIT)
-
-        # 分隔符跟随用户 prompt 语言
-        _has_chinese = bool(re.search(r'[\u4e00-\u9fff]', self._state.prompt))
-        _sep = "--- 请严格按照以下描述生成图像/视频 ---" if _has_chinese else "--- Generate image/video strictly based on the following description ---"
-        full_prompt = f"{self._state.system_prompt.strip()}\n\n{_sep}\n{self._state.prompt}" if self._state.system_prompt.strip() else self._state.prompt
+        ref_images, first_frame, last_frame, audio_urls = self._collect_media()
+        await self._emit(
+            "video_gen", "running",
+            self._t("progress.simple.submitting", mode=self._state.mode),
+            _PROGRESS_SUBMIT,
+        )
         video_id = await self.video_api.submit_video(
-            prompt=full_prompt,
+            prompt=self._build_full_prompt(),
             reference_image_paths=ref_images,
             duration=self._state.duration,
             width=self._state.video_width,
@@ -206,3 +170,73 @@ class SimpleVideoPipeline(BasePipeline):
 
         await self._emit("video_gen", "completed", self._t("progress.simple.completed"), _PROGRESS_DONE)
         return video_path
+
+    async def _resume_saved_video(self, video_path: str) -> Optional[str]:
+        """按 task.json / state 中已落盘的 video_id 续跑轮询。
+
+        Returns:
+            续跑成功返回成片路径；无可用 video_id 时返回 ``None``。
+        """
+        saved_video_id = self._load_task_json(self.working_dir)
+        if saved_video_id:
+            logger.info(f"[Simple] Resuming from saved task.json video_id: {saved_video_id}")
+            self._state.video_id = saved_video_id
+            self.task_manager.update_state(video_id=saved_video_id)
+            return await self._poll_saved_video(saved_video_id, video_path)
+
+        # 也检查 state 中的 video_id（旧版 resume 兼容）
+        if self._state.video_id:
+            logger.info(f"[Simple] Resuming from state video_id: {self._state.video_id}")
+            self._save_task_json(self.working_dir, {"video_id": self._state.video_id})
+            return await self._poll_saved_video(self._state.video_id, video_path)
+        return None
+
+    async def _poll_saved_video(self, video_id: str, video_path: str) -> str:
+        """轮询已提交的 video_id 并落盘成片（resume 共用）。"""
+        await self._emit(
+            "video_gen", "running",
+            self._t("progress.simple.resume_polling", vid=video_id[:16]),
+            _PROGRESS_WAIT,
+        )
+        video_output = await self.video_api.wait_for_video(video_id)
+        await video_output.save(video_path)
+        return video_path
+
+    def _collect_media(self) -> tuple:
+        """按模式归拢素材（v8.0：区分 keyframe 首尾帧 / reference 多图 / 参考音频）。
+
+        Returns:
+            ``(ref_images, first_frame, last_frame, audio_urls)``。
+        """
+        state = self._state
+        ref_images: List[str] = list(getattr(state, "reference_images", None) or [])
+        first_frame = getattr(state, "first_frame_image", "") or ""
+        last_frame = getattr(state, "last_frame_image", "") or ""
+        audio_urls = list(getattr(state, "reference_audio_urls", None) or [])
+
+        if state.mode == VideoMode.KEYFRAMES:
+            # 历史 keyframes 任务把首尾帧存在 reference_image / end_frame_image
+            first_frame = first_frame or state.reference_image or ""
+            last_frame = last_frame or state.end_frame_image or ""
+            # 官方规则：keyframe 不允许 images/audios，素材互斥
+            ref_images, audio_urls = [], []
+        elif state.mode in (VideoMode.I2V, VideoMode.TI2VID):
+            # 图生视频只走 reference(images)，不混入首尾帧
+            first_frame, last_frame = "", ""
+            if not ref_images and state.reference_image:
+                ref_images = [state.reference_image]
+        # t2v：保持「有素材则自动按 reference 处理」的旧行为（兼容旧 API 调用）
+        return ref_images, first_frame, last_frame, audio_urls
+
+    def _build_full_prompt(self) -> str:
+        """拼接系统提示词与用户 prompt（分隔符跟随 prompt 语言）。"""
+        prompt = self._state.prompt
+        system_prompt = self._state.system_prompt.strip()
+        if not system_prompt:
+            return prompt
+        has_chinese = bool(re.search(r"[\u4e00-\u9fff]", prompt))
+        sep = (
+            "--- 请严格按照以下描述生成图像/视频 ---" if has_chinese
+            else "--- Generate image/video strictly based on the following description ---"
+        )
+        return f"{system_prompt}\n\n{sep}\n{prompt}"
