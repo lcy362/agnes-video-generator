@@ -196,6 +196,8 @@ async function loadModels() {
       const d = await r.json()
       if (d.models) appState.modelListCache = d.models
       if (d.video_capabilities) appState.videoCapabilities = d.video_capabilities
+      // v8.1：图片侧能力（参考图上限，与视频侧同构）
+      if (d.image_capabilities) appState.imageCapabilities = d.image_capabilities
       // v8.0：简单视频一键预设（后端单一来源）
       if (d.simple_default) appState.simpleDefault = d.simple_default
     }
@@ -225,6 +227,7 @@ async function syncModels() {
       const d = await r.json()
       if (d.models) appState.modelListCache = d.models
       if (d.video_capabilities) appState.videoCapabilities = d.video_capabilities
+      if (d.image_capabilities) appState.imageCapabilities = d.image_capabilities
       if (d.simple_default) appState.simpleDefault = d.simple_default
       modelSyncStatus.value = 'ok'
       setTimeout(() => (modelSyncStatus.value = 'idle'), 1500)

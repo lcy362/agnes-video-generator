@@ -261,6 +261,9 @@ try:
 
         # ── 模型 / 提示词 ──
         agnes_image_i2i_model: str | None = None
+        # v8.1：图片接口参考图张数上限（官方未明确，取保守值 5；经
+        # ``get_max_ref_images(..., media="image")`` 唯一读取）
+        agnes_image_max_ref_images: int = 5
         prompt_language: str = "zh"
 
         # ── 合成 / 字幕 ──
@@ -319,6 +322,9 @@ except ImportError:  # pragma: no cover - pydantic-settings 为必备依赖，�
             self.agnes_rate_burst = _env_int("AGNES_RATE_BURST")
             self.agnes_video_rate_burst = _env_int("AGNES_VIDEO_RATE_BURST")
             self.agnes_image_i2i_model = os.environ.get("AGNES_IMAGE_I2I_MODEL") or None
+            self.agnes_image_max_ref_images = int(
+                os.environ.get("AGNES_IMAGE_MAX_REF_IMAGES", "5")
+            )
             self.prompt_language = os.environ.get("PROMPT_LANGUAGE", "zh")
             self.agnes_subtitle_ass = os.environ.get("AGNES_SUBTITLE_ASS", "1").strip().lower() not in (
                 "0", "false", "off",
@@ -1477,6 +1483,53 @@ VIDEO_MODEL_CAPABILITIES = {
 def get_video_model_capabilities() -> dict:
     """返回全部视频模型能力元数据（含未知模型的兜底默认）。"""
     return dict(VIDEO_MODEL_CAPABILITIES)
+
+
+# 参考图张数上限兜底（模型未在能力表 / 环境变量非法时使用）
+DEFAULT_MAX_REF_IMAGES = 5
+
+
+def get_max_ref_images(model: str = "", media: str = "video") -> int:
+    """参考图张数上限的**唯一出处**（v8.1）。
+
+    此前上限有两份来源：``VIDEO_MODEL_CAPABILITIES[*]["max_ref_images"]`` 与
+    ``core/api/agnes_video.py`` 里硬编码的 ``5 if flash else 8``。改一处即静默
+    截断，因此收敛到本函数：
+
+    - ``media="video"``：取视频模型能力表；未知模型回退 5；
+    - ``media="image"``：取 ``AGNES_IMAGE_MAX_REF_IMAGES``（默认 5，官方未明确）。
+
+    前端经 ``GET /api/models`` 拿到同一份值，路由层 / API 层 / 流水线层共用它，
+    保证「选满即禁用」「超限 422」「兜底截断」的口径一致。
+
+    Args:
+        model: 模型 id（图片侧忽略）。
+        media: ``"video"`` 或 ``"image"``。
+
+    Returns:
+        正整数张数上限（至少 1）。
+    """
+    if media == "image":
+        try:
+            value = int(get_settings().agnes_image_max_ref_images)
+        except Exception:
+            value = DEFAULT_MAX_REF_IMAGES
+        return max(1, value)
+    caps = VIDEO_MODEL_CAPABILITIES.get(model or "", {})
+    try:
+        value = int(caps.get("max_ref_images") or DEFAULT_MAX_REF_IMAGES)
+    except (TypeError, ValueError):
+        value = DEFAULT_MAX_REF_IMAGES
+    return max(1, value)
+
+
+def get_image_model_capabilities() -> dict:
+    """图片模型能力元数据（v8.1：仅参考图上限，经 ``/api/models`` 下发）。
+
+    与视频侧同构：前端读 ``max_ref_images`` 决定「选满即禁用」，
+    后端路由按同一值做 422 校验，避免两套口径。
+    """
+    return {"max_ref_images": get_max_ref_images(media="image")}
 
 
 # ═══════════════════════════════════════════════════

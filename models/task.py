@@ -204,6 +204,8 @@ class SceneTask(BaseModel):
     scene_prompt: str = ""
     end_frame_prompt: str = ""
     end_frame_file: str = ""
+    # v8.1 路径 K：本段首帧静帧（由人物板+风格板+上一镜尾帧+本段内容图 i2i 生成）
+    first_frame_file: str = ""
     video_id: str = ""
     video_status: StepStatus = StepStatus.PENDING
     video_file: str = ""
@@ -217,6 +219,8 @@ class SceneTask(BaseModel):
     final_clip: str = ""
     # v3.x 新增：每个场景独立时长
     duration: int = 5
+    # v8.1：逐场景多参考图（顺序即提示词里的 <Picture N>，由各流水线填充）
+    ref_images: List[str] = Field(default_factory=list)
 
 
 # ═══════════════════════════════════════════════════
@@ -275,6 +279,12 @@ class BaseTaskState(BaseModel):
     # resume 后丢失，轮询会随机挑一把 Key → 404 → 被当成「入库延迟」无限容忍
     # → 白等 30 分钟后超时。这里只存 sha256(Key)[:16] 指纹，不存明文。
     video_key_hints: dict[str, str] = Field(default_factory=dict)
+
+    # ── v8.1：人物板 / 风格板（多参考图三档槽位模型的系统图）──
+    # 用户上传则直接写入，否则由流水线生成；空列表表示该任务没有这块板。
+    # 合并顺序（人物 → 风格 → 衔接 → 本段内容）见 core/pipelines/ref_slots.py。
+    character_plate: List[str] = Field(default_factory=list)
+    style_plate: List[str] = Field(default_factory=list)
 
     # ── v6.1 二期：任务时间戳（诊断端点时间窗口匹配兜底用）──
     # 默认值保证旧 task_state.json 加载时向后兼容（无字段 → 自动补齐）。
@@ -352,8 +362,14 @@ class CreativeVideoTask(BaseTaskState):
     generate_end_frames_from_ref: bool = True  # i2i 尾帧优化后默认开启
 
     # ── v5.0 优化 5：用户上传分镜场景图（按场景顺序存储参考图路径）──
-    # 某场景存在用户图时，视频生成以用户图为参考（跳过该场景的 AI 分镜图生成）
+    # 某场景存在用户图时，视频生成以用户图为参考（跳过该场景的 AI 分镜图生成）。
+    # v8.1 起只读兼容：新任务的逐场景多图写在 ``scene_reference_images_map``，
+    # 旧字段在 ``_build_reference_images`` 阶段幂等迁移一次后不再写入。
     scene_reference_images: List[str] = Field(default_factory=list)
+    # v8.1：逐场景多图（key = 场景 index 字符串，value 为该场景参考图列表）
+    scene_reference_images_map: Dict[str, List[str]] = Field(default_factory=dict)
+    # v8.1：用户上传的风格板（≤2）；空 = 由 style 文本生成 style_plate.png
+    style_images: List[str] = Field(default_factory=list)
 
     # ── v3.x 场景配置步骤 ──
     step_scene_config: StepStatus = StepStatus.PENDING
@@ -424,6 +440,14 @@ class ManuscriptVideoTask(BaseTaskState):
     # PR #33 吸收：逐段参考图，{段落 index(str): [本地图片路径, ...]}
     # 一张图可服务多个段落（reference_images_map 按 index 显式映射），用于 i2v 引导画面
     reference_images: Dict[str, List[str]] = Field(default_factory=dict)
+    # ── v8.1：人物板 / 风格板上传（各 ≤2），空 = 由流水线按正文生成 ──
+    character_images: List[str] = Field(default_factory=list)
+    style_images: List[str] = Field(default_factory=list)
+    # v8.1：分镜衔接开关（默认关）。关闭 = 路径 R（每段 images[] 锁人物+风格）；
+    # 打开 = 路径 K（逐段先画首尾帧，视频只提交这两张静帧）。
+    link_shots: bool = False
+    # v8.1：拆段后暂停等用户逐段补图（默认关，避免用户以为卡死）
+    pause_for_scene_refs: bool = False
     paragraphs: List[ManuscriptParagraph] = Field(default_factory=list)
     # v4.0 重构：通用场景列表（由 _build_scenes 填充，供模板与下游步骤引用）
     scenes: List[SceneTask] = Field(default_factory=list)
@@ -462,7 +486,10 @@ class AnchorVideoTask(BaseTaskState):
 
     # 用户输入
     anchor_prompt: str = ""
+    # v8.1：多参考图。第 1 张 = 数字人形象，其余 = 服饰/场景辅助参考。
+    # 旧 ``anchor_reference_image``（str）保留为「首图」兼容读路径。
     anchor_reference_image: str = ""
+    anchor_reference_images: List[str] = Field(default_factory=list)
     script_text: str = ""
 
     # 配置
@@ -511,6 +538,12 @@ class PoetryVideoTask(BaseTaskState):
     user_scene_prompts: List[str] = Field(default_factory=list)
     # 视觉风格（与创意视频保持一致，传入 LLM 分镜拆分）；留空时由编剧层给中性默认
     style: str = ""
+    # ── v8.1：人物板 / 风格板上传（各 ≤2）+ 句间衔接开关 ──
+    character_images: List[str] = Field(default_factory=list)
+    style_images: List[str] = Field(default_factory=list)
+    link_shots: bool = False
+    # v8.1：逐句内容图 {句 index(str): [本地图片路径, ...]}
+    scene_reference_images: Dict[str, List[str]] = Field(default_factory=dict)
 
     # 配置（分辨率等参数与创意视频保持一致）
     video_width: int = 768
@@ -555,6 +588,8 @@ class SimpleImageTask(BaseTaskState):
     size: str = "1024x1024"
     negative_prompt: str = ""
     system_prompt: str = ""
+    # v8.1：i2i 参考图（多张，顺序即 upstream extra_body.image 数组顺序）
+    reference_images: List[str] = Field(default_factory=list)
 
 
 # ═══════════════════════════════════════════════════

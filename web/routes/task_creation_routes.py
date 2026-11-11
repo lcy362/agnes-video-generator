@@ -19,6 +19,7 @@ from core.config import (
     VIDEO_25_DURATIONS,
     api_key_missing_msg,
     get_api_key,
+    get_max_ref_images,
     get_selected_models,
     get_video_model_capabilities,
     normalize_video_size,
@@ -241,6 +242,14 @@ def _build_subtitle_config(
     )
 
 
+def _upload_max_mb() -> int:
+    """单文件上传大小上限（MB）；``0`` / 负数 = 不限制（兼容老部署）。"""
+    try:
+        return int(os.environ.get("AGNES_UPLOAD_MAX_MB", "10"))
+    except (TypeError, ValueError):
+        return 10
+
+
 def _validate_image_bytes(data: bytes) -> bool:
     """校验字节是否为可解码图片（PIL verify），不可解码时返回 False。"""
     if not data:
@@ -287,6 +296,14 @@ async def _save_upload_file(
             ),
         )
     data = await upload.read()
+    # v8.1：单文件大小上限（默认 10MB，AGNES_UPLOAD_MAX_MB=0 关闭）。
+    # 参考图会多张进内存并随请求发给上游，无上限时一张 60MB 的图就能拖垮进程。
+    max_mb = _upload_max_mb()
+    if max_mb > 0 and len(data) > max_mb * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=translate("error.upload_too_large", None, mb=max_mb),
+        )
     if not _validate_image_bytes(data):
         key = "error.image_unreadable_scene" if scene_index is not None else "error.image_unreadable"
         raise HTTPException(
@@ -297,6 +314,46 @@ async def _save_upload_file(
     upload_path = safe_join(upload_dir, f"{prefix}{ext}")
     await write_bytes(upload_path, data)
     return upload_path
+
+
+#: v8.1：人物板 / 风格板各允许的上传张数（PRD §3.6「最多 2 张：脸 + 服装」）
+_MAX_PLATE_IMAGES = 2
+
+
+async def _save_ref_upload_list(
+    uploads: Optional[List[UploadFile]],
+    upload_dir: str,
+    prefix: str,
+    max_count: int,
+) -> List[str]:
+    """落盘一组成员图（人物板/风格板/逐段内容图），超限抛 422。
+
+    Args:
+        uploads: 上传文件列表（空/None 返回空列表）。
+        upload_dir: 落盘目录。
+        prefix: 文件名前缀（序号自动追加，避免覆盖）。
+        max_count: 允许的张数上限（来自 ``get_max_ref_images`` 或板块常量）。
+
+    Raises:
+        HTTPException: 张数超限（422，复用 22 语言文案）。
+    """
+    # 直接调用路由函数（如旧端点转发）时，未显式传参的默认值是 FastAPI 的
+    # ``File(...)`` 标记对象而非列表，这里统一按「没有上传」处理。
+    if not isinstance(uploads, (list, tuple)):
+        return []
+    files = [f for f in uploads if f and getattr(f, "filename", "")]
+    if len(files) > max_count:
+        raise HTTPException(
+            status_code=422,
+            detail=translate(
+                "validation.too_many_ref_images", None,
+                max=max_count, current=len(files),
+            ),
+        )
+    return [
+        await _save_upload_file(f, upload_dir, f"{prefix}{idx}")
+        for idx, f in enumerate(files)
+    ]
 
 
 #: 简单视频支持的生成模式（v8.0 对齐官方 2.5 协议）
@@ -370,7 +427,8 @@ def _resolve_simple_media(
         ``(ref_files, audio_urls)``。
     """
     caps = get_video_model_capabilities().get(video_model, {})
-    max_ref_images = int(caps.get("max_ref_images") or 5)
+    # v8.1：图片/视频参考图上限统一走 core.config.get_max_ref_images（唯一出处）
+    max_ref_images = get_max_ref_images(video_model)
     max_ref_audios = int(caps.get("max_ref_audios") or 3)
     ref_files = [f for f in (reference_images or []) if f and f.filename]
     audio_urls = _split_audio_urls(reference_audio_urls)
@@ -542,6 +600,9 @@ async def create_creative_task(
     reference_image: UploadFile = File(None),
     end_frame_images: List[UploadFile] = File(None),
     scene_reference_images: List[UploadFile] = File(None),
+    # v8.1：逐场景多图映射（JSON [[0,3],[1],...]，与 scene_reference_images 顺序一致）
+    scene_reference_images_map: str = Form("[]"),
+    style_images: List[UploadFile] = File(None),
     end_frame_indices_json: str = Form("[]"),
     use_custom_end_frames: bool = Form(False),
     generate_end_frames_from_ref: bool = Form(True),
@@ -686,15 +747,42 @@ async def create_creative_task(
                 f"[Pipeline] Saved {len(saved)} custom end frame images for task {task_id}"
             )
 
-    # v5.0 优化 5：用户上传分镜场景图（按场景顺序落盘，场景数不匹配时按场景 index 对齐）
+    # v8.1：用户上传分镜场景图（逐场景**多张**）。上传文件按
+    # ``scene_reference_images_map`` 映射到场景 index；旧客户端不传 map 时
+    # 退化为「第 i 个文件属于场景 i」（与 v5.0 行为一致）。
     if scene_reference_images:
-        saved_scene_refs = []
-        for idx, sref_file in enumerate(scene_reference_images):
-            if sref_file and sref_file.filename:
-                saved_scene_refs.append(await _save_upload_file(sref_file, upload_dir, f"{task_id}_scene_{idx}"))
-        if saved_scene_refs:
-            state.scene_reference_images = saved_scene_refs
-            logger.info(f"[Pipeline] Saved {len(saved_scene_refs)} user scene reference images for task {task_id}")
+        try:
+            scene_idx_map = json.loads(scene_reference_images_map) if scene_reference_images_map else []
+            if not isinstance(scene_idx_map, list):
+                raise ValueError("not a list")
+            for item in scene_idx_map:
+                if not isinstance(item, list) or not all(isinstance(i, int) for i in item):
+                    raise ValueError("element must be list[int]")
+        except Exception:
+            raise HTTPException(
+                status_code=422,
+                detail=translate("validation.reference_images_map_not_list", None),
+            )
+        saved_scene_map: dict = {}
+        for pos, sref_file in enumerate(scene_reference_images):
+            if not (sref_file and sref_file.filename):
+                continue
+            path = await _save_upload_file(sref_file, upload_dir, f"{task_id}_scene_{pos}")
+            targets = scene_idx_map[pos] if pos < len(scene_idx_map) else [pos]
+            for sidx in targets:
+                if 0 <= sidx < _MAX_SCENE_COUNT:
+                    saved_scene_map.setdefault(str(sidx), []).append(path)
+        if saved_scene_map:
+            state.scene_reference_images_map = saved_scene_map
+            logger.info(
+                "[Pipeline] Saved %d user scene reference images for %d scene(s), task %s",
+                sum(len(v) for v in saved_scene_map.values()), len(saved_scene_map), task_id,
+            )
+
+    # v8.1：风格板（用户上传优先，空则由 style 文本生成）
+    state.style_images = await _save_ref_upload_list(
+        style_images, upload_dir, f"{task_id}_splate", _MAX_PLATE_IMAGES,
+    )
 
     pipeline = deps.create_pipeline_for_type(TaskType.CREATIVE, api_key, task_id, dir_name)
     app_state.active_pipelines[task_id] = pipeline
@@ -717,6 +805,11 @@ async def create_manuscript_task(
     # 用于该段落视频的 i2v 画面引导；一张图可服务多个段落。
     reference_images: List[UploadFile] = File([]),
     reference_images_map: str = Form("[]"),  # JSON: [[0,2],[1],...] 顺序与 reference_images 一致
+    # v8.1：人物板 / 风格板（各 ≤2）+ 分镜衔接 / 逐段补图开关
+    character_images: List[UploadFile] = File([]),
+    style_images: List[UploadFile] = File([]),
+    link_shots: bool = Form(False),
+    pause_for_scene_refs: bool = Form(False),
     video_width: int = Form(768),
     video_height: int = Form(1152),
     video_duration: int = Form(10),
@@ -752,6 +845,18 @@ async def create_manuscript_task(
     manual_config = _build_manual_config(
         execution_mode, pause_points, provider, audio_source, "manuscript",
         subtitle_source)
+    # v8.1：勾选「生成前暂停补图」时，即使用户处于自动模式也强制在
+    # references 检查点暂停一次（否则勾选形同虚设）；只加这一个暂停点，
+    # 用户恢复后不会在全流程反复被打断。
+    if pause_for_scene_refs and "references" not in manual_config.pause_points:
+        manual_config = ManualConfig(
+            enabled=True,
+            pause_points=[*manual_config.pause_points, "references"],
+            provider=manual_config.provider,
+            audio_source=manual_config.audio_source,
+            execution_mode="manual",
+            subtitle_source=manual_config.subtitle_source,
+        )
     if _external_video_audio(manual_config):
         audio_enabled = False
 
@@ -807,6 +912,14 @@ async def create_manuscript_task(
                     continue
                 ref_images_by_para.setdefault(str(pidx), []).append(saved_path)
 
+    # v8.1：人物板 / 风格板（用户上传优先，未上传由流水线按需生成）
+    character_paths = await _save_ref_upload_list(
+        character_images, helpers.get_upload_dir(), f"{task_id}_cref", _MAX_PLATE_IMAGES,
+    )
+    style_paths = await _save_ref_upload_list(
+        style_images, helpers.get_upload_dir(), f"{task_id}_splate", _MAX_PLATE_IMAGES,
+    )
+
     # 构建音频配置
     audio_config = AudioConfig(
         enabled=audio_enabled,
@@ -827,6 +940,10 @@ async def create_manuscript_task(
         manuscript_text=manuscript_text.strip(),
         style=style.strip(),
         reference_images=ref_images_by_para,
+        character_images=character_paths,
+        style_images=style_paths,
+        link_shots=link_shots,
+        pause_for_scene_refs=pause_for_scene_refs,
         video_width=video_width,
         video_height=video_height,
         video_duration=video_duration,
@@ -862,6 +979,12 @@ async def create_poetry_task(
     scene_count: int = Form(3),
     uniform_duration: bool = Form(True),
     scene_durations_json: str = Form("[5,5,5]"),
+    # v8.1：人物板 / 风格板（各 ≤2）+ 逐句内容图 + 句间衔接开关
+    character_images: List[UploadFile] = File([]),
+    style_images: List[UploadFile] = File([]),
+    scene_reference_images: List[UploadFile] = File([]),
+    scene_reference_images_map: str = Form("[]"),
+    link_shots: bool = Form(False),
     # 音频配置（默认开启朗诵配音）
     audio_enabled: bool = Form(True),
     audio_voice: str = Form("zh-CN-XiaoxiaoNeural"),
@@ -938,6 +1061,37 @@ async def create_poetry_task(
     name = creative_name.strip() if creative_name else f"poetry_{task_id}"
     dir_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_id}"
 
+    # v8.1：人物板 / 风格板 + 逐句内容图（按句 index 映射，一张图可服务多句）
+    upload_dir = helpers.get_upload_dir()
+    character_paths = await _save_ref_upload_list(
+        character_images, upload_dir, f"{task_id}_cref", _MAX_PLATE_IMAGES,
+    )
+    style_paths = await _save_ref_upload_list(
+        style_images, upload_dir, f"{task_id}_splate", _MAX_PLATE_IMAGES,
+    )
+    scene_ref_map: dict = {}
+    if scene_reference_images:
+        try:
+            idx_map = json.loads(scene_reference_images_map) if scene_reference_images_map else []
+            if not isinstance(idx_map, list):
+                raise ValueError("not a list")
+            for item in idx_map:
+                if not isinstance(item, list) or not all(isinstance(i, int) for i in item):
+                    raise ValueError("element must be list[int]")
+        except Exception:
+            raise HTTPException(
+                status_code=422,
+                detail=translate("validation.reference_images_map_not_list", None),
+            )
+        for i, up in enumerate(scene_reference_images):
+            if not up or not up.filename:
+                continue
+            saved_path = await _save_upload_file(up, upload_dir, f"{task_id}_sref{i}")
+            for sidx in (idx_map[i] if i < len(idx_map) else []):
+                if sidx < 0:
+                    continue
+                scene_ref_map.setdefault(str(sidx), []).append(saved_path)
+
     audio_config = AudioConfig(
         enabled=audio_enabled,
         voice=audio_voice,
@@ -955,6 +1109,10 @@ async def create_poetry_task(
         poem_text=poem_text.strip(),
         user_scene_prompts=user_scene_prompts,
         style=style.strip(),
+        character_images=character_paths,
+        style_images=style_paths,
+        scene_reference_images=scene_ref_map,
+        link_shots=link_shots,
         video_width=video_width,
         video_height=video_height,
         video_duration=video_duration,
@@ -984,7 +1142,10 @@ async def create_poetry_task(
 @router.post("/api/tasks/anchor")
 async def create_anchor_task(
     anchor_prompt: str = Form(""),
+    # v8.1：多参考图（第 1 张为数字人形象，其余为服饰/场景辅助）。
+    # 旧 ``anchor_reference_image``（str）保留为「首图」兼容读路径。
     anchor_reference_image: str = Form(""),
+    anchor_reference_images: List[UploadFile] = File([]),
     script_text: str = Form(...),
     audio_source: str = Form("post_stitch"),
     video_width: int = Form(768),
@@ -1051,6 +1212,16 @@ async def create_anchor_task(
     name = f"anchor_{task_id}"
     dir_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{task_id}"
 
+    # v8.1：数字人参考图落盘（此前该字段声明为 str 且全仓无落盘代码，
+    # 用户上传的图 100% 丢失、锚点图静默退化为 t2i —— 属契约不一致修复）
+    anchor_paths = await _save_ref_upload_list(
+        anchor_reference_images,
+        helpers.get_upload_dir(),
+        f"{task_id}_aref",
+        get_max_ref_images("", media="image"),
+    )
+    legacy_anchor_ref = anchor_reference_image.strip()
+
     audio_config = AudioConfig(
         enabled=audio_enabled,
         voice=audio_voice,
@@ -1066,7 +1237,8 @@ async def create_anchor_task(
         task_id=task_id,
         creative_name=name,
         anchor_prompt=anchor_prompt,
-        anchor_reference_image=anchor_reference_image,
+        anchor_reference_image=legacy_anchor_ref,
+        anchor_reference_images=anchor_paths,
         script_text=script_text.strip(),
         audio_source=audio_source,
         video_width=video_width,

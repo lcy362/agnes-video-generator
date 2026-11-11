@@ -5,16 +5,14 @@ import logging
 import os
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from core.api.agnes_image import AgnesImageAPI
-from core.async_io import write_bytes
-from core.config import api_key_missing_msg, get_api_key
+from core.config import api_key_missing_msg, get_api_key, get_max_ref_images
 from core.i18n_backend import get_current_lang, translate
-from core.path_security import safe_join
 from core.task_manager import TaskManager
 from models.task import SimpleImageTask, StepStatus
 from utils.network import describe_network_error
@@ -31,8 +29,6 @@ _VALID_SIZES = {
 }
 
 # 参考图上传允许的扩展名白名单（拒绝任意后缀，杜绝路径穿越/异常文件）
-_ALLOWED_UPLOAD_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
-
 
 @router.post("/api/image/generate")
 async def generate_image(
@@ -40,6 +36,9 @@ async def generate_image(
     size: str = Form("1024x1024"),
     negative_prompt: Optional[str] = Form(None),
     system_prompt: str = Form(""),
+    # v8.1：i2i 多参考图（上游 extra_body.image 本就是数组）。
+    # 旧 ``reference_image`` 单数字段保留兼容，两边都传时以前的为准并集。
+    reference_images: List[UploadFile] = File([]),
     reference_image: UploadFile = File(None),
 ):
     """简单图片生成：创建任务 → 直调 Agnes Image API → 保存到任务目录。"""
@@ -80,17 +79,35 @@ async def generate_image(
 
     image_api = AgnesImageAPI(api_key=api_key)
 
+    # v8.1：多参考图（上限唯一来源 core.config.get_max_ref_images）
+    uploads = [f for f in (reference_images if isinstance(reference_images, (list, tuple)) else [])
+               if f and getattr(f, "filename", "")]
+    if reference_image is not None and getattr(reference_image, "filename", ""):
+        uploads.append(reference_image)
+    max_refs = get_max_ref_images(media="image")
+    if len(uploads) > max_refs:
+        raise HTTPException(
+            status_code=422,
+            detail=translate("validation.too_many_ref_images", None,
+                             max=max_refs, current=len(uploads)),
+        )
+
     ref_paths = []
-    if reference_image and reference_image.filename:
-        # 扩展名白名单：拒绝用户可控 filename 中夹带的路径片段，杜绝路径穿越
-        ext = (os.path.splitext(reference_image.filename)[1] or ".png").lower()
-        if ext not in _ALLOWED_UPLOAD_EXTS:
-            ext = ".png"
+    if uploads:
+        # 复用任务创建侧的落盘逻辑（扩展名白名单 / 大小上限 / 可解码校验 / 防穿越），
+        # 避免图片侧再维护一套「后缀撒谎 + 无大小上限」的旧逻辑。
+        from web.routes.task_creation_routes import _save_upload_file
+
         upload_dir = helpers.get_upload_dir()
         os.makedirs(upload_dir, exist_ok=True)
-        ref_path = safe_join(upload_dir, f"img_ref_{uuid.uuid4().hex[:8]}{ext}")
-        await write_bytes(ref_path, await reference_image.read())
-        ref_paths.append(ref_path)
+        batch = uuid.uuid4().hex[:8]
+        for idx, upload in enumerate(uploads):
+            ref_paths.append(await _save_upload_file(
+                upload, upload_dir, f"img_ref_{batch}_{idx}",
+            ))
+        # 参考图落盘路径写回状态（诊断 / 续传 / 产物登记需要）
+        state.reference_images = ref_paths
+        tm.update_state(reference_images=ref_paths)
 
     try:
         state.status = StepStatus.RUNNING

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { t, currentLang } from '@/i18n'
+import { t, tf, currentLang } from '@/i18n'
 import { stripEmoji } from '@/utils/text'
 import { siteUrl } from '@/utils/siteLinks'
 import { appState } from '@/store'
@@ -12,6 +12,7 @@ import { normalizeResolution } from '@/composables/useVideoModelCaps'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
 import PresetPicker from '@/components/presets/PresetPicker.vue'
+import RefImagesInput from '@/components/shared/RefImagesInput.vue'
 
 const { voiceSelections } = useVoice()
 const { submitting, runSubmit } = useTaskSubmit()
@@ -35,8 +36,17 @@ const form = reactive({
   useEndFrames: false,
   genEndFromRef: false,
   endFrames: [] as File[],
-  // v5.0 优化 5：用户上传分镜场景图（按场景 index 对齐）
-  sceneRefs: [] as File[],
+  // v8.1：逐场景多图（索引 = 场景 index，顺序即 <Picture N>）
+  sceneRefs: [] as File[][],
+  // v8.1：风格板（≤2）；空则由 style 文本生成 style_plate.png
+  styleImages: [] as File[],
+})
+
+// v8.1：本段内容图剩余额度 = 模型上限 − 人物图 − 风格板 −（链式 1 张衔接静帧）
+const sceneRefMax = computed(() => {
+  const limit = Number(appState.videoCapabilities?.[appState.models.video]?.max_ref_images ?? 5)
+  const system = (form.refImage ? 1 : 0) + form.styleImages.length + (form.chaining === 'ti2vid' ? 1 : 0)
+  return Math.max(1, limit - system)
 })
 
 function parseResolution(val: string) {
@@ -113,11 +123,6 @@ function onEndFrameChange(e: Event, idx: number) {
   if (file) form.endFrames[idx] = file
 }
 
-function onSceneRefChange(e: Event, idx: number) {
-  const file = (e.target as HTMLInputElement).files?.[0] || null
-  if (file) form.sceneRefs[idx] = file
-}
-
 async function submitCreative() {
   let ev: Record<string, any> = {}
   await runSubmit({
@@ -168,12 +173,21 @@ async function submitCreative() {
         }
         fd.append('end_frame_indices_json', JSON.stringify(efIdx))
       }
-      // v5.0 优化 5：用户上传分镜场景图（多文件，后端按上传顺序对应场景 index）
-      if (form.sceneRefs.length > 0) {
-        form.sceneRefs.forEach((f) => {
-          if (f && f.size > 0) fd.append('scene_reference_images', f)
+      // v8.1：逐场景多图 —— 顺序 append 文件 + 同步映射（与稿件契约同形）
+      const sceneFiles: File[] = []
+      const sceneMap: number[][] = []
+      form.sceneRefs.forEach((files, sceneIdx) => {
+        ;(files || []).forEach((f) => {
+          if (f && f.size > 0) {
+            sceneFiles.push(f)
+            sceneMap.push([sceneIdx])
+          }
         })
-      }
+      })
+      sceneFiles.forEach((f) => fd.append('scene_reference_images', f))
+      fd.append('scene_reference_images_map', JSON.stringify(sceneMap))
+      // v8.1：风格板（用户上传优先）
+      form.styleImages.forEach((f) => fd.append('style_images', f))
 
       // Audio & Subtitle
       const sc = subtitleRef.value
@@ -360,14 +374,34 @@ async function submitCreative() {
           </div>
         </div>
 
-        <!-- Scene Reference Images (v5.0 优化 5) -->
+        <!-- v8.1：风格板（用户上传优先，否则按风格文本生成） -->
+        <div class="border-t border-rule/60 pt-4">
+          <RefImagesInput
+            v-model="form.styleImages"
+            :max="2"
+            :label="t('plateStyle')"
+            :hint="t('plateHint')"
+          />
+        </div>
+
+        <!-- v8.1：逐场景多参考图（顺序即 <Picture N>） -->
         <div class="border-t border-rule/60 pt-4">
           <label class="label">{{ t('sceneReferenceImages') }}</label>
-          <p class="hint mb-2">{{ t('sceneRefDesc') }}</p>
-          <div class="space-y-1.5">
-            <div v-for="i in form.sceneCount" :key="i" class="flex items-center gap-3">
-              <span class="mono w-8 shrink-0 text-[11px] text-muted">{{ i }}</span>
-              <input type="file" accept="image/*" class="scene-ref-file field file-field" @change="onSceneRefChange($event, i - 1)" />
+          <p class="hint mb-2">
+            {{ form.chaining === 'keyframes' ? t('sceneRefKeyframesHint') : t('sceneRefDesc') }}
+          </p>
+          <div class="space-y-3">
+            <div v-for="i in form.sceneCount" :key="i">
+              <div class="mb-1 flex items-center gap-2">
+                <span class="mono w-8 shrink-0 text-[11px] text-muted">{{ i }}</span>
+                <span class="hint">{{ tf('sceneRefQuota', { n: sceneRefMax }) }}</span>
+              </div>
+              <RefImagesInput
+                :model-value="form.sceneRefs[i - 1] || []"
+                :max="sceneRefMax"
+                input-class="scene-ref-file"
+                @update:model-value="(v: File[]) => (form.sceneRefs[i - 1] = v)"
+              />
             </div>
           </div>
         </div>

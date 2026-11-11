@@ -26,6 +26,12 @@
 >   - 简单视频一键预设：`core/config.py::SIMPLE_DEFAULT_PRESET`（免费 `agnes-video-2.5-flash` / 文生视频 / 5s / **16:9** / 720P），经 `GET /api/models` 的 `simple_default` 下发；默认任务类型 `simple` 并由前端 `localStorage('wb_task_type')` 记忆
 >   - 官方接口能力：原生首尾帧 `first_frame`/`last_frame`、参考图 `images`（Flash ≤5 / 2.5 ≤8）、参考音频 `audios`（≤3，公开 URL）；参数表见 `docs/dev/agnes_video_upstream_behavior.md` §9.5
 >   - 快速重试自动模式：`docs/plans/v8.0/fast_retry_auto_PRD.md`（设置页全局 `auto` + 频率 → 到条件自动连打；任务页「以后自动」= 一次性 or 永久；手动关闭只在本次生效 `auto_off`）；配置读写 `core/config.py::get_fast_retry_config/set_fast_retry_config`，端点 `GET /api/config.fast_retry` + `POST /api/config/fast-retry` + `POST /api/tasks/{id}/fast-retry?remember=true`；单测 `tests/test_fast_retry.py`，回归 `docs/dev/regression_test_plan.md` §十七 `FR*`
+> - 多参考图（v8.1）：`docs/plans/v8.1/multi_reference_images_PRD.md`（🟢 已实施，§十三 为实施记录 + 偏差）
+>   - 上限唯一出处 `core/config.py::get_max_ref_images(model, media)`（视频取能力表 / 图片取 `AGNES_IMAGE_MAX_REF_IMAGES`，默认 5），`GET /api/models` 下发 `image_capabilities`；API 层截断必打 warning
+>   - 四类槽位合并唯一出处 `core/pipelines/ref_slots.py`（人物板 → 风格板 → 衔接静帧 → 本段内容图，去重 + 截断返回 `dropped`）；系统板落 `BaseTaskState.character_plate/style_plate`，逐段内容图落 `SceneTask.ref_images`
+>   - 路径 R（默认）：每段 `images[]` 带系统板；路径 K（`link_shots`）：逐段先画首/尾帧（`SceneTask.first_frame_file/end_frame_file`），视频只提交 `first_frame`/`last_frame`；钩子 `MultiScenePipeline._get_scene_ref_images/_get_scene_keyframes`
+>   - 逐场景补图：`POST /api/tasks/{id}/scene-refs`（**仅**暂停在 `references` 检查点时可用；409/422/额度）；稿件 `pause_for_scene_refs` 自动把 `references` 加进 `pause_points`
+>   - 前端共享组件 `frontend/src/components/shared/RefImagesInput.vue`；上传单文件上限 `AGNES_UPLOAD_MAX_MB`（默认 10）；单测 `tests/test_ref_slots.py`，回归 `docs/dev/regression_test_plan.md` §十八 `MR*`
 > - 优化路线图：`docs/plans/v6.0/optimization_roadmap.md`（合并版，现行唯一路线图，计划 v6 版本线内完成；已取代并废弃 `docs/plans/v5.0/optimization_roadmap.md`）
 > - 待调研存档：`docs/plans/optimization-research/README.md`
 > - 发版规范：`docs/dev/release_process.md`（版本号规则 + 新增内容规范 + 发布流程）

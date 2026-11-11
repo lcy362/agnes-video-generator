@@ -6,9 +6,16 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Form, HTTPException, Response
+from typing import List
 
-from core.config import api_key_missing_msg, get_api_key
+from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
+
+from core.config import (
+    api_key_missing_msg,
+    get_api_key,
+    get_max_ref_images,
+    get_selected_models,
+)
 from core.i18n_backend import translate
 from core.pipelines import ALL_CHECKPOINTS, compute_current_checkpoint
 from core.task_manager import TaskManager
@@ -317,6 +324,99 @@ async def resume_task(task_id: str):
 
         app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
+
+
+@router.post("/api/tasks/{task_id}/scene-refs")
+async def set_scene_reference_images(
+    task_id: str,
+    scene_index: int = Form(...),
+    reference_images: List[UploadFile] = File([]),
+):
+    """逐场景补图（v8.1）：仅在任务暂停等待补图时允许调用。
+
+    拆段（scenes）之后、提交视频之前，用户可给某一段上传/替换多张内容图；
+    覆盖语义（``scenes[i].ref_images`` 整体替换）。人物板 / 风格板占用的额度
+    会先从模型上限里扣掉，剩余部分才是本段可传张数。
+
+    Args:
+        task_id: 任务 id。
+        scene_index: 场景/段落序号（0 基）。
+        reference_images: 该段内容图（可多张，顺序即 ``<Picture N>``）。
+
+    Raises:
+        HTTPException: 404 任务不存在 / 409 任务未处于暂停补图状态 /
+            422 序号越界或张数超限。
+    """
+    # 延迟导入：避免与任务创建路由模块形成循环依赖
+    from web.routes.task_creation_routes import _save_upload_file
+
+    dir_name = helpers.find_dir_name(task_id)
+    tm = TaskManager(task_id, dir_name=dir_name)
+    state = tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    mc = getattr(state, "manual_config", None)
+    paused = bool(
+        mc and mc.enabled and state.status == StepStatus.PENDING and mc.current_checkpoint
+    )
+    if not paused:
+        # 运行中改参数会让已完成/在途的段落与磁盘不一致，必须拒绝
+        raise HTTPException(
+            status_code=409,
+            detail=translate("error.scene_refs_not_paused", getattr(state, "ui_language", "zh")),
+        )
+
+    scenes = list(getattr(state, "scenes", None) or [])
+    if scene_index < 0 or scene_index >= len(scenes):
+        raise HTTPException(
+            status_code=422,
+            detail=translate(
+                "error.scene_index_invalid", getattr(state, "ui_language", "zh"),
+                index=scene_index, total=len(scenes),
+            ),
+        )
+
+    uploads = [
+        f for f in (reference_images if isinstance(reference_images, (list, tuple)) else [])
+        if f and getattr(f, "filename", "")
+    ]
+    video_model = get_selected_models()["video"]
+    system_used = len(getattr(state, "character_plate", None) or []) + len(
+        getattr(state, "style_plate", None) or [])
+    if getattr(state, "link_shots", False):
+        system_used += 1  # 路径 K 还要给衔接静帧留 1 张
+    remaining = max(get_max_ref_images(video_model) - system_used, 1)
+    if len(uploads) > remaining:
+        raise HTTPException(
+            status_code=422,
+            detail=translate(
+                "validation.too_many_ref_images", getattr(state, "ui_language", "zh"),
+                max=remaining, current=len(uploads),
+            ),
+        )
+
+    upload_dir = helpers.get_upload_dir()
+    saved: List[str] = []
+    for seq, upload in enumerate(uploads):
+        saved.append(await _save_upload_file(
+            upload, upload_dir, f"{task_id}_sref_{scene_index}_{seq}",
+            scene_index=scene_index + 1,
+        ))
+
+    scenes[scene_index].ref_images = saved
+    tm.update_state(scenes=[s.model_dump() for s in scenes])
+    logger.info(
+        "[SceneRefs] Task %s scene %d: %d image(s) saved (remaining quota %d)",
+        safe_log(task_id), scene_index, len(saved), remaining,
+    )
+    return {
+        "ok": True,
+        "task_id": task_id,
+        "scene_index": scene_index,
+        "ref_images": saved,
+        "remaining": remaining,
+    }
 
 
 @router.post("/api/tasks/{task_id}/stop")

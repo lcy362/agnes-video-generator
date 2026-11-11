@@ -8,6 +8,7 @@ import { useProgress } from '@/composables/useProgress'
 import { useToast } from '@/composables/useToast'
 import { copyText } from '@/utils/clipboard'
 import ExperimentalBadge from './shared/ExperimentalBadge.vue'
+import RefImagesInput from './shared/RefImagesInput.vue'
 import { JIMENG_FAQ_PATH, JIMENG_GUIDE_PATH, siteUrl } from '@/utils/siteLinks'
 
 const props = defineProps<{ taskId: string; checkpoint: string }>()
@@ -29,6 +30,42 @@ const aiLoading = ref(false)
 const aiResult = ref<any>(null)
 const checkpointData = ref<any>(null)
 const loadingData = ref(false)
+
+// ── v8.1：references 检查点「逐段补图」 ──
+const sceneRefs = computed<any[]>(() =>
+  props.checkpoint === 'references' ? checkpointData.value?.scenes || [] : [],
+)
+const sceneRefEdits = ref<Record<number, File[]>>({})
+const sceneRefSaving = ref<number | null>(null)
+// 保守额度：先给人物板 + 风格板预留 2 张，剩余才是本段内容图
+const sceneRefMax = computed(() => {
+  const limit = Number(appState.videoCapabilities?.[appState.models.video]?.max_ref_images ?? 5)
+  return Math.max(1, limit - 2)
+})
+
+async function saveSceneRefs(index: number) {
+  const files = sceneRefEdits.value[index] || []
+  if (!files.length) return
+  sceneRefSaving.value = index
+  try {
+    const d = await api.setSceneRefs(props.taskId, index, files)
+    if (d.ok) {
+      const item = sceneRefs.value.find((x: any) => x.index === index)
+      if (item) {
+        item.ref_count = (d.ref_images || []).length
+        item.ref_files = (d.ref_images || []).map((p: string) => p.split('/').pop())
+      }
+      delete sceneRefEdits.value[index]
+      showToast(t('cpDone'))
+    } else {
+      if (d.detail) showToast(String(d.detail))
+    }
+  } catch (e: any) {
+    if (e?.detail || e?.message) showToast(String(e.detail || e.message))
+  } finally {
+    sceneRefSaving.value = null
+  }
+}
 
 const impactData = ref<any>(null)
 const impactLoading = ref(false)
@@ -384,6 +421,37 @@ function artLabel(a: any): string {
         {{ confirming ? t('submitting') : t('continueConfirm') }}
       </button>
       <span class="hint">{{ t('continueNoChangeHint') }}</span>
+    </div>
+
+    <!-- v8.1：逐段补图（仅 references 检查点；拆段后、提交视频前） -->
+    <div v-if="sceneRefs.length && !collabPrimary" class="mb-4 rounded border border-rule bg-paper p-3">
+      <div class="mb-1 text-sm font-medium text-ink-2">{{ t('sceneReferenceImages') }}</div>
+      <p class="hint mb-3">{{ t('sceneRefDesc') }}</p>
+      <div class="space-y-3">
+        <div v-for="s in sceneRefs" :key="s.index" class="rounded border border-rule/60 p-2">
+          <div class="mb-1 flex items-center justify-between gap-2">
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="mono text-[11px] text-muted">#{{ s.index + 1 }}</span>
+              <span class="truncate text-[11.5px] text-ink-2">{{ s.text }}</span>
+            </div>
+            <span class="mono shrink-0 text-[10.5px] text-muted">{{ s.ref_count }} / {{ sceneRefMax }}</span>
+          </div>
+          <RefImagesInput
+            :model-value="sceneRefEdits[s.index] || []"
+            :max="sceneRefMax"
+            @update:model-value="(v: File[]) => (sceneRefEdits[s.index] = v)"
+          />
+          <div v-if="(sceneRefEdits[s.index] || []).length" class="mt-2">
+            <button
+              class="btn btn-ghost btn-sm"
+              :disabled="sceneRefSaving === s.index"
+              @click="saveSceneRefs(s.index)"
+            >
+              {{ sceneRefSaving === s.index ? t('submitting') : t('save') }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 卡片：AI / 自己 / Agent / 在线编辑 +（v7.6）外部工具协作。

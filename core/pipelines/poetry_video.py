@@ -133,6 +133,10 @@ class PoetryVideoPipeline(MultiScenePipeline):
 
     def _finalize_scenes(self, scenes: List[SceneTask], poem: str, source: str) -> None:
         n = len(scenes)
+        # v8.1：逐句内容图（用户按句上传）写入 scene.ref_images，顺序即 <Picture N>
+        ref_map = getattr(self._state, "scene_reference_images", {}) or {}
+        for idx, scene in enumerate(scenes):
+            scene.ref_images = list(ref_map.get(str(idx), []) or [])
         self._state.scenes = scenes
         self._state.scene_count = n
         self._state.scene_durations = [s.duration for s in scenes]
@@ -245,15 +249,34 @@ class PoetryVideoPipeline(MultiScenePipeline):
         self._finalize_scenes(scenes, poem, source="llm")
 
     async def _build_reference_images(self) -> None:
-        """诗词视频不需参考图，跳过。"""
-        pass
+        """v8.1：准备诗词的风格板（与可选人物板），必要时逐句画衔接静帧。
 
-    # v6.0 P3：诗词无参考图 → references 检查点不可暂停
+        诗词的连贯性主体是风格板：每句视频都带同一张风格图（路径 R）。
+        纯意象、无人入画时不生成人物板；用户上传则直接采用，不另画。
+        """
+        state = self._state
+        await self._prepare_ref_plates(state.poem_text, state.style)
+        if getattr(state, "link_shots", False):
+            await self._prepare_link_shot_frames()
+
+    # v6.0 P3：无参考图时不暂停 references 检查点；
+    # v8.1：生成风格板 / 上传参考图 / 打开句间衔接后恢复为可暂停检查点。
     def _get_pausable_steps(self) -> set:
         from core.pipelines import _STEP_TO_CHECKPOINT
 
         steps = set(_STEP_TO_CHECKPOINT.keys())
-        steps.discard("step_reference_images")
+        state = self._state
+        can_pause = bool(
+            state
+            and (
+                getattr(state, "style_images", None)
+                or getattr(state, "character_images", None)
+                or getattr(state, "scene_reference_images", None)
+                or getattr(state, "link_shots", False)
+            )
+        )
+        if not can_pause:
+            steps.discard("step_reference_images")
         return steps
 
     # ------------------------------------------------------------------

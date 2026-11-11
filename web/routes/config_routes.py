@@ -38,6 +38,7 @@ from core.config import (
     get_api_keys_source,
     get_api_keys_with_sources,
     get_fast_retry_config,
+    get_image_model_capabilities,
     get_selected_models,
     get_selected_text_provider,
     get_simple_default_preset,
@@ -607,6 +608,8 @@ async def list_models(refresh: bool = False):
             # 是否因版本过旧（能力表随发版硬编码）
             "app_version": APP_VERSION,
             "video_capabilities": get_video_model_capabilities(),
+            # v8.1：图片侧能力（参考图上限，与视频侧同构）
+            "image_capabilities": get_image_model_capabilities(),
             # v8.0：简单视频一键预设（单一事实来源，前端据此初始化表单）
             "simple_default": get_simple_default_preset(),
         }
@@ -619,6 +622,7 @@ async def list_models(refresh: bool = False):
         "cached": False,
         "app_version": APP_VERSION,
         "video_capabilities": get_video_model_capabilities(),
+        "image_capabilities": get_image_model_capabilities(),
         "simple_default": get_simple_default_preset(),
     }
 

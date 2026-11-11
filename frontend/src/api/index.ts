@@ -358,6 +358,19 @@ export function approveCheckpoint(
     body: form,
   }).then((r) => r.json())
 }
+/**
+ * 逐场景补图（v8.1）：仅在 references 检查点暂停时可用，覆盖语义。
+ */
+export function setSceneRefs(taskId: string, sceneIndex: number, files: File[]) {
+  const form = new FormData()
+  form.append('scene_index', String(sceneIndex))
+  files.forEach((f) => form.append('reference_images', f))
+  return apiFetch('/api/tasks/' + taskId + '/scene-refs', {
+    method: 'POST',
+    body: form,
+  }).then((r) => r.json())
+}
+
 export function regenCheckpoint(taskId: string, checkpoint: string) {
   return apiFetch('/api/tasks/' + taskId + '/checkpoints/' + encodeURIComponent(checkpoint) + '/regen', {
     method: 'POST',

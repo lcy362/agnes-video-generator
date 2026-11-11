@@ -374,8 +374,23 @@ v8.0 起默认走原生 keyframe，并保留一键回退：
 export AGNES_KEYFRAME_NATIVE=0   # 回落 reference 多图降级（旧行为）
 ```
 
-**待办**：用真实 Key 复验 `mode=keyframe + aspect_ratio=16:9 + first_frame/last_frame`
-的输出尺寸与方向，结论回填本节与 §5.2。
+**复验结论（2026-11-11，真实 Key，创意长视频 v8.1 回归 case1）**：`keyframe` 模式
+**仍然忽略 `aspect_ratio`，固定输出方形**。
+
+| 实测项 | 值 |
+|---|---|
+| 请求 | `mode=keyframe`、`seconds=5`、`size=720P`、`aspect_ratio=9:16`、`first_frame`/`last_frame`（832×1248 竖图） |
+| 返回视频 | **720×720**（两段一致） |
+| 画面 | 左右/上下均**无黑边**（采样边列/边行亮度非 0）→ 竖图被拉伸成方形，人物比例变形 |
+| 同会话对照 | 同参数 `mode=reference`（3 张图）→ 720×1280 竖屏正常 |
+
+结论与建议：
+
+1. v6.2.1 的「keyframe 固定方形」在 2026-11 依旧成立，`aspect_ratio` 不是 keyframe 的调节项；
+2. 竖屏 / 宽屏且要求画面比例准确时，应走 reference 多图降级（`AGNES_KEYFRAME_NATIVE=0`），
+   或在本地按目标比例裁切/扩边后再提交首尾帧（裁切不改上游输出方形，仍需叠加裁切）；
+3. 注意 `size=720P` 的 keyframe 输出是 **720×720**（像素总量小于 reference 的 720×1280），
+   长视频拼接前若混用两种模式需先统一分辨率，否则拼接会缩放/加黑边。
 
 ## 10. 复测方法
 

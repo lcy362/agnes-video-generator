@@ -26,6 +26,7 @@ from core.config import (
     get_api_key_domains,
     get_api_root_for_key,
     get_base_url_for_key,
+    get_max_ref_images,
     is_v25_video_model,
     normalize_video_size,
     width_height_to_aspect_ratio,
@@ -34,6 +35,9 @@ from utils.image_normalizer import normalize_reference_path
 from utils.video import download_video
 
 logger = logging.getLogger(__name__)
+
+#: v8.1：keyframe 方形输出告警只打一次的进程内标记（见 ``_apply_v25_mode``）
+_KEYFRAME_SQUARE_WARNED = False
 
 _UPLOAD_RETRY_BASE_DELAY_SECONDS = 30  # 上传退避基数：忙轨取固定值，故障轨取 base×(n+1)
 _UPLOAD_RETRY_MAX_ATTEMPTS = 10        # v7.2 上传忙轨次数封顶（等效旧的 300s 预算 ÷ 30s）
@@ -1490,6 +1494,18 @@ class AgnesVideoAPI:
         """按「keyframe > reference > text」写入 mode 与素材，返回日志描述。"""
         native_keyframe = self._native_keyframe_enabled()
         if (resolved_first or resolved_last) and native_keyframe:
+            # v8.1 实测（2026-11-11）：keyframe 模式忽略 aspect_ratio，固定返回方形视频
+            # （720P → 720×720，竖图被拉伸）。这里一次性告警，避免用户以为参数生效。
+            global _KEYFRAME_SQUARE_WARNED
+            aspect = str(payload.get("aspect_ratio") or "")
+            if aspect and aspect != "1:1" and not _KEYFRAME_SQUARE_WARNED:
+                _KEYFRAME_SQUARE_WARNED = True
+                logger.warning(
+                    "[AgnesVideo] keyframe mode ignores aspect_ratio=%s: upstream returns "
+                    "square video; set AGNES_KEYFRAME_NATIVE=0 to fall back to reference "
+                    "multi-image if exact aspect ratio matters",
+                    aspect,
+                )
             return self._apply_keyframe_payload(payload, resolved_first, resolved_last)
         if not (resolved_first or resolved_last or resolved_refs or audios):
             return "text-to-video"
@@ -1522,11 +1538,18 @@ class AgnesVideoAPI:
     ) -> str:
         """reference 模式：images / audios（keyframe 关闭时首尾帧并入参考图）。"""
         payload["mode"] = "reference"
-        max_refs = 5 if self.model == "agnes-video-2.5-flash" else 8
+        # v8.1：上限唯一来源（core.config.get_max_ref_images），不再硬编码
+        max_refs = get_max_ref_images(self.model)
         images = resolved_refs
         if not native_keyframe:
             # 降级路径：首尾帧并入参考图（旧行为），输出遵循 aspect_ratio
             images = [x for x in (resolved_first, resolved_last) if x] + images
+        if len(images) > max_refs:
+            # 兜底截断必须留痕：此前静默截断，误以为「传了 N 张都生效」
+            logger.warning(
+                "[AgnesVideo] reference images truncated: %d > %d (%s)",
+                len(images), max_refs, self.model,
+            )
         if images:
             payload["images"] = images[:max_refs]
         if audios:

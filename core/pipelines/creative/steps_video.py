@@ -5,7 +5,16 @@ import re
 from typing import List
 
 from core.api.agnes_video import is_remote_video_failure
+from core.config import get_max_ref_images
 from core.pipelines import PipelineShutdown
+from core.pipelines.ref_slots import (
+    KIND_CHARACTER,
+    KIND_CONTINUITY,
+    KIND_STYLE,
+    KIND_USER_SCENE,
+    RefSlot,
+    merge_ref_images,
+)
 from models.task import StepStatus
 
 from .steps_frames import _fallback_end_frame, _localize_preserve_tags, _run_ffmpeg_async
@@ -43,16 +52,58 @@ class VideoStepsMixin:
     v5.0 Batch 4（4.2）拆分自 CreativeVideoPipeline，经 MRO 组合回主类。
     """
 
-    def _user_scene_ref(self, scene_idx: int):
-        """返回用户上传的分镜参考图路径（优化 5），无则 None。
+    def _user_scene_refs(self, scene_idx: int) -> List[str]:
+        """返回该场景的用户内容图（v8.1 多图；旧单图字段只读兼容）。"""
+        ref_map = getattr(self._state, "scene_reference_images_map", None) or {}
+        refs = [p for p in (ref_map.get(str(scene_idx)) or []) if p]
+        if refs:
+            return refs
+        legacy = getattr(self._state, "scene_reference_images", None) or []
+        if 0 <= scene_idx < len(legacy) and legacy[scene_idx]:
+            return [legacy[scene_idx]]
+        return []
 
-        用户在某场景上传参考图后，该场景以用户图为视频参考，
-        跳过对应的 AI 分镜图生成 / 角色参考图。
-        """
-        refs = getattr(self._state, "scene_reference_images", None) or []
-        if 0 <= scene_idx < len(refs):
-            return refs[scene_idx]
-        return None
+    def _user_scene_ref(self, scene_idx: int):
+        """返回用户上传的分镜参考图路径（单图兼容入口），无则 None。"""
+        refs = self._user_scene_refs(scene_idx)
+        return refs[0] if refs else None
+
+    def _scene_ref_slots(self, scene_idx: int, continuity: str = "") -> List[RefSlot]:
+        """该场景的参考图槽位：人物 → 风格 → 衔接 → 本段内容。"""
+        state = self._state
+        return [
+            RefSlot(KIND_CHARACTER, list(getattr(state, "character_plate", None) or [])),
+            RefSlot(KIND_STYLE, list(getattr(state, "style_plate", None) or [])),
+            RefSlot(KIND_CONTINUITY, [continuity] if continuity else []),
+            RefSlot(KIND_USER_SCENE, self._user_scene_refs(scene_idx)),
+        ]
+
+    def _merge_scene_refs(self, scene_idx: int, continuity: str = "") -> List[str]:
+        """按统一规则合并该场景参考图（上限唯一出处 + 截断留痕）。"""
+        images, dropped = merge_ref_images(
+            self._scene_ref_slots(scene_idx, continuity),
+            get_max_ref_images(self.video_generator.model),
+        )
+        if dropped:
+            logger.warning(
+                "[Pipeline] Scene %d ref images truncated: %s", scene_idx, dropped,
+            )
+        return images
+
+    def _plate_refs(self, continuity: str = "") -> List[str]:
+        """人物板 + 风格板（+ 衔接静帧），用于画衔接静帧 / 尾帧的图生图。"""
+        state = self._state
+        slots = [
+            RefSlot(KIND_CHARACTER, list(getattr(state, "character_plate", None) or [])),
+            RefSlot(KIND_STYLE, list(getattr(state, "style_plate", None) or [])),
+            RefSlot(KIND_CONTINUITY, [continuity] if continuity else []),
+        ]
+        images, dropped = merge_ref_images(
+            slots, get_max_ref_images(self.image_generator.i2i_model, media="image"),
+        )
+        if dropped:
+            logger.warning("[Pipeline] plate refs truncated: %s", dropped)
+        return images
 
     async def _step_generate_videos(
         self,
@@ -202,11 +253,10 @@ class VideoStepsMixin:
                 self._t("progress.creative_video.scene_submit_ti2vid", i=scene_idx + 1, total=total),
                 _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * scene_idx / total,
             )
-            # 优化 5：该场景有用户上传参考图时以用户图为参考
-            user_ref = self._user_scene_ref(scene_idx)
+            # v8.1 路径 R：人物板 → 风格板 → 本段内容图（不含衔接静帧）
             video_id = await self.video_generator.submit_video(
                 prompt=scene_text,
-                reference_image_paths=[user_ref] if user_ref else [character_ref_path],
+                reference_image_paths=self._merge_scene_refs(scene_idx),
                 duration=self._scene_duration(scene_idx),
                 width=vw,
                 height=vh,
@@ -286,11 +336,11 @@ class VideoStepsMixin:
         for scene_idx, scene_text in enumerate(scenes):
             if self._is_shutdown():
                 raise PipelineShutdown(f"interrupted during chained scene {scene_idx}")
-            # 优化 5：该场景有用户上传参考图时，以用户图为起点（跳过前场景链式图）
-            user_ref = self._user_scene_ref(scene_idx)
-            if user_ref:
-                logger.info(f"[Pipeline] Scene {scene_idx}: using user reference image")
-                current_image = user_ref
+            # v8.1 路径 R + 衔接：用户本段内容图存在时，以该段起点图作为衔接静帧
+            user_refs = self._user_scene_refs(scene_idx)
+            if user_refs:
+                logger.info(f"[Pipeline] Scene {scene_idx}: using user content image as anchor")
+                current_image = user_refs[0]
             scene_dir = os.path.join(self.working_dir, f"scene_{scene_idx}")
             os.makedirs(scene_dir, exist_ok=True)
             video_path = os.path.join(scene_dir, "video.mp4")
@@ -326,16 +376,9 @@ class VideoStepsMixin:
                     self._t("progress.creative_video.scene_submit_ti2vid", i=scene_idx + 1, total=total),
                     _PROGRESS_CACHED_START + _PROGRESS_CACHED_SPAN * scene_idx / total,
                 )
-                # 优化路线图 3.6：双参考图——尾帧（时序连贯）+ 角色参考图
-                # （身份稳定），缓解链式生成的角色漂移累积。
-                # 首场景 current_image == reference_image 时避免重复提交同一张图。
-                ref_paths = [current_image]
-                if (
-                    reference_image
-                    and os.path.exists(reference_image)
-                    and current_image != reference_image
-                ):
-                    ref_paths = [current_image, reference_image]
+                # v8.1：人物板 → 风格板 → 衔接静帧（current_image）→ 本段内容图
+                # （自动去重：首场景 current_image 就是人物板时不会重复提交）
+                ref_paths = self._merge_scene_refs(scene_idx, continuity=current_image)
                 video_id = await self.video_generator.submit_video(
                     prompt=scene_text,
                     reference_image_paths=ref_paths,
@@ -385,15 +428,14 @@ class VideoStepsMixin:
                     timeout=30,
                 )
 
-                last_frame_url = await self.video_generator._resolve_image_ref(last_frame_path)
-
                 next_scene_text = scenes[scene_idx + 1]
                 transition_prompt = _localize_transition_prompt(next_scene_text)
                 transition_path = os.path.join(scene_dir, f"transition_to_{scene_idx+1}.png")
 
+                # v8.1：衔接静帧参考图 = 人物板 + 风格板 + 上一镜尾帧（不掺本段内容）
                 img_output = await self.image_generator.generate_single_image(
                     prompt=transition_prompt,
-                    reference_image_paths=[last_frame_url],
+                    reference_image_paths=self._plate_refs(last_frame_path),
                     size=f"{vw}x{vh}",
                 )
                 await img_output.save(transition_path)
@@ -498,9 +540,15 @@ class VideoStepsMixin:
                             if scene_idx < len(end_frame_prompts)
                             else _fallback_end_frame(scene_text)
                         )
-                        use_i2i = (
+                        # v8.1：有板（人物/风格）即可做 i2i，不再强制要求用户参考图
+                        i2i_refs = self._plate_refs(
+                            current_first_frame
+                            if current_first_frame and current_first_frame != reference_image
+                            else "",
+                        )
+                        use_i2i = bool(
                             self._state.generate_end_frames_from_ref
-                            and reference_image
+                            and (i2i_refs or reference_image)
                         )
                         if use_i2i:
                             # 程序化拼入 [PRESERVE] 角色外观硬约束
@@ -514,13 +562,17 @@ class VideoStepsMixin:
                                     f"{_tags['change']}\n"
                                     f"{end_frame_prompt}"
                                 )
-                            normalized_ref = await self._get_normalized_character_ref(reference_image)
+                            # v8.1：顺序 = 人物板 → 风格板 → 本段首帧 → 本段内容图
+                            refs = i2i_refs
+                            if not refs and reference_image:
+                                normalized_ref = await self._get_normalized_character_ref(reference_image)
+                                refs = [normalized_ref]
                             logger.info(
-                                f"[Keyframes] Scene {scene_idx} fallback: i2i with normalized ref"
+                                f"[Keyframes] Scene {scene_idx} fallback: i2i with {len(refs)} ref(s)"
                             )
                             img_output = await self.image_generator.generate_single_image(
                                 prompt=end_frame_prompt,
-                                reference_image_paths=[normalized_ref],
+                                reference_image_paths=refs,
                                 size=f"{vw}x{vh}",
                             )
                         else:
@@ -530,15 +582,13 @@ class VideoStepsMixin:
                             )
                         await img_output.save(end_frame_path)
 
-            first_frame_url = await self.video_generator._resolve_image_ref(current_first_frame)
-            end_frame_url = await self.video_generator._resolve_image_ref(end_frame_path)
-
             pending.append({
                 "scene_idx": scene_idx,
                 "scene_text": scene_text,
                 "video_path": video_path,
-                "first_frame_url": first_frame_url,
-                "end_frame_url": end_frame_url,
+                # v8.1：原生 keyframe 提交本地路径（由 submit_video 统一归一化）
+                "first_frame": current_first_frame,
+                "end_frame": end_frame_path,
                 "end_frame_path": end_frame_path,
                 "scene_dir": scene_dir,
                 "already_submitted": False,
@@ -567,7 +617,10 @@ class VideoStepsMixin:
             )
             video_id = await self.video_generator.submit_video(
                 prompt=info["scene_text"],
-                reference_image_paths=[info["first_frame_url"], info["end_frame_url"]],
+                # v8.1：原生 keyframe（首尾帧），不带 images[]（两模式互斥）
+                reference_image_paths=[],
+                first_frame=info["first_frame"],
+                last_frame=info["end_frame"],
                 duration=self._scene_duration(scene_idx),
                 width=vw,
                 height=vh,

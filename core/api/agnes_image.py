@@ -120,6 +120,18 @@ class AgnesImageAPI:
     ) -> ImageOutput:
         use_i2i = len(reference_image_paths) > 0
         model = self.i2i_model if use_i2i else self.model
+        if use_i2i:
+            # v8.1：图片侧参考图上限唯一来源（AGNES_IMAGE_MAX_REF_IMAGES，默认 5）。
+            # 超限只截断并留痕，不影响既有单图调用方（1 张永远在限内）。
+            from core.config import get_max_ref_images
+
+            max_refs = get_max_ref_images(model, media="image")
+            if len(reference_image_paths) > max_refs:
+                logger.warning(
+                    "[AgnesImage] reference images truncated: %d > %d (%s)",
+                    len(reference_image_paths), max_refs, model,
+                )
+                reference_image_paths = reference_image_paths[:max_refs]
         payload: dict = {
             "model": model,
             "prompt": prompt,

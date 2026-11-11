@@ -4,6 +4,7 @@
 AgnesImageAPI/AgnesVideoAPI 在此模块 import 并实例化（mock 回归 patch 目标）。"""
 import asyncio
 import logging
+import os
 from typing import Callable, Optional
 
 from core.api.agnes_image import AgnesImageAPI
@@ -195,11 +196,14 @@ class CreativeVideoPipeline(
     async def _build_reference_images(self) -> None:
         """参考图生成：角色参考 → 尾帧 prompt → 预生成（keyframes 模式）。
 
-        每个有产物的细粒度环节完成后检查手动暂停点（v6.1）。
+        每个有产物的细粒度环节完成后检查手动暂停点（v6.1）。v8.1 起额外准备
+        两块全程复用的板：人物板（复用现有 ``character_reference.png``，用户上传
+        优先）+ 风格板（新产物 ``style_plate.png``，用户已上传风格图则跳过）。
         """
         self._character_ref_path = await self._step_character_reference(self._story)
         self._check_shutdown()
         await self._maybe_pause("step_character_ref")
+        await self._prepare_creative_plates()
         self._end_frame_prompts = await self._step_end_frame_prompts(
             self._story, self._scenes
         )
@@ -210,6 +214,58 @@ class CreativeVideoPipeline(
         )
         self._check_shutdown()
         await self._maybe_pause("step_end_frame_generation")
+
+    # ------------------------------------------------------------------
+    # v8.1：参考图板块 + 逐场景多图迁移
+    # ------------------------------------------------------------------
+
+    def _migrate_scene_ref_map(self) -> None:
+        """把旧 ``scene_reference_images`` 幂等迁移到 ``scene_reference_images_map``。
+
+        迁移条件：map 为空（续传重入不会重复迁移）。旧字段保留只读，便于回滚。
+        """
+        state = self._state
+        mapped = getattr(state, "scene_reference_images_map", None) or {}
+        if mapped:
+            return
+        legacy = getattr(state, "scene_reference_images", None) or []
+        migrated = {str(i): [p] for i, p in enumerate(legacy) if p}
+        if not migrated:
+            return
+        state.scene_reference_images_map = migrated
+        self.task_manager.update_state(scene_reference_images_map=migrated)
+        logger.info(
+            "[Creative] migrated %d legacy scene reference images to map", len(migrated),
+        )
+
+    async def _prepare_creative_plates(self) -> None:
+        """准备人物板 / 风格板，并把逐场景多图写进 ``scene.ref_images``。"""
+        state = self._state
+        self._migrate_scene_ref_map()
+
+        # 风格板：用户上传的风格图优先（route 落在 style_images），否则按 style 生成
+        await self._prepare_ref_plates(
+            state.idea, state.style, with_character=False,
+        )
+
+        # 人物板复用现有角色参考图（必须在板块准备之后写入：_prepare_ref_plates
+        # 会按 character_images 重置该字段）
+        character_path = getattr(self, "_character_ref_path", "") or ""
+        if character_path and os.path.exists(character_path):
+            state.character_plate = [character_path]
+            self.task_manager.update_state(character_plate=[character_path])
+
+        ref_map = getattr(state, "scene_reference_images_map", None) or {}
+        scenes = list(getattr(state, "scenes", None) or [])
+        for idx, scene in enumerate(scenes):
+            scene.ref_images = list(ref_map.get(str(idx), []) or [])
+        if scenes:
+            self.task_manager.update_state(scenes=[s.model_dump() for s in scenes])
+        logger.info(
+            "[Creative] ref plates: character=%d style=%d, scene refs=%d",
+            len(state.character_plate or []), len(state.style_plate or []),
+            sum(len(v) for v in ref_map.values()),
+        )
 
     # ------------------------------------------------------------------
     # 视频生成（链式 keyframes / ti2vid / independent — 保留原逻辑）

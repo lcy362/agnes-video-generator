@@ -8,6 +8,7 @@ import { useVoice } from '@/composables/useVoice'
 import { useTaskSubmit, collectAudioSubtitleFields } from '@/composables/useTaskSubmit'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
+import RefImagesInput from '@/components/shared/RefImagesInput.vue'
 
 const { voiceSelections } = useVoice()
 const { submitting, runSubmit } = useTaskSubmit()
@@ -18,7 +19,15 @@ const form = reactive({
   name: '',
   text: '',
   resolution: '768x1152',
+  // v8.1：人物板 / 风格板（各 ≤2，空则由流水线按正文生成）
+  characterImages: [] as File[],
+  styleImages: [] as File[],
+  // v8.1：分镜衔接（路径 K）/ 生成前暂停补图
+  linkShots: false,
+  pauseForSceneRefs: false,
 })
+
+const advancedOpen = ref(false)
 
 const charCount = computed(() => form.text.length)
 
@@ -40,6 +49,11 @@ async function submitManuscript() {
       const res = parseResolution(form.resolution)
       fd.append('video_width', String(res.width))
       fd.append('video_height', String(res.height))
+      // v8.1：人物板 / 风格板 + 衔接与补图开关
+      form.characterImages.forEach((f) => fd.append('character_images', f))
+      form.styleImages.forEach((f) => fd.append('style_images', f))
+      fd.append('link_shots', String(form.linkShots))
+      fd.append('pause_for_scene_refs', String(form.pauseForSceneRefs))
 
       const sc = subtitleRef.value
       collectAudioSubtitleFields(fd, sc, voiceSelections, 'm')
@@ -97,6 +111,50 @@ async function submitManuscript() {
             <option value="1280x720">{{ t('resLandscape') }}</option>
             <option value="1024x1024">{{ t('resSquare') }}</option>
           </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- v8.1：多参考图（默认折叠，不打扰不传图的用户） -->
+    <section class="panel mb-4">
+      <header class="panel-head">
+        <button
+          type="button"
+          class="flex w-full items-center justify-between text-start"
+          @click="advancedOpen = !advancedOpen"
+        >
+          <h2 class="panel-title">{{ t('advancedSettings') }}</h2>
+          <span class="mono text-[11px] text-muted">{{ advancedOpen ? '−' : '+' }}</span>
+        </button>
+      </header>
+      <div v-show="advancedOpen" class="panel-body space-y-5">
+        <RefImagesInput
+          v-model="form.characterImages"
+          :max="2"
+          :label="t('plateCharacter')"
+          :hint="t('plateHint')"
+        />
+        <RefImagesInput
+          v-model="form.styleImages"
+          :max="2"
+          :label="t('plateStyle')"
+          :hint="t('plateHint')"
+        />
+        <div class="space-y-2 border-t border-rule/60 pt-4">
+          <label class="flex cursor-pointer items-start gap-2 text-[12px] text-ink-2">
+            <input v-model="form.linkShots" type="checkbox" class="check mt-0.5" />
+            <span class="min-w-0">
+              <span class="block">{{ t('linkShots') }}</span>
+              <span class="mt-0.5 block text-[11px] leading-relaxed text-muted">{{ t('linkShotsHint') }}</span>
+            </span>
+          </label>
+          <label class="flex cursor-pointer items-start gap-2 text-[12px] text-ink-2">
+            <input v-model="form.pauseForSceneRefs" type="checkbox" class="check mt-0.5" />
+            <span class="min-w-0">
+              <span class="block">{{ t('pauseSceneRefs') }}</span>
+              <span class="mt-0.5 block text-[11px] leading-relaxed text-muted">{{ t('pauseSceneRefsHint') }}</span>
+            </span>
+          </label>
         </div>
       </div>
     </section>

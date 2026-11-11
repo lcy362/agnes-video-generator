@@ -291,3 +291,30 @@ def test_flash_size_is_normalized(client, env):
     )
     assert resp.status_code == 200
     assert env["state"].video_size == "720P"
+
+
+# ── v8.1：参考图上限单源 + 截断留痕 ──
+
+
+@pytest.mark.asyncio
+async def test_reference_payload_truncates_to_config_limit(api, caplog):
+    """上限来自 get_max_ref_images（flash=5），超限截断并留 warning。"""
+    inst, captured = api
+    await inst.submit_video(
+        prompt="很多参考图",
+        reference_image_paths=[f"/tmp/r{i}.png" for i in range(9)],
+    )
+    assert len(captured["images"]) == 5
+    assert any("truncated" in r.message for r in caplog.records)
+
+
+def test_reference_images_over_limit_422(client, env):
+    """路由层与 API 层同口径：超过上限直接 422，不静默丢弃。"""
+    files = [("reference_images", _file(f"r{i}.png")) for i in range(6)]
+    resp = client.post(
+        "/api/tasks/simple",
+        data={"prompt": "p", "mode": "i2v"},
+        files=files,
+    )
+    assert resp.status_code == 422
+    assert "5" in str(resp.json().get("detail", ""))

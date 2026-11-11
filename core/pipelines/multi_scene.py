@@ -15,13 +15,22 @@
 import asyncio
 import logging
 import os
+import re
 import traceback
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
 from core.api.agnes_video import VideoTaskCancelled, is_remote_video_failure
+from core.config import get_max_ref_images
 from core.pipelines import BasePipeline, CheckpointPause, PipelineShutdown
+from core.pipelines.ref_slots import (
+    KIND_CHARACTER,
+    KIND_STYLE,
+    KIND_USER_SCENE,
+    RefSlot,
+    merge_ref_images,
+)
 from models.task import SceneTask, StepStatus
 from utils.network import (
     describe_network_error,
@@ -57,6 +66,23 @@ _PROGRESS_FAILED = 0.0
 
 # 视频等待失败的重试间隔基数（秒）：delay = 基数 * (retry + 1)
 _RETRY_INTERVAL_BASE_SECONDS = 20
+
+# ── v8.1：人物板 / 风格板 ──
+# 「文案里有没有反复出现的人物」的轻量启发式：命中任一人称/职业词才画人物板，
+# 纯意象文本（诗词常见）不发明一张脸。宁可少画一张，也不要把人物硬塞进画面。
+_PERSON_HINT_RE = re.compile(
+    r"(他|她|你|我|人们|人物|主角|男主|女主|少年|少女|老人|孩子|母亲|父亲|诗人|将军|"
+    r"士兵|女子|男子|孩童|身影|"
+    r"\b(he|she|his|her|him|they|them|man|woman|boy|girl|child|person|people|"
+    r"protagonist|hero|heroine)\b)",
+    re.IGNORECASE,
+)
+
+#: 风格板默认描述（用户未填视觉风格时使用；只写介质/调色/光线，不写人物与情节）
+_DEFAULT_STYLE_PLATE_PROMPT = (
+    "Cinematic still frame, consistent color grading, soft directional light, "
+    "film grain, shallow depth of field. No people, no text, no logo."
+)
 
 
 class MultiScenePipeline(BasePipeline):
@@ -306,6 +332,14 @@ class MultiScenePipeline(BasePipeline):
             prompt = self._get_scene_video_prompt(scene, i)
             ref_images = self._get_scene_ref_images(scene, i)
             duration = self._get_scene_duration(scene, i)
+            # v8.1 路径 K：该场景有首尾帧时只提交静帧（keyframe 与 reference 互斥）
+            keyframes = self._get_scene_keyframes(scene, i)
+
+            submit_kwargs = {}
+            if keyframes:
+                first_frame, last_frame = keyframes
+                submit_kwargs = {"first_frame": first_frame, "last_frame": last_frame}
+                ref_images = []
 
             video_id = await self.video_api.submit_video(
                 prompt=prompt,
@@ -315,6 +349,7 @@ class MultiScenePipeline(BasePipeline):
                 height=self._state.video_height,
                 # U1（v7.0）：队列满时实时向前端推「排队重试中」
                 progress_callback=self._submit_progress_callback("video_gen", 0.40),
+                **submit_kwargs,
             )
             scene.video_id = video_id
             self._save_task_json(scene_dir, {"video_id": video_id})
@@ -451,6 +486,217 @@ class MultiScenePipeline(BasePipeline):
         self._set_subtitle_paths(srt_path, styles_path)
 
     # ==================================================================
+    # v8.1 参考图板块（人物板 / 风格板）与衔接静帧
+    # ==================================================================
+
+    def _ensure_image_generator(self):
+        """延迟创建图片 API（稿件/诗词此前没有图片客户端，按需创建）。"""
+        generator = getattr(self, "image_generator", None)
+        if generator is None:
+            from core.api.agnes_image import AgnesImageAPI
+
+            generator = AgnesImageAPI(api_key=self.api_key)
+            self.image_generator = generator
+        return generator
+
+    async def _generate_plate_image(self, prompt: str, output_path: str) -> str:
+        """生成一张板块图（存在即复用），失败只记日志、不阻断任务。"""
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            return output_path
+        generator = self._ensure_image_generator()
+        size = f"{self._state.video_width}x{self._state.video_height}"
+        try:
+            output = await generator.generate_single_image(prompt=prompt, size=size)
+            await output.save(output_path)
+        except Exception as e:
+            logger.warning("[MultiScene] plate image generation failed (%s): %s", output_path, e)
+            return ""
+        logger.info("[MultiScene] plate image ready: %s", output_path)
+        return output_path
+
+    async def _prepare_ref_plates(
+        self, text: str, style: str = "", *, with_character: bool = True,
+    ) -> None:
+        """准备人物板 / 风格板（用户上传优先，其余按需生成）。
+
+        规则（PRD v8.1 §3.6）：
+        - 用户上传的图直接写入对应板块，不另外生成；
+        - 风格板默认生成 1 张（只描述介质/调色/光线，不写人物与情节）；
+        - 人物板仅在文案里出现（反复出现的）人物时才生成——纯意象文本不发明一张脸。
+
+        本方法**不抛异常**：板块图属于「锦上添花」，生成失败只留 warning，
+        后续路径会退化为无板参考（行为与升级前一致）。
+        """
+        state = self._state
+        uploaded_character = [p for p in (getattr(state, "character_images", []) or []) if p]
+        uploaded_style = [p for p in (getattr(state, "style_images", []) or []) if p]
+        state.character_plate = uploaded_character[:2]
+        state.style_plate = uploaded_style[:2]
+
+        if not state.style_plate:
+            raw_style = (style or "").strip()
+            prompt = (
+                f"Style reference only — medium, color grading and lighting: {raw_style}. "
+                f"{_DEFAULT_STYLE_PLATE_PROMPT}"
+                if raw_style else _DEFAULT_STYLE_PLATE_PROMPT
+            )
+            path = await self._generate_plate_image(
+                prompt, os.path.join(self.working_dir, "style_plate.png"),
+            )
+            if path:
+                state.style_plate = [path]
+
+        if with_character and not state.character_plate and _PERSON_HINT_RE.search(text or ""):
+            appearance = ""
+            screenwriter = getattr(self, "screenwriter", None)
+            if screenwriter is not None:
+                try:
+                    appearance = await asyncio.to_thread(
+                        screenwriter.get_character_appearance, text,
+                    )
+                except Exception as e:  # LLM 失败不影响主流程
+                    logger.warning("[MultiScene] character appearance failed: %s", e)
+            prompt = (
+                f"Character reference sheet, single person, front-facing, neutral "
+                f"background, full identity details visible. {appearance}"
+                if appearance else
+                "Character reference sheet, single person, front-facing, neutral "
+                "background, cinematic lighting."
+            )
+            path = await self._generate_plate_image(
+                prompt, os.path.join(self.working_dir, "character_plate.png"),
+            )
+            if path:
+                state.character_plate = [path]
+
+        self.task_manager.update_state(
+            character_plate=state.character_plate or [],
+            style_plate=state.style_plate or [],
+        )
+        logger.info(
+            "[MultiScene] ref plates: character=%d style=%d",
+            len(state.character_plate or []), len(state.style_plate or []),
+        )
+
+    @staticmethod
+    def _frame_prompt(scene_prompt: str, roles: List[str], kind: str) -> str:
+        """拼装首/尾帧图生图提示词：逐张说明角色，避免参考图互相抢画面。"""
+        guidance = "；".join(
+            f"第 {i + 1} 张：{desc}" for i, desc in enumerate(roles)
+        ) if re.search(r"[\u4e00-\u9fff]", scene_prompt or "") else "; ".join(
+            f"Picture {i + 1}: {desc}" for i, desc in enumerate(roles)
+        )
+        head = "本段首帧" if kind == "first" else "本段尾帧"
+        return (
+            f"{head}。{guidance}。画面内容：{scene_prompt}"
+            if re.search(r"[\u4e00-\u9fff]", scene_prompt or "")
+            else f"{'Opening' if kind == 'first' else 'Closing'} frame of the shot. "
+                 f"{guidance}. Shot content: {scene_prompt}"
+        )
+
+    async def _prepare_link_shot_frames(self) -> None:
+        """路径 K：逐段画首/尾帧静帧（存在即复用，按段串行以保证衔接）。
+
+        首帧参考：人物板 + 风格板 + 上一镜**已画好的**尾帧 + 本段内容图；
+        尾帧参考：人物板 + 风格板 + 本段首帧 + 本段内容图（不带上一镜，否则画面
+        不会往前走）。超出图片侧上限时从末尾丢（先丢多出来的本段内容图）。
+        """
+        state = self._state
+        scenes = list(getattr(state, "scenes", []) or [])
+        if not scenes:
+            return
+        generator = self._ensure_image_generator()
+        limit = get_max_ref_images(getattr(generator, "i2i_model", ""), media="image")
+        size = f"{state.video_width}x{state.video_height}"
+        character = list(getattr(state, "character_plate", []) or [])
+        style = list(getattr(state, "style_plate", []) or [])
+        previous_end = ""
+
+        for index, scene in enumerate(scenes):
+            self._check_shutdown()
+            scene_dir = os.path.join(self.working_dir, f"scene_{index}")
+            os.makedirs(scene_dir, exist_ok=True)
+            first_path = os.path.join(scene_dir, "start_frame.png")
+            end_path = os.path.join(scene_dir, "end_frame.png")
+            content = list(getattr(scene, "ref_images", []) or [])
+            scene_prompt = self._get_scene_video_prompt(scene, index)
+
+            if not (os.path.exists(first_path) and os.path.getsize(first_path) > 0):
+                slots = [
+                    RefSlot(KIND_CHARACTER, character),
+                    RefSlot(KIND_STYLE, style),
+                    RefSlot("continuity", [previous_end] if previous_end else []),
+                    RefSlot(KIND_USER_SCENE, content),
+                ]
+                images, dropped = merge_ref_images(slots, limit)
+                if dropped:
+                    logger.warning("[MultiScene] Scene %d first-frame refs truncated: %s",
+                                   index, dropped)
+                roles = []
+                if character:
+                    roles.append("锁定人物身份，不改变长相")
+                if style:
+                    roles.append("只取风格（介质/调色/光线），不要复制构图")
+                if previous_end:
+                    roles.append("沿用上一镜的空间与光位")
+                roles.extend(["本段内容参考"] * max(len(content), 1))
+                try:
+                    output = await generator.generate_single_image(
+                        prompt=self._frame_prompt(
+                            scene_prompt,
+                            roles[: len(images)] or roles[:1],
+                            "first",
+                        ),
+                        reference_image_paths=images,
+                        size=size,
+                    )
+                    await output.save(first_path)
+                except Exception as e:
+                    logger.warning("[MultiScene] Scene %d first frame failed: %s", index, e)
+                    raise
+
+            if not (os.path.exists(end_path) and os.path.getsize(end_path) > 0):
+                slots = [
+                    RefSlot(KIND_CHARACTER, character),
+                    RefSlot(KIND_STYLE, style),
+                    RefSlot("continuity", [first_path]),
+                    RefSlot(KIND_USER_SCENE, content),
+                ]
+                images, dropped = merge_ref_images(slots, limit)
+                if dropped:
+                    logger.warning("[MultiScene] Scene %d end-frame refs truncated: %s",
+                                   index, dropped)
+                roles = []
+                if character:
+                    roles.append("锁定人物身份，与首帧同一人")
+                if style:
+                    roles.append("只取风格，不要复制构图")
+                roles.append("本段首帧，保持空间连续但画面推进到本段结尾")
+                roles.extend(["本段内容参考"] * max(len(content), 1))
+                try:
+                    output = await generator.generate_single_image(
+                        prompt=self._frame_prompt(
+                            scene_prompt, roles[: len(images)] or roles[:1], "end",
+                        ),
+                        reference_image_paths=images,
+                        size=size,
+                    )
+                    await output.save(end_path)
+                except Exception as e:
+                    logger.warning("[MultiScene] Scene %d end frame failed: %s", index, e)
+                    raise
+
+            scene.first_frame_file = first_path
+            scene.end_frame_file = end_path
+            previous_end = end_path
+            self.task_manager.update_state(scenes=[s.model_dump() for s in scenes])
+            await self._emit(
+                "reference_images", "running",
+                self._t("progress.multi_scene.link_shots", cur=index + 1, total=len(scenes)),
+                0.20 + 0.08 * (index + 1) / len(scenes),
+            )
+
+    # ==================================================================
     # 钩子方法（子类可覆盖）
     # ==================================================================
 
@@ -490,8 +736,36 @@ class MultiScenePipeline(BasePipeline):
         return getattr(scene, "end_frame_prompt", "") or getattr(scene, "scene_prompt", "")
 
     def _get_scene_ref_images(self, scene: SceneTask, index: int) -> List[str]:
-        """单场景参考图列表。默认取 scene.ref_images。"""
-        return list(getattr(scene, "ref_images", []) or [])
+        """单场景参考图列表（v8.1 路径 R）。
+
+        顺序唯一由 ``ref_slots.merge_ref_images`` 决定：人物板 → 风格板 → 本段
+        内容图。超出模型上限时从末尾丢并留日志（不再静默截断）。
+        """
+        slots = [
+            RefSlot(KIND_CHARACTER, list(getattr(self._state, "character_plate", []) or [])),
+            RefSlot(KIND_STYLE, list(getattr(self._state, "style_plate", []) or [])),
+            RefSlot(KIND_USER_SCENE, list(getattr(scene, "ref_images", []) or [])),
+        ]
+        images, dropped = merge_ref_images(slots, get_max_ref_images(self.video_api.model))
+        if dropped:
+            logger.warning(
+                "[MultiScene] Scene %d ref images truncated: %s", index, dropped,
+            )
+        return images
+
+    def _get_scene_keyframes(self, scene: SceneTask, index: int) -> Optional[tuple]:
+        """单场景首尾帧（v8.1 路径 K）。默认 None = 走参考图路径。
+
+        仅在任务开启「衔接」（``state.link_shots``）且该段首/尾帧已画好时返回
+        ``(first_frame, last_frame)``，模板据此只提交 keyframe、不带 images[]。
+        """
+        if not getattr(self._state, "link_shots", False):
+            return None
+        first = getattr(scene, "first_frame_file", "") or ""
+        last = getattr(scene, "end_frame_file", "") or ""
+        if not (first and os.path.exists(first) and last and os.path.exists(last)):
+            return None
+        return first, last
 
     def _get_scene_duration(self, scene: SceneTask, index: int) -> int:
         """单场景视频时长。默认 max(scene.duration, 3)。"""

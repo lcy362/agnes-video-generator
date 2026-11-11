@@ -476,6 +476,11 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "参考图生成完成",
         "en": "Reference images generated",
     },
+    # v8.1：路径 K（分镜衔接）逐段绘制首/尾帧静帧的进度
+    "progress.multi_scene.link_shots": {
+        "zh": "绘制分镜衔接静帧 {cur}/{total}",
+        "en": "Drawing continuity key frames {cur}/{total}",
+    },
     "progress.multi_scene.videos_running": {
         "zh": "生成视频",
         "en": "Generating videos",
@@ -884,6 +889,15 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "参考图最多 {max} 张，当前 {current} 张",
         "en": "At most {max} reference images are allowed, got {current}",
     },
+    # v8.1：逐场景补图端点只允许在「等待你操作」的暂停态调用
+    "error.scene_refs_not_paused": {
+        "zh": "任务当前不在等待补图的暂停状态，无法修改分镜参考图",
+        "en": "Task is not paused for scene references; cannot edit scene images now",
+    },
+    "error.scene_index_invalid": {
+        "zh": "分镜序号 {index} 超出范围（共 {total} 段）",
+        "en": "Scene index {index} is out of range (total {total})",
+    },
     "validation.too_many_ref_audios": {
         "zh": "参考音频最多 {max} 段，当前 {current} 段",
         "en": "At most {max} reference audios are allowed, got {current}",
@@ -1133,6 +1147,11 @@ CATALOG: Dict[str, Dict[str, str]] = {
 
     # ── 上传图片校验（issue #88）：非白名单后缀拒绝 / 字节不可解码 ──
     # 上传时即校验，避免坏文件拖到流水线深处（end_frame_gen）才抛 PIL 原始栈打死整任务。
+    # v8.1：参考图上传单文件大小上限（AGNES_UPLOAD_MAX_MB，默认 10MB）
+    "error.upload_too_large": {
+        "zh": "图片过大（上限 {mb} MB），请压缩后重试",
+        "en": "Image is too large (limit {mb} MB); please compress it and retry",
+    },
     "error.upload_ext_invalid": {
         "zh": "不支持的图片格式 {ext}（仅支持：{options}）。请更换为 PNG/JPG 等常见图片格式后重试。",
         "en": "Unsupported image format {ext} (allowed: {options}). Please upload a common image format such as PNG or JPG, then retry.",

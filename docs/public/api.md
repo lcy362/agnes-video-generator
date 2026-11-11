@@ -122,7 +122,7 @@ AGNES_CORS_ORIGINS=http://localhost:8787,http://127.0.0.1:8787 bash start.sh
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/image/generate` | Generate simple image (t2i / i2i) |
+| POST | `/api/image/generate` | Generate simple image (t2i / i2i)。v8.1：`reference_images`（多文件，≤5）替换旧的单数 `reference_image`（仍兼容） |
 | GET | `/api/image/{task_id}` | Download/preview generated image |
 
 ## 任务创建 (Task Creation)
@@ -158,6 +158,24 @@ AGNES_CORS_ORIGINS=http://localhost:8787,http://127.0.0.1:8787 bash start.sh
 **PR #33 吸收新增表单参数**：
 - `audio_add_tashkeel`（creative / manuscript，默认 `false`）：阿拉伯语旁白自动加变音符号（tashkeel/harakat），提升 TTS 朗读准确度。**只作用于送入 TTS 的文本**——字幕与 `narration.txt` 产物始终保持无变音符号的干净版本（字幕隔离）。
 - `reference_images`（manuscript，文件列表）+ `reference_images_map`（JSON 数组字符串）：逐段参考图，按段落 index 显式映射（见上「参考图 API 语义差异」）。
+
+**多参考图参数（v8.1，四类槽位：人物板 → 风格板 → 衔接静帧 → 本段内容图）**：
+
+| 端点 | 新增参数 | 说明 |
+|------|---------|------|
+| `POST /api/tasks/creative` | `scene_reference_images_map`（JSON，**文件 → 目标场景**：`[[0],[0],[1]]` 表示第 1、2 张给场景 0、第 3 张给场景 1）、`style_images`（≤2） | 不传 map 时退化为「第 i 张给场景 i」；旧单图字段只读兼容 |
+| `POST /api/tasks/manuscript` | `character_images`（≤2）、`style_images`（≤2）、`link_shots`、`pause_for_scene_refs` | `link_shots` = 路径 K（先画逐段首尾帧，视频只提交 keyframe）；`pause_for_scene_refs` = 拆段后停在 `references` 等补图 |
+| `POST /api/tasks/poetry` | `character_images`、`style_images`、`scene_reference_images` + `scene_reference_images_map`、`link_shots` | 逐句内容图，map 语义与创意视频一致（文件 → 目标句） |
+| `POST /api/tasks/anchor` | `anchor_reference_images`（多文件，≤5） | 第 1 张为数字人形象，其余为服饰/场景辅助；旧 `anchor_reference_image`（str）作为首图兼容 |
+| `GET /api/models` | `image_capabilities.max_ref_images` | 图片侧参考图上限（`AGNES_IMAGE_MAX_REF_IMAGES`，默认 5），与视频 `video_capabilities` 同构 |
+
+**`POST /api/tasks/{task_id}/scene-refs`**：表单 `scene_index`（0 基）+ `reference_images`（多文件，**覆盖**该段已有内容图）。
+
+- 任务不在「暂停等待补图」状态 → `409 error.scene_refs_not_paused`；
+- 序号越界 → `422 error.scene_index_invalid`；
+- 张数上限 = `get_max_ref_images(video_model)` −（人物板 + 风格板 + 衔接静帧 1 张）→ 超限 `422 validation.too_many_ref_images`。
+
+> 上传限制（v8.1）：单文件默认 10MB（`AGNES_UPLOAD_MAX_MB`，`0` = 关闭），超限 `413 error.upload_too_large`；扩展名白名单外的文件 `400`。
 
 ## 预览端点 (Preview — PR #33 吸收)
 

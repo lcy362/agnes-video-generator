@@ -18,7 +18,7 @@ from typing import Callable, Optional
 from core.api.agnes_image import AgnesImageAPI
 from core.api.agnes_video import AgnesVideoAPI, VideoTaskCancelled
 from core.compositor.concatenator import VideoConcatenator
-from core.config import DEFAULT_TEXT_MODEL
+from core.config import DEFAULT_TEXT_MODEL, get_max_ref_images
 from core.pipelines import MultiScenePipeline
 from core.screenwriter import Screenwriter
 from models.task import (
@@ -113,6 +113,26 @@ class AnchorPipeline(MultiScenePipeline):
     # 数据来源：参考图（主播形象）
     # ------------------------------------------------------------------
 
+    def _anchor_ref_images(self) -> list:
+        """数字人多参考图（v8.1）。
+
+        第 1 张 = 数字人形象，其余 = 服饰/场景辅助参考。旧
+        ``anchor_reference_image``（str）在列表为空时视为首图（兼容旧任务），
+        最终按图片侧上限截断。
+        """
+        state = self._state
+        refs = [p for p in (getattr(state, "anchor_reference_images", None) or []) if p]
+        legacy = getattr(state, "anchor_reference_image", "") or ""
+        if legacy and legacy not in refs:
+            refs.insert(0, legacy)
+        limit = get_max_ref_images(self.image_generator.i2i_model, media="image")
+        if len(refs) > limit:
+            logger.warning(
+                "[Anchor] reference images truncated: %d > %d", len(refs), limit,
+            )
+            refs = refs[:limit]
+        return [p for p in refs if os.path.exists(p)]
+
     async def _build_reference_images(self) -> None:
         """Step: 生成主播形象图（t2i / i2i）。"""
         prompt = self._state.anchor_prompt or self._get_default_anchor_prompt()
@@ -123,21 +143,21 @@ class AnchorPipeline(MultiScenePipeline):
             logger.info("[Anchor] anchor image already exists, skipping")
             return
 
-        ref_image = self._state.anchor_reference_image
+        ref_images = self._anchor_ref_images()
         size = f"{self._state.video_width}x{self._state.video_height}"
 
         await self._emit(
             "generate_anchor", "running",
-            self._t("progress.anchor.image_running") if not ref_image
+            self._t("progress.anchor.image_running") if not ref_images
             else self._t("progress.anchor.image_running_ref"),
             _PROGRESS_ANCHOR_IMAGE,
         )
 
         try:
-            if ref_image and os.path.exists(ref_image):
+            if ref_images:
                 img_output = await self.image_generator.generate_single_image(
                     prompt=prompt,
-                    reference_image_paths=[ref_image],
+                    reference_image_paths=ref_images,
                     size=size,
                 )
             else:

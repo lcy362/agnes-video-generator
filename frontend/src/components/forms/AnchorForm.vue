@@ -8,6 +8,7 @@ import { useVoice } from '@/composables/useVoice'
 import { useTaskSubmit, collectAudioSubtitleFields } from '@/composables/useTaskSubmit'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
+import RefImagesInput from '@/components/shared/RefImagesInput.vue'
 
 const { voiceSelections } = useVoice()
 const { submitting, runSubmit } = useTaskSubmit()
@@ -16,8 +17,8 @@ const subtitleRef = ref<InstanceType<typeof SubtitleConfig>>()
 
 const form = reactive({
   prompt: '',
-  refImage: null as File | null,
-  refName: '',
+  // v8.1：多参考图；第 1 张为数字人形象，其余为服饰/场景辅助
+  refImages: [] as File[],
   script: '',
   resolution: '768x1344',
   audioSource: 'post_stitch' as 'post_stitch' | 'model',
@@ -25,15 +26,12 @@ const form = reactive({
 
 const charCount = computed(() => form.script.length)
 
+// v8.1：图片侧参考图上限（/api/models image_capabilities，默认 5）
+const maxRefImages = computed(() => Number(appState.imageCapabilities?.max_ref_images ?? 5))
+
 function parseResolution(val: string) {
   const [w, h] = val.split('x').map(Number)
   return { width: w, height: h }
-}
-
-function onRefImageChange(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0] || null
-  form.refImage = file
-  form.refName = file ? file.name : ''
 }
 
 async function submitAnchor() {
@@ -50,7 +48,8 @@ async function submitAnchor() {
       const res = parseResolution(form.resolution)
       fd.append('video_width', String(res.width))
       fd.append('video_height', String(res.height))
-      if (form.refImage) fd.append('anchor_reference_image', form.refImage)
+      // v8.1：多参考图（后端 anchor_reference_images，旧单数字段仍兼容）
+      form.refImages.forEach((f) => fd.append('anchor_reference_images', f))
       // v7.6 外部素材模式：音频来源改由外部模式决定；否则用数字人自身的音频模式
       if (appState.execMode === 'external') {
         fd.append('audio_source', appState.externalAudioSource)
@@ -100,17 +99,12 @@ async function submitAnchor() {
           <textarea v-model="form.prompt" rows="3" :placeholder="t('anchorPromptPlaceholder')" class="field"></textarea>
         </div>
 
-        <div>
-          <label class="label">{{ t('anchorRefImage') }}</label>
-          <div class="flex items-center gap-3">
-            <label class="btn btn-ghost shrink-0">
-              <span>{{ t('chooseImage') }}</span>
-              <input type="file" accept="image/*" class="hidden" @change="onRefImageChange" />
-            </label>
-            <span class="truncate text-[11.5px] text-muted">{{ form.refName || t('notSelected') }}</span>
-          </div>
-          <p class="hint mt-1.5">{{ t('anchorRefImageHint') }}</p>
-        </div>
+        <RefImagesInput
+          v-model="form.refImages"
+          :max="maxRefImages"
+          :label="t('anchorRefImage')"
+          :hint="t('anchorRefImageHint')"
+        />
 
         <div>
           <label class="label">{{ t('scriptText') }} <span class="text-danger">*</span></label>

@@ -386,11 +386,29 @@ async def get_task_checkpoint(task_id: str, checkpoint: str):
     for a in group.get("artifacts", []):
         rel = a.get("path") or ""
         a["abs_path"] = os.path.join(tm.task_dir, rel) if rel else ""
+    # v8.1：references 检查点额外下发逐段摘要（供「逐段补图」面板渲染）。
+    # 只回显序号 / 文本片段 / 已有参考图数量，不暴露服务器绝对路径。
+    scene_items = []
+    if checkpoint == "references":
+        for idx, scene in enumerate(getattr(state, "scenes", None) or []):
+            refs = [p for p in (getattr(scene, "ref_images", None) or []) if p]
+            scene_items.append({
+                "index": idx,
+                "text": (
+                    getattr(scene, "narration_text", "")
+                    or getattr(scene, "scene_prompt", "")
+                    or ""
+                )[:160],
+                "ref_count": len(refs),
+                "ref_files": [os.path.basename(p) for p in refs],
+            })
+
     return {
         "ok": True,
         "checkpoint": checkpoint,
         "working_dir": tm.task_dir,
         "external_hint": _build_external_hint(state, checkpoint, tm.task_dir),
+        "scenes": scene_items,
         **group,
     }
 

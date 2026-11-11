@@ -699,4 +699,53 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 
 ---
 
-*文档版本：v3.11 | 更新日期：2026-11-11 | 变更：新增 v8.0 快速重试自动模式回归*
+## 十八、v8.1 多参考图回归（增量）
+
+> 新增于 v8.1（`docs/plans/v8.1/multi_reference_images_PRD.md`）。
+> 变更：参考图上限收敛为 `core.config.get_max_ref_images`（唯一出处）；四类槽位
+> （人物板 → 风格板 → 衔接静帧 → 本段内容图）统一由 `core/pipelines/ref_slots.py`
+> 合并；创意 / 稿件 / 诗词 / 数字人 / 简单图片全部支持多图；新增逐场景补图端点
+> `POST /api/tasks/{id}/scene-refs`。
+> 单测见 `tests/test_ref_slots.py`（合并 / 上限 / 兼容 / 模板）+ `tests/test_simple_v8.py`
+> 末尾两条（截断留痕、超限 422）；本专项用 `MR*` 命名。
+
+### 18.1 单测（自动）
+
+| ID | 条目 | 验证要点 |
+|----|------|---------|
+| MR1 | 槽位合并顺序 | `merge_ref_images` 输出 人物 → 风格 → 衔接 → 本段内容，与传入顺序无关；同优先级稳定 |
+| MR2 | 去重 | URL / data URI 按字符串、本地路径按 realpath；重复图只进一次 |
+| MR3 | 截断留痕 | 超限从末尾丢并返回 `dropped`；`agnes_video._apply_reference_payload` 打 warning |
+| MR4 | 上限单源 | `get_max_ref_images("agnes-video-2.5-flash")==5`、`("…2.5")==8`、未知模型 5；图片侧读 `AGNES_IMAGE_MAX_REF_IMAGES` |
+| MR5 | 旧任务兼容 | 缺新字段的 `task.json` 反序列化后默认空列表 / `False`；`SceneTask.ref_images` 往返 |
+| MR6 | 模板拼装 | `_get_scene_ref_images` = 人物板 + 风格板 + 本段内容图，flash 截到 5 张；`_get_scene_keyframes` 默认 None |
+| MR7 | 简单视频超限 | 6 张 → 422；5 张 → 200 且全量落盘 |
+| MR8 | 简单图片超限 | `/api/image/generate` 6 张 → 422；多图 payload `extra_body.image` 顺序保持 |
+| MR9 | 逐场景补图鉴权 | 非暂停态 409；序号越界 422；额度 = 上限 −（人物板 + 风格板 + 衔接 1 张） |
+| MR10 | 零回归 | 不上传任何图时，稿件/诗词仍生成风格板、创意仍走原链路，payload 与升级前差异仅多一块风格板 |
+
+### 18.2 端到端（人工）
+
+| ID | 场景 | 验证要点 |
+|----|------|---------|
+| MR11 | 稿件路径 R | 上传 2 张人物 + 1 张风格 → `task_state.json` 的 `character_plate`/`style_plate` 落地；各段日志 `ref images` 以人物板开头 |
+| MR12 | 稿件路径 K | 勾「分镜衔接」→ references 检查点等到首/尾帧静帧；视频 payload 只有 `first_frame`/`last_frame`（看 `curl.sh`） |
+| MR13 | 逐段补图 | 勾「生成前暂停补图」→ 任务停在 references；检查点页逐段上传 → `POST …/scene-refs` 返回新路径，续跑后该段 `images` 带上新图 |
+| MR14 | 创意关键帧 | `curl.sh` 的 payload 为 keyframe（无 `images`）；`scene_*/end_frame.png` 由多图 i2i 生成 |
+| MR15 | 创意链式 | payload `images` 顺序为人物板 → 风格板 → 上一镜尾帧 → 本段内容图；独立模式无衔接静帧 |
+| MR16 | 诗词 | 上传 2 张风格图 → 不另生成 `style_plate.png`；每句 `images` 以这 2 张开头；纯意象无人物板 |
+| MR17 | 数字人 | 上传 2 张 → `anchor.png` 走 i2i（日志 `Generating (i2i)`），第 1 张为脸；单张仍可用 |
+| MR18 | 简单图片 | 前端多选 3 张 → 任务详情 `reference_images` 三条；图生图结果以 #1 构图为主 |
+
+### 18.3 隔离性回归
+
+| 项 | 期望 |
+|----|------|
+| 旧客户端（只传 `reference_image` / `anchor_reference_image` 字符串） | 简单图片、anchor 仍可用；`anchor_reference_image` 未落盘的老行为不再复现（图挂 `anchor_reference_images`） |
+| 旧 `scene_reference_images` 创意任务续传 | 首次进 `_build_reference_images` 幂等迁移到 `scene_reference_images_map`，旧字段只读 |
+| 上传大小上限 | 单文件 > 10MB → 413（`AGNES_UPLOAD_MAX_MB`，0 = 关闭）；不影响既有小图 |
+| 22 语言 | `python3 scripts/i18n_check.py` 无缺失；新增 9 个 key 全语言覆盖 |
+
+---
+
+*文档版本：v3.12 | 更新日期：2026-11-11 | 变更：新增 v8.1 多参考图回归（MR1–MR18）*

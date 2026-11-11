@@ -11,6 +11,7 @@ import { useTaskSubmit } from '@/composables/useTaskSubmit'
 import { useDraft } from '@/composables/useDraft'
 import { useConfirm } from '@/composables/useConfirm'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
+import RefImagesInput from '@/components/shared/RefImagesInput.vue'
 
 const { trackEvent } = useGa()
 const { saveModels, isApiKeyConfigured } = useConfig()
@@ -76,8 +77,8 @@ const image = reactive({
   size: '1024x1024',
   negative: '',
   system: '',
-  refImage: null as File | null,
-  refName: '',
+  // v8.1：i2i 多参考图（上游 extra_body.image 本就是数组）
+  refImages: [] as File[],
   imageResultVisible: false,
   imageResultSrc: '',
 })
@@ -115,6 +116,8 @@ const ratioOptions = computed(() => vmCaps.ratioOptions(currentVideoModel.value)
 const sizeOptions = computed(() => vmCaps.sizeOptions(currentVideoModel.value))
 const pixelOptions = computed(() => vmCaps.pixelOptions(currentVideoModel.value))
 const maxRefImages = computed(() => vmCaps.maxRefImages(currentVideoModel.value) ?? 5)
+// v8.1：图片参考图上限（后端 AGNES_IMAGE_MAX_REF_IMAGES 下发，默认 5）
+const maxImageRefImages = computed(() => Number(appState.imageCapabilities?.max_ref_images ?? 5))
 const maxRefAudios = computed(() => vmCaps.maxRefAudios(currentVideoModel.value) ?? 3)
 
 // 免费档排前面、付费档靠后：降低免费用户误选付费档的概率（仍保留显式标注与二次确认）
@@ -189,29 +192,8 @@ function toggleCollapse(key: 'video' | 'image') {
   advancedCollapsed[key] = !advancedCollapsed[key]
 }
 
-function onImageRefChange(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0] || null
-  image.refImage = file
-  image.refName = file ? file.name : ''
-}
-
 // ── v8.0：视频素材（多图 / 首尾帧 / 音频 URL）──
-function onRefImagesChange(e: Event) {
-  const input = e.target as HTMLInputElement
-  const merged = [...video.refImages]
-  // 超出上限的文件直接忽略（上传前就拦住，避免后端 422）
-  for (const f of Array.from(input.files || [])) {
-    if (merged.length >= maxRefImages.value) break
-    merged.push(f)
-  }
-  video.refImages = merged
-  input.value = '' // 允许重复选择同一文件
-}
-
-function removeRefImage(index: number) {
-  video.refImages.splice(index, 1)
-}
-
+// v8.1：多图交互收敛到共享组件 RefImagesInput（缩略图 / #N / 排序 / 选满禁用）
 function onFirstFrameChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0] || null
   video.firstFrame = file
@@ -360,7 +342,8 @@ async function submitImage() {
       form.append('size', image.size)
       if (image.negative) form.append('negative_prompt', image.negative)
       if (image.system.trim()) form.append('system_prompt', image.system.trim())
-      if (image.refImage) form.append('reference_image', image.refImage)
+      // v8.1：多参考图（旧单数字段仍被后端接受，新前端统一走数组）
+      image.refImages.forEach((f) => form.append('reference_images', f))
       return form
     },
     extraEvent: { size: image.size },
@@ -492,23 +475,12 @@ async function submitImage() {
 
           <!-- reference：多图 + 参考音频 -->
           <div v-if="needsRefImages" class="subpanel space-y-4">
-            <div>
-              <label class="label">{{ t('simpleRefImagesLabel') }} <span class="opacity-70">(≤ {{ maxRefImages }})</span></label>
-              <div class="flex flex-wrap items-center gap-3">
-                <label class="btn btn-ghost">
-                  <span>{{ t('chooseImage') }}</span>
-                  <input type="file" accept="image/*" multiple class="hidden" @change="onRefImagesChange" />
-                </label>
-                <span class="mono text-[11px] text-muted">{{ video.refImages.length }} / {{ maxRefImages }}</span>
-              </div>
-              <ul v-if="video.refImages.length" class="mt-2 space-y-1">
-                <li v-for="(f, i) in video.refImages" :key="i" class="flex items-center justify-between rounded border border-rule bg-paper-2 px-2.5 py-1 text-[11.5px] text-ink-2">
-                  <span class="truncate">{{ i + 1 }}. {{ f.name }}</span>
-                  <button type="button" class="ms-3 text-danger transition-opacity hover:opacity-70" @click="removeRefImage(i)">✕</button>
-                </li>
-              </ul>
-              <p class="hint mt-1.5">{{ t('simpleRefImagesHint') }}</p>
-            </div>
+            <RefImagesInput
+              v-model="video.refImages"
+              :max="maxRefImages"
+              :label="`${t('simpleRefImagesLabel')} (≤ ${maxRefImages})`"
+              :hint="t('simpleRefImagesHint')"
+            />
 
             <div>
               <label class="label">{{ t('simpleRefAudiosLabel') }} <span class="opacity-70">(≤ {{ maxRefAudios }})</span></label>
@@ -621,17 +593,12 @@ async function submitImage() {
             </select>
           </div>
 
-          <div>
-            <label class="label">{{ t('refImageSimple') }}</label>
-            <div class="flex items-center gap-3">
-              <label class="btn btn-ghost shrink-0">
-                <span>{{ t('chooseImage') }}</span>
-                <input type="file" accept="image/*" class="hidden" @change="onImageRefChange" />
-              </label>
-              <span class="truncate text-[11.5px] text-muted">{{ image.refName || t('notSelected') }}</span>
-            </div>
-            <p class="hint mt-1.5">{{ t('refImageHint') }}</p>
-          </div>
+          <RefImagesInput
+            v-model="image.refImages"
+            :max="maxImageRefImages"
+            :label="t('refImageSimple')"
+            :hint="t('refImageHint')"
+          />
 
           <div class="border-t border-rule/60 pt-4">
             <button type="button" class="collapse-header flex w-full items-center justify-between" @click="toggleCollapse('image')">

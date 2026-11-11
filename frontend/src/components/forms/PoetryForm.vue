@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { t, currentLang } from '@/i18n'
+import { t, tf, currentLang } from '@/i18n'
 import { appState } from '@/store'
 import { useVoice } from '@/composables/useVoice'
 import { useTaskSubmit } from '@/composables/useTaskSubmit'
@@ -10,6 +10,7 @@ import * as api from '@/api'
 import WatermarkToggle from '@/components/shared/WatermarkToggle.vue'
 import SubtitleConfig from '@/components/shared/SubtitleConfig.vue'
 import PresetPicker from '@/components/presets/PresetPicker.vue'
+import RefImagesInput from '@/components/shared/RefImagesInput.vue'
 
 const { voiceSelections } = useVoice()
 const { submitting, runSubmit } = useTaskSubmit()
@@ -27,6 +28,18 @@ const form = reactive({
   scenePrompts: '',
   style: '',
   resolution: '768x1152',
+  // v8.1：人物板 / 风格板（各 ≤2）+ 逐句内容图 + 句间衔接
+  characterImages: [] as File[],
+  styleImages: [] as File[],
+  sceneRefs: [] as File[][],
+  linkShots: false,
+})
+
+// v8.1：本句内容图剩余额度 = 模型上限 − 人物板 − 风格板 −（衔接 1 张）
+const sceneRefMax = computed(() => {
+  const limit = Number(appState.videoCapabilities?.[appState.models.video]?.max_ref_images ?? 5)
+  const system = form.characterImages.length + form.styleImages.length + (form.linkShots ? 1 : 0)
+  return Math.max(1, limit - system)
 })
 
 const promptPanelVisible = ref(false)
@@ -113,6 +126,22 @@ async function submitPoetry() {
       fd.append('video_width', String(res.width))
       fd.append('video_height', String(res.height))
       fd.append('video_duration', '30')
+      // v8.1：人物板 / 风格板 + 逐句内容图（映射到句 index）
+      form.characterImages.forEach((f) => fd.append('character_images', f))
+      form.styleImages.forEach((f) => fd.append('style_images', f))
+      const sceneFiles: File[] = []
+      const sceneMap: number[][] = []
+      form.sceneRefs.forEach((files, idx) => {
+        ;(files || []).forEach((f) => {
+          if (f && f.size > 0) {
+            sceneFiles.push(f)
+            sceneMap.push([idx])
+          }
+        })
+      })
+      sceneFiles.forEach((f) => fd.append('scene_reference_images', f))
+      fd.append('scene_reference_images_map', JSON.stringify(sceneMap))
+      fd.append('link_shots', String(form.linkShots))
 
       fd.append('duration_source', 'manual')
       fd.append('scene_count', String(form.sceneCount))
@@ -251,7 +280,7 @@ async function submitPoetry() {
       <header class="panel-head">
         <h2 class="panel-title">{{ t('advancedSettings') }}</h2>
       </header>
-      <div class="panel-body">
+      <div class="panel-body space-y-5">
         <div class="max-w-64">
           <label class="label">{{ t('resolution') }}</label>
           <select v-model="form.resolution" class="field">
@@ -260,6 +289,48 @@ async function submitPoetry() {
             <option value="1024x1024">{{ t('resSquare') }}</option>
           </select>
         </div>
+
+        <!-- v8.1：人物板 / 风格板（空则按诗句生成风格板；无人入画不生成人物板） -->
+        <RefImagesInput
+          v-model="form.characterImages"
+          :max="2"
+          :label="t('plateCharacter')"
+          :hint="t('plateHint')"
+        />
+        <RefImagesInput
+          v-model="form.styleImages"
+          :max="2"
+          :label="t('plateStyle')"
+          :hint="t('plateHint')"
+        />
+
+        <!-- v8.1：逐句内容图（序号 = 句 index） -->
+        <div class="border-t border-rule/60 pt-4">
+          <label class="label">{{ t('sceneReferenceImages') }}</label>
+          <p class="hint mb-2">{{ t('sceneRefDesc') }}</p>
+          <div class="space-y-3">
+            <div v-for="i in form.sceneCount" :key="i">
+              <div class="mb-1 flex items-center gap-2">
+                <span class="mono w-8 shrink-0 text-[11px] text-muted">{{ i }}</span>
+                <span class="hint">{{ tf('sceneRefQuota', { n: sceneRefMax }) }}</span>
+              </div>
+              <RefImagesInput
+                :model-value="form.sceneRefs[i - 1] || []"
+                :max="sceneRefMax"
+                input-class="scene-ref-file"
+                @update:model-value="(v: File[]) => (form.sceneRefs[i - 1] = v)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <label class="flex cursor-pointer items-start gap-2 border-t border-rule/60 pt-4 text-[12px] text-ink-2">
+          <input v-model="form.linkShots" type="checkbox" class="check mt-0.5" />
+          <span class="min-w-0">
+            <span class="block">{{ t('linkShots') }}</span>
+            <span class="mt-0.5 block text-[11px] leading-relaxed text-muted">{{ t('linkShotsHint') }}</span>
+          </span>
+        </label>
       </div>
     </section>
 

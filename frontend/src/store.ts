@@ -59,6 +59,8 @@ export const appState = reactive({
   providerModelCache: {} as Record<string, string[]>,
   // v6.2：视频模型能力元数据（来自 /api/models video_capabilities）
   videoCapabilities: {} as Record<string, any>,
+  // v8.1：图片侧能力元数据（来自 /api/models image_capabilities，参考图上限）
+  imageCapabilities: {} as Record<string, any>,
   // v8.0：简单视频一键预设（来自 /api/models simple_default，后端单一来源）
   simpleDefault: {} as Record<string, any>,
   // 音色目录

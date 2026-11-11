@@ -204,29 +204,49 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             self.task_manager.update_state(reference_images=self._state.reference_images)
 
         # 填充通用 scenes 列表（供模板与下游步骤引用）
+        # v8.1：逐段多图写入 scene.ref_images（顺序即 <Picture N>）
+        ref_map = self._state.reference_images or {}
         self._state.scenes = [
             SceneTask(
                 index=p.index,
                 scene_prompt=p.scene_prompt,
                 narration_text=p.text,
                 duration=max(int(math.ceil(duration_len(p.text) / estimate_chars_per_sec(p.text))), 3),
+                ref_images=list(ref_map.get(str(p.index), []) or []),
             )
             for p in self._state.paragraphs
         ]
         self.task_manager.update_state(scenes=[s.model_dump() for s in self._state.scenes])
 
     async def _build_reference_images(self) -> None:
-        """稿件参考图阶段：参考图在任务创建时已上传并映射到段落，
-        此步骤为空实现（作为手动模式检查点 / 模板阶段占位）。"""
-        return
+        """稿件参考图阶段（v8.1）：准备人物板 / 风格板，必要时逐段画衔接静帧。
+
+        默认路径 R：两块板由 ``_get_scene_ref_images`` 自动拼进每段 ``images[]``。
+        打开「分镜衔接」时改走路径 K：此处按段串行画首/尾帧，视频只提交这两张。
+        所有生成失败均降级（不阻断任务），用户不上传图时行为与升级前等价。
+        """
+        state = self._state
+        await self._prepare_ref_plates(state.manuscript_text, state.style)
+        if getattr(state, "link_shots", False):
+            await self._prepare_link_shot_frames()
 
     # v6.0 P3 / PRD 1.7：稿件默认无参考图 → references 检查点不可暂停；
-    # 引入逐段参考图（reference_images）后恢复为可暂停检查点。
+    # v8.1：勾选「暂停补图」或存在人物/风格板时恢复为可暂停检查点。
     def _get_pausable_steps(self) -> set:
         from core.pipelines import _STEP_TO_CHECKPOINT
 
         steps = set(_STEP_TO_CHECKPOINT.keys())
-        if not (self._state and getattr(self._state, "reference_images", None)):
+        state = self._state
+        can_pause = bool(
+            state
+            and (
+                getattr(state, "reference_images", None)
+                or getattr(state, "pause_for_scene_refs", False)
+                or getattr(state, "character_images", None)
+                or getattr(state, "style_images", None)
+            )
+        )
+        if not can_pause:
             steps.discard("step_reference_images")
         return steps
 
@@ -426,8 +446,18 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
             )
 
             para_duration = max(int(math.ceil(duration_len(para.text) / estimate_chars_per_sec(para.text))), 3)
-            # 逐段参考图（PRD 1.5）：用户上传图按段落 index 映射，用于 i2v 引导画面
-            ref_images = self._state.reference_images.get(str(para.index), [])
+            # 逐段参考图（v8.1）：人物板 → 风格板 → 本段内容图，上限唯一出处
+            scene = self._state.scenes[i] if i < len(self._state.scenes) else None
+            ref_images = (
+                self._get_scene_ref_images(scene, para.index) if scene is not None else
+                self._state.reference_images.get(str(para.index), [])
+            )
+            keyframes = self._get_scene_keyframes(scene, para.index) if scene is not None else None
+            submit_kwargs = {}
+            if keyframes:
+                # 路径 K：keyframe 与 reference 互斥，只提交首尾帧
+                submit_kwargs = {"first_frame": keyframes[0], "last_frame": keyframes[1]}
+                ref_images = []
 
             for retry in range(_SUBMIT_RETRIES):
                 try:
@@ -437,6 +467,7 @@ class ManuscriptVideoPipeline(MultiScenePipeline):
                         duration=para_duration,
                         width=self._state.video_width,
                         height=self._state.video_height,
+                        **submit_kwargs,
                     )
                     para.video_id = video_id
                     self._save_task_json(para_dir, {"video_id": video_id})
