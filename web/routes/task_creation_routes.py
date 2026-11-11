@@ -520,7 +520,10 @@ async def create_simple_task(
     tm.create(state)
     deps.mark_task_queued(tm, lang=state.ui_language)
     app_state.launch_background_task(deps.run_pipeline_with_concurrency(pipeline, state, tm))
-    logger.info(f"[Simple] Task created: {task_id}, mode={mode}, duration={duration}s (queued)")
+    logger.info(
+        "[Simple] Task created: %s, mode=%s, duration=%ss (queued)",
+        task_id, safe_log(mode), duration,
+    )
     return {"ok": True, "task_id": task_id, "dir_name": dir_name}
 
 @router.post("/api/tasks/creative")
