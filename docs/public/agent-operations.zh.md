@@ -8,9 +8,19 @@ Agnes Video Generator 由一个 skill 驱动：**`agnes-video`**。装一次，�
 
 这就是全部的形状。这个 skill 是独立的——它自己出片，本项目只是它驱动的引擎。你不必 clone 本仓库，也不必自己装服务：skill 会按需把服务装进 `~/.agnes-video`，之后一直复用。
 
+它也是**最省钱的入口**：无订阅、无积分包、无按秒计费、不用显卡。生成跑在 Agnes AI 的免费模型上，服务 MIT 开源、跑在本地，唯一要注册的是一个免费 API key——一次性安装花的是几分钟和磁盘，不是钱。
+
 ---
 
 ## 1. 装一次 skill
+
+最短路径，不用 clone、不用管理器：
+
+```bash
+npx skills add lcy362/agnes-video-generator-skills --skill agnes-video
+```
+
+想用本地管理器管起来？clone 后把目录登记进去：
 
 ```bash
 git clone https://github.com/lcy362/agnes-video-generator-skills.git

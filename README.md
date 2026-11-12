@@ -73,13 +73,15 @@ schema.org structured data for SEO/GEO indexing. GitHub does not execute this sc
 |---------|-----------|----------|------|
 | **[Agnes Video Generator](https://github.com/lcy362/agnes-video-generator)** (this project) | **Download & run locally** | **More powerful** — TTS narration, auto subtitles, digital anchor, image-to-video, keyframes animation, manuscript-to-video, checkpoint resume & more | [GitHub](https://github.com/lcy362/agnes-video-generator) |
 | **[FreeShortVideoStudio](https://github.com/lcy362/free-short-video-studio)** | **Fully online, in the browser** | Lightweight, zero install — no setup at all, **features under active construction** | [video.lichuanyang.top/studio](https://video.lichuanyang.top/studio) · [GitHub](https://github.com/lcy362/free-short-video-studio) |
-| **[Agnes Video Generator](https://github.com/lcy362/agnes-video-generator)** — **agent-ready** | **Driven by an AI coding agent** | **Least effort** — install the standalone `agnes-video` skill: it installs the service, generates the video, delivers the file, debugs failures and can open a PR for a real defect | [Skill repository](https://github.com/lcy362/agnes-video-generator-skills) · [Flint](https://github.com/lcy362/flint) |
+| **[Agnes Video Generator](https://github.com/lcy362/agnes-video-generator)** — **agent-ready** | **Driven by an AI coding agent** | **Least effort, still completely free** — install the standalone `agnes-video` skill: it installs the service, generates the video, delivers the file, debugs failures and can open a PR for a real defect. No credits, no subscription, no GPU | [Skill repository](https://github.com/lcy362/agnes-video-generator-skills) · [Flint](https://github.com/lcy362/flint) |
 
 ## 🤖 Or Let an AI Agent Drive It
 
 Install **one skill**, then describe the result you want. The `agnes-video` skill installs the
 service, makes the video, delivers the file and diagnoses failures — **you never clone this
-repository**, and the skill is useful on its own, not just as an add-on to this project.
+repository**, and the skill is useful on its own, not just as an add-on to this project. It is also
+**the cheapest way to start**: no subscription, no credit packs, no per-second billing, no GPU — just
+one free API key.
 
 ```bash
 git clone https://github.com/lcy362/agnes-video-generator-skills.git

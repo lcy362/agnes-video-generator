@@ -13,9 +13,21 @@ The skill is standalone — it generates videos, and this project is what it dri
 this repository, and you do not install the service yourself: the skill installs it on demand under
 `~/.agnes-video` and reuses it afterwards.
 
+It is also **the cheapest way in**: no subscription, no credit packs, no per-second billing and no GPU.
+Generation runs on Agnes AI's free models; the service is MIT-licensed and local; the only thing you
+register for is a free API key. The one-time install costs minutes and disk space, not money.
+
 ---
 
 ## 1. Install the skill once
+
+The shortest path — no clone, no manager:
+
+```bash
+npx skills add lcy362/agnes-video-generator-skills --skill agnes-video
+```
+
+Prefer a local skills manager? Clone it and register the directory:
 
 ```bash
 git clone https://github.com/lcy362/agnes-video-generator-skills.git
