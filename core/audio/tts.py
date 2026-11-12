@@ -71,9 +71,17 @@ class EdgeTTSEngine(TTSEngine):
                         elif chunk["type"] in ("WordBoundary", "SentenceBoundary"):
                             sub_maker.feed(chunk)
 
+                # Reject an empty stream before replacing the destination; otherwise
+                # an upstream TTS failure can leave a zero-byte file that looks successful.
+                if not os.path.exists(tmp_path) or os.path.getsize(tmp_path) == 0:
+                    raise RuntimeError("EdgeTTS returned no audio bytes")
+
                 # 原子替换，避免半成品被误用
                 os.replace(tmp_path, output_path)
-                logger.info(f"[TTS] Audio saved: {output_path}")
+                logger.info(
+                    f"[TTS] Audio saved: {output_path} "
+                    f"({os.path.getsize(output_path)} bytes)"
+                )
                 return output_path, sub_maker
             except Exception as e:
                 # 清理半成品文件
