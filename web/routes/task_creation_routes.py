@@ -320,6 +320,13 @@ async def _save_upload_file(
 _MAX_PLATE_IMAGES = 2
 
 
+async def _count_uploads(uploads) -> int:
+    """统计真正带文件名的上传数量（容忍 FastAPI 的 ``File(...)`` 默认标记对象）。"""
+    if not isinstance(uploads, (list, tuple)):
+        return 0
+    return sum(1 for f in uploads if f and getattr(f, "filename", ""))
+
+
 async def _save_ref_upload_list(
     uploads: Optional[List[UploadFile]],
     upload_dir: str,
@@ -719,11 +726,13 @@ async def create_creative_task(
     if reference_image and reference_image.filename:
         state.reference_image = await _save_upload_file(reference_image, upload_dir, f"{task_id}_ref")
 
-    # P3: 处理自定义尾帧图片上传
-    # 前端只上送非空槽位，并附带「文件 → 场景 index」映射（end_frame_indices_json）；
-    # 此处按映射落盘并**保留空串占位**，维持「图片 ↔ 场景」索引对应（此前仅按上送顺序
-    # 落盘，前面的空槽位会让后续文件整体前移、图场景错位，issue #88）。
-    if use_custom_end_frames and end_frame_images:
+    # P3: 处理自定义尾帧图片上传（仅关键帧模式生效：其他衔接方式没有首尾帧概念）
+    if use_custom_end_frames and end_frame_images and chaining_mode != "keyframes":
+        logger.info(
+            "[Pipeline] Custom end frames only apply to keyframes; ignored %d upload(s) for task %s",
+            _count_uploads(end_frame_images), task_id,
+        )
+    elif use_custom_end_frames and end_frame_images:
         ef_indices = _parse_end_frame_indices(end_frame_indices_json)
         # 先按「场景 index → 路径」收集（分配量只与上传文件数有关，与 index 数值无关），
         # 再物化成带空串占位的定长列表。**列表长度只由常量 _MAX_SCENE_COUNT 决定**：
@@ -750,7 +759,14 @@ async def create_creative_task(
     # v8.1：用户上传分镜场景图（逐场景**多张**）。上传文件按
     # ``scene_reference_images_map`` 映射到场景 index；旧客户端不传 map 时
     # 退化为「第 i 个文件属于场景 i」（与 v5.0 行为一致）。
-    if scene_reference_images:
+    # 关键帧模式不使用逐段参考图（首帧 = 角色参考图 / 上一段尾帧），上传一律忽略。
+    if scene_reference_images and chaining_mode == "keyframes":
+        logger.info(
+            "[Pipeline] Keyframes mode ignores per-scene reference images; "
+            "dropped %d upload(s) for task %s",
+            _count_uploads(scene_reference_images), task_id,
+        )
+    elif scene_reference_images:
         try:
             scene_idx_map = json.loads(scene_reference_images_map) if scene_reference_images_map else []
             if not isinstance(scene_idx_map, list):
@@ -779,10 +795,18 @@ async def create_creative_task(
                 sum(len(v) for v in saved_scene_map.values()), len(saved_scene_map), task_id,
             )
 
-    # v8.1：风格板（用户上传优先，空则由 style 文本生成）
-    state.style_images = await _save_ref_upload_list(
-        style_images, upload_dir, f"{task_id}_splate", _MAX_PLATE_IMAGES,
-    )
+    # v8.1：风格板（用户上传优先，空则由 style 文本生成）。
+    # 仅路径 R（ti2vid / none）会把它拼进视频 images[]；关键帧模式的视频只提交
+    # 首尾帧，风格板不会被任何请求用到，因此不接收上传（省磁盘，也不误导用户）。
+    if style_images and chaining_mode == "keyframes":
+        logger.info(
+            "[Pipeline] Keyframes mode ignores style images; dropped %d upload(s) for task %s",
+            _count_uploads(style_images), task_id,
+        )
+    else:
+        state.style_images = await _save_ref_upload_list(
+            style_images, upload_dir, f"{task_id}_splate", _MAX_PLATE_IMAGES,
+        )
 
     pipeline = deps.create_pipeline_for_type(TaskType.CREATIVE, api_key, task_id, dir_name)
     app_state.active_pipelines[task_id] = pipeline

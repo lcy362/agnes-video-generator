@@ -63,11 +63,6 @@ class VideoStepsMixin:
             return [legacy[scene_idx]]
         return []
 
-    def _user_scene_ref(self, scene_idx: int):
-        """返回用户上传的分镜参考图路径（单图兼容入口），无则 None。"""
-        refs = self._user_scene_refs(scene_idx)
-        return refs[0] if refs else None
-
     def _scene_ref_slots(self, scene_idx: int, continuity: str = "") -> List[RefSlot]:
         """该场景的参考图槽位：人物 → 风格 → 衔接 → 本段内容。"""
         state = self._state
@@ -480,11 +475,9 @@ class VideoStepsMixin:
         for scene_idx, scene_text in enumerate(scenes):
             if self._is_shutdown():
                 raise PipelineShutdown(f"interrupted during keyframe scene {scene_idx}")
-            # 优化 5：该场景有用户上传参考图时，以用户图为 first frame（跳过角色参考图）
-            user_ref = self._user_scene_ref(scene_idx)
-            if user_ref:
-                logger.info(f"[Pipeline] Scene {scene_idx}: using user reference image as first frame")
-                current_first_frame = user_ref
+            # v8.1 修复：关键帧模式不再接受逐段上传图作为首帧。首帧只有两个来源：
+            # 第 1 段 = 角色参考图，其后 = 上一段尾帧。此前「逐段图顶掉上一段尾帧」
+            # 会让用户设的衔接被隐式覆盖，且与「自定义尾帧」两个控件争夺同一段起点。
             scene_dir = os.path.join(self.working_dir, f"scene_{scene_idx}")
             os.makedirs(scene_dir, exist_ok=True)
             video_path = os.path.join(scene_dir, "video.mp4")

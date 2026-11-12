@@ -78,6 +78,11 @@ def _file(name, content=_PNG):
     return (name, content, "image/png")
 
 
+def _saved(env) -> list:
+    """上传目录里的文件名列表（目录可能尚未创建，按空列表处理）。"""
+    return os.listdir(env["uploads"]) if os.path.isdir(env["uploads"]) else []
+
+
 # ═══════════════════════════════════════════════
 # simple：参考图 + 尾帧上传 + 各 mode + v2.5 时长
 # ═══════════════════════════════════════════════
@@ -128,9 +133,11 @@ class TestSimpleRich:
 
 class TestCreativeRich:
     def test_with_reference_and_end_frames(self, client, env):
+        """关键帧模式：参考图 + 自定义尾帧落盘；逐段参考图不落盘（该模式不使用）。"""
         resp = client.post(
             "/api/tasks/creative",
             data={"idea": "太空探险", "scene_count": "2", "scene_durations_json": "[5,5]",
+                  "chaining_mode": "keyframes",
                   "use_custom_end_frames": "true", "audio_enabled": "false"},
             files=[("reference_image", _file("r.png")),
                    ("end_frame_images", _file("e1.png")),
@@ -138,8 +145,74 @@ class TestCreativeRich:
                    ("scene_reference_images", _file("s1.png"))],
         )
         assert resp.status_code == 200
-        assert any("_end_" in f for f in os.listdir(env["uploads"]))
-        assert any("_scene_" in f for f in os.listdir(env["uploads"]))
+        saved = _saved(env)
+        assert any("_end_" in f for f in saved)
+        assert not any("_scene_" in f for f in saved)
+
+    def test_keyframes_ignores_scene_refs(self, client, env):
+        """关键帧模式不使用逐段参考图（首帧由角色图 / 上一段尾帧决定），上传一律不落盘。"""
+        resp = client.post(
+            "/api/tasks/creative",
+            data={"idea": "x", "chaining_mode": "keyframes", "scene_count": "2",
+                  "scene_durations_json": "[5,5]", "audio_enabled": "false",
+                  "scene_reference_images_map": "[[0],[0],[1],[1]]"},
+            files=[("scene_reference_images", _file("a.png")),
+                   ("scene_reference_images", _file("b.png")),
+                   ("scene_reference_images", _file("c.png")),
+                   ("scene_reference_images", _file("d.png"))],
+        )
+        assert resp.status_code == 200
+        assert not [f for f in _saved(env) if "_scene_" in f]
+
+    def test_keyframes_ignores_custom_end_frames(self, client, env):
+        """非关键帧模式的自定义尾帧同样不落盘（没有首尾帧概念）。"""
+        resp = client.post(
+            "/api/tasks/creative",
+            data={"idea": "x", "chaining_mode": "ti2vid", "scene_count": "2",
+                  "scene_durations_json": "[5,5]", "audio_enabled": "false",
+                  "use_custom_end_frames": "true", "end_frame_indices_json": "[0]"},
+            files=[("end_frame_images", _file("e.png"))],
+        )
+        assert resp.status_code == 200
+        assert not [f for f in _saved(env) if "_end_" in f]
+
+    def test_keyframes_ignores_style_images(self, client, env):
+        """关键帧模式用不到风格图（视频只提交首尾帧），上传不落盘。"""
+        resp = client.post(
+            "/api/tasks/creative",
+            data={"idea": "x", "chaining_mode": "keyframes", "scene_count": "2",
+                  "scene_durations_json": "[5,5]", "audio_enabled": "false"},
+            files=[("style_images", _file("s1.png"))],
+        )
+        assert resp.status_code == 200
+        assert not [f for f in _saved(env) if "_splate" in f]
+
+    def test_ti2vid_keeps_style_images(self, client, env):
+        """ti2vid 会把风格板拼进 images[]，上传照常落盘。"""
+        resp = client.post(
+            "/api/tasks/creative",
+            data={"idea": "x", "chaining_mode": "ti2vid", "scene_count": "2",
+                  "scene_durations_json": "[5,5]", "audio_enabled": "false"},
+            files=[("style_images", _file("s1.png"))],
+        )
+        assert resp.status_code == 200
+        assert [f for f in _saved(env) if "_splate" in f]
+
+    def test_ti2vid_keeps_multiple_scene_refs(self, client, env):
+        """非关键帧模式（ti2vid）仍按段保留多张参考图。"""
+        resp = client.post(
+            "/api/tasks/creative",
+            data={"idea": "x", "chaining_mode": "ti2vid", "scene_count": "2",
+                  "scene_durations_json": "[5,5]", "audio_enabled": "false",
+                  "scene_reference_images_map": "[[0],[0],[1],[1]]"},
+            files=[("scene_reference_images", _file("a.png")),
+                   ("scene_reference_images", _file("b.png")),
+                   ("scene_reference_images", _file("c.png")),
+                   ("scene_reference_images", _file("d.png"))],
+        )
+        assert resp.status_code == 200
+        saved = [f for f in _saved(env) if "_scene_" in f]
+        assert len(saved) == 4, saved
 
     def test_duration_source_prompt_ok(self, client, env):
         resp = client.post("/api/tasks/creative", data={"idea": "x", "duration_source": "prompt"})

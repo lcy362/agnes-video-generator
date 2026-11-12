@@ -243,9 +243,12 @@ class CreativeVideoPipeline(
         state = self._state
         self._migrate_scene_ref_map()
 
-        # 风格板：用户上传的风格图优先（route 落在 style_images），否则按 style 生成
+        # 风格板：仅路径 R（ti2vid / none）会把它拼进视频 images[]。
+        # 关键帧模式视频只提交首尾帧、尾帧 i2i 也只读人物图 + 上一镜尾帧，
+        # 风格板不会被任何请求用到 → 不生成、不接收上传，避免白跑一次图生图。
         await self._prepare_ref_plates(
             state.idea, state.style, with_character=False,
+            with_style=state.chaining_mode != "keyframes",
         )
 
         # 人物板复用现有角色参考图（必须在板块准备之后写入：_prepare_ref_plates

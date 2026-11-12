@@ -516,6 +516,7 @@ class MultiScenePipeline(BasePipeline):
 
     async def _prepare_ref_plates(
         self, text: str, style: str = "", *, with_character: bool = True,
+        with_style: bool = True,
     ) -> None:
         """准备人物板 / 风格板（用户上传优先，其余按需生成）。
 
@@ -524,6 +525,14 @@ class MultiScenePipeline(BasePipeline):
         - 风格板默认生成 1 张（只描述介质/调色/光线，不写人物与情节）；
         - 人物板仅在文案里出现（反复出现的）人物时才生成——纯意象文本不发明一张脸。
 
+        Args:
+            text: 任务正文，用于判断是否需要人物板。
+            style: 风格描述文本，用于生成风格板。
+            with_character: 是否允许生成人物板。
+            with_style: 是否准备风格板。创意关键帧模式传 ``False``：该模式视频
+                只提交首尾帧、尾帧 i2i 也不读风格板，生成出来的图不会被任何
+                请求使用（白白多一次图生图）。其余类型/路径保持默认 ``True``。
+
         本方法**不抛异常**：板块图属于「锦上添花」，生成失败只留 warning，
         后续路径会退化为无板参考（行为与升级前一致）。
         """
@@ -531,13 +540,13 @@ class MultiScenePipeline(BasePipeline):
         uploaded_character = [p for p in (getattr(state, "character_images", []) or []) if p]
         uploaded_style = [p for p in (getattr(state, "style_images", []) or []) if p]
         state.character_plate = uploaded_character[:2]
-        state.style_plate = uploaded_style[:2]
+        state.style_plate = uploaded_style[:2] if with_style else []
 
         # v7.6 外部素材模式：板块图同样由外部工具产出（references 检查点导入），
         # 本项目不调用 Agnes 图像模型；用户已上传的图仍作为板块使用。
         external = self._is_external()
 
-        if not state.style_plate and not external:
+        if with_style and not state.style_plate and not external:
             raw_style = (style or "").strip()
             prompt = (
                 f"Style reference only — medium, color grading and lighting: {raw_style}. "

@@ -1102,12 +1102,12 @@ class TestVideoModuleHelpers:
 class TestUserSceneRef:
     def test_no_refs(self, tmp_path):
         pipe = _make_pipeline(tmp_path)
-        assert pipe._user_scene_ref(0) is None
+        assert pipe._user_scene_refs(0) == []
 
     def test_in_range(self, tmp_path):
         pipe = _make_pipeline(tmp_path)
         pipe._state.scene_reference_images = ["img.png", "img2.png"]
-        assert pipe._user_scene_ref(1) == "img2.png"
+        assert pipe._user_scene_refs(1) == ["img2.png"]
 
 
 class TestStepGenerateVideosDispatch:
@@ -1314,6 +1314,36 @@ class TestKeyframeScenes:
         asyncio.run(pipe._generate_keyframe_scenes(
             ["s0"], ref, ["p0"], {}, 768, 1152, []
         ))
+
+    def test_scene_refs_do_not_override_first_frame(self, tmp_path):
+        """关键帧模式忽略逐段上传图：首帧只来自角色参考图 / 上一段尾帧。"""
+        pipe = self._pipe(tmp_path)
+        pipe._state.scene_reference_images = ["/tmp/user.png"]
+        ref = _write(tmp_path, "ref.png", "img")
+        pre = _write(tmp_path, "scene_0/end_frame.png", "e")
+        asyncio.run(pipe._generate_keyframe_scenes(
+            ["s0"], ref, ["p0"], {"0": pre}, 768, 1152, []
+        ))
+        _, kwargs = pipe.video_generator.submit_video.call_args
+        assert kwargs["first_frame"] == ref
+        assert kwargs["last_frame"] == pre
+        assert kwargs["reference_image_paths"] == []
+
+    def test_second_scene_first_frame_is_previous_end_frame(self, tmp_path):
+        """第 2 段首帧 = 第 1 段尾帧，与逐段上传图无关。"""
+        pipe = self._pipe(tmp_path)
+        pipe._state.scene_reference_images = ["", "/tmp/user.png"]
+        ref = _write(tmp_path, "ref.png", "img")
+        ef0 = _write(tmp_path, "scene_0/end_frame.png", "e0")
+        ef1 = _write(tmp_path, "scene_1/end_frame.png", "e1")
+        asyncio.run(pipe._generate_keyframe_scenes(
+            ["s0", "s1"], ref, ["p0", "p1"], {"0": ef0, "1": ef1}, 768, 1152, []
+        ))
+        calls = pipe.video_generator.submit_video.call_args_list
+        assert len(calls) == 2
+        assert calls[0].kwargs["first_frame"] == ref
+        assert calls[1].kwargs["first_frame"] == ef0
+        assert calls[1].kwargs["last_frame"] == ef1
 
     def test_shutdown(self, tmp_path):
         pipe = self._pipe(tmp_path)

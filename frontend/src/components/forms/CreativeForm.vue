@@ -43,15 +43,49 @@ const form = reactive({
 })
 
 // v8.1：本段内容图剩余额度 = 模型上限 − 人物图 − 风格板 −（链式 1 张衔接静帧）
+// 逐段参考图只在 ti2vid / none 模式使用；关键帧模式没有这个上传入口（首帧由
+// 角色参考图与上一段尾帧衔接决定）。
 const sceneRefMax = computed(() => {
   const limit = Number(appState.videoCapabilities?.[appState.models.video]?.max_ref_images ?? 5)
   const system = (form.refImage ? 1 : 0) + form.styleImages.length + (form.chaining === 'ti2vid' ? 1 : 0)
   return Math.max(1, limit - system)
 })
 
+// 切换衔接方式 / 增减人物板、风格板后会改变每段上限，把已选但超出上限的图裁掉，
+// 保证界面上看到的张数就是实际会提交的张数。
+watch(sceneRefMax, (max) => {
+  let trimmed = false
+  const next = form.sceneRefs.map((files) => {
+    const list = files || []
+    if (list.length <= max) return list
+    trimmed = true
+    return list.slice(0, max)
+  })
+  if (trimmed) form.sceneRefs = next
+})
+
+// 尾帧 / 首尾帧只属于关键帧模式：切到其他衔接方式时清掉隐藏字段，避免带着
+// 不会生效的配置提交（后端同样会忽略非关键帧模式的尾帧上传）。反向切换时
+// 一并清掉逐段参考图，避免它在关键帧模式下"看得见但没用"。
+watch(() => form.chaining, (mode) => {
+  if (mode === 'keyframes') {
+    form.sceneRefs = []
+    form.styleImages = []
+    return
+  }
+  form.useEndFrames = false
+  form.genEndFromRef = false
+  form.endFrames = []
+})
+
 function parseResolution(val: string) {
   const [w, h] = val.split('x').map(Number)
   return { width: w, height: h }
+}
+
+// 本段剩余可传张数（0 = 已选满，组件会禁用选择）
+function sceneRefRemaining(index: number) {
+  return Math.max(0, sceneRefMax.value - (form.sceneRefs[index - 1]?.length || 0))
 }
 
 // 3.4：创意表单草稿（JSON 安全字段，File 不保存）
@@ -155,11 +189,13 @@ async function submitCreative() {
       const res = parseResolution(form.resolution)
       fd.append('video_width', String(res.width))
       fd.append('video_height', String(res.height))
-      fd.append('use_custom_end_frames', String(form.useEndFrames))
-      fd.append('generate_end_frames_from_ref', String(form.genEndFromRef))
+      // 尾帧 / 首尾帧只属于关键帧模式；其他模式不上送，避免后端收到无效配置
+      const keyframes = form.chaining === 'keyframes'
+      fd.append('use_custom_end_frames', String(keyframes && form.useEndFrames))
+      fd.append('generate_end_frames_from_ref', String(keyframes && form.genEndFromRef))
 
       if (form.refImage) fd.append('reference_image', form.refImage)
-      if (form.useEndFrames) {
+      if (keyframes && form.useEndFrames) {
         // 只上送非空槽位，并附带「文件 → 场景 index」映射，让后端按场景落盘，
         // 保持「图片 ↔ 场景」索引对应（此前按顺序上送会让空槽位后的文件整体前移、
         // 造成图场景错位，issue #88）。空文件无法作为 multipart 文件上送，故不占位。
@@ -174,20 +210,23 @@ async function submitCreative() {
         fd.append('end_frame_indices_json', JSON.stringify(efIdx))
       }
       // v8.1：逐场景多图 —— 顺序 append 文件 + 同步映射（与稿件契约同形）
-      const sceneFiles: File[] = []
-      const sceneMap: number[][] = []
-      form.sceneRefs.forEach((files, sceneIdx) => {
-        ;(files || []).forEach((f) => {
-          if (f && f.size > 0) {
-            sceneFiles.push(f)
-            sceneMap.push([sceneIdx])
-          }
+      // 关键帧模式不用逐段参考图（首帧由角色图 / 上一段尾帧决定），不上送。
+      if (!keyframes) {
+        const sceneFiles: File[] = []
+        const sceneMap: number[][] = []
+        form.sceneRefs.forEach((files, sceneIdx) => {
+          ;(files || []).forEach((f) => {
+            if (f && f.size > 0) {
+              sceneFiles.push(f)
+              sceneMap.push([sceneIdx])
+            }
+          })
         })
-      })
-      sceneFiles.forEach((f) => fd.append('scene_reference_images', f))
-      fd.append('scene_reference_images_map', JSON.stringify(sceneMap))
-      // v8.1：风格板（用户上传优先）
-      form.styleImages.forEach((f) => fd.append('style_images', f))
+        sceneFiles.forEach((f) => fd.append('scene_reference_images', f))
+        fd.append('scene_reference_images_map', JSON.stringify(sceneMap))
+      }
+      // v8.1：风格板（用户上传优先；关键帧模式用不到，不上送）
+      if (!keyframes) form.styleImages.forEach((f) => fd.append('style_images', f))
 
       // Audio & Subtitle
       const sc = subtitleRef.value
@@ -350,8 +389,8 @@ async function submitCreative() {
           <p class="hint mt-1.5">{{ t('refDescription') }}</p>
         </div>
 
-        <!-- End Frames -->
-        <div class="border-t border-rule/60 pt-4">
+        <!-- End Frames（仅关键帧模式：其他衔接方式没有首尾帧概念） -->
+        <div v-if="form.chaining === 'keyframes'" class="border-t border-rule/60 pt-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <span class="label mb-0">{{ t('customEndFrames') }}</span>
             <div class="flex flex-wrap gap-4">
@@ -374,8 +413,8 @@ async function submitCreative() {
           </div>
         </div>
 
-        <!-- v8.1：风格板（用户上传优先，否则按风格文本生成） -->
-        <div class="border-t border-rule/60 pt-4">
+        <!-- v8.1：风格板（仅 ti2vid / none：关键帧模式视频只提交首尾帧，用不到风格图） -->
+        <div v-if="form.chaining !== 'keyframes'" class="border-t border-rule/60 pt-4">
           <RefImagesInput
             v-model="form.styleImages"
             :max="2"
@@ -384,26 +423,29 @@ async function submitCreative() {
           />
         </div>
 
-        <!-- v8.1：逐场景多参考图（顺序即 <Picture N>） -->
+        <!-- v8.1：逐场景参考图（仅 ti2vid / none；关键帧模式的起点由衔接决定） -->
         <div class="border-t border-rule/60 pt-4">
-          <label class="label">{{ t('sceneReferenceImages') }}</label>
-          <p class="hint mb-2">
-            {{ form.chaining === 'keyframes' ? t('sceneRefKeyframesHint') : t('sceneRefDesc') }}
-          </p>
-          <div class="space-y-3">
-            <div v-for="i in form.sceneCount" :key="i">
-              <div class="mb-1 flex items-center gap-2">
-                <span class="mono w-8 shrink-0 text-[11px] text-muted">{{ i }}</span>
-                <span class="hint">{{ tf('sceneRefQuota', { n: sceneRefMax }) }}</span>
+          <template v-if="form.chaining === 'keyframes'">
+            <p class="hint">{{ t('sceneRefKeyframesHint') }}</p>
+          </template>
+          <template v-else>
+            <label class="label">{{ t('sceneReferenceImages') }}</label>
+            <p class="hint mb-2">{{ t('sceneRefDesc') }}</p>
+            <div class="space-y-3">
+              <div v-for="i in form.sceneCount" :key="i">
+                <div class="mb-1 flex items-center gap-2">
+                  <span class="mono w-8 shrink-0 text-[11px] text-muted">{{ i }}</span>
+                  <span class="hint">{{ tf('sceneRefQuota', { n: sceneRefRemaining(i) }) }}</span>
+                </div>
+                <RefImagesInput
+                  :model-value="form.sceneRefs[i - 1] || []"
+                  :max="sceneRefMax"
+                  input-class="scene-ref-file"
+                  @update:model-value="(v: File[]) => (form.sceneRefs[i - 1] = v)"
+                />
               </div>
-              <RefImagesInput
-                :model-value="form.sceneRefs[i - 1] || []"
-                :max="sceneRefMax"
-                input-class="scene-ref-file"
-                @update:model-value="(v: File[]) => (form.sceneRefs[i - 1] = v)"
-              />
             </div>
-          </div>
+          </template>
         </div>
       </div>
     </section>

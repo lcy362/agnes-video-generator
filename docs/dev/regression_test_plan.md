@@ -723,6 +723,9 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 | MR8 | 简单图片超限 | `/api/image/generate` 6 张 → 422；多图 payload `extra_body.image` 顺序保持 |
 | MR9 | 逐场景补图鉴权 | 非暂停态 409；序号越界 422；额度 = 上限 −（人物板 + 风格板 + 衔接 1 张） |
 | MR10 | 零回归 | 不上传任何图时，稿件/诗词仍生成风格板、创意仍走原链路，payload 与升级前差异仅多一块风格板 |
+| MR19 | 创意关键帧忽略逐段图 | keyframes 模式 4 张（映射 2 段）→ 一张都不落盘；ti2vid 同输入 → 4 张全落盘（`tests/test_task_creation_extra.py`） |
+| MR20 | 创意风格板模式隔离 | keyframes 模式上传 `style_images` → 不落盘、`style_plate` 保持空、流水线不额外跑图生图；ti2vid 同输入 → 落盘并进入 `images[]` 第 2 张 |
+| MR21 | 创意尾帧模式隔离 | `chaining_mode != keyframes` 时 `use_custom_end_frames=true` + 尾帧文件 → 不落盘；首帧链只由「角色参考图 → 上一段尾帧」决定（`tests/test_creative_steps_coverage.py::TestKeyframeScenes`） |
 
 ### 18.2 端到端（人工）
 
@@ -731,7 +734,7 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 | MR11 | 稿件路径 R | 上传 2 张人物 + 1 张风格 → `task_state.json` 的 `character_plate`/`style_plate` 落地；各段日志 `ref images` 以人物板开头 |
 | MR12 | 稿件路径 K | 勾「分镜衔接」→ references 检查点等到首/尾帧静帧；视频 payload 只有 `first_frame`/`last_frame`（看 `curl.sh`） |
 | MR13 | 逐段补图 | 勾「生成前暂停补图」→ 任务停在 references；检查点页逐段上传 → `POST …/scene-refs` 返回新路径，续跑后该段 `images` 带上新图 |
-| MR14 | 创意关键帧 | `curl.sh` 的 payload 为 keyframe（无 `images`）；`scene_*/end_frame.png` 由多图 i2i 生成 |
+| MR14 | 创意关键帧 | `curl.sh` 的 payload 为 keyframe（无 `images`）；`first_frame` 第 1 段 = 角色参考图、其后 = 上一段 `end_frame.png`（逐段上传图不参与）；`scene_*/end_frame.png` 由多图 i2i 生成 |
 | MR15 | 创意链式 | payload `images` 顺序为人物板 → 风格板 → 上一镜尾帧 → 本段内容图；独立模式无衔接静帧 |
 | MR16 | 诗词 | 上传 2 张风格图 → 不另生成 `style_plate.png`；每句 `images` 以这 2 张开头；纯意象无人物板 |
 | MR17 | 数字人 | 上传 2 张 → `anchor.png` 走 i2i（日志 `Generating (i2i)`），第 1 张为脸；单张仍可用 |

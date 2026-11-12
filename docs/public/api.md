@@ -106,7 +106,7 @@ AGNES_CORS_ORIGINS=http://localhost:8787,http://127.0.0.1:8787 bash start.sh
 ```
 
 > **参考图 API 语义差异（重要，避免混淆）**：
-> - **创意模式 `scene_reference_images`**：按场景**顺序**对齐——第 `i` 张上传图 → 第 `i` 个场景（`POST /api/tasks/creative` 的 `scene_reference_images` 文件列表）。
+> - **创意模式 `scene_reference_images`**：按场景**顺序**对齐——第 `i` 张上传图 → 第 `i` 个场景（`POST /api/tasks/creative` 的 `scene_reference_images` 文件列表）。**仅 `chaining_mode=ti2vid|none` 生效**：`keyframes` 模式下该段首帧由「角色参考图 / 上一段尾帧」决定，逐段上传图一律忽略（不落盘，日志留痕）。
 > - **稿件模式 `reference_images` + `reference_images_map`**：按**段落 index 显式映射**——`reference_images_map` 为 JSON 数组（顺序与上传图一致），第 `i` 张图对应 `reference_images_map[i]`（非负整数数组，每项是段落 index）；**一张图可服务多个段落**。段落数在任务执行拆段后才确定，越界 index 记 warning 并忽略该图（不 422）。
 > - 两者命名相似但对齐规则不同，调用时请按上文分别处理。
 
@@ -163,7 +163,7 @@ AGNES_CORS_ORIGINS=http://localhost:8787,http://127.0.0.1:8787 bash start.sh
 
 | 端点 | 新增参数 | 说明 |
 |------|---------|------|
-| `POST /api/tasks/creative` | `scene_reference_images_map`（JSON，**文件 → 目标场景**：`[[0],[0],[1]]` 表示第 1、2 张给场景 0、第 3 张给场景 1）、`style_images`（≤2） | 不传 map 时退化为「第 i 张给场景 i」；旧单图字段只读兼容 |
+| `POST /api/tasks/creative` | `scene_reference_images_map`（JSON，**文件 → 目标场景**：`[[0],[0],[1]]` 表示第 1、2 张给场景 0、第 3 张给场景 1）、`style_images`（≤2） | 不传 map 时退化为「第 i 张给场景 i」；旧单图字段只读兼容；逐段图与 `style_images` 仅 `chaining_mode=ti2vid\|none` 生效，`use_custom_end_frames` / `end_frame_images` 仅 `keyframes` 生效（不匹配的上传会被忽略、不落盘） |
 | `POST /api/tasks/manuscript` | `character_images`（≤2）、`style_images`（≤2）、`link_shots`、`pause_for_scene_refs` | `link_shots` = 路径 K（先画逐段首尾帧，视频只提交 keyframe）；`pause_for_scene_refs` = 拆段后停在 `references` 等补图 |
 | `POST /api/tasks/poetry` | `character_images`、`style_images`、`scene_reference_images` + `scene_reference_images_map`、`link_shots` | 逐句内容图，map 语义与创意视频一致（文件 → 目标句） |
 | `POST /api/tasks/anchor` | `anchor_reference_images`（多文件，≤5） | 第 1 张为数字人形象，其余为服饰/场景辅助；旧 `anchor_reference_image`（str）作为首图兼容 |
