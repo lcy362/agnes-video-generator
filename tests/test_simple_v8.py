@@ -80,7 +80,8 @@ def api(monkeypatch):
     inst = AgnesVideoAPI(api_key="k", model="agnes-video-2.5-flash")
     captured = {}
 
-    async def fake_resolve(src):
+    async def fake_resolve(src, size="1024x1024"):
+        captured.setdefault("resolve_sizes", []).append(size)
         return "https://cdn.example/" + os.path.basename(src)
 
     async def fake_submit(payload, desc, cb):
@@ -318,3 +319,28 @@ def test_reference_images_over_limit_422(client, env):
     )
     assert resp.status_code == 422
     assert "5" in str(resp.json().get("detail", ""))
+
+
+# ── v8.1：首尾帧托管尺寸必须跟随素材比例（否则方化后出片恒 720x720）──
+
+
+def test_media_upload_size_preserves_aspect():
+    f = AgnesVideoAPI._media_upload_size
+    assert f(768, 1152) == "768x1152"          # 2:3
+    assert f(720, 1280) == "704x1280"          # 9:16（32 的倍数就近吸附）
+    assert f(1280, 720) == "1280x704"          # 16:9（与官方 720P 输出一致）
+    assert f(1024, 1024) == "1024x1024"
+    assert f(0, 0) == "1024x1024"              # 非法输入回退
+    assert f(2560, 1440) == "1280x704"         # 长边封顶 1280
+
+
+@pytest.mark.asyncio
+async def test_keyframe_hosted_frames_keep_aspect(api):
+    """竖屏 9:16 首尾帧托管时不得再传 1024x1024。"""
+    inst, captured = api
+    await inst.submit_video(
+        prompt="转身", width=768, height=1152,
+        first_frame="/tmp/first.png", last_frame="/tmp/last.png",
+    )
+    assert captured["mode"] == "keyframe"
+    assert captured["resolve_sizes"] == ["768x1152", "768x1152"]

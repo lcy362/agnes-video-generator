@@ -36,9 +36,6 @@ from utils.video import download_video
 
 logger = logging.getLogger(__name__)
 
-#: v8.1：keyframe 方形输出告警只打一次的进程内标记（见 ``_apply_v25_mode``）
-_KEYFRAME_SQUARE_WARNED = False
-
 _UPLOAD_RETRY_BASE_DELAY_SECONDS = 30  # 上传退避基数：忙轨取固定值，故障轨取 base×(n+1)
 _UPLOAD_RETRY_MAX_ATTEMPTS = 10        # v7.2 上传忙轨次数封顶（等效旧的 300s 预算 ÷ 30s）
 
@@ -511,7 +508,15 @@ class AgnesVideoAPI:
         mime = mimetypes.guess_type(path)[0] or "image/png"
         return f"data:{mime};base64,{b64}"
 
-    async def _resolve_image_ref(self, ref: str) -> str:
+    async def _resolve_image_ref(self, ref: str, size: str = "1024x1024") -> str:
+        """本地图片 → 公网 URL（无上传端点，走「图生图 + 保持原样」托管）。
+
+        Args:
+            ref: 本地路径 / URL / data URI。
+            size: 托管时的生成尺寸。**必须与源图比例一致**——图片接口会按该尺寸
+                重绘，传 ``1024x1024`` 会把竖/横图压成方图（v8.1 实测：首尾帧被
+                方化后，keyframe 上游按 1:1 出片，表现为「输出 720×720」）。
+        """
         if ref.startswith(("http://", "https://")):
             return ref
         if ref.startswith("data:"):
@@ -525,7 +530,15 @@ class AgnesVideoAPI:
                     cache_data = await asyncio.to_thread(_read_json_cache, url_file)
                     cached_url = cache_data.get("url", "")
                     cached_ts = cache_data.get("ts", 0)
+                    cached_size = cache_data.get("size", "")
                     age = time.time() - cached_ts
+                    # 尺寸口径变化（含旧版无 size 的缓存）必须重传，否则复用方图
+                    if cached_url and cached_size != size and cached_size:
+                        logger.info(
+                            "[AgnesVideo] Cached URL size mismatch (%s -> %s), re-uploading",
+                            cached_size, size,
+                        )
+                        cached_url = ""
                     if cached_url and age < _URL_CACHE_MAX_AGE:
                         logger.info(
                             f"[AgnesVideo] Using cached hosted URL (age={age:.0f}s): "
@@ -541,10 +554,13 @@ class AgnesVideoAPI:
                 # 兼容旧格式纯文本缓存文件
                 except Exception as e:
                     logger.debug(f"[AgnesVideo] Failed to read legacy URL cache: {e}")
-            url = await self._upload_image_to_url(ref)
+            url = await self._upload_image_to_url(ref, size=size)
             if url:
                 try:
-                    await asyncio.to_thread(_write_json_cache, url_file, {"url": url, "ts": time.time()})
+                    await asyncio.to_thread(
+                        _write_json_cache, url_file,
+                        {"url": url, "ts": time.time(), "size": size},
+                    )
                 except Exception as e:
                     logger.debug(f"[AgnesVideo] Failed to cache URL: {e}")
                 return url
@@ -552,7 +568,9 @@ class AgnesVideoAPI:
             return self._path_to_b64(ref)
         return ref
 
-    async def _upload_image_to_url(self, image_path: str, retries: int = 3) -> Optional[str]:
+    async def _upload_image_to_url(
+        self, image_path: str, retries: int = 3, size: str = "1024x1024",
+    ) -> Optional[str]:
         attempt = 0
         rotations = 0
         ring = get_key_ring()
@@ -569,7 +587,9 @@ class AgnesVideoAPI:
                     "model": "agnes-image-2.5-flash",
                     "prompt": "Keep the image exactly as it is",
                     "n": 1,
-                    "size": "1024x1024",
+                    # 尺寸跟随源图比例（v8.1 修复）：固定 1024x1024 会把首尾帧方化，
+                    # 导致 keyframe 出片恒为 720x720。
+                    "size": size,
                     "extra_body": {
                         "response_format": "url",
                         "image": b64_data,
@@ -1457,10 +1477,14 @@ class AgnesVideoAPI:
             ``(resolved_refs, resolved_first, resolved_last, audios)``。
         """
 
+        # 托管尺寸必须与素材比例一致：图片接口会按 size 重绘，固定 1024x1024
+        # 会把竖/横帧方化（v8.1 实测根因：keyframe 输出恒 720x720 即由此导致）。
+        upload_size = self._media_upload_size(width, height)
+
         async def _resolve(src: str) -> str:
             """本地图片 → 归一化 → 公开 URL（与既有参考图链路一致）。"""
             norm = await asyncio.to_thread(normalize_reference_path, src, width, height)
-            return await self._resolve_image_ref(norm)
+            return await self._resolve_image_ref(norm, size=upload_size)
 
         resolved_refs: List[str] = [await _resolve(p) for p in reference_image_paths if p]
         resolved_first = await _resolve(first_frame) if first_frame else ""
@@ -1471,6 +1495,25 @@ class AgnesVideoAPI:
             if isinstance(u, str) and u.strip().startswith(("http://", "https://"))
         ][:3]
         return resolved_refs, resolved_first, resolved_last, audios
+
+    @staticmethod
+    def _media_upload_size(width: int, height: int, max_side: int = 1280) -> str:
+        """按素材比例换算「图生图托管」尺寸（32 的倍数，长边不超过 ``max_side``）。
+
+        上游没有文件上传端点，本地图只能经 ``/images/generations`` + 「保持原样」
+        提示词托管；该接口会按 ``size`` 重绘图片，所以尺寸比例必须与源图一致。
+        例：768×1152 → ``768x1152``；1280×720 → ``1280x720``。
+        """
+        try:
+            w, h = int(width), int(height)
+        except (TypeError, ValueError):
+            return "1024x1024"
+        if w <= 0 or h <= 0:
+            return "1024x1024"
+        scale = min(1.0, max_side / max(w, h))
+        out_w = max(64, int(round(w * scale / 32)) * 32)
+        out_h = max(64, int(round(h * scale / 32)) * 32)
+        return f"{out_w}x{out_h}"
 
     @staticmethod
     def _native_keyframe_enabled() -> bool:
@@ -1494,18 +1537,6 @@ class AgnesVideoAPI:
         """按「keyframe > reference > text」写入 mode 与素材，返回日志描述。"""
         native_keyframe = self._native_keyframe_enabled()
         if (resolved_first or resolved_last) and native_keyframe:
-            # v8.1 实测（2026-11-11）：keyframe 模式忽略 aspect_ratio，固定返回方形视频
-            # （720P → 720×720，竖图被拉伸）。这里一次性告警，避免用户以为参数生效。
-            global _KEYFRAME_SQUARE_WARNED
-            aspect = str(payload.get("aspect_ratio") or "")
-            if aspect and aspect != "1:1" and not _KEYFRAME_SQUARE_WARNED:
-                _KEYFRAME_SQUARE_WARNED = True
-                logger.warning(
-                    "[AgnesVideo] keyframe mode ignores aspect_ratio=%s: upstream returns "
-                    "square video; set AGNES_KEYFRAME_NATIVE=0 to fall back to reference "
-                    "multi-image if exact aspect ratio matters",
-                    aspect,
-                )
             return self._apply_keyframe_payload(payload, resolved_first, resolved_last)
         if not (resolved_first or resolved_last or resolved_refs or audios):
             return "text-to-video"

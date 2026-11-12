@@ -65,6 +65,8 @@ curl -X POST http://localhost:8765/api/tasks/simple \
 1. **keyframe 输出尺寸复验**：用真实 Key 测 `mode=keyframe + aspect_ratio=16:9 + first/last frame`，
    确认是否仍为 704×704；结论回填 `docs/dev/agnes_video_upstream_behavior.md` §9.5.3。
    若仍固定方形，默认保持原生并在 UI 标注，或改回 `AGNES_KEYFRAME_NATIVE=0`。
+   **2026-11-12 已完成**：方形输出由本项目「图生图托管写死 1024x1024」导致，修复后
+   9:16 帧 → 720×1260、16:9 帧 → 1260×720（官方文档结论成立）。
 2. **本地音频上传**：当前仅支持公开 URL；需确认上游是否有通用素材上传端点。
 3. **参考视频 `videos[]`**：付费 2.5 已支持，本期仅能力展示，UI 未暴露。
 4. **轮询节奏**：官方建议 1–2s，当前 20s 起步为规避共享令牌桶限流；
