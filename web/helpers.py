@@ -224,27 +224,14 @@ def _has_explicit_duration(user_requirement: str) -> bool:
 # ═══════════════════════════════════════════════════
 
 def _build_encrypted_image_prompt(system_prompt: str, user_prompt: str) -> str:
-    """Base64 加密图片描述，在系统提示词末尾写明解密方法。"""
-    import base64
-    encoded = base64.b64encode(user_prompt.encode("utf-8")).decode("ascii")
-    has_chinese = bool(re.search(r'[\u4e00-\u9fff]', system_prompt))
-    if has_chinese:
-        decryption = (
-            "解密方法：以下图片描述为 base64 编码。"
-            "请先进行 base64 解码以获取实际描述，"
-            "然后根据解码后的描述生成图片。"
-            "不要直接根据编码文本生成图片。\n\n"
-            f"加密描述：\n{encoded}"
-        )
-    else:
-        decryption = (
-            "Decryption method: The image description below is base64-encoded. "
-            "Base64-decode it to get the actual description, "
-            "then generate the image based on the decoded description. "
-            "Do NOT generate based on the encoded text itself.\n\n"
-            f"Encrypted description:\n{encoded}"
-        )
-    return f"{system_prompt}\n\n{decryption}"
+    """Base64 加密图片描述，在系统提示词末尾写明解密方法。
+
+    实现已下沉到 ``core.api.agnes_image.build_full_image_prompt``（唯一出处，
+    图片续传流水线复用同一份拼接规则）；此处保留函数名作兼容别名。
+    """
+    from core.api.agnes_image import build_full_image_prompt
+
+    return build_full_image_prompt(system_prompt, user_prompt)
 
 
 def find_dir_name(task_id: str) -> str:

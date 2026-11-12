@@ -362,6 +362,7 @@ class TestCreatePipelineForType:
         fake = MagicMock()
         for name in (
             "SimpleVideoPipeline",
+            "SimpleImagePipeline",
             "ManuscriptVideoPipeline",
             "AnchorPipeline",
             "PoetryVideoPipeline",
@@ -412,9 +413,23 @@ class TestCreatePipelineForType:
         deps.CreativeVideoPipeline.assert_called_once()
         self._assert_common(deps.CreativeVideoPipeline.call_args.kwargs)
 
+    def test_image_uses_image_pipeline(self, monkeypatch):
+        """issue #114：图片任务必须映射到图片流水线，不能兜到创意视频流水线。"""
+        self._prepare(monkeypatch)
+        result = deps.create_pipeline_for_type(TaskType.IMAGE, "key", "tid", "dir")
+        deps.SimpleImagePipeline.assert_called_once()
+        deps.CreativeVideoPipeline.assert_not_called()
+        assert result is deps.SimpleImagePipeline.return_value
+        kw = deps.SimpleImagePipeline.call_args.kwargs
+        assert kw["api_key"] == "key"
+        assert kw["task_id"] == "tid"
+        assert kw["dir_name"] == "dir"
+        assert kw["image_model"] == "i"
+        assert kw["shutdown_event"] is app_state.shutdown_event
+
     def test_unknown_falls_back_to_creative(self, monkeypatch):
         self._prepare(monkeypatch)
-        deps.create_pipeline_for_type(TaskType.IMAGE, "key", "tid", "dir")
+        deps.create_pipeline_for_type("legacy-unknown", "key", "tid", "dir")
         deps.CreativeVideoPipeline.assert_called_once()
 
 

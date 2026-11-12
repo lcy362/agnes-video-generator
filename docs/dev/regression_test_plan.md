@@ -748,4 +748,44 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 
 ---
 
-*文档版本：v3.12 | 更新日期：2026-11-11 | 变更：新增 v8.1 多参考图回归（MR1–MR18）*
+## 十九、简单图片续传回归（增量，Issue #114）
+
+> 修复：`POST /api/tasks/{id}/resume` 的「任务类型 → Pipeline」映射漏了
+> `TaskType.IMAGE`，图片任务续传兜到 `CreativeVideoPipeline`，在
+> `_execute_step("step_build_scenes")` 处抛
+> `ValueError: "SimpleImageTask" object has no field "step_build_scenes"`。
+> 新增 `core/pipelines/simple_image.py::SimpleImagePipeline`（按 `task_state.json`
+> 落盘参数重跑一次图片生成），映射见 `web/deps.py::create_pipeline_for_type`；
+> prompt 拼接统一收敛到 `core.api.agnes_image.build_full_image_prompt`（路由与
+> 流水线共用，`web.helpers._build_encrypted_image_prompt` 保留为兼容别名）。
+> 单测见 `tests/test_simple_image_resume.py`（`IR*` 命名）。
+
+### 19.1 单测（自动）
+
+| ID | 条目 | 验证要点 |
+|----|------|---------|
+| IR1 | 类型映射 | `create_pipeline_for_type(TaskType.IMAGE, …)` 返回 `SimpleImagePipeline`，不再落到创意流水线（`test_web_helpers_deps.py`） |
+| IR2 | 续传成功 | 失败图片任务 `run()` → `final_image.png` 落盘、`status=completed`、`final_video_file` 指向结果 |
+| IR3 | 参数回放 | `prompt` / `size` / `negative_prompt` 取自 `task_state.json`；`system_prompt` 非空时按 base64 封装规则拼接 |
+| IR4 | 参考图缺失 | 已清理的 `reference_images` 不提交上游（打 warning 跳过），存在的按原顺序提交 |
+| IR5 | 失败落盘 | 上游异常 → `status=failed`、`current_step=generate`、`error_traceback` 非空、异常上抛（前端「重试任务」再点仍可续） |
+| IR6 | 路由直连 | `POST /api/tasks/{id}/resume`（图片任务）200，`active_pipelines` 里是 `SimpleImagePipeline` |
+
+### 19.2 端到端（人工）
+
+| ID | 场景 | 验证要点 |
+|----|------|---------|
+| IR7 | 简单图片失败重试 | 断网 / 上游 500 制造失败 → 进度页点「重试任务」→ 进度消息走「正在生成图片…」→ 完成后直接展示图片，35 次重试那样的 `ValueError` 不再出现 |
+| IR8 | 取消与并发 | 重试期间点「停止」→ 任务停在可续传态；同一任务重复点重试返回 400「Task is already running」 |
+
+### 19.3 隔离性回归
+
+| 项 | 期望 |
+|----|------|
+| 视频类任务 | 简单/创意/稿件/数字人/诗词的续传选型与行为不变（既有 `test_web_helpers_deps.py` 用例全绿） |
+| 未知 task_type | 仍兜底创意流水线，但打 warning 便于定位（不再静默） |
+| 图片创建链路 | `/api/image/generate` 行为不变（同一份 prompt 拼接实现，`tests/test_image_routes_upload.py` 全绿） |
+
+---
+
+*文档版本：v3.13 | 更新日期：2026-11-12 | 变更：新增简单图片续传回归（IR1–IR8，Issue #114）*

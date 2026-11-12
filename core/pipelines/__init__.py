@@ -1448,6 +1448,7 @@ class BasePipeline(ABC):
 # ruff isort（I001）排序会破坏该顺序，故本文件在 ruff.toml 中豁免 I001。
 from core.pipelines.multi_scene import MultiScenePipeline
 from core.pipelines.simple_video import SimpleVideoPipeline
+from core.pipelines.simple_image import SimpleImagePipeline
 from core.pipelines.creative_video import CreativeVideoPipeline
 from core.pipelines.manuscript_video import ManuscriptVideoPipeline
 from core.pipelines.anchor_video import AnchorPipeline
@@ -1458,6 +1459,7 @@ __all__ = [
     "PipelineShutdown",
     "MultiScenePipeline",
     "SimpleVideoPipeline",
+    "SimpleImagePipeline",
     "CreativeVideoPipeline",
     "ManuscriptVideoPipeline",
     "AnchorPipeline",

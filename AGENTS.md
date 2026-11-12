@@ -171,6 +171,7 @@ agnes-video-generator/
 │       ├── __init__.py               # BasePipeline 抽象基类（共享 shutdown/WS 推送/字幕/水印）
 │       ├── multi_scene.py            # MultiScenePipeline 多场景模板方法基类（v4.0 重构核心）
 │       ├── simple_video.py           # 类型 1：单 prompt → 单视频（直接继承 BasePipeline）
+│       ├── simple_image.py           # 类型 5：简单图片的续传执行器（Issues #114，创建走 web/routes/image_routes.py）
 │       ├── creative/                  # 类型 2：创意长视频包（pipeline + steps_script/frames/video/audio）
 │       ├── manuscript_video.py       # 类型 3：稿件长视频（继承 MultiScenePipeline）
 │       ├── anchor_video.py           # 类型 4：数字人口播（继承 MultiScenePipeline）

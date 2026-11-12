@@ -333,6 +333,19 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "zh": "图片保存失败: {reason}",
         "en": "Failed to save image: {reason}",
     },
+    # ── 简单图片续传流水线（core/pipelines/simple_image.py，issue #114）──
+    "progress.image.start": {
+        "zh": "开始生成图片...",
+        "en": "Starting image generation...",
+    },
+    "progress.image.generating": {
+        "zh": "正在生成图片...",
+        "en": "Generating image...",
+    },
+    "progress.image.done": {
+        "zh": "图片生成完成!",
+        "en": "Image generation complete!",
+    },
 
     # ── AI 修改（web/routes/video_routes.py）──
     "ai_modify.failed": {

@@ -17,6 +17,7 @@ from core.pipelines import (
     ManuscriptVideoPipeline,
     PipelineShutdown,
     PoetryVideoPipeline,
+    SimpleImagePipeline,
     SimpleVideoPipeline,
 )
 from core.task_manager import TaskManager
@@ -82,8 +83,22 @@ def create_pipeline_for_type(
             video_model=video_model,
             shutdown_event=shutdown_event,
         )
+    elif task_type == TaskType.IMAGE:
+        # v8.0.2（issue #114）：简单图片任务此前漏映射，续传会兜到创意视频流水线，
+        # 在 step_build_scenes 处因 SimpleImageTask 无该字段直接崩。
+        return SimpleImagePipeline(
+            api_key=api_key,
+            task_id=task_id,
+            dir_name=dir_name,
+            image_model=image_model,
+            shutdown_event=shutdown_event,
+        )
     else:
-        # CREATIVE（默认）
+        # CREATIVE（默认）：TaskType 已全覆盖，走到这里说明传入了未知类型，
+        # 记录告警便于定位（不要静默兜底，否则会像 #114 一样在深层才炸）
+        logger.warning(
+            "[Pipeline] Unknown task_type %r, falling back to creative pipeline", task_type,
+        )
         return CreativeVideoPipeline(
             api_key=api_key,
             task_id=task_id,

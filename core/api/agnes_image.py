@@ -5,6 +5,7 @@ import base64
 import logging
 import mimetypes
 import os
+import re
 from typing import List, Optional
 
 import requests
@@ -24,6 +25,42 @@ _READ_TIMEOUT_BASE_SECONDS = 120
 
 # v7.2 忙轨次数封顶：等效旧的 300s 预算 ÷ 20s 间隔基数
 _BUSY_MAX_ATTEMPTS = 15
+
+
+def build_full_image_prompt(system_prompt: str, user_prompt: str) -> str:
+    """拼接图片生成的最终 prompt（唯一出处，路由与续传流水线共用）。
+
+    系统提示词为空时直接用用户描述；非空时把用户描述 base64 编码后附在
+    系统提示词末尾（并写明解密方法），避免系统提示词的指令覆盖用户画面描述。
+
+    Args:
+        system_prompt: 用户填写的系统提示词（可为空）。
+        user_prompt: 用户画面描述。
+
+    Returns:
+        真正提交给 Agnes Image API 的 prompt。
+    """
+    system_prompt = (system_prompt or "").strip()
+    if not system_prompt:
+        return user_prompt
+    encoded = base64.b64encode(user_prompt.encode("utf-8")).decode("ascii")
+    if re.search(r"[\u4e00-\u9fff]", system_prompt):
+        decryption = (
+            "解密方法：以下图片描述为 base64 编码。"
+            "请先进行 base64 解码以获取实际描述，"
+            "然后根据解码后的描述生成图片。"
+            "不要直接根据编码文本生成图片。\n\n"
+            f"加密描述：\n{encoded}"
+        )
+    else:
+        decryption = (
+            "Decryption method: The image description below is base64-encoded. "
+            "Base64-decode it to get the actual description, "
+            "then generate the image based on the decoded description. "
+            "Do NOT generate based on the encoded text itself.\n\n"
+            f"Encrypted description:\n{encoded}"
+        )
+    return f"{system_prompt}\n\n{decryption}"
 
 
 class ImageOutput:
