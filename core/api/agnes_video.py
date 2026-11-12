@@ -533,7 +533,7 @@ class AgnesVideoAPI:
                     cached_size = cache_data.get("size", "")
                     age = time.time() - cached_ts
                     # 尺寸口径变化（含旧版无 size 的缓存）必须重传，否则复用方图
-                    if cached_url and cached_size != size and cached_size:
+                    if cached_url and cached_size != size:
                         logger.info(
                             "[AgnesVideo] Cached URL size mismatch (%s -> %s), re-uploading",
                             cached_size, size,

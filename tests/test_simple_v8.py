@@ -344,3 +344,27 @@ async def test_keyframe_hosted_frames_keep_aspect(api):
     )
     assert captured["mode"] == "keyframe"
     assert captured["resolve_sizes"] == ["768x1152", "768x1152"]
+
+
+@pytest.mark.asyncio
+async def test_legacy_url_cache_without_size_is_refreshed(monkeypatch, tmp_path):
+    """旧版 .url 缓存没有 size 字段（方图）→ 必须重传，不能复用。"""
+    import json as _json
+
+    api = AgnesVideoAPI(api_key="k", model="agnes-video-2.5-flash")
+    img = tmp_path / "frame.png"
+    img.write_bytes(b"\x89PNG")
+    cache = tmp_path / "frame.png.url"
+    cache.write_text(_json.dumps({"url": "https://cdn/old-square.png", "ts": 9e9}))
+
+    calls = {}
+
+    async def _fake_upload(path, retries=3, size="1024x1024"):
+        calls["size"] = size
+        return "https://cdn/new-aspect.png"
+
+    monkeypatch.setattr(api, "_upload_image_to_url", _fake_upload)
+    url = await api._resolve_image_ref(str(img), size="768x1152")
+    assert url == "https://cdn/new-aspect.png"
+    assert calls["size"] == "768x1152"
+    assert _json.loads(cache.read_text())["size"] == "768x1152"
