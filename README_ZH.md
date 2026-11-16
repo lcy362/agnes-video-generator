@@ -11,7 +11,7 @@
 [![Sonar Coverage](https://img.shields.io/sonar/coverage/lcy362_agnes-video-generator?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge)](https://sonarcloud.io/project/overview?id=lcy362_agnes-video-generator)
 
 <p align="center">
-  <img src="images/home.png" alt="Agnes Video Generator — 免费 AI 视频生成工具" width="720">
+  <img src="images/home-zh.png" alt="Agnes Video Generator — 免费 AI 视频生成工具（中文界面）" width="720">
 </p>
 
 <!--
