@@ -21,6 +21,14 @@ const taskTypes = [
   { key: 'poetry', icon: 'M20 4c-6 .5-11 3.5-13 8.5L4 20l7.5-3c5-2 8-6.5 8.5-13zM8 16l5.5-5.5', label: 'ttPoetry' },
 ]
 
+// v8.6：任务类型改名（单镜短片 / 多镜成片）后，选中时给出产出范围与风险提示。
+// 只有这两个类型有文案：稿件 / 数字人 / 诗词的边界由各自表单参数表达得更清楚。
+const TYPE_HINT_KEYS: Record<string, string> = {
+  simple: 'ttSimpleHint',
+  creative: 'ttCreativeHint',
+}
+const typeHintKey = computed(() => TYPE_HINT_KEYS[appState.currentTaskType] || '')
+
 // v6.0/6.1 手动模式：暂停点选项（按任务类型）
 // creative 细粒度（每个有产物的环节独立，v6.1）；其余粗粒度（PRD §4.3 顺序）
 const pausePointOptions: Record<string, { key: string; label: string }[]> = {
@@ -272,6 +280,15 @@ function selectExecMode(mode: 'auto' | 'manual' | 'external') {
         <span class="tt-name">{{ t(tt.label) }}</span>
       </button>
     </div>
+
+    <!-- v8.6：所选类型的产出范围 / 成功率提示（仅单镜、多镜） -->
+    <p
+      v-if="typeHintKey"
+      class="mt-3 flex items-start gap-1.5 text-[11.5px] leading-relaxed text-muted"
+    >
+      <span class="mt-1.5 h-1 w-1 shrink-0 rounded-full" style="background: var(--color-accent)"></span>
+      <span>{{ t(typeHintKey) }}</span>
+    </p>
 
     <!-- 官网引导 -->
     <div class="mt-5 mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted">
