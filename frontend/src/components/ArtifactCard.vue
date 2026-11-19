@@ -80,6 +80,7 @@ async function onCopyPath() {
         class="cursor-pointer rounded border border-rule"
         :class="large ? 'max-h-[400px] w-full' : 'max-h-36'"
         loading="lazy"
+        data-track="artifact_preview_image"
         @click="openImageModal(artifactFileUrl(art))"
       />
       <!-- 视频预览 -->
@@ -99,6 +100,7 @@ async function onCopyPath() {
         v-else
         class="cursor-pointer overflow-auto whitespace-pre-wrap rounded border border-rule bg-paper-2 p-2 text-[11px] leading-relaxed text-muted"
         :class="large ? 'max-h-64' : 'max-h-24'"
+        data-track="artifact_preview_text"
         @click="onPreviewClick"
       >{{ previewExpanded ? (previewLoading ? t('loading') + '...' : previewText) : t('clickToPreview') }}</pre>
 
@@ -107,6 +109,7 @@ async function onCopyPath() {
         v-if="(art as any).abs_path || (art as any).path"
         class="mono mt-1.5 cursor-pointer truncate text-[10px] text-muted transition-colors hover:text-ink-2"
         :title="t('copy')"
+        data-track="artifact_copy_path"
         @click="onCopyPath"
       >{{ (art as any).abs_path || (art as any).path }}</div>
     </div>
@@ -116,6 +119,8 @@ async function onCopyPath() {
       v-if="art.deletable && !isRunning"
       class="btn btn-quiet btn-xs shrink-0 text-danger"
       :title="t('delete')"
+      data-track="artifact_delete"
+      :data-track-params="JSON.stringify({ category: art.category })"
       @click="confirmDeleteArtifact(art)"
     >
       ✕

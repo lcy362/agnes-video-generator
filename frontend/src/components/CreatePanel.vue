@@ -2,7 +2,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { t } from '@/i18n'
 import { appState, rememberTaskType } from '@/store'
-import { useGa } from '@/composables/useGa'
 import * as api from '@/api'
 import SimpleForm from './forms/SimpleForm.vue'
 import CreativeForm from './forms/CreativeForm.vue'
@@ -12,8 +11,6 @@ import PoetryForm from './forms/PoetryForm.vue'
 import ExperimentalBadge from './shared/ExperimentalBadge.vue'
 import { JIMENG_FAQ_PATH, JIMENG_GUIDE_PATH, siteUrl } from '@/utils/siteLinks'
 import { stripEmoji } from '@/utils/text'
-
-const { trackEvent } = useGa()
 
 // 图标为 24×24 stroke path（与左侧导航同一套线宽），避免表情符号在不同系统下的观感差异
 const taskTypes = [
@@ -108,7 +105,8 @@ const providerGuideHref = computed(() => siteUrl(selectedProvider.value?.guide_p
 const providerFaqHref = computed(() => siteUrl(selectedProvider.value?.faq_path || JIMENG_FAQ_PATH))
 
 function switchTaskType(type: string) {
-  trackEvent('ui_action', { action: 'switch_task_type', type })
+  // 点击埋点由模板 data-track 统一上报（ui_click.switch_task_type），
+  // 这里不再单独发 ui_action，避免同一按钮双计。
   appState.currentTaskType = type
   // v8.0：记住上次选择（下次打开直接回到该类型）
   rememberTaskType(type)
@@ -141,7 +139,7 @@ function selectExecMode(mode: 'auto' | 'manual' | 'external') {
     <div class="sec-title">{{ t('execMode') }}</div>
     <div class="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2">
       <div class="seg">
-        <button class="seg-item" :class="appState.execMode === 'auto' ? 'is-active' : ''" @click="selectExecMode('auto')">
+        <button class="seg-item" :class="appState.execMode === 'auto' ? 'is-active' : ''" data-track="select_exec_mode" data-track-params='{"mode":"auto"}' @click="selectExecMode('auto')">
           {{ stripEmoji(t('execAuto')) }}
         </button>
         <button
@@ -149,6 +147,8 @@ function selectExecMode(mode: 'auto' | 'manual' | 'external') {
           :class="appState.execMode === 'manual' ? 'is-active' : ''"
           :disabled="!manualSupported"
           :title="!manualSupported ? t('manualUnsupported') : ''"
+          data-track="select_exec_mode"
+          data-track-params='{"mode":"manual"}'
           @click="selectExecMode('manual')"
         >
           {{ stripEmoji(t('execManual')) }}
@@ -161,6 +161,8 @@ function selectExecMode(mode: 'auto' | 'manual' | 'external') {
             :class="appState.execMode === 'external' ? 'is-active' : ''"
             :disabled="!manualSupported"
             :title="!manualSupported ? t('manualUnsupported') : ''"
+            data-track="select_exec_mode"
+            data-track-params='{"mode":"external"}'
             @click="selectExecMode('external')"
           >
             {{ stripEmoji(t('execMode.external')) }}
@@ -187,11 +189,11 @@ function selectExecMode(mode: 'auto' | 'manual' | 'external') {
           <span class="label">{{ t('execMode.audio_source') }}</span>
           <div class="flex flex-col gap-1.5">
             <label class="flex items-center gap-2 text-[12.5px] text-ink-2 cursor-pointer">
-              <input v-model="appState.externalAudioSource" type="radio" name="ext_audio_source" value="video" class="check" />
+              <input v-model="appState.externalAudioSource" type="radio" name="ext_audio_source" value="video" class="check" data-track="select_external_audio_source" data-track-params='{"source":"video"}' />
               <span>{{ t('execMode.audio_source.video') }}</span>
             </label>
             <label class="flex items-center gap-2 text-[12.5px] text-ink-2 cursor-pointer">
-              <input v-model="appState.externalAudioSource" type="radio" name="ext_audio_source" value="project" class="check" />
+              <input v-model="appState.externalAudioSource" type="radio" name="ext_audio_source" value="project" class="check" data-track="select_external_audio_source" data-track-params='{"source":"project"}' />
               <span>{{ t('execMode.audio_source.project') }}</span>
             </label>
           </div>
@@ -200,11 +202,11 @@ function selectExecMode(mode: 'auto' | 'manual' | 'external') {
           <span class="label">{{ t('execMode.subtitle_source') }}</span>
           <div class="flex flex-col gap-1.5">
             <label class="flex items-center gap-2 text-[12.5px] text-ink-2 cursor-pointer">
-              <input v-model="appState.externalSubtitleSource" type="radio" name="ext_subtitle_source" value="narration" class="check" />
+              <input v-model="appState.externalSubtitleSource" type="radio" name="ext_subtitle_source" value="narration" class="check" data-track="select_external_subtitle_source" data-track-params='{"source":"narration"}' />
               <span>{{ t('execMode.subtitle_source.narration') }}</span>
             </label>
             <label class="flex items-center gap-2 text-[12.5px] text-ink-2 cursor-pointer">
-              <input v-model="appState.externalSubtitleSource" type="radio" name="ext_subtitle_source" value="dialogue" class="check" />
+              <input v-model="appState.externalSubtitleSource" type="radio" name="ext_subtitle_source" value="dialogue" class="check" data-track="select_external_subtitle_source" data-track-params='{"source":"dialogue"}' />
               <span>{{ t('execMode.subtitle_source.dialogue') }}</span>
             </label>
           </div>
@@ -212,8 +214,8 @@ function selectExecMode(mode: 'auto' | 'manual' | 'external') {
         <p class="hint sm:col-span-3">{{ t('execMode.external_hint') }}</p>
         <!-- 官网新增的即梦说明与常见问题（语言前缀随 UI 语言切换） -->
         <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] sm:col-span-3">
-          <a :href="providerGuideHref" target="_blank" rel="noopener" class="text-accent transition-colors hover:text-ink">{{ t('experimentalGuideLink') }}</a>
-          <a :href="providerFaqHref" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('experimentalFaqLink') }}</a>
+          <a :href="providerGuideHref" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"provider_guide"}' class="text-accent transition-colors hover:text-ink">{{ t('experimentalGuideLink') }}</a>
+          <a :href="providerFaqHref" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"provider_faq"}' class="text-muted transition-colors hover:text-ink-2">{{ t('experimentalFaqLink') }}</a>
         </div>
       </div>
     </div>
@@ -230,6 +232,8 @@ function selectExecMode(mode: 'auto' | 'manual' | 'external') {
             :class="appState.pausePoints.includes(p.key)
               ? 'border-accent/40 bg-accent/10 text-accent'
               : 'border-rule bg-paper text-ink-2 hover:border-rule-2'"
+            data-track="toggle_pause_point"
+            :data-track-params="JSON.stringify({ point: p.key })"
           >
             <input
               type="checkbox"
@@ -258,6 +262,8 @@ function selectExecMode(mode: 'auto' | 'manual' | 'external') {
         class="type-card"
         :class="appState.currentTaskType === tt.key ? 'is-active' : ''"
         :aria-pressed="appState.currentTaskType === tt.key"
+        data-track="switch_task_type"
+        :data-track-params="JSON.stringify({ type: tt.key })"
         @click="switchTaskType(tt.key)"
       >
         <svg class="tt-icon h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -270,8 +276,8 @@ function selectExecMode(mode: 'auto' | 'manual' | 'external') {
     <!-- 官网引导 -->
     <div class="mt-5 mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted">
       <span class="mono text-[10px] uppercase tracking-[0.14em]">Tips</span>
-      <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="transition-colors hover:text-accent">{{ stripEmoji(t('formTipTips')) }}</a>
-      <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="transition-colors hover:text-accent">{{ stripEmoji(t('formTipModels')) }}</a>
+      <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"prompt_tips"}' class="transition-colors hover:text-accent">{{ stripEmoji(t('formTipTips')) }}</a>
+      <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"model_docs"}' class="transition-colors hover:text-accent">{{ stripEmoji(t('formTipModels')) }}</a>
     </div>
 
     <!-- 6 种任务表单 -->

@@ -206,7 +206,7 @@ onUnmounted(() => {
           <div class="sticky top-24 space-y-6">
             <StepTimeline @locate="scrollToStep" />
             <div class="sidebar-card">
-              <SupportFeedbackPanel />
+              <SupportFeedbackPanel placement="progress" />
             </div>
           </div>
         </aside>
@@ -259,6 +259,8 @@ onUnmounted(() => {
                     <button
                       class="btn btn-sm"
                       :class="retryIneffective ? 'btn-ghost' : 'btn-primary'"
+                      data-track="retry_failed_task"
+                      :data-track-params="JSON.stringify({ task_type: appState.currentTaskType || '' })"
                       @click="onRetryTask"
                     >
                       ↻ {{ t('fbRetryBtn') }}
@@ -304,6 +306,7 @@ onUnmounted(() => {
               :title="taskInfoOpen ? t('ppCollapse') : t('ppExpand')"
               :aria-label="taskInfoOpen ? t('ppCollapse') : t('ppExpand')"
               :aria-expanded="taskInfoOpen"
+              data-track="toggle_task_info"
               @click="taskInfoOpen = !taskInfoOpen"
             >
               <span class="panel-title">{{ t('taskInfo') }}</span>
@@ -343,6 +346,8 @@ onUnmounted(() => {
                 :title="isCollapsed(g.stepKey) ? t('ppExpand') : t('ppCollapse')"
                 :aria-label="isCollapsed(g.stepKey) ? t('ppExpand') : t('ppCollapse')"
                 :aria-expanded="!isCollapsed(g.stepKey)"
+                data-track="toggle_artifact_group"
+                :data-track-params="JSON.stringify({ step: g.stepKey })"
                 @click="toggleCollapse(g.stepKey)"
               >
                 <span class="flex min-w-0 items-center gap-2">
@@ -385,12 +390,13 @@ onUnmounted(() => {
                 v-if="resultIsImage"
                 :src="resultVideoSrc"
                 class="max-h-[70vh] w-full cursor-zoom-in rounded-lg object-contain"
+                data-track="preview_result_image"
                 @click="openImageModal(resultVideoSrc)"
               />
               <video v-else :src="resultVideoSrc" controls class="w-full rounded-lg max-h-96"></video>
               <div v-if="!resultIsImage" class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px]">
-                <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-accent transition-colors hover:text-ink">{{ t('doneTipTiktok') }}</a>
-                <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('doneTipMore') }}</a>
+                <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"done_tips"}' class="text-accent transition-colors hover:text-ink">{{ t('doneTipTiktok') }}</a>
+                <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"done_more"}' class="text-muted transition-colors hover:text-ink-2">{{ t('doneTipMore') }}</a>
               </div>
             </div>
           </section>
@@ -399,18 +405,18 @@ onUnmounted(() => {
           <footer class="mt-10 border-t border-rule/60 pt-6">
             <p class="eyebrow mb-3">{{ t('moreResources') }}</p>
             <div class="flex flex-wrap gap-x-5 gap-y-2 text-[11.5px]">
-              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('projectHome') }}</a>
-              <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-accent transition-colors hover:text-ink">{{ t('onlineDemo') }}</a>
-              <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('usageGuide') }}</a>
-              <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('promptTips') }}</a>
-              <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('faqTitle') }}</a>
-              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('modelOverview') }}</a>
-              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('apiCall') }}</a>
-              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('apiDocs') }}</a>
-              <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('appScenarios') }}</a>
-              <a href="https://video.lichuanyang.top/zh/guides/free-ai-tools" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('agentMoreTools') }}</a>
-              <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('flintLinkLabel') }}</a>
-              <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">GitHub</a>
+              <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"home"}' class="text-muted transition-colors hover:text-ink-2">{{ t('projectHome') }}</a>
+              <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"demo"}' class="text-accent transition-colors hover:text-ink">{{ t('onlineDemo') }}</a>
+              <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"usage_guide"}' class="text-muted transition-colors hover:text-ink-2">{{ t('usageGuide') }}</a>
+              <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"prompt_tips"}' class="text-muted transition-colors hover:text-ink-2">{{ t('promptTips') }}</a>
+              <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"faq"}' class="text-muted transition-colors hover:text-ink-2">{{ t('faqTitle') }}</a>
+              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"model_overview"}' class="text-muted transition-colors hover:text-ink-2">{{ t('modelOverview') }}</a>
+              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"api_call"}' class="text-muted transition-colors hover:text-ink-2">{{ t('apiCall') }}</a>
+              <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"api_docs"}' class="text-muted transition-colors hover:text-ink-2">{{ t('apiDocs') }}</a>
+              <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"learn"}' class="text-muted transition-colors hover:text-ink-2">{{ t('appScenarios') }}</a>
+              <a href="https://video.lichuanyang.top/zh/guides/free-ai-tools" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"free_ai_tools"}' class="text-muted transition-colors hover:text-ink-2">{{ t('agentMoreTools') }}</a>
+              <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"flint"}' class="text-muted transition-colors hover:text-ink-2">{{ t('flintLinkLabel') }}</a>
+              <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"github"}' class="text-muted transition-colors hover:text-ink-2">GitHub</a>
             </div>
           </footer>
         </main>
@@ -418,7 +424,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 图片放大弹窗 -->
-    <div v-if="imageModalUrl" class="modal-backdrop cursor-pointer" @click="closeImageModal">
+    <div v-if="imageModalUrl" class="modal-backdrop cursor-pointer" data-track="close_image_modal" @click="closeImageModal">
       <img :src="imageModalUrl" class="max-h-[90vh] max-w-[90vw] rounded-lg" />
     </div>
   </div>

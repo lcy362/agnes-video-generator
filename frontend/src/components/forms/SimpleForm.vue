@@ -159,6 +159,21 @@ const presetSummary = computed(() => {
   return parts.filter(Boolean).join(' · ')
 })
 
+// 「开始生成」点击埋点参数（分母）。mode 与 create_task / task_completed 同口径，
+// 这样「点击 → 提交成功 → 生成成功」三段可按同一 mode 维度对齐。
+const submitVideoTrackParams = computed(() =>
+  JSON.stringify({
+    mode: isV25.value ? MODE_V25_TO_API[video.mode] || 't2v' : video.mode,
+    mode_ui: video.mode,
+    duration: Number(video.duration) || 0,
+    video_model: currentVideoModel.value || '',
+    paid_model: isPaidModel.value,
+  }),
+)
+const submitImageTrackParams = computed(() =>
+  JSON.stringify({ size: image.size, ref_images: image.refImages.length }),
+)
+
 // 模型切换 → 修正表单值（选项集变化时避免非法值/422）
 // immediate：首次挂载时模型可能已加载完成，必须立刻把 'text' 与 2.5 选项对齐。
 watch(
@@ -256,7 +271,7 @@ async function onVideoModelChange(e: Event) {
 async function submitSimple() {
   // 付费档二次确认：避免免费用户误选后直接产生费用
   if (isPaidModel.value && !paidConfirmed.value) {
-    const ok = await confirmAsync(t('simplePaidConfirm'))
+    const ok = await confirmAsync(t('simplePaidConfirm'), { action: 'confirm_paid_model' })
     if (!ok) {
       videoAdvancedOpen.value = true // 引导用户改回免费档
       return
@@ -315,11 +330,15 @@ async function submitSimple() {
       return form
     },
     extraEvent: {
-      mode: video.mode,
+      // mode 统一成 API 语义（t2v/i2v/keyframes），与 task_completed 的 state.mode
+      // 同口径；2.5 系列的界面语义另存 mode_ui，避免「按模式算转化」时对不上
+      mode: isV25.value ? MODE_V25_TO_API[video.mode] || 't2v' : video.mode,
+      mode_ui: video.mode,
       duration: video.duration,
       resolution: isV25.value ? video.ratio + '/' + video.size : video.resolution,
       video_model: currentVideoModel.value,
       paid_model: isPaidModel.value,
+      execution_mode: 'auto',
       ref_images: video.refImages.length,
       ref_audios: video.audioUrls.filter((u) => u.trim()).length,
     },
@@ -346,7 +365,7 @@ async function submitImage() {
       image.refImages.forEach((f) => form.append('reference_images', f))
       return form
     },
-    extraEvent: { size: image.size },
+    extraEvent: { size: image.size, ref_images: image.refImages.length, execution_mode: 'auto' },
     successMessage: t('imgComplete'),
     onSubmit: (d) => {
       image.imageResultSrc = '/api/image/' + d.task_id
@@ -363,10 +382,10 @@ async function submitImage() {
     <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
       <span class="label mb-0 shrink-0">{{ t('subModeLabel') }}</span>
       <div class="seg">
-        <button type="button" class="seg-item" :class="subMode === 'video' ? 'is-active' : ''" @click="subMode = 'video'">
+        <button type="button" class="seg-item" :class="subMode === 'video' ? 'is-active' : ''" data-track="switch_simple_submode" data-track-params='{"submode":"video"}' @click="subMode = 'video'">
           {{ stripEmoji(t('subModeVideo')) }}
         </button>
-        <button type="button" class="seg-item" :class="subMode === 'image' ? 'is-active' : ''" @click="subMode = 'image'">
+        <button type="button" class="seg-item" :class="subMode === 'image' ? 'is-active' : ''" data-track="switch_simple_submode" data-track-params='{"submode":"image"}' @click="subMode = 'image'">
           {{ stripEmoji(t('subModeImage')) }}
         </button>
       </div>
@@ -401,10 +420,10 @@ async function submitImage() {
           <!-- 预设摘要 + 修改/恢复默认 -->
           <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11.5px] text-muted">
             <span>{{ t('simplePresetLabel') }}: <span class="text-ink-2">{{ presetSummary }}</span></span>
-            <button type="button" class="text-accent transition-colors hover:text-ink" @click="videoAdvancedOpen = !videoAdvancedOpen">
+            <button type="button" class="text-accent transition-colors hover:text-ink" data-track="toggle_simple_settings" @click="videoAdvancedOpen = !videoAdvancedOpen">
               {{ videoAdvancedOpen ? t('simpleHideSettings') : t('simpleCustomize') }}
             </button>
-            <button type="button" class="text-muted transition-colors hover:text-ink-2" @click="resetPreset">
+            <button type="button" class="text-muted transition-colors hover:text-ink-2" data-track="reset_simple_preset" @click="resetPreset">
               {{ t('simpleResetPreset') }}
             </button>
           </div>
@@ -487,10 +506,10 @@ async function submitImage() {
               <div class="space-y-2">
                 <div v-for="(_, i) in video.audioUrls" :key="i" class="flex items-center gap-2">
                   <input v-model="video.audioUrls[i]" type="url" placeholder="https://..." class="field flex-1" />
-                  <button type="button" class="btn btn-quiet btn-sm text-danger" @click="removeAudioUrl(i)">✕</button>
+                  <button type="button" class="btn btn-quiet btn-sm text-danger" data-track="remove_ref_audio" @click="removeAudioUrl(i)">✕</button>
                 </div>
               </div>
-              <button v-if="video.audioUrls.length < maxRefAudios" type="button" class="btn btn-quiet btn-xs mt-2 text-accent" @click="addAudioUrl">
+              <button v-if="video.audioUrls.length < maxRefAudios" type="button" class="btn btn-quiet btn-xs mt-2 text-accent" data-track="add_ref_audio" @click="addAudioUrl">
                 + {{ t('simpleAddAudio') }}
               </button>
               <p class="hint mt-1.5">{{ t('simpleRefAudioHint') }}</p>
@@ -503,7 +522,7 @@ async function submitImage() {
               <div>
                 <label class="label">{{ t('simpleFirstFrame') }}</label>
                 <div class="flex items-center gap-3">
-                  <label class="btn btn-ghost shrink-0">
+                  <label class="btn btn-ghost shrink-0" data-track="choose_first_frame">
                     <span>{{ t('chooseImage') }}</span>
                     <input type="file" accept="image/*" class="hidden" @change="onFirstFrameChange" />
                   </label>
@@ -513,7 +532,7 @@ async function submitImage() {
               <div>
                 <label class="label">{{ t('simpleLastFrame') }}</label>
                 <div class="flex items-center gap-3">
-                  <label class="btn btn-ghost shrink-0">
+                  <label class="btn btn-ghost shrink-0" data-track="choose_last_frame">
                     <span>{{ t('chooseImage') }}</span>
                     <input type="file" accept="image/*" class="hidden" @change="onLastFrameChange" />
                   </label>
@@ -526,7 +545,7 @@ async function submitImage() {
 
           <!-- 高级参数 -->
           <div class="border-t border-rule/60 pt-4">
-            <button type="button" class="collapse-header flex w-full items-center justify-between" @click="toggleCollapse('video')">
+            <button type="button" class="collapse-header flex w-full items-center justify-between" data-track="toggle_advanced_settings" data-track-params='{"form":"video"}' @click="toggleCollapse('video')">
               <span class="label mb-0">{{ t('advancedSettings') }}</span>
               <span class="mono text-[11px] text-muted">{{ advancedCollapsed.video ? '+' : '−' }}</span>
             </button>
@@ -560,6 +579,8 @@ async function submitImage() {
       <button
         class="btn btn-primary btn-block"
         :disabled="videoSubmit.submitting.value || !video.prompt.trim()"
+        data-track="submit_simple_video"
+        :data-track-params="submitVideoTrackParams"
         @click="submitSimple"
       >
         {{ videoSubmit.submitting.value ? t('submitting') : t('startGenerate') }}
@@ -601,7 +622,7 @@ async function submitImage() {
           />
 
           <div class="border-t border-rule/60 pt-4">
-            <button type="button" class="collapse-header flex w-full items-center justify-between" @click="toggleCollapse('image')">
+            <button type="button" class="collapse-header flex w-full items-center justify-between" data-track="toggle_advanced_settings" data-track-params='{"form":"image"}' @click="toggleCollapse('image')">
               <span class="label mb-0">{{ t('advancedSettings') }}</span>
               <span class="mono text-[11px] text-muted">{{ advancedCollapsed.image ? '+' : '−' }}</span>
             </button>
@@ -622,6 +643,8 @@ async function submitImage() {
       <button
         class="btn btn-primary btn-block"
         :disabled="imageSubmit.submitting.value"
+        data-track="submit_simple_image"
+        :data-track-params="submitImageTrackParams"
         @click="submitImage"
       >
         {{ imageSubmit.submitting.value ? t('submitting') : t('imgGenerate') }}

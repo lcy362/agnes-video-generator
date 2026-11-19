@@ -246,6 +246,8 @@ async function submitCreative() {
         chaining_mode: form.chaining,
         duration_source: form.durationSource,
         resolution: form.resolution,
+        execution_mode: appState.execMode,
+        provider: appState.execMode === 'external' ? appState.providerSelected || 'jimeng' : '',
         audio: sc?.audioEnabled ? 'on' : 'off',
         subtitle: sc?.subtitleEnabled ? 'on' : 'off',
       }
@@ -458,6 +460,7 @@ async function submitCreative() {
     <button
       class="btn btn-primary btn-block"
       :disabled="submitting"
+      data-track="submit_creative"
       @click="submitCreative"
     >
       {{ submitting ? t('submitting') : t('startGenerate') }}

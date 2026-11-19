@@ -79,6 +79,8 @@ function iconFor(state: Item['state']): string {
         :key="item.key"
         class="tl-item"
         :class="'is-' + item.state"
+        data-track="locate_step"
+        :data-track-params="JSON.stringify({ step: item.key })"
         @click="onLocate(item)"
       >
         <span class="tl-dot" :class="item.state === 'running' ? 'animate-pulse-dot' : ''">{{ iconFor(item.state) }}</span>
@@ -100,6 +102,8 @@ function iconFor(state: Item['state']): string {
         item.state === 'done' ? 'border-rule text-ink-2' : '',
         item.state === 'pending' ? 'border-rule text-muted' : '',
       ]"
+      data-track="locate_step"
+      :data-track-params="JSON.stringify({ step: item.key, via: 'mobile' })"
       @click="onLocate(item)"
     >
       <span class="text-[9px] leading-none">{{ iconFor(item.state) }}</span>

@@ -400,10 +400,21 @@ function artLabel(a: any): string {
         {{ t('awaitingUser') }} · {{ t('checkpointTitle') }}: {{ checkpointLabel }}
       </h3>
       <div class="flex gap-1.5">
-        <button class="btn btn-ghost btn-sm" @click="regen" :disabled="confirming">
+        <button
+          class="btn btn-ghost btn-sm"
+          data-track="checkpoint_regen"
+          :data-track-params="JSON.stringify({ checkpoint: props.checkpoint })"
+          @click="regen"
+          :disabled="confirming"
+        >
           {{ t('regenCurrent') }}
         </button>
-        <button class="btn btn-ghost btn-sm" @click="switchToAutoAndRun">
+        <button
+          class="btn btn-ghost btn-sm"
+          data-track="checkpoint_switch_auto"
+          :data-track-params="JSON.stringify({ checkpoint: props.checkpoint })"
+          @click="switchToAutoAndRun"
+        >
           {{ t('switchToAuto') }}
         </button>
       </div>
@@ -416,6 +427,8 @@ function artLabel(a: any): string {
       <button
         class="btn btn-primary px-6"
         :disabled="confirming"
+        data-track="checkpoint_continue"
+        :data-track-params="JSON.stringify({ checkpoint: props.checkpoint, channel: activeCard })"
         @click="continueTask"
       >
         {{ confirming ? t('submitting') : t('continueConfirm') }}
@@ -445,6 +458,8 @@ function artLabel(a: any): string {
             <button
               class="btn btn-ghost btn-sm"
               :disabled="sceneRefSaving === s.index"
+              data-track="checkpoint_scene_refs_save"
+              :data-track-params="JSON.stringify({ index: s.index })"
               @click="saveSceneRefs(s.index)"
             >
               {{ sceneRefSaving === s.index ? t('submitting') : t('save') }}
@@ -457,34 +472,36 @@ function artLabel(a: any): string {
     <!-- 卡片：AI / 自己 / Agent / 在线编辑 +（v7.6）外部工具协作。
          外部素材模式的 videos 检查点仅保留「协作」卡片（其余方式无实际产物可改）。 -->
     <div class="grid grid-cols-1 gap-3 mb-4" :class="collabPrimary ? 'md:grid-cols-1' : (collabHint ? 'md:grid-cols-5' : 'md:grid-cols-4')">
-      <button v-if="!collabPrimary && aiModifiableArts.length" class="rounded border p-3 text-left transition" :class="activeCard === 'ai' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'" @click="activeCard = 'ai'">
+      <button v-if="!collabPrimary && aiModifiableArts.length" class="rounded border p-3 text-left transition" :class="activeCard === 'ai' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'" data-track="checkpoint_channel" data-track-params='{"channel":"ai"}' @click="activeCard = 'ai'">
         <div class="text-sm font-medium text-ink-2">{{ t('handleAi') }}</div>
         <div class="text-xs text-muted mt-0.5">{{ t('handleAiDesc') }}</div>
       </button>
-      <button v-if="!collabPrimary" class="rounded border p-3 text-left transition" :class="activeCard === 'self' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'" @click="activeCard = 'self'">
+      <button v-if="!collabPrimary" class="rounded border p-3 text-left transition" :class="activeCard === 'self' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'" data-track="checkpoint_channel" data-track-params='{"channel":"self"}' @click="activeCard = 'self'">
         <div class="text-sm font-medium text-ink-2">{{ t('handleSelf') }}</div>
         <div class="text-xs text-muted mt-0.5">{{ t('handleSelfDesc') }}</div>
       </button>
       <div v-if="!collabPrimary" class="p-3 rounded-xl border transition flex flex-col" :class="activeCard === 'agent' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'">
-        <button class="text-left" @click="activeCard = 'agent'">
+        <button class="text-left" data-track="checkpoint_channel" data-track-params='{"channel":"agent"}' @click="activeCard = 'agent'">
           <div class="text-sm font-medium text-ink-2">{{ t('handleAgent') }}</div>
           <div class="text-xs text-muted mt-0.5">{{ t('handleAgentDesc') }}</div>
         </button>
-        <a :href="moreToolsHref" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[10px] text-accent hover:text-ink transition-colors mt-1.5">{{ t('agentMoreTools') }}</a>
-        <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[10px] text-accent hover:text-ink transition-colors mt-1.5">{{ t('handleAgentFlint') }}</a>
+        <a :href="moreToolsHref" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"free_ai_tools"}' class="inline-flex items-center gap-1 text-[10px] text-accent hover:text-ink transition-colors mt-1.5">{{ t('agentMoreTools') }}</a>
+        <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"flint"}' class="inline-flex items-center gap-1 text-[10px] text-accent hover:text-ink transition-colors mt-1.5">{{ t('handleAgentFlint') }}</a>
       </div>
       <button v-if="!collabPrimary" class="rounded border p-3 text-left transition"
         :class="editableTextArts.length
           ? (activeCard === 'edit' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2')
           : 'border-rule/40 bg-paper-2/20 opacity-45 cursor-not-allowed'"
         :disabled="!editableTextArts.length"
+        data-track="checkpoint_channel"
+        data-track-params='{"channel":"edit"}'
         @click="activeCard = 'edit'">
         <div class="text-sm font-medium" :class="editableTextArts.length ? 'text-ink-2' : 'text-muted'">{{ t('handleEdit') }}</div>
         <div class="text-xs text-muted mt-0.5">{{ t('handleEditDesc') }}</div>
         <div v-if="!editableTextArts.length" class="text-[10px] text-muted mt-1">{{ t('editTextOnly') }}</div>
       </button>
       <!-- v7.6 外部素材模式：外部工具协作（仅 external_hint 非空时展示） -->
-      <button v-if="collabHint" class="rounded border p-3 text-left transition" :class="activeCard === 'collab' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'" @click="activeCard = 'collab'">
+      <button v-if="collabHint" class="rounded border p-3 text-left transition" :class="activeCard === 'collab' ? 'border-accent/40 bg-accent/10' : 'border-rule bg-paper hover:border-rule-2'" data-track="checkpoint_channel" data-track-params='{"channel":"collab"}' @click="activeCard = 'collab'">
         <div class="flex flex-wrap items-center gap-1.5 text-sm font-medium text-ink-2">
           <span>{{ collabProvider.icon }} {{ t('checkpoint.collab.title').replace('{name}', collabProvider.name || '') }}</span>
           <ExperimentalBadge v-if="collabExperimental" />
@@ -499,7 +516,7 @@ function artLabel(a: any): string {
         <label class="label">{{ t('aiModifyRequest') }}</label>
         <textarea v-model="aiRequest" rows="2" class="field" :placeholder="t('aiModifyRequestPlaceholder')"></textarea>
       </div>
-      <button class="btn btn-primary btn-sm" :disabled="aiLoading" @click="runAiModify">
+      <button class="btn btn-primary btn-sm" :disabled="aiLoading" data-track="checkpoint_ai_modify" @click="runAiModify">
         {{ aiLoading ? t('aiModifyApplying') : t('aiModifyStart') }}
       </button>
       <!-- 影响预计算展示（修改前提示） -->
@@ -530,7 +547,7 @@ function artLabel(a: any): string {
           <img :src="aiResult.originUrl" class="rounded-lg border border-rule/60 max-h-40 object-contain w-full" :alt="t('originalContent')" />
           <img :src="aiResult.new_content" class="rounded-lg border border-emerald-400/40 max-h-40 object-contain w-full" :alt="t('aiModifyResult')" />
         </div>
-        <button class="w-full btn btn-primary btn-sm" :disabled="confirming" @click="applyAiAndContinue">
+        <button class="w-full btn btn-primary btn-sm" :disabled="confirming" data-track="checkpoint_ai_apply" @click="applyAiAndContinue">
           {{ confirming ? t('aiModifyApplying') : t('applyAndContinue') }}
         </button>
       </div>
@@ -542,6 +559,7 @@ function artLabel(a: any): string {
         <span class="text-muted">{{ art.label_key || art.artifact_id }}:</span>
         <code class="block text-ink-2 bg-paper-2 px-2 py-1 rounded mt-0.5 break-all cursor-pointer hover:border-accent/40 border border-transparent"
           :title="t('copy')"
+          data-track="checkpoint_copy_path"
           @click="copyText(art.abs_path || art.path || '')"
         >{{ art.abs_path || art.path || '' }}</code>
       </div>
@@ -566,22 +584,22 @@ function artLabel(a: any): string {
           </label>
           <div class="flex flex-wrap items-center gap-2 shrink-0">
             <!-- 官网新增的即梦说明与常见问题（含 503 处理），语言前缀随 UI 语言切换 -->
-            <a :href="collabGuideHref" target="_blank" rel="noopener"
+            <a :href="collabGuideHref" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"provider_guide"}'
                class="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 glass-input rounded-lg transition hover:border-accent/40">
               {{ t('experimentalGuideLink') }}
             </a>
-            <a :href="collabFaqHref" target="_blank" rel="noopener"
+            <a :href="collabFaqHref" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"provider_faq"}'
                class="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 glass-input rounded-lg transition hover:border-accent/40">
               {{ t('experimentalFaqLink') }}
             </a>
-            <a v-if="collabProvider.url" :href="collabProvider.url" target="_blank" rel="noopener"
+            <a v-if="collabProvider.url" :href="collabProvider.url" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"external_tool"}'
                class="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 glass-input rounded-lg transition hover:border-accent/40">
               {{ tf('checkpoint.collab.open_tool', { name: collabProviderName }) }}
             </a>
           </div>
         </div>
         <textarea rows="8" readonly class="w-full glass-input rounded-lg px-3 py-2 text-xs text-ink font-mono resize-y" :value="collabHint.prompt"></textarea>
-        <button class="mt-2 text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition" @click="copyCollabPrompt">
+        <button class="mt-2 text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition" data-track="checkpoint_copy_prompt" @click="copyCollabPrompt">
           {{ copyingPrompt ? t('checkpoint.collab.copied') : t('checkpoint.collab.copy_prompt') }}
         </button>
       </div>
@@ -594,7 +612,7 @@ function artLabel(a: any): string {
       <!-- 批量导入（仅 references / videos 检查点） -->
       <div v-if="canImport" class="pt-2 border-t border-rule/40 space-y-2">
         <div class="flex flex-wrap items-center gap-3">
-          <label class="cursor-pointer px-4 py-2 glass-input rounded-lg text-xs transition inline-block hover:border-blue-500/30">
+          <label class="cursor-pointer px-4 py-2 glass-input rounded-lg text-xs transition inline-block hover:border-blue-500/30" data-track="checkpoint_import_select" :data-track-params="JSON.stringify({ kind: importKind })">
             <span>{{ importing ? t('submitting') : t('checkpoint.import.select') }}</span>
             <input type="file" multiple :accept="importKind === 'image' ? 'image/*' : 'video/*'" class="hidden" @change="onImportFiles" />
           </label>
@@ -639,18 +657,18 @@ function artLabel(a: any): string {
         </span>
       </div>
       <p v-else class="text-xs text-amber-400">{{ t('noEditableText') }}</p>
-      <button class="text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed" :disabled="!editableTextArts.length" @click="openEditModal">
+      <button class="text-xs px-4 py-2 bg-accent text-accent-ink rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed" :disabled="!editableTextArts.length" data-track="checkpoint_edit_open" @click="openEditModal">
         {{ t('editOpen') }}
       </button>
     </div>
   </div>
 
   <!-- 在线编辑弹窗 -->
-  <div v-if="editModalOpen" class="modal-backdrop" @click.self="closeEditModal">
+  <div v-if="editModalOpen" class="modal-backdrop" data-track="checkpoint_edit_close" data-track-params='{"via":"backdrop"}' @click.self="closeEditModal">
     <div class="modal flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden">
       <div class="flex items-center justify-between gap-3 border-b border-rule px-5 py-3">
         <h3 class="text-[13px] font-semibold tracking-[-0.01em] text-ink">{{ t('editModalTitle') }} · {{ checkpointLabel }}</h3>
-        <button class="btn btn-ghost btn-sm" @click="closeEditModal">{{ t('close') }}</button>
+        <button class="btn btn-ghost btn-sm" data-track="checkpoint_edit_close" @click="closeEditModal">{{ t('close') }}</button>
       </div>
 
       <div class="flex-1 space-y-4 overflow-auto p-5">
@@ -666,7 +684,7 @@ function artLabel(a: any): string {
 
           <!-- 原内容（可折叠） -->
           <div class="rounded-lg bg-paper/50 border border-rule/40 overflow-hidden">
-            <button class="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-muted hover:bg-paper-2/30 transition" @click="toggleCompare(a.artifact_id)">
+            <button class="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-muted hover:bg-paper-2/30 transition" data-track="checkpoint_edit_compare" @click="toggleCompare(a.artifact_id)">
               <span class="transition-transform" :class="compareMap[a.artifact_id] ? 'rotate-90' : ''">▸</span>
               <span>{{ t('originalContent') }}</span>
               <span v-if="compareMap[a.artifact_id]" class="ml-auto text-[10px] text-accent">⇄ {{ t('compare') }}</span>
@@ -687,11 +705,13 @@ function artLabel(a: any): string {
             <button
               class="text-xs px-3 py-1.5 bg-accent text-accent-ink rounded-lg transition disabled:opacity-50"
               :disabled="!!savingId"
+              data-track="checkpoint_edit_save"
               @click="saveArtifact(a.artifact_id)"
             >{{ savingId === a.artifact_id ? t('submitting') : t('editSave') }}</button>
             <button
               class="text-xs px-3 py-1.5 border border-rule text-ink-2 rounded-lg transition hover:border-accent/40"
               :class="compareMap[a.artifact_id] ? 'border-accent/50 text-accent' : ''"
+              data-track="checkpoint_edit_compare"
               @click="toggleCompare(a.artifact_id)"
             >{{ t('compare') }}</button>
             <span class="text-[10px] text-muted">{{ t('editArtifactHint') }}</span>

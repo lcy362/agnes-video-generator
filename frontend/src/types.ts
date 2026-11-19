@@ -66,6 +66,8 @@ export interface UpstreamError {
 
 export interface TaskListItem {
   task_id: string
+  /** 仅 simple 任务下发：t2v / i2v / ti2vid / keyframes，用于成功归因 */
+  mode?: string
   task_type?: TaskType
   status?: string
   creative_name?: string

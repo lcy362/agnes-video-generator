@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { t } from '@/i18n'
 import { useTheme } from '@/composables/useTheme'
 import { useToast } from '@/composables/useToast'
@@ -10,6 +10,7 @@ import { useProgress } from '@/composables/useProgress'
 import { useNavigation } from '@/composables/useNavigation'
 import { useGallery } from '@/composables/useGallery'
 import { useModalA11y } from '@/composables/useModalA11y'
+import { useGa } from '@/composables/useGa'
 import { appState } from '@/store'
 import { stripEmoji } from '@/utils/text'
 import ConfigPanel from '@/components/ConfigPanel.vue'
@@ -32,6 +33,16 @@ const { initVoiceSelector } = useVoice()
 const { loadTaskList, startTaskListTimer, stopTaskListTimer } = useTasks()
 const { parseHash } = useNavigation()
 const { loadGallery, startGalleryTimer, stopGalleryTimer } = useGallery()
+const { trackPageView } = useGa()
+
+// 页面级 PV：视图键是稳定键（create/simple/list/gallery/progress），与语言、
+// taskId 无关。hash 路由不会触发 GA 自动 PV（config 已关闭 send_page_view），
+// 因此每个视图切换都由此处补一次，保证「页面浏览量」与「按钮点击」同口径可比。
+watch(
+  () => appState.view,
+  (view) => trackPageView(view),
+  { immediate: true },
+)
 
 // ── 视图导航（结构重构：顶部标签 → 左侧导航栏）──
 // 图标为 24×24 stroke path，序号用等宽字体承担「工位编号」的顺序感。
@@ -179,6 +190,8 @@ async function autoReconnectRunningTask() {
           class="nav-item"
           :class="appState.view === n.key ? 'is-active' : ''"
           :aria-current="appState.view === n.key ? 'page' : undefined"
+          data-track="nav_tab"
+          :data-track-params="JSON.stringify({ tab: n.key, via: 'rail' })"
           @click="switchMainTab(n.key)"
         >
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -192,7 +205,7 @@ async function autoReconnectRunningTask() {
 
       <div class="mt-auto">
         <div class="border-t border-rule/60 pt-3">
-          <button type="button" class="nav-item" @click="settingsOpen = true">
+          <button type="button" class="nav-item" data-track="open_settings" data-track-params='{"via":"rail"}' @click="settingsOpen = true">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.4-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.4l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4Z" />
@@ -209,7 +222,7 @@ async function autoReconnectRunningTask() {
 
         <!-- 支持作者（上）+ 问题反馈（下）：共用组件，进度页侧栏同款 -->
         <div class="mt-4 border-t border-rule/60 pt-4">
-          <SupportFeedbackPanel />
+          <SupportFeedbackPanel placement="rail" />
         </div>
       </div>
     </aside>
@@ -231,6 +244,8 @@ async function autoReconnectRunningTask() {
             class="btn btn-quiet h-8 w-8 px-0"
             :title="t('navSettings')"
             :aria-label="t('navSettings')"
+            data-track="open_settings"
+            data-track-params='{"via":"mobile_header"}'
             @click="settingsOpen = true"
           >
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -258,6 +273,7 @@ async function autoReconnectRunningTask() {
               class="btn btn-quiet h-8 gap-1.5 px-2"
               :title="themeLabel"
               :aria-label="themeLabel"
+              data-track="toggle_theme"
               @click="cycleTheme"
             >
               <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -278,6 +294,8 @@ async function autoReconnectRunningTask() {
             class="flex shrink-0 items-center gap-1.5 rounded border px-3 py-1.5 text-[12.5px] transition-colors"
             :class="appState.view === n.key ? 'border-rule-2 bg-paper-3 text-ink' : 'border-rule text-muted'"
             :aria-current="appState.view === n.key ? 'page' : undefined"
+            data-track="nav_tab"
+            :data-track-params="JSON.stringify({ tab: n.key, via: 'mobile' })"
             @click="switchMainTab(n.key)"
           >
             <span class="mono text-[9px]" :class="appState.view === n.key ? 'text-accent' : ''">{{ n.num }}</span>
@@ -310,14 +328,14 @@ async function autoReconnectRunningTask() {
         <footer class="mt-12 border-t border-rule/60 pt-6">
           <p class="eyebrow mb-3">{{ t('moreResources') }}</p>
           <div class="flex flex-wrap gap-x-5 gap-y-2 text-[11.5px]">
-            <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('projectHome') }}</a>
-            <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" class="text-accent transition-colors hover:text-ink">{{ t('onlineDemo') }}</a>
-            <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('usageGuide') }}</a>
-            <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('faqTitle') }}</a>
-            <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('apiDocs') }}</a>
-            <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('appScenarios') }}</a>
-            <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">{{ t('flintLinkLabel') }}</a>
-            <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" class="text-muted transition-colors hover:text-ink-2">GitHub</a>
+            <a href="https://video.lichuanyang.top" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"home"}' class="text-muted transition-colors hover:text-ink-2">{{ t('projectHome') }}</a>
+            <a href="https://video.lichuanyang.top/demo" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"demo"}' class="text-accent transition-colors hover:text-ink">{{ t('onlineDemo') }}</a>
+            <a href="https://video.lichuanyang.top/guides/prompt-tips" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"usage_guide"}' class="text-muted transition-colors hover:text-ink-2">{{ t('usageGuide') }}</a>
+            <a href="https://video.lichuanyang.top/faq" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"faq"}' class="text-muted transition-colors hover:text-ink-2">{{ t('faqTitle') }}</a>
+            <a href="https://video.lichuanyang.top/api-docs" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"api_docs"}' class="text-muted transition-colors hover:text-ink-2">{{ t('apiDocs') }}</a>
+            <a href="https://video.lichuanyang.top/learn" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"learn"}' class="text-muted transition-colors hover:text-ink-2">{{ t('appScenarios') }}</a>
+            <a href="https://github.com/lcy362/flint" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"flint"}' class="text-muted transition-colors hover:text-ink-2">{{ t('flintLinkLabel') }}</a>
+            <a href="https://github.com/lcy362/agnes-video-generator" target="_blank" rel="noopener" data-track="outbound_link" data-track-params='{"link":"github"}' class="text-muted transition-colors hover:text-ink-2">GitHub</a>
           </div>
           <!-- v7.0 U8：暴露应用版本，便于判断「模型档位未适配是否因版本过旧」 -->
           <p v-if="appState.appVersion" class="mono mt-4 text-[10.5px] tracking-wide text-muted/70">
@@ -328,7 +346,13 @@ async function autoReconnectRunningTask() {
     </div>
 
     <!-- ══ 系统配置抽屉 ══ -->
-    <div v-if="settingsOpen" class="drawer-backdrop" @click="settingsOpen = false"></div>
+    <div
+      v-if="settingsOpen"
+      class="drawer-backdrop"
+      data-track="close_settings"
+      data-track-params='{"via":"backdrop"}'
+      @click="settingsOpen = false"
+    ></div>
     <div
       v-show="settingsOpen"
       ref="settingsRef"
@@ -346,6 +370,8 @@ async function autoReconnectRunningTask() {
           type="button"
           class="btn btn-quiet h-8 w-8 px-0 text-[15px]"
           :aria-label="t('close')"
+          data-track="close_settings"
+          data-track-params='{"via":"button"}'
           @click="settingsOpen = false"
         >✕</button>
       </div>

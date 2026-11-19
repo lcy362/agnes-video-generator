@@ -14,7 +14,7 @@ const POLL_INTERVAL = 30000
 // v8.0：快速模式期间提高轮询频率，让「已重试次数」实时跳动（后端 1s 粒度落盘）
 const FAST_POLL_INTERVAL = 1000
 
-const { trackTaskResultOnce, trackEvent } = useGa()
+const { trackTaskResultOnce, trackTaskCompletedOnce, trackEvent } = useGa()
 const { showToast } = useToast()
 
 // 产物刷新（模块级单例，进度页共享状态）
@@ -359,10 +359,13 @@ async function pollTaskProgress(taskId: string) {
     }
 
     if (state.status === 'completed') {
-      trackTaskResultOnce('task_completed', taskId, {
+      // 成功口径：taskId 级持久化去重（进度页与任务列表轮询共享），
+      // 避免用户离开页面 / 一键创作回列表后漏报成功
+      trackTaskCompletedOnce(taskId, {
         task_type: state.task_type || appState.currentTaskType,
         // simple 任务携带生成模式（t2v / i2v / ti2vid / keyframes），便于 GA 按模式统计生成量
         ...(state.mode ? { mode: state.mode } : {}),
+        source: 'progress',
       })
       showResult(state.final_video_file, taskId, state.task_type)
       progressMessage.value = t('taskComplete')

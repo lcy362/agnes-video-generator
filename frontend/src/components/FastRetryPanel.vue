@@ -125,6 +125,8 @@ async function toggle() {
         :disabled="submitting"
         class="relative mt-0.5 h-[18px] w-8 shrink-0 rounded-full border transition-colors disabled:opacity-50"
         :class="enabled ? 'border-accent bg-accent/25' : 'border-rule-2 bg-paper-3'"
+        data-track="fast_retry_toggle"
+        :data-track-params="JSON.stringify({ to: enabled ? 'off' : 'on' })"
         @click="toggle"
       >
         <span
@@ -160,6 +162,7 @@ async function toggle() {
       <button
         class="btn btn-primary btn-sm"
         :disabled="submitting"
+        data-track="fast_retry_start"
         @click="toggle"
       >
         {{ t('fastRetry.start') }}
@@ -180,6 +183,8 @@ async function toggle() {
           :aria-label="t('fastRetry.rememberLabel')"
           class="relative mt-0.5 h-[18px] w-8 shrink-0 rounded-full border transition-colors"
           :class="remember ? 'border-accent bg-accent/25' : 'border-rule-2 bg-paper-3'"
+          data-track="fast_retry_remember"
+          :data-track-params="JSON.stringify({ to: remember ? 'off' : 'on' })"
           @click="remember = !remember"
         >
           <span
@@ -201,6 +206,7 @@ async function toggle() {
       <button
         class="btn btn-ghost btn-sm"
         :disabled="submitting"
+        data-track="fast_retry_stop"
         @click="toggle"
       >
         {{ t('fastRetry.stop') }}

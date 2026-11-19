@@ -10,7 +10,7 @@ const { confirmAsync } = useConfirm()
 
 async function toggleMode(task: TaskListItem) {
   const target = task.current_mode === 'manual' ? 'auto' : 'manual'
-  if (!(await confirmAsync(target === 'auto' ? t('switchToAutoConfirm') : t('switchToManualConfirm')))) return
+  if (!(await confirmAsync(target === 'auto' ? t('switchToAutoConfirm') : t('switchToManualConfirm'), { action: 'switch_task_mode' }))) return
   const d = await switchMode(task.task_id, target as 'auto' | 'manual')
   if (d && task.awaiting_user && target === 'auto') {
     // 手动→自动：切换即继续（后端已 resume），刷新列表
@@ -114,6 +114,8 @@ function onMainBtn(task: TaskListItem) {
             v-if="task.current_mode && !isCompleted(task) && task.status !== 'failed' && task.task_type !== 'simple' && task.task_type !== 'image'"
             class="btn btn-ghost btn-xs"
             :title="t(task.current_mode === 'manual' ? 'switchToAuto' : 'switchToManual')"
+            data-track="switch_task_mode"
+            :data-track-params="JSON.stringify({ to: task.current_mode === 'manual' ? 'auto' : 'manual', source: 'list', task_type: task.task_type })"
             @click="toggleMode(task)"
           >
             {{ task.current_mode === 'manual' ? t('switchToAuto') : t('switchToManual') }}
@@ -121,24 +123,35 @@ function onMainBtn(task: TaskListItem) {
           <button
             v-if="!isCompleted(task) && !isRunning(task)"
             class="btn btn-ghost btn-xs"
+            data-track="task_view"
+            :data-track-params="JSON.stringify({ task_type: task.task_type, status: task.status, source: 'list' })"
             @click="viewTask(task.task_id)"
           >
             {{ t('btnView') }}
           </button>
-          <button class="btn btn-secondary btn-xs" @click="onMainBtn(task)">
+          <button
+            class="btn btn-secondary btn-xs"
+            data-track="task_open"
+            :data-track-params="JSON.stringify({ task_type: task.task_type, status: task.status, target: isCompleted(task) ? 'view' : isRunning(task) ? 'progress' : 'resume' })"
+            @click="onMainBtn(task)"
+          >
             {{ mainBtnLabel(task) }}
           </button>
           <button
             v-if="isRunning(task)"
             class="btn btn-danger btn-xs"
-            @click="stopTaskById(task.task_id)"
+            data-track="stop_task"
+            :data-track-params="JSON.stringify({ task_type: task.task_type, source: 'list' })"
+            @click="stopTaskById(task.task_id, { source: 'list', taskType: task.task_type })"
           >
             {{ t('btnStop') }}
           </button>
           <button
             v-if="!isRunning(task)"
             class="btn btn-quiet btn-xs text-muted transition-colors hover:text-danger"
-            @click="deleteTaskById(task.task_id)"
+            data-track="delete_task"
+            :data-track-params="JSON.stringify({ task_type: task.task_type, source: 'list' })"
+            @click="deleteTaskById(task.task_id, { source: 'list', taskType: task.task_type })"
           >
             {{ t('deleteTask') }}
           </button>

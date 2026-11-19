@@ -70,6 +70,8 @@ async function submitAnchor() {
 
       ev = {
         resolution: form.resolution,
+        execution_mode: appState.execMode,
+        provider: appState.execMode === 'external' ? appState.providerSelected || 'jimeng' : '',
         audio_source: form.audioSource,
         audio: form.audioSource === 'model' ? 'off' : sc?.audioEnabled ? 'on' : 'off',
         subtitle: sc?.subtitleEnabled ? 'on' : 'off',
@@ -164,6 +166,7 @@ async function submitAnchor() {
     <button
       class="btn btn-primary btn-block"
       :disabled="submitting"
+      data-track="submit_anchor"
       @click="submitAnchor"
     >
       {{ submitting ? t('submitting') : t('startGenerate') }}

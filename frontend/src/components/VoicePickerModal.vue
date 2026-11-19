@@ -30,11 +30,11 @@ const selectedVoiceName = computed(() => {
 </script>
 
 <template>
-  <div v-if="pickerVisible" ref="containerRef" class="vp-overlay" @click.self="closeVoicePicker">
+  <div v-if="pickerVisible" ref="containerRef" class="vp-overlay" data-track="close_voice_picker" data-track-params='{"via":"overlay"}' @click.self="closeVoicePicker">
     <div class="vp-modal" role="dialog" aria-modal="true">
       <div class="vp-header">
         <h3>{{ t('selectVoice') }}</h3>
-        <button class="vp-close" @click="closeVoicePicker">✕</button>
+        <button class="vp-close" data-track="close_voice_picker" data-track-params='{"via":"button"}' @click="closeVoicePicker">✕</button>
       </div>
       <div class="vp-search">
         <input
@@ -50,6 +50,8 @@ const selectedVoiceName = computed(() => {
           :key="g.code"
           class="vp-tab"
           :class="{ active: g.code === activeLang }"
+          data-track="voice_picker_lang"
+          :data-track-params="JSON.stringify({ lang_group: g.code })"
           @click="activeLang = g.code"
         >
           {{ g.label }}<span class="vp-count">{{ g.count }}</span>
@@ -62,6 +64,8 @@ const selectedVoiceName = computed(() => {
           :key="v.id"
           class="vp-card"
           :class="{ selected: v.id === selectedId }"
+          data-track="select_voice"
+          :data-track-params="JSON.stringify({ voice_id: v.id })"
           @click="selectVoice(v.id)"
         >
           <div class="vp-card-top">
@@ -75,6 +79,8 @@ const selectedVoiceName = computed(() => {
           <button
             class="vp-preview-btn"
             :class="{ playing: playingId === v.id }"
+            data-track="preview_voice"
+            :data-track-params="JSON.stringify({ voice_id: v.id })"
             @click.stop="previewVoice(v.id)"
           >
             {{ playingId === v.id ? '⏸ ' + t('previewStop') : '▶ ' + t('previewPlay') }}
@@ -84,8 +90,8 @@ const selectedVoiceName = computed(() => {
       <div class="vp-selection">
         <div class="vp-current">{{ t('currentSelection') }}: <b>{{ selectedVoiceName }}</b></div>
         <div class="vp-actions">
-          <button class="vp-btn vp-btn-cancel" @click="closeVoicePicker">{{ t('cancel') }}</button>
-          <button class="vp-btn vp-btn-confirm" @click="confirmVoiceSelection">{{ t('confirmSelection') }}</button>
+          <button class="vp-btn vp-btn-cancel" data-track="close_voice_picker" data-track-params='{"via":"cancel"}' @click="closeVoicePicker">{{ t('cancel') }}</button>
+          <button class="vp-btn vp-btn-confirm" data-track="confirm_voice" @click="confirmVoiceSelection">{{ t('confirmSelection') }}</button>
         </div>
       </div>
     </div>

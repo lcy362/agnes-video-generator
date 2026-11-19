@@ -11,7 +11,7 @@ import type { TaskListItem, TaskState } from '@/types'
 
 const { showToast } = useToast()
 const { confirmAsync } = useConfirm()
-const { trackEvent } = useGa()
+const { trackEvent, trackTaskCompletedOnce, seedCompletedTasks } = useGa()
 const { loadArtifacts } = useArtifacts()
 const { goProgress } = useNavigation()
 
@@ -30,11 +30,33 @@ async function loadTaskList() {
   try {
     const d = await api.getTasks()
     tasks.value = d.tasks || []
+    reportCompletedTasks(tasks.value)
   } catch (e) {
     // 保留旧列表，不覆盖为失败态（轮询失败静默，下次重试）
   } finally {
     loading.value = false
     listInFlight = false
+  }
+}
+
+/**
+ * 列表轮询补报「生成成功」。
+ *
+ * 进度页只在用户停留观察时上报 task_completed，会漏掉：一键创作（提交后回列表）、
+ * 图片任务（结果留在表单内）、用户中途离开/刷新。列表每 5s 轮询一次状态，
+ * 因此在这里补报：首次运行只播种历史已完成任务（不上报，避免历史数据突增），
+ * 之后新出现的 completed 才会计数，且与进度页共享 taskId 级去重。
+ */
+function reportCompletedTasks(list: TaskListItem[]) {
+  const done = list.filter((it) => it.status === 'completed' && it.task_id)
+  if (!done.length) return
+  if (seedCompletedTasks(done.map((it) => it.task_id))) return
+  for (const it of done) {
+    trackTaskCompletedOnce(it.task_id, {
+      task_type: it.task_type || '',
+      ...(it.mode ? { mode: it.mode } : {}),
+      source: 'list_sweep',
+    })
   }
 }
 
@@ -103,12 +125,22 @@ async function resumeTask(taskId: string) {
   }
 }
 
-async function stopTaskById(taskId: string) {
-  if (!(await confirmAsync(t('stopConfirmById')))) return
+/** 操作来源：列表页 / 进度页。此前写死 'list'，进度页停止会被统计成列表页停止 */
+export interface TaskActionContext {
+  source?: 'list' | 'progress'
+  /** 被操作任务自身的类型（不能用 appState.currentTaskType，跨类型操作会归因错） */
+  taskType?: string
+}
+
+async function stopTaskById(taskId: string, ctx: TaskActionContext = {}) {
+  if (!(await confirmAsync(t('stopConfirmById'), { action: 'stop_task' }))) return
   try {
     const d = await api.stopTask(taskId)
     if (!d.ok) throw new Error(d.detail || t('failStop'))
-    trackEvent('task_stopped', { task_type: appState.currentTaskType || '', source: 'list' })
+    trackEvent('task_stopped', {
+      task_type: ctx.taskType || appState.currentTaskType || '',
+      source: ctx.source || 'list',
+    })
     showToast(t('stoppedById'), 3000, 'success')
     loadTaskList()
   } catch (e: any) {
@@ -116,12 +148,15 @@ async function stopTaskById(taskId: string) {
   }
 }
 
-async function deleteTaskById(taskId: string) {
-  if (!(await confirmAsync(t('deleteTaskConfirm')))) return
+async function deleteTaskById(taskId: string, ctx: TaskActionContext = {}) {
+  if (!(await confirmAsync(t('deleteTaskConfirm'), { action: 'delete_task' }))) return
   try {
     const d = await api.deleteTask(taskId)
     if (!d.ok) throw new Error(d.detail || t('failDelete'))
-    trackEvent('task_deleted', { task_type: appState.currentTaskType || '', source: 'list' })
+    trackEvent('task_deleted', {
+      task_type: ctx.taskType || appState.currentTaskType || '',
+      source: ctx.source || 'list',
+    })
     showToast(t('deletedTask'), 3000, 'success')
     loadTaskList()
   } catch (e: any) {
@@ -134,6 +169,7 @@ async function switchMode(taskId: string, mode: 'auto' | 'manual') {
   try {
     const d = await api.switchTaskMode(taskId, mode)
     if (!d.ok) throw new Error(d.detail || t('failSwitchMode'))
+    trackEvent('task_mode_switched', { mode, task_type: appState.currentTaskType || '' })
     showToast(t('modeSwitched'), 3000, 'success')
     loadTaskList()
     // 若正展示该任务进度，刷新

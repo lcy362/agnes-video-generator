@@ -69,6 +69,7 @@ onBeforeUnmount(() => {
       :aria-expanded="open"
       :aria-label="t('langSwitch')"
       :title="t('langSwitch')"
+      data-track="lang_menu_open"
       @click="open = !open"
     >
       <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -100,6 +101,8 @@ onBeforeUnmount(() => {
           :aria-current="code === currentLang ? 'true' : undefined"
           :lang="code"
           :title="labelOf[code]"
+          data-track="switch_lang"
+          :data-track-params="JSON.stringify({ to: code })"
           @click="pick(code)"
         >
           <span class="lang-name">{{ labelOf[code] }}</span>

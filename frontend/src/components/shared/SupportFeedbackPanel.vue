@@ -13,8 +13,16 @@
 import { t } from '@/i18n'
 import { stripEmoji } from '@/utils/text'
 
+// 同一面板在「左侧导航栏」与「进度页侧栏」两处复用：埋点用 placement 区分位置，
+// 否则两处的 Star / 反馈点击会被合并成同一个数，看不出哪个位置有效。
+const props = withDefaults(defineProps<{ placement?: 'rail' | 'progress' }>(), {
+  placement: 'rail',
+})
+
 interface PanelLink {
   href: string
+  /** 埋点稳定标识（英文 snake_case，与语言无关，直接进 GA 报表） */
+  trackId: string
   /** 主文案 i18n key */
   labelKey: string
   /** 一行说明 i18n key */
@@ -29,24 +37,28 @@ const ARROW = ['M7 17 17 7', 'M9 7h8v8']
 const SUPPORT_LINKS: PanelLink[] = [
   {
     href: 'https://github.com/lcy362/agnes-video-generator',
+    trackId: 'star_project',
     labelKey: 'adStar',
     descKey: 'adStarDesc',
     paths: ['M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z'],
   },
   {
     href: 'https://github.com/lcy362/flint',
+    trackId: 'star_flint',
     labelKey: 'adSkewStar',
     descKey: 'adSkewStarDesc',
     paths: ['M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z'],
   },
   {
     href: 'https://video.lichuanyang.top',
+    trackId: 'adblock_guide',
     labelKey: 'adAdblock',
     descKey: 'adAdblockDesc',
     paths: ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'],
   },
   {
     href: 'https://video.lichuanyang.top',
+    trackId: 'ad_click',
     labelKey: 'adClick',
     descKey: 'adClickDesc',
     paths: ['M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z'],
@@ -56,6 +68,7 @@ const SUPPORT_LINKS: PanelLink[] = [
 const FEEDBACK_LINKS: PanelLink[] = [
   {
     href: 'https://github.com/lcy362/agnes-video-generator/issues/new/choose',
+    trackId: 'github_issue',
     labelKey: 'adGithubIssue',
     descKey: 'adGithubIssueDesc',
     // 14px 下 octocat 轮廓会糊成一团，改用「问题 / 提醒」圆标，GitHub 语义交给文案
@@ -63,6 +76,7 @@ const FEEDBACK_LINKS: PanelLink[] = [
   },
   {
     href: 'https://x.com/Sand_Grid',
+    trackId: 'x_follow',
     labelKey: 'adXFollow',
     descKey: 'adXFollowDesc',
     paths: ['M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94', 'M16 12a4 4 0 1 0-8 0 4 4 0 0 0 8 0z'],
@@ -83,6 +97,8 @@ const FEEDBACK_LINKS: PanelLink[] = [
           :href="l.href"
           target="_blank"
           rel="noopener"
+          data-track="support_link"
+          :data-track-params="JSON.stringify({ link: l.trackId, placement: props.placement })"
           class="sf-link"
         >
           <svg class="sf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -111,6 +127,8 @@ const FEEDBACK_LINKS: PanelLink[] = [
           :href="l.href"
           target="_blank"
           rel="noopener"
+          data-track="support_link"
+          :data-track-params="JSON.stringify({ link: l.trackId, placement: props.placement })"
           class="sf-link"
         >
           <svg class="sf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

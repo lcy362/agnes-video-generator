@@ -140,7 +140,7 @@ async function confirmDeleteArtifact(art: Artifact) {
   const stepList = (preview.steps_to_reset || []).map((s: string) => '  • ' + s).join('\n')
   const msg =
     t('deleteArtifactConfirm') + '\n\n' + t('willDelete') + ':\n' + fileList + '\n\n' + t('willResetSteps') + ':\n' + stepList
-  if (!(await confirmAsync(msg))) return
+  if (!(await confirmAsync(msg, { action: 'artifact_delete' }))) return
   await deleteArtifact(taskId, art.artifact_id)
 }
 

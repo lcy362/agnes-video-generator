@@ -46,7 +46,7 @@ onMounted(() => {
       aria-modal="true"
       :aria-label="t('noticeRealNameTitle')"
     >
-      <div class="absolute inset-0" @click="close"></div>
+      <div class="absolute inset-0" data-track="dismiss_realname_notice" data-track-params='{"via":"backdrop"}' @click="close"></div>
 
       <div class="modal max-h-[85vh] w-full max-w-md overflow-y-auto p-5 sm:p-6">
         <div class="mb-4">
@@ -95,7 +95,7 @@ onMounted(() => {
         </ul>
 
         <div class="mt-5 flex justify-end">
-          <button class="btn btn-primary" @click="close">
+          <button class="btn btn-primary" data-track="dismiss_realname_notice" data-track-params='{"via":"button"}' @click="close">
             {{ t('noticeRealNameGotIt') }}
           </button>
         </div>

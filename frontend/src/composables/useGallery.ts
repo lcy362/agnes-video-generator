@@ -1,7 +1,10 @@
 // 产物画廊（P1）：只读加载 + 可选轮询（复用 useTasks 的退避/visibilitychange 模式）
 import { ref } from 'vue'
 import * as api from '@/api'
+import { useGa } from './useGa'
 import type { GalleryItem } from '@/types'
+
+const { trackClick } = useGa()
 
 const items = ref<GalleryItem[]>([])
 const loading = ref(false)
@@ -27,10 +30,12 @@ async function loadGallery() {
 
 function applyFilter(f: typeof filter.value) {
   filter.value = f
+  trackClick('gallery_filter', { dimension: 'kind', value: f })
   loadGallery()
 }
 function applyStatus(s: typeof status.value) {
   status.value = s
+  trackClick('gallery_filter', { dimension: 'status', value: s })
   loadGallery()
 }
 

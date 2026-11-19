@@ -13,7 +13,7 @@ function onChange(e: Event) {
 <template>
   <div class="mb-4 flex items-center justify-between gap-4 rounded border border-rule bg-paper-2 px-3 py-2">
     <p class="hint flex-1">{{ t('watermarkPromo') }}</p>
-    <label class="relative inline-flex shrink-0 cursor-pointer items-center" title="Video Watermark">
+    <label class="relative inline-flex shrink-0 cursor-pointer items-center" title="Video Watermark" data-track="toggle_watermark">
       <input
         type="checkbox"
         class="watermark-toggle sr-only peer"

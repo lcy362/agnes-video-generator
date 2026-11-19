@@ -103,7 +103,7 @@ async function detectKeyDomains(force = false): Promise<{ updated: number; faile
 }
 
 async function removeKey(id: string) {
-  if (!(await confirmAsync(t('removeKeyConfirm')))) return false
+  if (!(await confirmAsync(t('removeKeyConfirm'), { action: 'remove_api_key' }))) return false
   const r = await api.removeConfigKey(id)
   if (r.ok) {
     trackEvent('config_action', { action: 'remove_api_key' })
@@ -155,7 +155,7 @@ async function clearApiKey() {
     showToast(t('clearEnvHint'), 3500)
     return
   }
-  if (!(await confirmAsync(t('clearConfirm')))) return
+  if (!(await confirmAsync(t('clearConfirm'), { action: 'clear_api_key' }))) return
   const r = await api.clearApiKey()
   if (r.ok) {
     trackEvent('config_action', { action: 'clear_api_key' })
@@ -326,7 +326,7 @@ async function saveTextProvider(payload: {
 
 // 删除供应商；若删除的是当前所选则回退 agnes
 async function deleteTextProvider(id: string): Promise<boolean> {
-  if (!(await confirmAsync(t('providerDeleteConfirm')))) return false
+  if (!(await confirmAsync(t('providerDeleteConfirm'), { action: 'delete_text_provider' }))) return false
   try {
     const r = await api.deleteTextProvider(id)
     if (r && r.ok) {
@@ -504,7 +504,7 @@ async function activateWorkspace(path: string) {
 }
 
 async function removeWorkspaceEntry(path: string) {
-  if (!(await confirmAsync(t('workspaceRemoveConfirm')))) return
+  if (!(await confirmAsync(t('workspaceRemoveConfirm'), { action: 'workspace_remove' }))) return
   const r = await api.removeWorkspace(path)
   if (r.ok) {
     await renderWorkspaces()

@@ -42,7 +42,13 @@ function onHome() {
 }
 
 async function onStop() {
-  if (taskId.value) await stopTaskById(taskId.value)
+  // 来源与任务类型显式下传：此前 useTasks 里写死 source='list'，会把进度页操作算到列表页
+  if (taskId.value) {
+    await stopTaskById(taskId.value, {
+      source: 'progress',
+      taskType: appState.currentTaskType || '',
+    })
+  }
 }
 
 async function onResume() {
@@ -60,7 +66,7 @@ async function onSwitchAuto() {
     style="background: color-mix(in oklab, var(--color-paper) 90%, transparent); backdrop-filter: blur(12px)"
   >
     <div class="mx-auto flex w-full max-w-content items-center gap-2 px-4 py-2.5 lg:px-10">
-      <button class="btn btn-quiet h-8 shrink-0 gap-1.5 px-2" @click="onBack">
+      <button class="btn btn-quiet h-8 shrink-0 gap-1.5 px-2" data-track="progress_back" @click="onBack">
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 6l-6 6 6 6" />
         </svg>
@@ -70,6 +76,7 @@ async function onSwitchAuto() {
       <a
         href="#"
         class="btn btn-quiet h-8 shrink-0 gap-1.5 px-2"
+        data-track="go_home"
         @click.prevent="onHome"
       >
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -96,6 +103,8 @@ async function onSwitchAuto() {
         <button
           v-if="needsResume"
           class="btn btn-primary btn-sm"
+          data-track="resume_task"
+          data-track-params='{"source":"progress"}'
           @click="onResume"
         >
           {{ t('resumeTaskBtn') }}
@@ -103,6 +112,8 @@ async function onSwitchAuto() {
         <button
           v-if="awaitingCheckpoint"
           class="btn btn-ghost btn-sm"
+          data-track="switch_task_mode"
+          data-track-params='{"to":"auto","source":"progress"}'
           @click="onSwitchAuto"
         >
           {{ t('switchToAuto') }}
@@ -110,6 +121,8 @@ async function onSwitchAuto() {
         <button
           v-if="appState.isTaskRunning"
           class="btn btn-danger btn-sm"
+          data-track="stop_task"
+          data-track-params='{"source":"progress"}'
           @click="onStop"
         >
           {{ t('stopTask') }}

@@ -20,8 +20,10 @@ themeApply(themeStored())
 initThemeListener()
 
 // 初始化 GA 与全局错误捕获
-const { initGA, initErrorListeners } = useGa()
+const { initGA, initErrorListeners, initClickTracking } = useGa()
 initGA()
 initErrorListeners()
+// 按钮级埋点：全局代理所有 `[data-track]` 控件（与 UI 语言解耦，见 useGa.ts 契约）
+initClickTracking()
 
 createApp(App).mount('#app')

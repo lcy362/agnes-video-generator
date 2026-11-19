@@ -61,6 +61,8 @@ onMounted(() => {
         v-for="it in items"
         :key="it.task_id"
         class="group cursor-pointer overflow-hidden rounded border border-rule bg-paper-2 transition-colors hover:border-rule-2"
+        data-track="open_gallery_item"
+        :data-track-params="JSON.stringify({ task_type: it.task_type, kind: it.kind, source: 'gallery' })"
         @click="openItem(it.task_id, it.dir_name, it.task_type)"
       >
         <div class="relative aspect-video overflow-hidden bg-paper">

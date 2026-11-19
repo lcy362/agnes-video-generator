@@ -59,13 +59,13 @@ defineExpose({
 <template>
   <!-- Audio Config -->
   <section class="panel mb-4">
-    <button type="button" class="panel-head collapse-header w-full text-start" @click="toggleCollapse('audio')">
+    <button type="button" class="panel-head collapse-header w-full text-start" data-track="toggle_audio_panel" @click="toggleCollapse('audio')">
       <h2 class="panel-title">{{ t('audioConfig') }}</h2>
       <span class="mono text-[11px] text-muted">{{ collapsed.audio ? '+' : '−' }}</span>
     </button>
     <div v-show="!collapsed.audio" class="panel-body">
       <label class="mb-4 flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
-        <input v-model="audioEnabled" type="checkbox" class="check" />
+        <input v-model="audioEnabled" type="checkbox" class="check" data-track="toggle_narration" />
         <span>{{ t('enableNarration') }}</span>
       </label>
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -89,13 +89,13 @@ defineExpose({
 
   <!-- Subtitle Config -->
   <section class="panel mb-4">
-    <button type="button" class="panel-head collapse-header w-full text-start" @click="toggleCollapse('subtitle')">
+    <button type="button" class="panel-head collapse-header w-full text-start" data-track="toggle_subtitle_panel" @click="toggleCollapse('subtitle')">
       <h2 class="panel-title">{{ t('subtitleConfig') }}</h2>
       <span class="mono text-[11px] text-muted">{{ collapsed.subtitle ? '+' : '−' }}</span>
     </button>
     <div v-show="!collapsed.subtitle" class="panel-body">
       <label class="mb-4 flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
-        <input v-model="subtitleEnabled" type="checkbox" class="check" />
+        <input v-model="subtitleEnabled" type="checkbox" class="check" data-track="toggle_subtitles" />
         <span>{{ t('enableSubtitle') }}</span>
       </label>
 

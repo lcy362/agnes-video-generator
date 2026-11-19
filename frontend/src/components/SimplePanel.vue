@@ -5,9 +5,11 @@ import { appState } from '@/store'
 import * as api from '@/api'
 import { useVoice } from '@/composables/useVoice'
 import { useToast } from '@/composables/useToast'
+import { useGa } from '@/composables/useGa'
 
 const { voiceSelections, voiceIndex, voiceName, voiceDescription, openVoicePicker, initVoiceSelector } = useVoice()
 const { showToast } = useToast()
+const { trackEvent } = useGa()
 
 const emit = defineEmits<{ (e: 'go-list'): void }>()
 
@@ -87,6 +89,17 @@ async function generate() {
 
     const d = await api.submitCreative(fd)
     if (!d.ok) throw new Error(d.detail || t('failCreate'))
+    // 本页绕过 useTaskSubmit（自带提交逻辑），转化终点需自行补齐，
+    // 否则「一键创作」只有点击没有 create_task，无法算转化率。
+    trackEvent('create_task', {
+      task_type: 'creative',
+      source: 'quick_creative',
+      scene_count: sceneCount.value,
+      resolution: resolution.value,
+      audio: audioEnabled.value ? 'on' : 'off',
+      subtitle: subtitleEnabled.value ? 'on' : 'off',
+      voice: currentVoiceId.value,
+    })
     showToast(t('simpleGenerated'), 5000, 'success')
     emit('go-list')
   } catch (e: any) {
@@ -140,6 +153,7 @@ async function generate() {
         <button
           class="btn btn-secondary btn-block mb-5"
           :disabled="previewLoading"
+          data-track="quick_preview"
           @click="generatePreview"
         >
           {{ previewLoading ? t('simplePreviewing') : t('simplePreview') }}
@@ -165,6 +179,7 @@ async function generate() {
             <label class="label">{{ t('voiceRole') }}</label>
             <button
               class="field flex items-center justify-between gap-2 text-start"
+              data-track="open_voice_picker"
               @click="pickVoice"
             >
               <span class="truncate">{{ voiceName(VOICE_KEY) || voiceDescription(VOICE_KEY) || currentVoiceId }}</span>
@@ -173,18 +188,18 @@ async function generate() {
           </div>
           <div>
             <label class="label">{{ t('resolution') }}</label>
-            <select v-model="resolution" class="field">
+            <select v-model="resolution" class="field" data-track="select_quick_resolution">
               <option v-for="r in resolutions" :key="r.value" :value="r.value">{{ t(r.label) }}</option>
             </select>
           </div>
         </div>
         <div class="mt-4 flex flex-wrap gap-6">
           <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
-            <input v-model="audioEnabled" type="checkbox" class="check" />
+            <input v-model="audioEnabled" type="checkbox" class="check" data-track="toggle_narration" />
             <span>{{ t('enableNarration') }}</span>
           </label>
           <label class="flex cursor-pointer items-center gap-2 text-[12.5px] text-ink-2">
-            <input v-model="subtitleEnabled" type="checkbox" class="check" />
+            <input v-model="subtitleEnabled" type="checkbox" class="check" data-track="toggle_subtitles" />
             <span>{{ t('enableSubtitle') }}</span>
           </label>
         </div>
@@ -195,6 +210,7 @@ async function generate() {
     <button
       class="btn btn-primary btn-block"
       :disabled="generating"
+      data-track="quick_generate"
       @click="generate"
     >
       {{ generating ? t('simpleGenerating') : t('simpleGenerate') }}

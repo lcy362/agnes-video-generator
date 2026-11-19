@@ -170,7 +170,7 @@ async function confirmVoiceSelection() {
   const compat = (appState.voiceCatalog && appState.voiceCatalog.compat_hint) || {}
   const supported = compat[voiceLang] || []
   if (voiceLang !== currentLang.value && !supported.includes(currentLang.value)) {
-    const ok = await confirmAsync(t('voiceCompatWarning'))
+    const ok = await confirmAsync(t('voiceCompatWarning'), { action: 'confirm_voice_compat' })
     if (!ok) return
   }
   voiceSelections[pickerTask.value] = selectedId.value

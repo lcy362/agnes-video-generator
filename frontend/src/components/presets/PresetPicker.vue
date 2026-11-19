@@ -102,7 +102,7 @@ async function submitSave() {
 }
 
 async function remove(p: Preset) {
-  if (!(await confirmAsync(t('presetDeleteConfirm')))) return
+  if (!(await confirmAsync(t('presetDeleteConfirm'), { action: 'delete_preset' }))) return
   try {
     await removePreset(p.id)
     showToast(t('presetDeleted'), 2500, 'success')
@@ -133,6 +133,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         class="btn btn-ghost h-9 gap-2"
         :class="open ? 'border-accent/60' : ''"
         :title="t('presetSelectHint')"
+        data-track="open_preset_menu"
         @click="toggle"
       >
         <span class="mono shrink-0 text-[9.5px] uppercase tracking-[0.1em] text-muted">{{ t('presetTriggerLabel') }}</span>
@@ -149,6 +150,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         type="button"
         class="btn btn-ghost h-9 w-9 shrink-0 px-0 text-[15px] leading-none"
         :title="t('presetSaveAs')"
+        data-track="open_preset_save"
         @click="saving = !saving"
       >
         +
@@ -163,10 +165,10 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         :placeholder="t('presetNamePlaceholder')"
         @keyup.enter="submitSave"
       />
-      <button type="button" class="btn btn-primary btn-sm whitespace-nowrap" @click="submitSave">
+      <button type="button" class="btn btn-primary btn-sm whitespace-nowrap" data-track="save_preset" @click="submitSave">
         {{ t('presetSaveAs') }}
       </button>
-      <button type="button" class="btn btn-quiet btn-sm" @click="saving = false">✕</button>
+      <button type="button" class="btn btn-quiet btn-sm" data-track="cancel_preset_save" @click="saving = false">✕</button>
     </div>
 
     <!-- 预设下拉面板 -->
@@ -185,6 +187,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             class="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-start text-[12.5px] transition-colors hover:bg-paper-3"
             :class="activePreset && activePreset.id === p.id ? 'font-medium text-accent' : 'text-ink-2'"
             :title="p.prompt"
+            data-track="apply_preset"
+            :data-track-params="JSON.stringify({ preset_id: p.id, kind: p.kind })"
             @click="choose(p)"
           >
             <span class="flex items-center gap-1.5 truncate">
@@ -198,6 +202,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
             <span
               v-if="p.kind === 'user'"
               class="shrink-0 px-1 text-muted transition-colors hover:text-danger"
+              data-track="delete_preset"
               @click.stop="remove(p)"
             >✕</span>
           </button>

@@ -70,6 +70,8 @@ async function submitManuscript() {
       ev = {
         resolution: form.resolution,
         text_len: text.length,
+        execution_mode: appState.execMode,
+        provider: appState.execMode === 'external' ? appState.providerSelected || 'jimeng' : '',
         audio: sc?.audioEnabled ? 'on' : 'off',
         subtitle: sc?.subtitleEnabled ? 'on' : 'off',
       }
@@ -121,6 +123,8 @@ async function submitManuscript() {
         <button
           type="button"
           class="flex w-full items-center justify-between text-start"
+          data-track="toggle_advanced_settings"
+          data-track-params='{"form":"manuscript"}'
           @click="advancedOpen = !advancedOpen"
         >
           <h2 class="panel-title">{{ t('advancedSettings') }}</h2>
@@ -166,6 +170,7 @@ async function submitManuscript() {
     <button
       class="btn btn-primary btn-block"
       :disabled="submitting"
+      data-track="submit_manuscript"
       @click="submitManuscript"
     >
       {{ submitting ? t('submitting') : t('startGenerate') }}

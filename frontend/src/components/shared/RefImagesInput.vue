@@ -92,7 +92,7 @@ function move(index: number, delta: number) {
   <div>
     <label v-if="label" class="label">{{ label }}</label>
     <div class="flex flex-wrap items-center gap-2">
-      <label class="btn btn-ghost shrink-0" :class="full ? 'pointer-events-none opacity-50' : ''">
+      <label class="btn btn-ghost shrink-0" :class="full ? 'pointer-events-none opacity-50' : ''" data-track="choose_reference_images">
         <span>{{ t('chooseImage') }}</span>
         <input
           type="file"
@@ -128,6 +128,8 @@ function move(index: number, delta: number) {
               class="px-1 text-[11px] text-muted transition-colors hover:text-ink disabled:opacity-30"
               :disabled="index === 0"
               :aria-label="`#${index + 1} ↑`"
+              data-track="reorder_reference_image"
+              data-track-params='{"to":"up"}'
               @click="move(index, -1)"
             >↑</button>
             <button
@@ -135,12 +137,15 @@ function move(index: number, delta: number) {
               class="px-1 text-[11px] text-muted transition-colors hover:text-ink disabled:opacity-30"
               :disabled="index === modelValue.length - 1"
               :aria-label="`#${index + 1} ↓`"
+              data-track="reorder_reference_image"
+              data-track-params='{"to":"down"}'
               @click="move(index, 1)"
             >↓</button>
             <button
               type="button"
               class="px-1 text-[12px] text-muted transition-colors hover:text-danger"
               :aria-label="`#${index + 1} ×`"
+              data-track="remove_reference_image"
               @click="removeAt(index)"
             >×</button>
           </span>

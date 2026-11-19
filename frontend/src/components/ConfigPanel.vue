@@ -411,7 +411,7 @@ syncFastRetrySettings()
       role="button"
       tabindex="0"
       :aria-expanded="!collapsed.apikey"
-      @click="toggleConfigPanel('apikey')"
+      data-track="toggle_settings_section" data-track-params='{"section":"apikey"}' @click="toggleConfigPanel('apikey')"
     >
       <div class="flex min-w-0 items-baseline gap-2.5">
         <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">01</span>
@@ -427,10 +427,10 @@ syncFastRetrySettings()
           {{ t('providerManageTitle') }}
         </h2>
         <div class="flex items-center gap-1">
-          <button class="btn btn-quiet btn-xs text-accent whitespace-nowrap" @click="openAddProvider()">
+          <button class="btn btn-quiet btn-xs text-accent whitespace-nowrap" data-track="open_add_provider" @click="openAddProvider()">
             {{ t('providerAddBtn') }}
           </button>
-          <button class="btn btn-quiet btn-xs" @click="toggleConfigPanel('apikey')">−</button>
+          <button class="btn btn-quiet btn-xs" data-track="toggle_settings_section" data-track-params='{"section":"apikey"}' @click="toggleConfigPanel('apikey')">−</button>
         </div>
       </div>
       <p class="hint mb-4">{{ t('providerManageHint') }}</p>
@@ -443,6 +443,7 @@ syncFastRetrySettings()
             type="button"
             class="text-accent hover:text-ink transition whitespace-nowrap"
             :aria-expanded="introOpen"
+            data-track="toggle_provider_intro"
             @click="introOpen = !introOpen"
           >{{ introOpen ? t('providerReadLess') : t('providerReadMore') }}</button>
         </div>
@@ -525,11 +526,13 @@ syncFastRetrySettings()
           <div class="flex shrink-0 items-center gap-1">
             <button
               class="btn btn-ghost btn-xs"
+              data-track="edit_text_provider"
               @click="openEditProvider(p)"
             >{{ t('providerEditLabel') }}</button>
             <button
               v-if="!p.builtin"
               class="btn btn-quiet btn-xs text-danger"
+              data-track="delete_text_provider"
               @click="onDeleteProvider(p.provider)"
             >{{ t('delete') }}</button>
             <span v-else class="px-1 text-muted/50" :title="t('providerBuiltinHint')">•</span>
@@ -549,13 +552,15 @@ syncFastRetrySettings()
       aria-modal="true"
       :aria-label="modalTitle"
     >
-      <div class="absolute inset-0" @click="showProviderModal = false"></div>
+      <div class="absolute inset-0" data-track="close_provider_modal" data-track-params='{"via":"backdrop"}' @click="showProviderModal = false"></div>
       <div class="modal max-h-[85vh] w-full max-w-lg overflow-y-auto p-5">
         <div class="mb-4 flex items-center justify-between gap-3">
           <h3 class="text-[13.5px] font-semibold tracking-[-0.01em] text-ink">{{ modalTitle }}</h3>
           <button
             class="btn btn-quiet h-7 w-7 px-0 text-[14px] leading-none"
             :aria-label="t('cancel')"
+            data-track="close_provider_modal"
+            data-track-params='{"via":"button"}'
             @click="showProviderModal = false"
           >✕</button>
         </div>
@@ -618,6 +623,7 @@ syncFastRetrySettings()
                   :title="item.enabled === false ? t('keyPoolOff') : t('keyPoolOn')"
                   class="relative h-3.5 w-7 shrink-0 rounded-full border transition-colors"
                   :class="item.enabled !== false ? 'border-accent bg-accent/25' : 'border-rule-2 bg-paper-3'"
+                  data-track="toggle_key_pool"
                   @click="onToggleKeyPool(item)"
                 >
                   <span
@@ -646,11 +652,11 @@ syncFastRetrySettings()
                   <option value="">{{ t('keyDomainAuto') }}（{{ displayDomain() }}）</option>
                   <option v-for="d in DOMAIN_ENTRIES" :key="d.key" :value="d.key">{{ d.url }}</option>
                 </select>
-                <button v-if="item.source !== 'env'" class="btn btn-quiet btn-xs text-danger" :title="t('removeKeyBtn')" @click="removeKey(item.id)">✕</button>
+                <button v-if="item.source !== 'env'" class="btn btn-quiet btn-xs text-danger" :title="t('removeKeyBtn')" data-track="remove_api_key" @click="removeKey(item.id)">✕</button>
                 <span v-else class="px-1 text-muted/50" :title="t('keySrcEnvHint')">•</span>
               </div>
               <div class="flex items-center gap-2 pt-1">
-                <button class="btn btn-ghost btn-xs" :disabled="detectingKeys" @click="detectKeyDomains()">{{ detectingKeys ? t('detectKeysRunning') : t('detectKeysBtn') }}</button>
+                <button class="btn btn-ghost btn-xs" :disabled="detectingKeys" data-track="detect_key_domains" @click="detectKeyDomains()">{{ detectingKeys ? t('detectKeysRunning') : t('detectKeysBtn') }}</button>
                 <span class="hint">{{ t('detectKeysHint') }}</span>
               </div>
             </div>
@@ -664,8 +670,8 @@ syncFastRetrySettings()
           <div class="mt-5 flex items-center justify-end gap-2">
             <span v-if="domainSaveStatus === 'ok'" class="me-auto text-[11.5px] text-success">{{ t('domainSaved') }}</span>
             <span v-if="domainSaveStatus === 'error'" class="me-auto text-[11.5px] text-danger">{{ domainErrorMsg }}</span>
-            <button v-if="apiKeyStatus !== 'none'" class="btn btn-danger" @click="clearApiKey">{{ t('clear') }}</button>
-            <button class="btn btn-primary" @click="onSaveAgnes">{{ apiKeyInput.trim() ? (hasApiKey ? t('addKey') : t('save')) : t('save') }}</button>
+            <button v-if="apiKeyStatus !== 'none'" class="btn btn-danger" data-track="clear_api_key" @click="clearApiKey">{{ t('clear') }}</button>
+            <button class="btn btn-primary" data-track="save_api_key" @click="onSaveAgnes">{{ apiKeyInput.trim() ? (hasApiKey ? t('addKey') : t('save')) : t('save') }}</button>
           </div>
         </template>
 
@@ -696,6 +702,7 @@ syncFastRetrySettings()
               <button
                 class="btn btn-ghost whitespace-nowrap"
                 :disabled="providerTestBusy"
+                data-track="fetch_provider_models"
                 @click="onFetchProviderModels"
               >{{ providerTestBusy ? t('providerFetching') : t('providerFetchModels') }}</button>
             </div>
@@ -710,12 +717,12 @@ syncFastRetrySettings()
             <div v-if="modelItems.length > 0" class="mb-2 space-y-1">
               <div v-for="(m, idx) in modelItems" :key="m + idx" class="flex items-center gap-2 rounded border border-rule bg-paper px-2.5 py-1">
                 <span class="mono min-w-0 flex-1 truncate text-[11px] text-ink">{{ m }}</span>
-                <button class="btn btn-quiet btn-xs text-danger" :aria-label="t('delete')" @click="removeModelItem(idx)">✕</button>
+                <button class="btn btn-quiet btn-xs text-danger" :aria-label="t('delete')" data-track="remove_model" @click="removeModelItem(idx)">✕</button>
               </div>
             </div>
             <div class="flex gap-2">
               <input v-model="modelInput" class="field flex-1 font-mono" :placeholder="t('modelInputPlaceholder')" @keyup.enter.prevent="onAddModel()" />
-              <button class="btn btn-secondary whitespace-nowrap" @click="onAddModel()">{{ t('modelAdd') }}</button>
+              <button class="btn btn-secondary whitespace-nowrap" data-track="add_model" @click="onAddModel()">{{ t('modelAdd') }}</button>
             </div>
             <p class="hint mt-1.5">{{ t('modelInputHint') }}</p>
           </div>
@@ -723,8 +730,8 @@ syncFastRetrySettings()
           <div class="mt-6 flex items-center justify-end gap-2">
             <span v-if="providerSaveStatus === 'ok'" class="me-auto text-[11.5px] text-success">{{ t('providerSaved') }}</span>
             <span v-if="providerSaveStatus === 'error'" class="me-auto text-[11.5px] text-danger">{{ providerErrorMsg }}</span>
-            <button class="btn btn-ghost" @click="showProviderModal = false">{{ t('cancel') }}</button>
-            <button class="btn btn-primary" @click="onSaveProvider">{{ t('save') }}</button>
+            <button class="btn btn-ghost" data-track="close_provider_modal" data-track-params='{"via":"cancel"}' @click="showProviderModal = false">{{ t('cancel') }}</button>
+            <button class="btn btn-primary" data-track="save_text_provider" @click="onSaveProvider">{{ t('save') }}</button>
           </div>
         </template>
       </div>
@@ -737,7 +744,7 @@ syncFastRetrySettings()
       class="panel-head collapse-header cursor-pointer"
       role="button"
       tabindex="0"
-      @click="toggleConfigPanel('model')"
+      data-track="toggle_settings_section" data-track-params='{"section":"model"}' @click="toggleConfigPanel('model')"
     >
       <div class="flex min-w-0 items-baseline gap-2.5">
         <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">02</span>
@@ -761,7 +768,7 @@ syncFastRetrySettings()
         </h2>
         <div class="flex items-center gap-1">
           <span class="chip">{{ t('modelSyncIdle') }}</span>
-          <button class="btn btn-quiet btn-xs" @click="toggleConfigPanel('model')">−</button>
+          <button class="btn btn-quiet btn-xs" data-track="toggle_settings_section" data-track-params='{"section":"model"}' @click="toggleConfigPanel('model')">−</button>
         </div>
       </div>
       <p class="hint mb-4">{{ t('modelHint') }}</p>
@@ -771,7 +778,7 @@ syncFastRetrySettings()
           <div class="mb-1 flex justify-end">
             <button
               class="btn btn-quiet btn-xs text-accent whitespace-nowrap"
-              @click="openAddProvider()"
+              data-track="open_add_provider" @click="openAddProvider()"
             >{{ t('providerAddBtn') }}</button>
           </div>
           <div class="flex gap-2">
@@ -782,7 +789,7 @@ syncFastRetrySettings()
             >
               <option v-for="opt in textProviderOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
             </select>
-            <button class="btn btn-secondary whitespace-nowrap" @click="syncModels">
+            <button class="btn btn-secondary whitespace-nowrap" data-track="sync_models" @click="syncModels">
               {{ t('modelSync') }}
             </button>
           </div>
@@ -883,7 +890,7 @@ syncFastRetrySettings()
         </div>
       </div>
       <div class="mt-4 flex items-center gap-2">
-        <button class="btn btn-primary" @click="saveModels">{{ t('save') }}</button>
+        <button class="btn btn-primary" data-track="save_models" @click="saveModels">{{ t('save') }}</button>
         <span v-if="modelSaveStatus === 'ok'" class="text-[11.5px] text-success">{{ t('modelSaved') }}</span>
         <span v-if="modelSaveStatus === 'error'" class="text-[11.5px] text-danger">{{ modelErrorMsg }}</span>
       </div>
@@ -897,7 +904,7 @@ syncFastRetrySettings()
       class="panel-head collapse-header cursor-pointer"
       role="button"
       tabindex="0"
-      @click="toggleConfigPanel('workspace')"
+      data-track="toggle_settings_section" data-track-params='{"section":"workspace"}' @click="toggleConfigPanel('workspace')"
     >
       <div class="flex min-w-0 items-baseline gap-2.5">
         <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">03</span>
@@ -918,7 +925,7 @@ syncFastRetrySettings()
           <span class="chip" :class="appState.activeWorkspace ? 'chip-success' : ''">
             {{ appState.activeWorkspace ? t('workspaceActive') : t('workspaceNone') }}
           </span>
-          <button class="btn btn-quiet btn-xs" @click="toggleConfigPanel('workspace')">−</button>
+          <button class="btn btn-quiet btn-xs" data-track="toggle_settings_section" data-track-params='{"section":"workspace"}' @click="toggleConfigPanel('workspace')">−</button>
         </div>
       </div>
       <div v-if="isRegression" class="mb-3 rounded border border-accent/40 bg-accent/10 px-3 py-2 text-[11.5px] text-accent">{{ t('workspaceRegressionHint') }}</div>
@@ -930,8 +937,8 @@ syncFastRetrySettings()
       <div class="mb-4 flex flex-wrap gap-2">
         <input v-model="workspacePath" :placeholder="t('workspacePathPlaceholder')" readonly class="field min-w-40 flex-1" />
         <input v-model="workspaceName" :placeholder="t('workspaceNamePlaceholder')" class="field w-36" />
-        <button class="btn btn-secondary" @click="onBrowse">{{ t('workspaceBrowse') }}</button>
-        <button class="btn btn-primary" @click="onAddWorkspace">{{ t('workspaceAdd') }}</button>
+        <button class="btn btn-secondary" data-track="workspace_browse" @click="onBrowse">{{ t('workspaceBrowse') }}</button>
+        <button class="btn btn-primary" data-track="workspace_add" @click="onAddWorkspace">{{ t('workspaceAdd') }}</button>
       </div>
       <div class="mb-2 flex items-baseline gap-2">
         <h3 class="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">{{ t('workspaceListTitle') }}</h3>
@@ -949,10 +956,10 @@ syncFastRetrySettings()
           </div>
           <div class="flex shrink-0 items-center gap-1">
             <span v-if="ws.path === appState.activeWorkspace" class="chip chip-success">{{ t('workspaceActiveBadge') }}</span>
-            <button v-else class="btn btn-ghost btn-xs" @click="activateWorkspace(ws.path)">
+            <button v-else class="btn btn-ghost btn-xs" data-track="workspace_activate" @click="activateWorkspace(ws.path)">
               {{ t('workspaceActivate') }}
             </button>
-            <button v-if="!ws.is_default" class="btn btn-quiet btn-xs text-danger" @click="removeWorkspaceEntry(ws.path)">
+            <button v-if="!ws.is_default" class="btn btn-quiet btn-xs text-danger" data-track="workspace_remove" @click="removeWorkspaceEntry(ws.path)">
               {{ t('workspaceRemove') }}
             </button>
           </div>
@@ -969,7 +976,7 @@ syncFastRetrySettings()
       role="button"
       tabindex="0"
       :aria-expanded="!collapsed.retry"
-      @click="toggleConfigPanel('retry')"
+      data-track="toggle_settings_section" data-track-params='{"section":"retry"}' @click="toggleConfigPanel('retry')"
     >
       <div class="flex min-w-0 items-baseline gap-2.5">
         <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">04</span>
@@ -994,12 +1001,12 @@ syncFastRetrySettings()
               ? tf('fastRetry.autoOnShort', { x: fastRetryPerMinute, y: fastRetryMinutes })
               : t('fastRetry.autoOffShort') }}
           </span>
-          <button class="btn btn-quiet btn-xs" @click="toggleConfigPanel('retry')">−</button>
+          <button class="btn btn-quiet btn-xs" data-track="toggle_settings_section" data-track-params='{"section":"retry"}' @click="toggleConfigPanel('retry')">−</button>
         </div>
       </div>
 
       <label class="flex cursor-pointer select-none items-start gap-3">
-        <input v-model="fastRetryAuto" type="checkbox" class="check mt-0.5" />
+        <input v-model="fastRetryAuto" type="checkbox" class="check mt-0.5" data-track="toggle_fast_retry_auto" />
         <span>
           <span class="block text-[12.5px] font-medium text-ink">{{ t('fastRetry.autoLabel') }}</span>
           <span class="mt-0.5 block text-[11px] leading-relaxed text-muted">{{ t('fastRetry.autoHint') }}</span>
@@ -1029,7 +1036,7 @@ syncFastRetrySettings()
             class="field w-24"
           />
         </label>
-        <button class="btn btn-primary btn-sm" @click="saveFastRetrySettings">{{ t('save') }}</button>
+        <button class="btn btn-primary btn-sm" data-track="save_fast_retry" @click="saveFastRetrySettings">{{ t('save') }}</button>
         <span v-if="fastRetrySaveStatus === 'ok'" class="text-[11.5px] text-success">
           {{ t('fastRetry.autoSaved') }}
         </span>
@@ -1046,7 +1053,7 @@ syncFastRetrySettings()
       role="button"
       tabindex="0"
       :aria-expanded="!collapsed.privacy"
-      @click="toggleConfigPanel('privacy')"
+      data-track="toggle_settings_section" data-track-params='{"section":"privacy"}' @click="toggleConfigPanel('privacy')"
     >
       <div class="flex min-w-0 items-baseline gap-2.5">
         <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">05</span>
@@ -1067,11 +1074,11 @@ syncFastRetrySettings()
           <span class="chip" :class="gaOptOut ? 'chip-success' : ''">
             {{ gaOptOut ? t('gaStatOff') : t('gaStatOn') }}
           </span>
-          <button class="btn btn-quiet btn-xs" @click="toggleConfigPanel('privacy')">−</button>
+          <button class="btn btn-quiet btn-xs" data-track="toggle_settings_section" data-track-params='{"section":"privacy"}' @click="toggleConfigPanel('privacy')">−</button>
         </div>
       </div>
       <label class="flex cursor-pointer select-none items-start gap-3">
-        <input v-model="gaOptOut" type="checkbox" class="check mt-0.5" @change="toggleGaOptOut" />
+        <input v-model="gaOptOut" type="checkbox" class="check mt-0.5" data-track="toggle_ga_opt_out" @change="toggleGaOptOut" />
         <span>
           <span class="block text-[12.5px] font-medium text-ink">{{ t('gaOptOutLabel') }}</span>
           <span class="mt-0.5 block text-[11px] leading-relaxed text-muted">{{ t('gaOptOutHint') }}</span>

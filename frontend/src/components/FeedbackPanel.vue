@@ -197,6 +197,7 @@ onMounted(async () => {
       v-if="!open"
       type="button"
       class="inline-flex items-center gap-1.5 text-[11.5px] text-muted transition-colors hover:text-accent"
+      data-track="feedback_toggle"
       @click="toggle"
     >
       {{ t('fbCollapsedHint') }}
@@ -214,6 +215,7 @@ onMounted(async () => {
         <button
           type="button"
           class="collapse-header flex w-full items-center gap-2 px-3 py-2 text-start transition-colors hover:bg-paper-3/50"
+          data-track="feedback_diag_toggle"
           @click="diagOpen = !diagOpen"
         >
           <span class="mono text-[10px] text-muted">{{ diagOpen ? '−' : '+' }}</span>
@@ -227,7 +229,7 @@ onMounted(async () => {
 
       <!-- 操作按钮 -->
       <div class="flex flex-wrap items-center gap-2">
-        <button type="button" class="btn btn-ghost btn-sm" @click="onCopy">
+        <button type="button" class="btn btn-ghost btn-sm" data-track="feedback_copy" @click="onCopy">
           {{ t('fbCopy') }}
         </button>
         <a
@@ -235,16 +237,18 @@ onMounted(async () => {
           target="_blank"
           rel="noopener"
           class="btn btn-ghost btn-sm"
+          data-track="feedback_faq"
         >
           {{ t('fbFaq') }}
         </a>
-        <button type="button" class="btn btn-primary btn-sm" @click="onGithub">
+        <button type="button" class="btn btn-primary btn-sm" data-track="feedback_github" @click="onGithub">
           {{ t('fbGithub') }}
         </button>
         <button
           v-if="deterministic"
           type="button"
           class="btn btn-quiet btn-sm text-accent"
+          data-track="feedback_retry"
           @click="$emit('retry')"
         >
           ↻ {{ t('fbRetryBtn') }}

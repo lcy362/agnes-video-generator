@@ -173,6 +173,8 @@ async function submitPoetry() {
       ev = {
         style: form.style,
         scene_count: form.sceneCount,
+        execution_mode: appState.execMode,
+        provider: appState.execMode === 'external' ? appState.providerSelected || 'jimeng' : '',
         resolution: form.resolution,
         audio: sc?.audioEnabled ? 'on' : 'off',
         subtitle: sc?.subtitleEnabled ? 'on' : 'off',
@@ -248,13 +250,13 @@ async function submitPoetry() {
           <div class="mt-3 rounded border border-rule bg-paper px-3 py-2">
             <div class="flex items-center justify-between gap-3">
               <span class="text-[11.5px] font-medium text-ink-2">{{ t('scenePromptTool') }}</span>
-              <button type="button" class="btn btn-quiet btn-xs text-accent" @click="togglePoetryPrompt">{{ t('showPrompt') }}</button>
+              <button type="button" class="btn btn-quiet btn-xs text-accent" data-track="toggle_scene_prompt_panel" @click="togglePoetryPrompt">{{ t('showPrompt') }}</button>
             </div>
             <div v-if="promptPanelVisible" class="mt-2 space-y-1.5">
               <p class="hint">{{ t('scenePromptToolHint') }}</p>
               <pre class="max-h-40 overflow-auto rounded border border-rule bg-paper-2 p-2 text-[11px] text-ink-2">{{ promptSystem }}</pre>
               <pre class="max-h-40 overflow-auto rounded border border-rule bg-paper-2 p-2 text-[11px] text-muted">{{ promptUser }}</pre>
-              <button type="button" class="btn btn-secondary btn-sm w-full" @click="copyPoetryPromptWithPoem">
+              <button type="button" class="btn btn-secondary btn-sm w-full" data-track="copy_scene_prompt" @click="copyPoetryPromptWithPoem">
                 {{ copyBtnText || t('copyPromptWithPoem') }}
               </button>
             </div>
@@ -342,6 +344,7 @@ async function submitPoetry() {
     <button
       class="btn btn-primary btn-block"
       :disabled="submitting"
+      data-track="submit_poetry"
       @click="submitPoetry"
     >
       {{ submitting ? t('submitting') : t('startGenerate') }}
