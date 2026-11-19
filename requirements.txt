@@ -14,10 +14,9 @@ anyio>=4.0.0,<5.0.0            # 异步文件 IO（core/async_io.py，FastAPI �
 edge_tts>=6.1.0,<8.0.0          # Azure Edge TTS，免费无需 API Key
 srt>=3.5.0,<4.0.0               # SRT 字幕解析/生成工具
 
-# 阿拉伯语字幕支持：Pillow/moviepy 的 TextClip 不做双向文本重排/字母连写，
-# 需在渲染前手动 reshape + bidi 重排（否则字母不连写、显示顺序反向）。
-arabic-reshaper>=3.0.0,<4.0.0
-python-bidi>=0.4.2,<1.0.0
+# 阿拉伯语字幕支持：Pillow/moviepy 的 TextClip 只在带 Raqm 时才能连写字母、
+# 从右到左排版。khatt 用 HarfBuzz 自行排版，结果与 Pillow 是否带 Raqm 无关。
+khatt>=0.10.0
 
 # 阿拉伯语旁白自动加变音符号（tashkeel/harakat），提升 TTS 朗读准确度。
 # 用规则形态学分析而非 LLM：LLM 方案实测会偶发替换借词/连词拼写，不适合

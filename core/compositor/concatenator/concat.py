@@ -201,23 +201,6 @@ class ConcatMixin:
         )
 
     @staticmethod
-    def _shape_bidi_text(text: str) -> str:
-        """阿拉伯文字母连写 + 双向重排（Pillow/moviepy 不做复杂文本排版，需手动处理）。
-
-        非阿拉伯文文本原样返回；多行文本逐行处理，保留行序。
-        """
-        from core.audio.voices import _ARABIC_RE
-
-        if not _ARABIC_RE.search(text):
-            return text
-
-        import arabic_reshaper
-        from bidi.algorithm import get_display
-
-        lines = text.split("\n")
-        return "\n".join(get_display(arabic_reshaper.reshape(line)) for line in lines)
-
-    @staticmethod
     def _parse_srt_to_clips(
         srt_path: str,
         subtitle_style: SubtitleStyle,
@@ -238,6 +221,7 @@ class ConcatMixin:
                 每项含 index, position, color, fontsize。
                 未指定的字段回退到 subtitle_style 的全局值。
         """
+        from khatt.video import TextClip as KhattTextClip
         from moviepy import TextClip as MpTextClip
 
         from core.audio.subtitle import SubtitleGenerator
@@ -322,7 +306,6 @@ class ConcatMixin:
 
                 # 长文本自动拆为多行，避免单行溢出屏幕
                 wrapped = SubtitleGenerator._split_long_text(txt, cjk_max_chars)
-                wrapped = VideoConcatenator._shape_bidi_text(wrapped)
                 # 按文本脚本匹配字体：命中阿/泰/印地/孟加拉任一脚本则回退对应内置字体
                 entry_font = font_path
                 for script_re, script_font in script_font_map.items():
@@ -330,7 +313,7 @@ class ConcatMixin:
                         entry_font = script_font
                         break
 
-                clip = MpTextClip(
+                clip_options = dict(
                     text=wrapped,
                     font=entry_font,
                     font_size=fs,
@@ -342,6 +325,13 @@ class ConcatMixin:
                     size=(available_w, None),
                     text_align="center",
                 )
+                if _ARABIC_RE.search(txt):
+                    # 阿拉伯文交给 khatt 绘制：自行连写字母、从右到左排版并保留变音符号，
+                    # 与 Pillow 是否带 Raqm 无关（预先 reshape 的文本在带 Raqm 的
+                    # Pillow 上会被二次处理、显示反向）。字体缺的字符（括号等）回退到全局字体。
+                    clip = KhattTextClip(**clip_options, fallback_fonts=[font_path])
+                else:
+                    clip = MpTextClip(**clip_options)
                 # M10: 钳位字幕结束时间不超过视频时长
                 if video_duration > 0:
                     end_s = min(end_s, video_duration - 0.01)
