@@ -4,6 +4,7 @@
 > **性质**：A 节为合并评审时发现并接受的遗留瑕疵；B 节为以 PR #32 实施模式为模板、补齐其余 UI 语言缺口的待办。
 > **注意**：PR #32 改动目前仅在 master；v6.0-dev 需合并 master 后才会包含阿语链路，本文引用的代码位置以 master 为准。
 > **状态（2026-08-30）**：✅ **A 节与 B 节均已实施完成**。A 节修复 `_ARABIC_RE` 排除 U+FEFF；B 节补齐 tr/vi/th/tl/hi/fa/bn/ur 共 8 种语言后端链路（音色分组/试听/脚本检测/字幕字体/RTL）。详见各节「实施记录」。
+> **后续变化（2026-11-19，PR #116）**：本文提到的 `_shape_bidi_text`（`arabic_reshaper` + `python-bidi` 预整形）已删除，阿文字幕改由 `khatt.video.TextClip` 用 HarfBuzz 自行排版（khatt 缺失时降级回 moviepy，见 `tests/test_arabic_subtitle_fallback.py`）。下文对 `_shape_bidi_text` 的引用仅作历史记录，不再指向现存代码。
 
 ***
 

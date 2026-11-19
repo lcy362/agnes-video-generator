@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
+# khatt 是可选依赖：未安装时本文件跳过，由 tests/test_arabic_subtitle_fallback.py 保证降级路径可用
 pytest.importorskip("khatt")
 
 from khatt.video import TextClip as KhattTextClip  # noqa: E402

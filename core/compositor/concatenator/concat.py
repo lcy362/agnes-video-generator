@@ -23,6 +23,31 @@ _AUDIO_BITRATE = "192k"
 _AUDIO_FPS = 44100
 _VIDEO_FPS = 30
 
+# ── 阿拉伯文字幕渲染器（可选依赖）──
+# khatt 缺失时不影响任何语种：阿文行降级回 moviepy TextClip（可能出现字母不连写 /
+# 双向反向），其余语种本来就走 moviepy，与 khatt 无关。
+_khatt_text_clip_cls = None      # None = 尚未解析
+_khatt_import_failed = False     # 只尝试一次，失败后不再重复 import / 刷日志
+
+
+def _get_khatt_text_clip():
+    """惰性解析 khatt 的 moviepy TextClip 直替，缺失时返回 None（只告警一次）。"""
+    global _khatt_text_clip_cls, _khatt_import_failed
+    if _khatt_text_clip_cls is not None or _khatt_import_failed:
+        return _khatt_text_clip_cls
+    try:
+        from khatt.video import TextClip as KhattTextClip
+    except ImportError:
+        _khatt_import_failed = True
+        logger.warning(
+            "[Compositor] 未安装 khatt（pip install \"khatt[video]\"），"
+            "阿拉伯文字幕回退 moviepy TextClip：字母可能不连写、双向顺序可能反向、"
+            "缺字形可能显示为方块"
+        )
+        return None
+    _khatt_text_clip_cls = KhattTextClip
+    return _khatt_text_clip_cls
+
 
 class _CopyConcatSkipped(Exception):
     """内部信号：``-c copy`` fast path 不适用（探针失败/参数不一致），静默回退 moviepy。"""
@@ -221,7 +246,6 @@ class ConcatMixin:
                 每项含 index, position, color, fontsize。
                 未指定的字段回退到 subtitle_style 的全局值。
         """
-        from khatt.video import TextClip as KhattTextClip
         from moviepy import TextClip as MpTextClip
 
         from core.audio.subtitle import SubtitleGenerator
@@ -325,12 +349,14 @@ class ConcatMixin:
                     size=(available_w, None),
                     text_align="center",
                 )
-                if _ARABIC_RE.search(txt):
+                khatt_clip_cls = _get_khatt_text_clip() if _ARABIC_RE.search(txt) else None
+                if khatt_clip_cls is not None:
                     # 阿拉伯文交给 khatt 绘制：自行连写字母、从右到左排版并保留变音符号，
                     # 与 Pillow 是否带 Raqm 无关（预先 reshape 的文本在带 Raqm 的
                     # Pillow 上会被二次处理、显示反向）。字体缺的字符（括号等）回退到全局字体。
-                    clip = KhattTextClip(**clip_options, fallback_fonts=[font_path])
+                    clip = khatt_clip_cls(**clip_options, fallback_fonts=[font_path])
                 else:
+                    # 非阿文，或 khatt 不可用时的阿文降级：仍用 moviepy 原路径
                     clip = MpTextClip(**clip_options)
                 # M10: 钳位字幕结束时间不超过视频时长
                 if video_duration > 0:
