@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "Sarado",
   "longTask.saved": "Na-save",
   "fastRetry.interval": "Agwat (min)",
-  "fastRetry.chainHint": "Bumalik sa normal na bilis; susunod na round sa ~{i} min"
+  "fastRetry.chainHint": "Bumalik sa normal na bilis; susunod na round sa ~{i} min",
+  "featureTip.retryTitle": "Mabilis na pagsubok muli",
+  "featureTip.retryBody": "Kapag puno ang pila sa upstream, paulit-ulit na sinusubukan sa itinakdang bilis (hal. 30 beses kada minuto sa loob ng 3 minuto). Pagkatapos ng isang round, bumabalik sa normal at awtomatikong magsisimula ang susunod pagkalipas ng itinakdang agwat.",
+  "featureTip.longTaskTitle": "Long-task mode",
+  "featureTip.longTaskBody": "Pinapalitan ang limitasyon sa bilang ng pagsubok ng naipon na waiting budget (default 60 min) — mainam para sa mahahabang video na nakapila. Hindi nagbabago ang bilis; mababago ang default sa Settings.",
+  "featureTip.next": "Susunod",
+  "featureTip.gotit": "Naintindihan",
+  "featureTip.skip": "Laktawan"
 }

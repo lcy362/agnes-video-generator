@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "Disattivato",
   "longTask.saved": "Salvato",
   "fastRetry.interval": "Intervallo (min)",
-  "fastRetry.chainHint": "Cadenza normale ripristinata; prossimo ciclo tra ~{i} min"
+  "fastRetry.chainHint": "Cadenza normale ripristinata; prossimo ciclo tra ~{i} min",
+  "featureTip.retryTitle": "Nuovo tentativo rapido",
+  "featureTip.retryBody": "Quando la coda a monte è piena, i tentativi seguono la frequenza impostata (ad es. 30 volte al minuto per 3 minuti). Finita una serie si torna al ritmo normale e la successiva parte dopo l'intervallo configurato.",
+  "featureTip.longTaskTitle": "Modalità attività lunga",
+  "featureTip.longTaskBody": "Sostituisce il limite di tentativi con un budget di attesa (60 min per impostazione predefinita), utile per i video lunghi in coda. La frequenza non cambia; il valore predefinito si modifica nelle impostazioni.",
+  "featureTip.next": "Avanti",
+  "featureTip.gotit": "Ho capito",
+  "featureTip.skip": "Salta"
 }

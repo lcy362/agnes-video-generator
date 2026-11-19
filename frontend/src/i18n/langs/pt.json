@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "Desativado",
   "longTask.saved": "Salvo",
   "fastRetry.interval": "Intervalo (min)",
-  "fastRetry.chainHint": "Cadência normal retomada; próxima rodada em ~{i} min"
+  "fastRetry.chainHint": "Cadência normal retomada; próxima rodada em ~{i} min",
+  "featureTip.retryTitle": "Nova tentativa rápida",
+  "featureTip.retryBody": "Quando a fila do serviço está cheia, as tentativas seguem a frequência definida (por exemplo, 30 vezes por minuto durante 3 minutos). Ao fim de uma rodada o ritmo normal volta e a próxima começa após o intervalo configurado.",
+  "featureTip.longTaskTitle": "Modo de tarefa longa",
+  "featureTip.longTaskBody": "Troca o limite de tentativas por um orçamento de espera (60 min por padrão), útil para vídeos longos na fila. A frequência não muda; o padrão pode ser alterado nas configurações.",
+  "featureTip.next": "Próximo",
+  "featureTip.gotit": "Entendi",
+  "featureTip.skip": "Pular"
 }

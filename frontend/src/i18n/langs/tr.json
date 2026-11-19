@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "Kapalı",
   "longTask.saved": "Kaydedildi",
   "fastRetry.interval": "Aralık (dk)",
-  "fastRetry.chainHint": "Normal hıza dönüldü; sonraki tur ~{i} dk sonra"
+  "fastRetry.chainHint": "Normal hıza dönüldü; sonraki tur ~{i} dk sonra",
+  "featureTip.retryTitle": "Hızlı yeniden deneme",
+  "featureTip.retryBody": "Üst servis kuyruğu dolduğunda ayarlanan hızda sürekli denenir (ör. dakikada 30 kez, 3 dakika). Tur bitince normal hıza dönülür ve ayarlanan aralıktan sonra yeni tur otomatik başlar.",
+  "featureTip.longTaskTitle": "Uzun görev modu",
+  "featureTip.longTaskBody": "Deneme sayısı sınırını toplam bekleme bütçesiyle değiştirir (varsayılan 60 dk); kuyrukta bekleyen uzun videolar için uygundur. Deneme hızı değişmez; varsayılanı Ayarlar'dan değiştirebilirsiniz.",
+  "featureTip.next": "İleri",
+  "featureTip.gotit": "Anladım",
+  "featureTip.skip": "Atla"
 }

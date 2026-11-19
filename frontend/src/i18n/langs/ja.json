@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "無効",
   "longTask.saved": "保存しました",
   "fastRetry.interval": "ラウンド間隔（分）",
-  "fastRetry.chainHint": "通常ペースに戻りました。約 {i} 分後に次のラウンドを自動開始します"
+  "fastRetry.chainHint": "通常ペースに戻りました。約 {i} 分後に次のラウンドを自動開始します",
+  "featureTip.retryTitle": "高速リトライ",
+  "featureTip.retryBody": "上流のキューが満杯のとき、設定した頻度で連続リトライします（例：毎分 30 回を 3 分間）。1 ラウンド終了後は通常ペースに戻り、設定した間隔の後に次のラウンドを自動開始します。",
+  "featureTip.longTaskTitle": "長時間タスクモード",
+  "featureTip.longTaskBody": "「リトライ回数の上限」を「累計待機時間」（既定 60 分）に置き換えます。長時間の動画が順番待ちのときに有効です。頻度は変わらず、既定値は設定で変更できます。",
+  "featureTip.next": "次へ",
+  "featureTip.gotit": "了解",
+  "featureTip.skip": "スキップ"
 }

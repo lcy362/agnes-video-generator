@@ -854,5 +854,12 @@
   "longTask.autoOffShort": "未开启",
   "longTask.saved": "已保存",
   "fastRetry.interval": "两轮间隔（分钟）",
-  "fastRetry.chainHint": "已恢复常规节奏，约 {i} 分钟后自动再开一轮"
+  "fastRetry.chainHint": "已恢复常规节奏，约 {i} 分钟后自动再开一轮",
+  "featureTip.retryTitle": "快速重试",
+  "featureTip.retryBody": "上游排队满时，可按设定频率连续重试（例如每分钟 30 次、持续 3 分钟）。一轮结束后恢复常规节奏，等设定间隔后再自动开下一轮。",
+  "featureTip.longTaskTitle": "长任务模式",
+  "featureTip.longTaskBody": "把「重试次数上限」换成「累计等待时长」（默认 60 分钟），适合长视频排在队尾时慢慢等。重试频率不变，默认值可在设置页修改。",
+  "featureTip.next": "下一步",
+  "featureTip.gotit": "知道了",
+  "featureTip.skip": "跳过"
 }

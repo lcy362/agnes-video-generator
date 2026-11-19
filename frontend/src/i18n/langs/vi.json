@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "Tắt",
   "longTask.saved": "Đã lưu",
   "fastRetry.interval": "Khoảng cách (phút)",
-  "fastRetry.chainHint": "Đã trở lại nhịp thường; vòng tiếp theo sau ~{i} phút"
+  "fastRetry.chainHint": "Đã trở lại nhịp thường; vòng tiếp theo sau ~{i} phút",
+  "featureTip.retryTitle": "Thử lại nhanh",
+  "featureTip.retryBody": "Khi hàng đợi phía trên đầy, hệ thống thử lại theo tần suất đã đặt (ví dụ 30 lần/phút trong 3 phút). Hết một vòng sẽ trở về nhịp thường và tự mở vòng tiếp theo sau khoảng nghỉ đã cấu hình.",
+  "featureTip.longTaskTitle": "Chế độ tác vụ dài",
+  "featureTip.longTaskBody": "Thay giới hạn số lần thử bằng ngân sách chờ tích lũy (mặc định 60 phút), phù hợp khi video dài phải xếp hàng. Tần suất không đổi; có thể sửa mặc định trong Cài đặt.",
+  "featureTip.next": "Tiếp",
+  "featureTip.gotit": "Đã hiểu",
+  "featureTip.skip": "Bỏ qua"
 }

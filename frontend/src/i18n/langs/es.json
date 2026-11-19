@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "Desactivado",
   "longTask.saved": "Guardado",
   "fastRetry.interval": "Intervalo (min)",
-  "fastRetry.chainHint": "Cadencia normal restaurada; siguiente ronda en ~{i} min"
+  "fastRetry.chainHint": "Cadencia normal restaurada; siguiente ronda en ~{i} min",
+  "featureTip.retryTitle": "Reintento rápido",
+  "featureTip.retryBody": "Cuando la cola del servicio está llena, se reintenta a la frecuencia indicada (por ejemplo, 30 veces por minuto durante 3 minutos). Al terminar una ronda vuelve la cadencia normal y la siguiente empieza tras el intervalo configurado.",
+  "featureTip.longTaskTitle": "Modo de tarea larga",
+  "featureTip.longTaskBody": "Sustituye el límite de reintentos por un presupuesto de espera (60 min por defecto), útil para vídeos largos en cola. La frecuencia no cambia; el valor por defecto se ajusta en Ajustes.",
+  "featureTip.next": "Siguiente",
+  "featureTip.gotit": "Entendido",
+  "featureTip.skip": "Omitir"
 }

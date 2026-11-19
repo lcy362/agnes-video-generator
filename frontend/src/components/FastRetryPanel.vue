@@ -20,6 +20,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { t, tf } from '@/i18n'
 import { appState } from '@/store'
 import { useProgress } from '@/composables/useProgress'
+import FeatureTip from '@/components/shared/FeatureTip.vue'
 
 const { fastRetry, setFastRetryMode, longTask, setLongTaskMode } = useProgress()
 
@@ -182,9 +183,51 @@ async function enableLongTask() {
     ltSubmitting.value = false
   }
 }
+
+// ── v8.5 首次引导：解释「快速重试 / 长任务模式」两个开关 ──────────
+// 新用户第一次进入带重试面板的进度页时弹一次（跨任务只弹一次）。这两个开关是
+// v7.7/v8.3 才引入的，老用户升级后也会看到一次，之后不再打扰。
+const TIP_STORAGE_KEY = 'wb_tip_retry_modes_seen'
+const tipOpen = ref(false)
+let tipChecked = false
+
+const tipSteps = computed(() => [
+  { title: t('featureTip.retryTitle'), body: t('featureTip.retryBody') },
+  { title: t('featureTip.longTaskTitle'), body: t('featureTip.longTaskBody') },
+])
+
+// 面板真正出现（有任务在跑且已拿到状态）才弹，避免在空白区域弹空气泡
+const tipAnchorVisible = computed(() => visible.value || ltVisible.value)
+
+watch(
+  tipAnchorVisible,
+  (v) => {
+    if (!v || tipChecked) return
+    tipChecked = true
+    try {
+      if (localStorage.getItem(TIP_STORAGE_KEY)) return
+    } catch {
+      /* 隐私模式读不到 localStorage：仍然展示一次，只是不写标记 */
+    }
+    tipOpen.value = true
+  },
+  { immediate: true },
+)
+
+function closeTip() {
+  tipOpen.value = false
+  try {
+    localStorage.setItem(TIP_STORAGE_KEY, '1')
+  } catch {
+    /* ignore */
+  }
+}
 </script>
 
 <template>
+  <!-- v8.5 首次进入的开关说明（两步：快速重试 → 长任务模式） -->
+  <FeatureTip :open="tipOpen" :steps="tipSteps" @close="closeTip" />
+
   <div
     v-if="visible"
     class="mt-4 border-t border-rule pt-4"

@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "Nonaktif",
   "longTask.saved": "Tersimpan",
   "fastRetry.interval": "Jeda (mnt)",
-  "fastRetry.chainHint": "Irama normal dipulihkan; putaran berikutnya ~{i} mnt lagi"
+  "fastRetry.chainHint": "Irama normal dipulihkan; putaran berikutnya ~{i} mnt lagi",
+  "featureTip.retryTitle": "Percobaan cepat",
+  "featureTip.retryBody": "Saat antrean hulu penuh, percobaan dilakukan dengan frekuensi yang diatur (mis. 30 kali per menit selama 3 menit). Setelah satu putaran, irama normal kembali dan putaran berikutnya dimulai otomatis setelah jeda yang diatur.",
+  "featureTip.longTaskTitle": "Mode tugas panjang",
+  "featureTip.longTaskBody": "Mengganti batas jumlah percobaan dengan anggaran tunggu terakumulasi (default 60 menit) — cocok untuk video panjang yang mengantre. Frekuensi tidak berubah; nilai default bisa diubah di Pengaturan.",
+  "featureTip.next": "Lanjut",
+  "featureTip.gotit": "Mengerti",
+  "featureTip.skip": "Lewati"
 }

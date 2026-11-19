@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "사용 안 함",
   "longTask.saved": "저장됨",
   "fastRetry.interval": "라운드 간격(분)",
-  "fastRetry.chainHint": "일반 속도로 복귀했습니다. 약 {i}분 후 다음 라운드가 자동 시작됩니다"
+  "fastRetry.chainHint": "일반 속도로 복귀했습니다. 약 {i}분 후 다음 라운드가 자동 시작됩니다",
+  "featureTip.retryTitle": "빠른 재시도",
+  "featureTip.retryBody": "업스트림 대기열이 가득 찼을 때 설정한 빈도로 연속 재시도합니다(예: 분당 30회, 3분간). 한 라운드가 끝나면 일반 속도로 돌아가고 설정한 간격 후 다음 라운드가 자동 시작됩니다.",
+  "featureTip.longTaskTitle": "장시간 작업 모드",
+  "featureTip.longTaskBody": "재시도 횟수 상한을 누적 대기 시간(기본 60분)으로 바꿉니다. 긴 영상이 대기열에 있을 때 유용합니다. 재시도 빈도는 그대로이며 기본값은 설정에서 변경할 수 있습니다.",
+  "featureTip.next": "다음",
+  "featureTip.gotit": "확인",
+  "featureTip.skip": "건너뛰기"
 }

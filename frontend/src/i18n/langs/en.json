@@ -854,5 +854,12 @@
   "longTask.autoOffShort": "Off",
   "longTask.saved": "Saved",
   "fastRetry.interval": "Interval (min)",
-  "fastRetry.chainHint": "Normal cadence resumed; next round in about {i} min"
+  "fastRetry.chainHint": "Normal cadence resumed; next round in about {i} min",
+  "featureTip.retryTitle": "Fast retry",
+  "featureTip.retryBody": "When the upstream queue is full, retry at a set rate (e.g. 30 times per minute for 3 minutes). After a round ends it returns to the normal cadence and starts the next round after the configured interval.",
+  "featureTip.longTaskTitle": "Long-task mode",
+  "featureTip.longTaskBody": "Replaces the retry-count cap with an accumulated-wait budget (60 min by default) — handy for long videos stuck in the queue. The retry rate is unchanged; change the default in Settings.",
+  "featureTip.next": "Next",
+  "featureTip.gotit": "Got it",
+  "featureTip.skip": "Skip"
 }

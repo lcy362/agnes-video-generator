@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "Mati",
   "longTask.saved": "Disimpan",
   "fastRetry.interval": "Selang (min)",
-  "fastRetry.chainHint": "Kadar biasa dipulihkan; pusingan seterusnya dalam ~{i} min"
+  "fastRetry.chainHint": "Kadar biasa dipulihkan; pusingan seterusnya dalam ~{i} min",
+  "featureTip.retryTitle": "Cubaan semula pantas",
+  "featureTip.retryBody": "Apabila baris gilir huluan penuh, cubaan semula dibuat pada kadar yang ditetapkan (cth 30 kali seminit selama 3 minit). Selepas satu pusingan, kadar biasa dipulihkan dan pusingan seterusnya bermula selepas selang yang ditetapkan.",
+  "featureTip.longTaskTitle": "Mod tugas panjang",
+  "featureTip.longTaskBody": "Menggantikan had bilangan cubaan dengan bajet menunggu terkumpul (lalai 60 minit) — sesuai untuk video panjang dalam baris gilir. Kadar cubaan tidak berubah; nilai lalai boleh diubah dalam Tetapan.",
+  "featureTip.next": "Seterusnya",
+  "featureTip.gotit": "Faham",
+  "featureTip.skip": "Langkau"
 }

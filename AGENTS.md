@@ -32,6 +32,8 @@
 >   - 路径 R（默认）：每段 `images[]` 带系统板；路径 K（`link_shots`）：逐段先画首/尾帧（`SceneTask.first_frame_file/end_frame_file`），视频只提交 `first_frame`/`last_frame`；钩子 `MultiScenePipeline._get_scene_ref_images/_get_scene_keyframes`
 >   - 逐场景补图：`POST /api/tasks/{id}/scene-refs`（**仅**暂停在 `references` 检查点时可用；409/422/额度）；稿件 `pause_for_scene_refs` 自动把 `references` 加进 `pause_points`
 >   - 前端共享组件 `frontend/src/components/shared/RefImagesInput.vue`；上传单文件上限 `AGNES_UPLOAD_MAX_MB`（默认 10）；单测 `tests/test_ref_slots.py`，回归 `docs/dev/regression_test_plan.md` §十八 `MR*`
+> - 重试开关首次引导（v8.5）：`docs/plans/v8.5/feature_tip_PRD.md`（进度页重试面板首次出现时两步气泡：快速重试 → 长任务模式；`localStorage['wb_tip_retry_modes_seen']` 跨任务只弹一次）
+>   - 组件 `frontend/src/components/shared/FeatureTip.vue`（通用分步气泡，文案由父组件传入）+ `FastRetryPanel.vue` 接入；22 语言 `featureTip.*`；埋点 `feature_tip*`
 > - 快速重试自动接力（v8.4）：`docs/plans/v8.4/fast_retry_chain_PRD.md`（一轮到期后回常规节奏重试 X 分钟，满 X 分钟的下一个忙信号处自动再开一轮）
 >   - 参数「两轮间隔 X」：任务级 `POST /api/tasks/{id}/fast-retry` 的 `interval_minutes` + 全局 `POST /api/config/fast-retry`；默认 5 分钟（1–60）
 >   - 状态 `models/task.py::FastRetryConfig` 的 `interval_minutes` / `chain_pending` / `chain_started_at` / `rounds`；接力判定 `core/pipelines/__init__.py::_PipelineFastRetryHook._chain_due`；单测 `tests/test_fast_retry_chain.py`

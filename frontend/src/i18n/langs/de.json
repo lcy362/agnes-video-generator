@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "Aus",
   "longTask.saved": "Gespeichert",
   "fastRetry.interval": "Intervall (Min.)",
-  "fastRetry.chainHint": "Normales Tempo wieder aktiv; nächste Runde in ca. {i} Min."
+  "fastRetry.chainHint": "Normales Tempo wieder aktiv; nächste Runde in ca. {i} Min.",
+  "featureTip.retryTitle": "Schnelle Wiederholung",
+  "featureTip.retryBody": "Bei voller Upstream-Warteschlange wird mit fester Rate wiederholt (z. B. 30-mal pro Minute für 3 Minuten). Danach gilt wieder das normale Tempo, die nächste Runde startet nach dem eingestellten Intervall.",
+  "featureTip.longTaskTitle": "Langlaufmodus",
+  "featureTip.longTaskBody": "Ersetzt die Obergrenze der Versuche durch ein Wartebudget (standardmäßig 60 Min.) – praktisch für lange Videos in der Warteschlange. Die Rate bleibt gleich; den Standard änderst du in den Einstellungen.",
+  "featureTip.next": "Weiter",
+  "featureTip.gotit": "Verstanden",
+  "featureTip.skip": "Überspringen"
 }

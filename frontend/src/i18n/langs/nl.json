@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "Uit",
   "longTask.saved": "Opgeslagen",
   "fastRetry.interval": "Interval (min)",
-  "fastRetry.chainHint": "Normaal tempo hervat; volgende ronde over ~{i} min"
+  "fastRetry.chainHint": "Normaal tempo hervat; volgende ronde over ~{i} min",
+  "featureTip.retryTitle": "Snel opnieuw proberen",
+  "featureTip.retryBody": "Bij een volle wachtrij wordt op de ingestelde frequentie opnieuw geprobeerd (bijv. 30 keer per minuut gedurende 3 minuten). Daarna geldt weer het normale tempo en start de volgende ronde na het ingestelde interval.",
+  "featureTip.longTaskTitle": "Langetaakmodus",
+  "featureTip.longTaskBody": "Vervangt de pogingslimiet door een wachtbudget (standaard 60 min) — handig voor lange video's in de wachtrij. De frequentie blijft gelijk; de standaard wijzig je in Instellingen.",
+  "featureTip.next": "Volgende",
+  "featureTip.gotit": "Begrepen",
+  "featureTip.skip": "Overslaan"
 }

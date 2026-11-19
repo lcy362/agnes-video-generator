@@ -861,5 +861,12 @@
   "longTask.autoOffShort": "Désactivé",
   "longTask.saved": "Enregistré",
   "fastRetry.interval": "Intervalle (min)",
-  "fastRetry.chainHint": "Cadence normale reprise ; prochaine série dans ~{i} min"
+  "fastRetry.chainHint": "Cadence normale reprise ; prochaine série dans ~{i} min",
+  "featureTip.retryTitle": "Nouvelle tentative rapide",
+  "featureTip.retryBody": "Quand la file amont est saturée, les tentatives s'enchaînent à la fréquence choisie (par ex. 30 fois par minute pendant 3 minutes). Ensuite le rythme normal revient et la série suivante démarre après l'intervalle défini.",
+  "featureTip.longTaskTitle": "Mode tâche longue",
+  "featureTip.longTaskBody": "Remplace la limite du nombre de tentatives par un budget d'attente (60 min par défaut) — pratique pour les vidéos longues en file. La fréquence ne change pas ; la valeur par défaut se règle dans les paramètres.",
+  "featureTip.next": "Suivant",
+  "featureTip.gotit": "Compris",
+  "featureTip.skip": "Ignorer"
 }
