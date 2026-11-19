@@ -29,7 +29,7 @@ from core.api.fast_retry import (
     clamp_interval_minutes,
 )
 from core.api.key_manager import get_key_ring, key_fingerprint
-from core.api.long_task import LONG_TASK_DEFAULT_MINUTES, clamp_timeout_minutes
+from core.api.long_task import LONG_TASK_DEFAULT_MINUTES
 from core.async_io import read_text, write_text
 from core.compositor.ffmpeg_tool import probe_duration, resolve_cmd_binary
 from core.compositor.watermark import add_watermark, detect_language

@@ -1106,9 +1106,7 @@ def get_fast_retry_config() -> dict:
     """
     # 延迟导入：core.config ↔ core.api 存在循环依赖（core.api.__init__ 会
     # 导入 agnes_video 等，后者反向 import core.config），顶层导入会炸。
-    from core.api.fast_retry import clamp_params
-
-    from core.api.fast_retry import clamp_interval_minutes
+    from core.api.fast_retry import clamp_interval_minutes, clamp_params
 
     settings = get_settings()
     raw = load_config().get("fast_retry") or {}
