@@ -33,8 +33,10 @@ from core.pipelines.ref_slots import (
 )
 from models.task import SceneTask, StepStatus
 from utils.network import (
+    describe_fatal_error,
     describe_network_error,
     describe_queue_full_error,
+    fatal_error_details,
     queue_full_message_params,
 )
 
@@ -202,11 +204,18 @@ class MultiScenePipeline(BasePipeline):
             # v7.0 U1：队列满优先走结构化提示（前端按 22 语言渲染，后端给 zh/en 兜底）
             message = (
                 describe_queue_full_error(e, lang=self._ui_lang())
+                or describe_fatal_error(e, lang=self._ui_lang())
                 or describe_network_error(e, lang=self._ui_lang())
                 or str(e)
             )
             message_key = "error.video.queue_full" if queue_full_message_params(e) else None
             message_params = queue_full_message_params(e) or None
+            if not message_key:
+                # v8.3：明确不可重试的上游报错（401/400/404…）下发结构化最终结果
+                fkey, fparams = fatal_error_details(e)
+                if fkey:
+                    message_key = fkey
+                    message_params = fparams
             failed_step = self._state.current_step if self._state else ""
             # 持久化完整 traceback，供诊断端点/前端反馈报告暴露（定位环境级异常如 [WinError 2]）
             self._state.status = StepStatus.FAILED

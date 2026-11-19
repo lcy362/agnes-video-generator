@@ -24,8 +24,12 @@ _ENCODING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
     max_workers=2, thread_name_prefix="encoding"
 )
 
-from core.api.fast_retry import FAST_RETRY_AVAILABLE_AFTER
+from core.api.fast_retry import (
+    FAST_RETRY_AVAILABLE_AFTER,
+    clamp_interval_minutes,
+)
 from core.api.key_manager import get_key_ring, key_fingerprint
+from core.api.long_task import LONG_TASK_DEFAULT_MINUTES, clamp_timeout_minutes
 from core.async_io import read_text, write_text
 from core.compositor.ffmpeg_tool import probe_duration, resolve_cmd_binary
 from core.compositor.watermark import add_watermark, detect_language
@@ -232,6 +236,14 @@ class _PipelineFastRetryHook:
             return None
 
         if not cfg.enabled:
+            # v8.4：上一轮到期后先进入「等待接力」——常规忙轨继续重试，
+            # 累计满 interval_minutes 分钟就自动再开一轮（不需要用户再点）。
+            if self._chain_due(cfg):
+                cfg.rounds = int(cfg.rounds or 0) + 1
+                return self._start_fast_retry(
+                    cfg, cfg.per_minute, cfg.minutes,
+                    auto_started=True, payload=payload, chained=True,
+                )
             cfg.consecutive_busy += 1
             if cfg.consecutive_busy >= FAST_RETRY_AVAILABLE_AFTER:
                 # v8.0：设置页开了「自动快速重试」→ 到条件直接开跑。
@@ -240,7 +252,8 @@ class _PipelineFastRetryHook:
                 auto = None if cfg.auto_off else self._auto_params()
                 if auto is not None:
                     return self._start_fast_retry(
-                        cfg, auto[0], auto[1], auto_started=True, payload=payload
+                        cfg, auto[0], auto[1], auto_started=True,
+                        payload=payload, interval_minutes=auto[2],
                     )
                 if not cfg.available:
                     cfg.available = True
@@ -274,12 +287,18 @@ class _PipelineFastRetryHook:
             cfg.enabled = False
             cfg.auto = False
             cfg.finished_reason = "expired"
-            # 清零连续计数：到期后需要重新累计 2 次忙信号才会再次自动开启，
-            # 避免「到期即重开」在自动模式下变成无缝连打。
+            # 清零连续计数：接力按「间隔 X 分钟」判定，不依赖连续忙信号次数
             cfg.consecutive_busy = 0
+            # v8.4：进入等待接力状态——X 分钟后自动再开一轮
+            cfg.chain_pending = True
+            cfg.chain_started_at = datetime.now().isoformat(timespec="seconds")
             p._save_fast_retry()
             p._emit_fast_retry(
-                "progress.video.fast_retry.expired", {"y": int(cfg.minutes or 1)}
+                "progress.video.fast_retry.expired",
+                {
+                    "y": int(cfg.minutes or 1),
+                    "x": int(cfg.interval_minutes or 0),
+                },
             )
             logger.info(
                 "[FastRetry] Task %s: expired after %s (limit %ds), "
@@ -294,7 +313,7 @@ class _PipelineFastRetryHook:
         """读设置页的全局自动配置：未开启（或读取失败）返回 None。
 
         Returns:
-            ``(per_minute, minutes)`` 或 ``None``。
+            ``(per_minute, minutes, interval_minutes)`` 或 ``None``。
         """
         try:
             cfg = get_fast_retry_config()
@@ -304,13 +323,35 @@ class _PipelineFastRetryHook:
         if not cfg.get("auto"):
             return None
         try:
-            return int(cfg.get("per_minute") or 30), int(cfg.get("minutes") or 3)
+            return (
+                int(cfg.get("per_minute") or 30),
+                int(cfg.get("minutes") or 3),
+                clamp_interval_minutes(cfg.get("interval_minutes")),
+            )
         except (TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _chain_due(cfg) -> bool:
+        """v8.4：上一轮到期后是否已等满「两轮间隔 X 分钟」。
+
+        计时从**到期时刻**（``chain_started_at``）起算：期间常规忙轨按原节奏
+        继续重试，到点后由 :meth:`decide` 自动再开一轮。
+        """
+        if not getattr(cfg, "chain_pending", False):
+            return False
+        elapsed = _fast_retry_elapsed(getattr(cfg, "chain_started_at", ""))
+        if elapsed is None:
+            return False
+        interval = int(getattr(cfg, "interval_minutes", 0) or 0)
+        if interval <= 0:
+            interval = 5
+        return elapsed >= interval * 60
 
     def _start_fast_retry(
         self, cfg, per_minute: int, minutes: int, *,
         auto_started: bool, payload: Optional[dict] = None,
+        interval_minutes: Optional[int] = None, chained: bool = False,
     ) -> float:
         """统一入口：把本次快速模式写进任务状态并返回首跳间隔。
 
@@ -318,8 +359,10 @@ class _PipelineFastRetryHook:
             cfg: 任务状态的 ``fast_retry`` 配置。
             per_minute: 每分钟次数 x。
             minutes: 持续分钟数 y。
-            auto_started: True = 由全局设置自动触发（消息与标记都区分来源）。
+            auto_started: True = 非用户点击触发（自动模式或接力）。
             payload: 触发本次开启的忙信号（仅用于日志）。
+            interval_minutes: 两轮间隔 X（``None`` = 保留当前值）。
+            chained: True = 由上一轮到期后的自动接力开启（消息单独区分）。
 
         Returns:
             本跳的快速模式间隔（秒）。
@@ -330,21 +373,36 @@ class _PipelineFastRetryHook:
         cfg.auto = auto_started
         cfg.per_minute = int(per_minute)
         cfg.minutes = int(minutes)
+        if interval_minutes is not None:
+            cfg.interval_minutes = clamp_interval_minutes(interval_minutes)
+        # 接力状态在本轮开始时清空（到期时会重新置位）
+        cfg.chain_pending = False
+        cfg.chain_started_at = ""
         cfg.attempts = 0              # 每轮开启重新计数（面板「已发 N 次」）
         cfg.started_at = datetime.now().isoformat(timespec="seconds")
         cfg.finished_reason = ""
         self._last_attempts_save = 0.0   # 首跳立即落盘
         p._save_fast_retry()
-        p._emit_fast_retry(
-            "progress.video.fast_retry.auto" if auto_started
-            else "progress.video.fast_retry.active",
-            {"x": cfg.per_minute, "y": cfg.minutes},
-        )
+        if chained:
+            message_key = "progress.video.fast_retry.chain"
+            params = {
+                "x": cfg.per_minute, "y": cfg.minutes,
+                "n": int(cfg.rounds or 0), "i": int(cfg.interval_minutes or 5),
+            }
+        else:
+            message_key = (
+                "progress.video.fast_retry.auto" if auto_started
+                else "progress.video.fast_retry.active"
+            )
+            params = {"x": cfg.per_minute, "y": cfg.minutes}
+        p._emit_fast_retry(message_key, params)
         logger.info(
-            "[FastRetry] Task %s: started %s x=%d/min y=%dmin "
+            "[FastRetry] Task %s: started %s x=%d/min y=%dmin round=%d "
             "(HTTP %s · %s)",
-            p.task_id, "automatically" if auto_started else "by user",
-            cfg.per_minute, cfg.minutes,
+            p.task_id,
+            ("by chain after %dmin" % cfg.interval_minutes) if chained
+            else ("automatically" if auto_started else "by user"),
+            cfg.per_minute, cfg.minutes, int(cfg.rounds or 0),
             (payload or {}).get("status"), (payload or {}).get("code") or "-",
         )
         return cfg.interval_seconds
@@ -403,6 +461,8 @@ class _PipelineFastRetryHook:
         cfg.consecutive_busy = 0
         cfg.available = False
         cfg.auto = False
+        cfg.chain_pending = False      # v8.4：成功即结束接力
+        cfg.chain_started_at = ""
         if probe:
             cfg.attempts = int(probe)
         if was_enabled:
@@ -416,6 +476,110 @@ class _PipelineFastRetryHook:
             logger.info(
                 "[FastRetry] Task %s: submitted successfully in fast mode", p.task_id
             )
+
+
+class _PipelineLongTaskHook:
+    """v8.3 长任务模式钩子：把「预算消耗 / 到期 / 不可重试收尾」落到任务状态。
+
+    与 :class:`_PipelineFastRetryHook` 的分工：快速重试只改**节奏**，本钩子只改
+    **总预算**（累计忙轨等待秒数），两者互不覆盖，可同时开启。
+
+    - ``notify_busy``：每次忙信号按 ``waited_s`` 的**增量**累加。多段流水线里每段
+      都会新建 ``BusyTracker``（``waited_s`` 从 0 重新计），用「回绕视为新 tracker」
+      处理，保证跨段累计正确、且不会因为渲染耗时被误计。
+    - ``allow_extend``：常规忙轨次数耗尽时被调用；True 表示还有预算，继续按原节奏
+      重试（间隔不变）。
+    - ``on_fatal``：错误分类表判定不可重试时收尾，便于面板显示原因。
+
+    落盘节流 5s：长任务模式一次可能跑一小时，逐跳写盘没有意义；状态切换
+    （到期 / 不可重试 / 用户开关）立即落盘。
+    """
+
+    #: 累计等待落盘节流（秒）
+    _SAVE_INTERVAL = 5.0
+
+    def __init__(self, pipeline):
+        self._pipeline = pipeline
+        # 本段 BusyTracker 上一次上报的 waited_s（用于算增量）
+        self._last_waited = 0.0
+        self._last_save = 0.0
+
+    def _cfg(self):
+        return getattr(getattr(self._pipeline, "_state", None), "long_task", None)
+
+    def notify_busy(self, payload: dict) -> None:
+        """累计本次忙信号的等待增量（未开启时立即返回）。"""
+        cfg = self._cfg()
+        try:
+            waited = float(payload.get("waited_s") or 0.0)
+        except (TypeError, ValueError):
+            return
+        if cfg is None or not cfg.enabled:
+            # 未开启时只记录游标：用户中途开启后，此前已经等过的时间不计入预算
+            self._last_waited = waited
+            return
+        prev = self._last_waited
+        # waited_s 回绕（新一段 / 新提交循环）→ 视为新 tracker，增量取本次全部
+        delta = waited - prev if waited >= prev else waited
+        self._last_waited = waited
+        if delta <= 0:
+            return
+        cfg.waited_s = float(cfg.waited_s or 0.0) + delta
+        if not cfg.started_at:
+            cfg.started_at = datetime.now().isoformat(timespec="seconds")
+        if cfg.waited_s >= cfg.budget_s:
+            self._expire(cfg)
+            return
+        self._save_throttled()
+
+    def allow_extend(self, payload: dict) -> bool:
+        """忙轨次数耗尽时判定：是否还有预算继续重试。"""
+        cfg = self._cfg()
+        if cfg is None or not cfg.enabled:
+            return False
+        if float(cfg.waited_s or 0.0) >= cfg.budget_s:
+            self._expire(cfg)
+            return False
+        return True
+
+    def on_fatal(self, reason: str) -> None:
+        """不可重试错误即将抛出：关闭开关并记录原因（面板可见）。"""
+        cfg = self._cfg()
+        if cfg is None or not cfg.enabled:
+            return
+        cfg.enabled = False
+        cfg.last_reason = reason or ""
+        cfg.finished_reason = "non_retryable"
+        p = self._pipeline
+        p._save_long_task()
+        p._emit_long_task(
+            "progress.video.long_task.non_retryable", {"reason": reason or ""}
+        )
+        logger.info(
+            "[LongTask] Task %s: stopped on non-retryable error (%s)",
+            p.task_id, reason or "-",
+        )
+
+    def _expire(self, cfg) -> None:
+        """预算耗尽：关闭开关并推送用户可见消息。"""
+        cfg.enabled = False
+        cfg.finished_reason = "expired"
+        p = self._pipeline
+        p._save_long_task()
+        minutes = int(cfg.timeout_minutes or LONG_TASK_DEFAULT_MINUTES)
+        p._emit_long_task("progress.video.long_task.expired", {"y": minutes})
+        logger.info(
+            "[LongTask] Task %s: budget exhausted after %.0fs (limit %dmin), "
+            "back to normal busy track",
+            p.task_id, float(cfg.waited_s or 0.0), minutes,
+        )
+
+    def _save_throttled(self) -> None:
+        now = time.monotonic()
+        if now - self._last_save < self._SAVE_INTERVAL:
+            return
+        self._last_save = now
+        self._pipeline._save_long_task()
 
 
 class BasePipeline(ABC):
@@ -752,6 +916,8 @@ class BasePipeline(ABC):
             return
         hooks = {
             "fast_retry_hook": _PipelineFastRetryHook(self),
+            # v8.3 长任务模式：只改忙轨预算（次数封顶 → 累计等待时长），节奏不变
+            "long_task_hook": _PipelineLongTaskHook(self),
             "on_task_key_bound": self._on_task_key_bound,
             "key_hint_resolver": self._resolve_video_key_hint,
             "poll_progress_hook": self._on_poll_progress,
@@ -875,6 +1041,17 @@ class BasePipeline(ABC):
 
     def _emit_fast_retry(self, message_key: str, params: dict) -> None:
         """v7.7 快速重试：兼容入口（实际推送统一走 ``_emit_status_message``）。"""
+        self._emit_status_message(message_key, params)
+
+    def _save_long_task(self) -> None:
+        """v8.3 长任务模式：把当前内存状态落盘（与 ``_save_fast_retry`` 同口径）。"""
+        try:
+            self.task_manager.update_state()
+        except Exception as e:
+            logger.debug(f"[LongTask] persist failed: {e}")
+
+    def _emit_long_task(self, message_key: str, params: dict) -> None:
+        """v8.3 长任务模式：推送一条用户可见状态消息。"""
         self._emit_status_message(message_key, params)
 
     @abstractmethod

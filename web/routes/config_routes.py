@@ -38,6 +38,7 @@ from core.config import (
     get_api_keys_source,
     get_api_keys_with_sources,
     get_fast_retry_config,
+    get_long_task_config,
     get_image_model_capabilities,
     get_selected_models,
     get_selected_text_provider,
@@ -55,6 +56,7 @@ from core.config import (
     set_api_key_enabled,
     set_api_keys,
     set_fast_retry_config,
+    set_long_task_config,
     set_selected_models,
     set_selected_text_provider,
     set_watermark_config,
@@ -95,6 +97,7 @@ async def get_config():
         "agnes_domains": list(AGNES_DOMAIN_MAP.keys()),
         # v8.0：快速重试模式全局设置（auto=到条件自动开启，无需用户在任务页点）
         "fast_retry": get_fast_retry_config(),
+        "long_task": get_long_task_config(),
     }
     return data
 
@@ -672,6 +675,7 @@ async def save_fast_retry_config(
     auto: bool = Form(False),
     per_minute: int = Form(0),
     minutes: int = Form(0),
+    interval_minutes: int = Form(0),
 ):
     """保存「快速重试模式」全局设置（v8.0）。
 
@@ -686,6 +690,7 @@ async def save_fast_retry_config(
         auto: 是否到条件自动开启。
         per_minute: 每分钟次数 x（0 = 保留原值；越界自动收敛到 1–120）。
         minutes: 持续分钟数 y（0 = 保留原值；越界自动收敛到 1–30）。
+        interval_minutes: 两轮之间的常规节奏间隔 X（0 = 保留原值；1–60）。
 
     Returns:
         ``{"ok": True, "fast_retry": {"auto", "per_minute", "minutes"}}``
@@ -712,16 +717,68 @@ async def save_fast_retry_config(
             ymin=FAST_RETRY_MIN_MINUTES, ymax=FAST_RETRY_MAX_MINUTES,
         ))
 
+    from core.api.fast_retry import (
+        FAST_RETRY_MAX_INTERVAL_MINUTES,
+        FAST_RETRY_MIN_INTERVAL_MINUTES,
+    )
+
+    if interval_minutes and not (
+        FAST_RETRY_MIN_INTERVAL_MINUTES <= interval_minutes <= FAST_RETRY_MAX_INTERVAL_MINUTES
+    ):
+        raise HTTPException(status_code=422, detail=translate(
+            "fast_retry.invalid_interval", None,
+            imin=FAST_RETRY_MIN_INTERVAL_MINUTES,
+            imax=FAST_RETRY_MAX_INTERVAL_MINUTES,
+        ))
+
     entry = set_fast_retry_config(
         auto=auto,
         per_minute=per_minute or None,
         minutes=minutes or None,
+        interval_minutes=interval_minutes or None,
     )
     logger.info(
-        "[FastRetry] Global settings saved: auto=%s x=%d/min y=%dmin",
-        entry["auto"], entry["per_minute"], entry["minutes"],
+        "[FastRetry] Global settings saved: auto=%s x=%d/min y=%dmin interval=%dmin",
+        entry["auto"], entry["per_minute"], entry["minutes"], entry["interval_minutes"],
     )
     return {"ok": True, "fast_retry": entry}
+
+
+@router.post("/api/config/long-task")
+async def save_long_task_config(
+    enabled: bool = Form(False),
+    minutes: int = Form(0),
+):
+    """保存「长任务模式」全局默认（v8.3）。
+
+    设置页的这份配置**跨任务**生效：``enabled=True`` 时，此后新建的视频任务
+    自动带上长任务模式与 ``minutes`` 超时（忙轨次数封顶 → 累计等待时长封顶，
+    重试节奏不变）。
+
+    与任务页的关系：进度页只能**开启**（不提供关闭），避免误关；关闭统一走
+    本设置或任务自然结束（成功 / 到期）。
+
+    Args:
+        enabled: 新任务是否默认开启长任务模式。
+        minutes: 默认超时分钟数（0 = 保留原值；越界 422）。
+
+    Returns:
+        ``{"ok": True, "long_task": {"enabled", "minutes"}}``
+    """
+    from core.api.long_task import LONG_TASK_MAX_MINUTES, LONG_TASK_MIN_MINUTES
+
+    if minutes and not (LONG_TASK_MIN_MINUTES <= minutes <= LONG_TASK_MAX_MINUTES):
+        raise HTTPException(status_code=422, detail=translate(
+            "long_task.invalid_range", None,
+            ymin=LONG_TASK_MIN_MINUTES, ymax=LONG_TASK_MAX_MINUTES,
+        ))
+
+    entry = set_long_task_config(enabled=enabled, minutes=minutes or None)
+    logger.info(
+        "[LongTask] Global settings saved: enabled=%s minutes=%d",
+        entry["enabled"], entry["minutes"],
+    )
+    return {"ok": True, "long_task": entry}
 
 
 @router.post("/api/config/domain")

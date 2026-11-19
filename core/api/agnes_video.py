@@ -13,6 +13,7 @@ from typing import List, Optional
 import requests
 
 from core.api.error_collector import collect_error, collect_error_from_exception
+from core.api.error_taxonomy import classify
 from core.api.key_manager import get_key_ring, key_fingerprint
 from core.api.rate_limiter import get_rate_limiter, get_video_submit_limiter
 from core.api.retry_policy import (
@@ -215,6 +216,29 @@ class AgnesQueueFullError(RuntimeError):
         self.queue_full_waited_s = waited_s
 
 
+class UpstreamFatalError(RuntimeError):
+    """v8.3：上游明确「重试不会成功」的报错——立即结束重试，返回最终结果。
+
+    判定与文案都来自 :mod:`core.api.error_taxonomy`：``reason`` 是稳定 id（统计用），
+    ``message_key`` 是前端 22 语言 key（后端 :mod:`core.i18n_backend` 只给 zh/en 兜底句）。
+
+    典型场景：401 Key 无效 / 403 无权限 / 404 接口不存在 / 400 参数被拒 /
+    413 内容过大 / 422 校验失败 / 内容审核拦截。此前这些错误会走故障轨重试或
+    在长任务模式下被反复重打，既浪费配额又拖延用户拿到结论的时间。
+    """
+
+    def __init__(self, status: int, code: str, reason: str,
+                 message_key: str = "", message_params: Optional[dict] = None):
+        detail = f"HTTP {status}" + (f" · {code}" if code else "")
+        super().__init__(f"Agnes video upstream rejected the request ({detail}, {reason}); "
+                         f"retrying will not help")
+        self.fatal_status = status
+        self.fatal_code = code
+        self.fatal_reason = reason
+        self.fatal_message_key = message_key
+        self.fatal_message_params = dict(message_params or {})
+
+
 class VideoTaskCancelled(RuntimeError):
     """用户停止任务导致的取消（优化路线图 0.2）。
 
@@ -368,6 +392,9 @@ class AgnesVideoAPI:
         # v7.7 快速重试模式：由流水线注入的可选钩子（见 core/api/fast_retry.py）。
         # 默认 None = 完全走原有忙轨节奏，行为与引入本功能前一致（零回归）。
         self.fast_retry_hook = None
+        # v8.3 长任务模式：把忙轨「次数封顶」扩展为「累计等待时长封顶」的钩子。
+        # 默认 None = 与未引入该功能前完全一致（15 次后按原逻辑失败）。
+        self.long_task_hook = None
         # 快速模式下的探测计数（仅用于 collect_error 降采样）
         self._fast_retry_probes = 0
         # ── v7.8：轮询健壮性钩子（全部由流水线注入，默认 None = 零回归）──
@@ -501,6 +528,59 @@ class AgnesVideoAPI:
                 logger.warning(f"[FastRetry] hook on_success() failed: {e}")
         except Exception as e:
             logger.warning(f"[FastRetry] hook on_success() failed: {e}")
+
+    # ── v8.3 长任务模式（忙轨次数封顶 → 累计等待时长封顶）──────────────
+
+    def _long_task_notify_busy(self, payload: dict) -> None:
+        """把一次忙信号交给钩子（用于累计等待时长，默认空操作）。"""
+        hook = self.long_task_hook
+        if hook is None:
+            return
+        try:
+            hook.notify_busy(payload)
+        except Exception as e:  # 计时失败绝不打断提交循环
+            logger.debug(f"[LongTask] hook notify_busy() failed: {e}")
+
+    def _long_task_allow_extend(self, payload: dict) -> bool:
+        """忙轨次数耗尽时询问钩子：是否可以继续重试。
+
+        Returns:
+            True = 长任务模式开启且预算未耗尽（继续按原节奏重试）；
+            False = 未开启 / 已到期 / 钩子异常（走既有失败路径）。
+        """
+        hook = self.long_task_hook
+        if hook is None:
+            return False
+        try:
+            return bool(hook.allow_extend(payload))
+        except Exception as e:
+            # 判定失败必须保守：按「不允许延长」处理，保持 v8.2 的失败行为
+            logger.warning(f"[LongTask] hook allow_extend() failed, fallback to fail: {e}")
+            return False
+
+    def _long_task_notify_fatal(self, reason: str) -> None:
+        """不可重试错误即将抛出：通知钩子收尾（可选）。"""
+        hook = self.long_task_hook
+        if hook is None:
+            return
+        try:
+            hook.on_fatal(reason)
+        except Exception as e:
+            logger.debug(f"[LongTask] hook on_fatal() failed: {e}")
+
+    def _raise_fatal(self, status: int, code: str, rule, context: str) -> None:
+        """按分类表结果抛出「不再重试」的最终错误（永不返回）。"""
+        self._long_task_notify_fatal(rule.reason)
+        params = {"status": status, "code": code or "", "reason": rule.reason}
+        logger.error(
+            "[AgnesVideo] %s: non-retryable upstream error (HTTP %s%s, reason=%s)",
+            context, status, f" · {code}" if code else "", rule.reason,
+        )
+        raise UpstreamFatalError(
+            status=status, code=code, reason=rule.reason,
+            message_key=rule.message_key or "",
+            message_params=params,
+        )
 
     def _path_to_b64(self, path: str) -> str:
         with open(path, "rb") as f:
@@ -1066,6 +1146,14 @@ class AgnesVideoAPI:
                                 f"max {busy.max_attempts} attempts)"
                             )
                         waited = busy.waited_s
+                        # v8.3 长任务模式：累计忙轨等待时长（未开启时钩子内部直接返回，
+                        # 不影响任何既有节奏与日志）
+                        self._long_task_notify_busy({
+                            "status": resp.status_code,
+                            "code": code,
+                            "retries": busy.retries,
+                            "waited_s": waited,
+                        })
                         if resp.status_code == 429:
                             error_type = "RateLimit429"
                             error_message = "HTTP 429: rate limited"
@@ -1139,6 +1227,25 @@ class AgnesVideoAPI:
 
                         # 快速模式到期/被关闭：本跳起恢复常规忙轨（含令牌桶节奏）
                         fast_gap = 0.0
+                        if busy.exhausted() and self._long_task_allow_extend({
+                                "status": resp.status_code, "code": code,
+                                "retries": busy.retries, "waited_s": waited}):
+                            # v8.3 长任务模式：次数封顶失效，**间隔与节奏不变**，
+                            # 只把总预算换成「累计忙轨等待时长」（由钩子判定）。
+                            busy.retries += 1
+                            delay = busy_delay(
+                                _QUEUE_RETRY_BASE_DELAY, _QUEUE_RETRY_JITTER,
+                                busy.retries - 1,
+                            )
+                            logger.warning(
+                                f"[AgnesVideo] {mode_desc}: long-task mode keeps retrying "
+                                f"(HTTP {resp.status_code}"
+                                f"{f' · {code}' if code else ''}), retry "
+                                f"#{busy.retries}, waited {waited:.0f}s, "
+                                f"next in {delay:.0f}s"
+                            )
+                            await asyncio.sleep(delay)
+                            continue
                         if busy.exhausted():
                             collect_error(
                                 "video", "submit_video",
@@ -1284,6 +1391,14 @@ class AgnesVideoAPI:
                     retry_count=attempt + 1,
                     extra={"mode": mode_desc},
                 )
+                # v8.3：明确不可重试的 4xx（401/403/404/413/422/400 参数类）直接
+                # 返回最终结果，不再走故障轨或长任务模式的预算
+                _fatal_code, _ = _upstream_error(resp)
+                rule = classify(resp.status_code, _fatal_code, error_text)
+                if not rule.retryable:
+                    self._raise_fatal(
+                        resp.status_code, _fatal_code, rule, f"{mode_desc} submit"
+                    )
                 raise RuntimeError(f"Agnes video submit failed (HTTP {resp.status_code}): {error_text}")
 
             except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,

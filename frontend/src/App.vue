@@ -133,6 +133,13 @@ onMounted(async () => {
         minutes: cfg.fast_retry.minutes || 3,
       }
     }
+    // v8.3：长任务模式全局默认（设置页开关 + 默认超时；缺失时保持默认关闭）
+    if (cfg.long_task) {
+      appState.longTaskSettings = {
+        enabled: !!cfg.long_task.enabled,
+        minutes: cfg.long_task.minutes || 60,
+      }
+    }
     await loadModels()
     isConfigLoaded.value = true
   } catch (e) {

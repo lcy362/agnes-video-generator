@@ -168,12 +168,62 @@ class FastRetryConfig(BaseModel):
     finished_reason: str = ""          # "" | success | expired | disabled
     auto: bool = False                 # v8.0：本次由全局设置自动开启
     auto_off: bool = False             # v8.0：本任务内用户手动关过 → 不再自动开启
+    # ── v8.4：两轮之间的自动接力 ──
+    # 一轮到期后回到常规忙轨，累计重试 interval_minutes 分钟后自动再开一轮
+    # （直到提交成功 / 用户手动关闭 / 长任务预算耗尽）。
+    interval_minutes: int = 5          # 两轮间隔 X（1–60 分钟）
+    chain_pending: bool = False        # 上一轮到期后处于「等待接力」状态
+    chain_started_at: str = ""         # 到期时刻（本地 ISO，用于判定 X 分钟是否已到）
+    rounds: int = 0                    # 已自动接力的轮次（面板展示「第 N 轮」）
 
     @property
     def interval_seconds(self) -> float:
         """快速模式的两次请求间隔（秒），下限 0.5s 防止除零/打爆。"""
         per_minute = max(1, int(self.per_minute or 1))
         return max(0.5, 60.0 / per_minute)
+
+
+class LongTaskConfig(BaseModel):
+    """长任务模式（v8.3）：把忙轨的「次数封顶」换成「累计等待时长封顶」。
+
+    与 ``FastRetryConfig`` 的分工：快速重试改**节奏**（多久打一次），本配置改
+    **预算**（总共等多久）。两者可同时开启，互不覆盖。
+
+    预算口径是**累计忙轨等待秒数**（`waited_s`），不是墙钟：视频渲染、分镜、TTS、
+    拼接等时间不计入，多段流水线跨段累计（一个任务一份预算）。到期后回到既有
+    失败路径（队列满 / 上游忙最终结果），不改变任何间隔与次数计算。
+
+    状态机（字段全部有默认值，旧 task_state.json 加载自动补齐）::
+
+        enabled=True → 每次忙信号累计 waited_s（不超过 timeout_minutes × 60）
+        累计耗尽 → enabled=False, finished_reason="expired"
+        任务成功 → finished_reason="success"（预算不再消耗）
+        不可重试错误 → enabled=False, finished_reason="non_retryable"
+        用户关闭 → enabled=False, finished_reason="disabled"
+    """
+
+    enabled: bool = False                # 用户已开启长任务模式
+    timeout_minutes: int = 60            # 总预算（5–480 分钟，默认 1 小时）
+    waited_s: float = 0.0                # 累计忙轨等待秒数（跨段累计）
+    started_at: str = ""                 # 首次忙信号时刻（展示/排查用）
+    finished_reason: str = ""            # "" | expired | success | non_retryable | disabled
+    last_reason: str = ""                # 最近一次终态的分类 reason（error_taxonomy）
+
+    @property
+    def budget_s(self) -> float:
+        """预算秒数（分钟 × 60，非法值回落 ``LONG_TASK_DEFAULT_MINUTES``）。"""
+        # 惰性导入：models 层不依赖 core.api，但默认值必须只有一处（core.api.long_task）
+        from core.api.long_task import LONG_TASK_DEFAULT_MINUTES
+
+        minutes = int(self.timeout_minutes or 0)
+        if minutes <= 0:
+            minutes = LONG_TASK_DEFAULT_MINUTES
+        return float(minutes * 60)
+
+    @property
+    def remaining_s(self) -> float:
+        """剩余预算秒数（可能为 0）。"""
+        return max(0.0, self.budget_s - float(self.waited_s or 0.0))
 
 
 # ═══════════════════════════════════════════════════
@@ -272,6 +322,11 @@ class BaseTaskState(BaseModel):
     # 只在视频提交连续遇到 2 次忙信号（503 / 队列满）后才 available=True，
     # 由用户在进度页显式开启，不影响未开启时的任何既有重试行为。
     fast_retry: FastRetryConfig = Field(default_factory=FastRetryConfig)
+
+    # ── v8.3：长任务模式（默认关闭；旧 JSON 缺字段自动补默认）──
+    # 与快速重试相互独立：快速重试改「节奏」，本配置改「总预算」（累计忙轨等待时长）。
+    # 默认关闭 = 行为与 v8.2 完全一致。
+    long_task: LongTaskConfig = Field(default_factory=LongTaskConfig)
 
     # ── v7.8：视频任务 → 提交 Key 指纹（进程重启后仍能找回轮询用的 Key）──
     # 实测（2026-11-06）：上游视频任务按「账号/Key」隔离，同一 video_id 用

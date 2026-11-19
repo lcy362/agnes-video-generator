@@ -791,4 +791,46 @@ for name, color in [('test_ref.png', (100,150,200)), ('test_end.png', (200,150,1
 
 ---
 
-*文档版本：v3.13 | 更新日期：2026-11-12 | 变更：新增简单图片续传回归（IR1–IR8，Issue #114）*
+## 二十、长任务模式（v8.3，LT*）
+
+> 方案：`docs/plans/v8.3/long_task_mode_PRD.md`；单测：`tests/test_long_task.py`
+
+### 20.1 自动回归（pytest）
+
+| ID | 场景 | 命令 / 断言 |
+|----|------|------------|
+| LT1 | 忙轨次数耗尽后继续重试 | `pytest tests/test_long_task.py -k beyond_busy_cap`：钩子允许延长后越过 `max_attempts` 直到成功 |
+| LT2 | 未开启（钩子拒绝） | `-k disabled_fails_after_busy_cap`：仍抛 `AgnesQueueFullError`（v8.2 行为不变） |
+| LT3 | 不可重试 400 | `-k non_retryable_400`：只发一次请求、抛 `UpstreamFatalError(bad_request)` |
+| LT4 | 401 认证失败 | `-k 401_raises_auth_fatal`：不重试，`fatal_reason=auth_invalid` |
+| LT5 | 钩子异常 | `-k hook_exception`：保守按「不允许延长」处理，不影响提交循环 |
+| LT6 | 端点与续传 | `-k TestLongTaskEndpoint`：默认 60 分钟、越界 422、关闭置 `disabled`、续传保留开关但重置预算 |
+
+### 20.2 端到端（人工）
+
+| ID | 场景 | 验证要点 |
+|----|------|---------|
+| LT7 | 队列饱和 15 分钟后仍不失败 | 开长任务模式（60 分钟）+ 制造持续 503 → 进度页「已等待」持续增长，任务不失败 |
+| LT8 | 快速重试 + 长任务同时开 | 按 x 次/分钟连打，直到成功或累计等待到期；到期后回到常规 15 次上限并给出队列满文案 |
+| LT9 | Key 无效 | 401 → 失败文案为「API Key 无效或无权限」，不再空转重试 |
+| LT10 | 多段任务（creative） | 第 1 段成功后开关保持开启，预算跨段累计（渲染时间不计入） |
+
+---
+
+## 二十一、快速重试自动接力（v8.4，FC*）
+
+> 方案：`docs/plans/v8.4/fast_retry_chain_PRD.md`；单测：`tests/test_fast_retry_chain.py`
+
+| ID | 场景 | 命令 / 断言 |
+|----|------|------------|
+| FC1 | 到期进入接力等待 | `-k expire_enters_chain_wait`：`chain_pending=true`，到期消息带 `x` |
+| FC2 | 未满 X 不接力 | `-k waits_until_interval_elapsed`：`rounds` 不变、仍关闭 |
+| FC3 | 满 X 自动开新一轮 | `-k starts_new_round_after_interval`：`rounds+1`、参数沿用、消息 `chain` |
+| FC4 | 多轮累加 | `-k rounds_increment` |
+| FC5 | 成功停止接力 | `-k success_stops_chain` |
+| FC6 | 端点与边界 | `-k TestFastRetryEndpointInterval`：`interval_minutes` 透传、越界 422、关闭清接力 |
+| FC7 | 与长任务同开（人工） | 队列饱和下观察：接力照常消耗长任务预算，预算耗尽后抛队列满 |
+
+---
+
+*文档版本：v3.15 | 更新日期：2026-11-19 | 变更：新增快速重试自动接力回归（FC1–FC7，v8.4）*

@@ -21,11 +21,13 @@ import { t, tf } from '@/i18n'
 import { appState } from '@/store'
 import { useProgress } from '@/composables/useProgress'
 
-const { fastRetry, setFastRetryMode } = useProgress()
+const { fastRetry, setFastRetryMode, longTask, setLongTaskMode } = useProgress()
 
 // 界面单位：次/分钟（与后端 per_minute 一致，区间 1–120）
 const perMinute = ref(30)
 const minutes = ref(3)
+// v8.4：两轮快速重试之间的常规节奏间隔 X（分钟，默认 5）
+const intervalMinute = ref(5)
 const submitting = ref(false)
 // v8.0：「以后自动」——勾选后本次参数写入设置页的全局设置，此后到条件自动开启
 const remember = ref(false)
@@ -59,6 +61,7 @@ watch(
       paramsSynced = true
     }
     if (v?.minutes) minutes.value = v.minutes
+    if (v?.interval_minutes) intervalMinute.value = v.interval_minutes
   },
   { immediate: true },
 )
@@ -81,7 +84,11 @@ const hint = computed(() => {
   const c = cfg.value
   if (!c) return ''
   if (c.enabled) return tf('fastRetry.remaining', { x: activePerMinute.value, t: remainingText.value })
-  if (c.finished_reason === 'expired') return t('fastRetry.expiredHint')
+  if (c.finished_reason === 'expired') {
+    // v8.4：到期后进入接力等待，X 分钟后自动再开一轮
+    if (c.chain_pending) return tf('fastRetry.chainHint', { i: c.interval_minutes || 5 })
+    return t('fastRetry.expiredHint')
+  }
   return t('fastRetry.desc')
 })
 
@@ -93,14 +100,86 @@ async function toggle() {
     const v = Number(perMinute.value)
     const rate = Number.isFinite(v) && v > 0 ? v : 1
     const perMinuteValue = Math.max(1, Math.min(120, Math.round(rate)))
+    const iv = Number(intervalMinute.value)
+    const intervalValue = Number.isFinite(iv) && iv > 0
+      ? Math.max(1, Math.min(60, Math.round(iv)))
+      : 5
     await setFastRetryMode(
       !enabled.value,
       perMinuteValue,
       minutes.value,
       !enabled.value && remember.value && !autoGlobal.value,
+      intervalValue,
     )
   } finally {
     submitting.value = false
+  }
+}
+
+// ── v8.3 长任务模式 ────────────────────────────────────────────────
+// 与快速重试的分工：快速重试改「节奏」，本模式改「总预算」（累计忙轨等待时长）。
+// 只在视频类任务显示（图片任务没有视频提交忙轨，开了也没有意义）。
+const VIDEO_TASK_TYPES = ['simple', 'creative', 'manuscript', 'anchor', 'poetry']
+const ltCfg = computed(() => longTask.value)
+const ltVisible = computed(
+  () => VIDEO_TASK_TYPES.includes(String(appState.currentTaskType || '')) && !!ltCfg.value,
+)
+const ltEnabled = computed(() => !!ltCfg.value?.enabled)
+// 默认 1 小时；后端 clamp 区间 5–480 分钟
+const ltTimeout = ref(60)
+const ltSubmitting = ref(false)
+
+// 后端下发的配置回填（只在首次同步，避免轮询覆盖用户正在编辑的输入）
+let ltSynced = false
+watch(
+  ltCfg,
+  (v) => {
+    if (!v || ltSynced) return
+    if (v.timeout_minutes) ltTimeout.value = v.timeout_minutes
+    ltSynced = true
+  },
+  { immediate: true },
+)
+
+function fmtDuration(sec: number): string {
+  const s = Math.max(0, Math.round(sec))
+  const m = Math.floor(s / 60)
+  const r = s % 60
+  return `${m}:${String(r).padStart(2, '0')}`
+}
+
+const ltWaitedText = computed(() => fmtDuration(Number(ltCfg.value?.waited_s || 0)))
+const ltRemainingText = computed(() => {
+  const budget = Math.max(1, Number(ltCfg.value?.timeout_minutes || 60)) * 60
+  return fmtDuration(budget - Number(ltCfg.value?.waited_s || 0))
+})
+
+const ltHint = computed(() => {
+  const c = ltCfg.value
+  if (!c) return ''
+  if (c.enabled)
+    return tf('longTask.active', {
+      y: c.timeout_minutes || 60,
+      waited: ltWaitedText.value,
+      left: ltRemainingText.value,
+    })
+  if (c.finished_reason === 'expired') return tf('longTask.expired', { y: c.timeout_minutes || 60 })
+  if (c.finished_reason === 'non_retryable')
+    return tf('longTask.nonRetryable', { reason: c.last_reason || '-' })
+  if (c.finished_reason === 'disabled') return t('longTask.disabled')
+  return t('longTask.desc')
+})
+
+// 进度页只负责「开启本次任务」；关闭统一走设置页（避免误关后长任务白等）
+async function enableLongTask() {
+  if (ltSubmitting.value || ltEnabled.value) return
+  ltSubmitting.value = true
+  try {
+    const v = Number(ltTimeout.value)
+    const timeout = Number.isFinite(v) && v > 0 ? Math.round(v) : 60
+    await setLongTaskMode(true, Math.max(5, Math.min(480, timeout)))
+  } finally {
+    ltSubmitting.value = false
   }
 }
 </script>
@@ -159,6 +238,18 @@ async function toggle() {
           class="field w-20"
         />
       </label>
+      <!-- v8.4：两轮之间的常规节奏间隔 X（到期后回到常规重试 X 分钟，再自动开下一轮） -->
+      <label>
+        <span class="label">{{ t('fastRetry.interval') }}</span>
+        <input
+          v-model.number="intervalMinute"
+          type="number"
+          min="1"
+          max="60"
+          step="1"
+          class="field w-20"
+        />
+      </label>
       <button
         class="btn btn-primary btn-sm"
         :disabled="submitting"
@@ -211,6 +302,64 @@ async function toggle() {
       >
         {{ t('fastRetry.stop') }}
       </button>
+    </div>
+  </div>
+
+  <!-- v8.3 长任务模式：保持现有重试频率，只把总预算延长到设定时长 -->
+  <div v-if="ltVisible" class="mt-4 border-t border-rule pt-4">
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <p class="flex items-center gap-2 text-[12px] font-medium text-ink-2">
+          <span class="h-1.5 w-1.5 rounded-full" style="background: var(--color-accent)"></span>
+          {{ t('longTask.title') }}
+        </p>
+        <p class="mt-1 text-[11px] leading-relaxed text-muted">{{ ltHint }}</p>
+      </div>
+      <button
+        role="switch"
+        :aria-checked="ltEnabled"
+        :aria-label="t('longTask.title')"
+        :disabled="ltSubmitting"
+        class="relative mt-0.5 h-[18px] w-8 shrink-0 rounded-full border transition-colors disabled:opacity-50"
+        :class="ltEnabled ? 'border-accent bg-accent/25' : 'border-rule-2 bg-paper-3'"
+        data-track="long_task_toggle"
+        :data-track-params="JSON.stringify({ to: ltEnabled ? 'off' : 'on' })"
+        @click="enableLongTask"
+      >
+        <span
+          class="absolute top-[2px] h-3 w-3 rounded-full transition-all"
+          :class="ltEnabled ? 'bg-accent' : 'bg-muted'"
+          :style="{ insetInlineStart: ltEnabled ? '16px' : '2px' }"
+        ></span>
+      </button>
+    </div>
+
+    <div v-if="!ltEnabled" class="mt-3 flex flex-wrap items-end gap-3">
+      <label>
+        <span class="label">{{ t('longTask.timeout') }}</span>
+        <input
+          v-model.number="ltTimeout"
+          type="number"
+          min="5"
+          max="480"
+          step="5"
+          class="field w-20"
+        />
+      </label>
+      <button
+        class="btn btn-primary btn-sm"
+        :disabled="ltSubmitting"
+        data-track="long_task_start"
+        @click="enableLongTask"
+      >
+        {{ t('longTask.start') }}
+      </button>
+    </div>
+
+    <div v-else class="mt-3 flex flex-wrap items-center gap-2">
+      <span class="chip chip-accent">
+        {{ tf('longTask.waited', { t: ltWaitedText, left: ltRemainingText }) }}
+      </span>
     </div>
   </div>
 </template>

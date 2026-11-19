@@ -30,7 +30,19 @@ export interface TaskState {
   upstream_errors?: UpstreamError[]
   // v7.7：快速重试模式状态（连续 2 次 503 后 available=true，用户开启后 enabled=true）
   fast_retry?: FastRetryState
+  // v8.3：长任务模式状态（忙轨次数封顶 → 累计等待时长封顶）
+  long_task?: LongTaskState
   [key: string]: any
+}
+
+// v8.3 长任务模式（后端 models/task.py::LongTaskConfig 对齐）
+export interface LongTaskState {
+  enabled?: boolean
+  timeout_minutes?: number
+  waited_s?: number
+  started_at?: string
+  finished_reason?: '' | 'expired' | 'success' | 'non_retryable' | 'disabled' | string
+  last_reason?: string
 }
 
 // v7.7 快速重试模式（后端 models/task.py::FastRetryConfig 对齐）
@@ -46,6 +58,10 @@ export interface FastRetryState {
   // v8.0：本次是否由「设置页自动快速重试」触发 / 用户本轮是否手动关过
   auto?: boolean
   auto_off?: boolean
+  // v8.4：两轮之间的常规节奏间隔 X（分钟）、接力等待状态、已接力轮次
+  interval_minutes?: number
+  chain_pending?: boolean
+  rounds?: number
 }
 
 // v8.0：快速重试全局设置（设置页 → /api/config.fast_retry）
@@ -53,6 +69,8 @@ export interface FastRetrySettings {
   auto: boolean
   per_minute: number
   minutes: number
+  /** v8.4：两轮快速重试之间的常规节奏间隔（分钟） */
+  interval_minutes?: number
 }
 
 export interface UpstreamError {

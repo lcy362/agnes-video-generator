@@ -46,11 +46,15 @@
 
 __all__ = [
     "FAST_RETRY_AVAILABLE_AFTER",
+    "FAST_RETRY_DEFAULT_INTERVAL_MINUTES",
+    "FAST_RETRY_MIN_INTERVAL_MINUTES",
+    "FAST_RETRY_MAX_INTERVAL_MINUTES",
     "FAST_RETRY_MIN_PER_MINUTE",
     "FAST_RETRY_MAX_PER_MINUTE",
     "FAST_RETRY_MIN_MINUTES",
     "FAST_RETRY_MAX_MINUTES",
     "clamp_params",
+    "clamp_interval_minutes",
     "interval_seconds",
 ]
 
@@ -64,6 +68,13 @@ FAST_RETRY_MAX_PER_MINUTE = 120
 #: 持续分钟数 y 的合法区间
 FAST_RETRY_MIN_MINUTES = 1
 FAST_RETRY_MAX_MINUTES = 30
+
+#: v8.4：两轮快速重试之间的常规节奏间隔 X（分钟）默认值与合法区间。
+#: 一轮到期后回到常规忙轨重试，累计满 X 分钟自动再开一轮（直到成功 / 用户关闭 /
+#: 长任务预算耗尽）。
+FAST_RETRY_DEFAULT_INTERVAL_MINUTES = 5
+FAST_RETRY_MIN_INTERVAL_MINUTES = 1
+FAST_RETRY_MAX_INTERVAL_MINUTES = 60
 
 
 def clamp_params(per_minute: int, minutes: int) -> tuple[int, int]:
@@ -87,6 +98,27 @@ def clamp_params(per_minute: int, minutes: int) -> tuple[int, int]:
     x = max(FAST_RETRY_MIN_PER_MINUTE, min(FAST_RETRY_MAX_PER_MINUTE, x))
     y = max(FAST_RETRY_MIN_MINUTES, min(FAST_RETRY_MAX_MINUTES, y))
     return x, y
+
+
+def clamp_interval_minutes(value) -> int:
+    """把「两轮之间的常规重试间隔 X（分钟）」收敛到合法区间。
+
+    Args:
+        value: 分钟数（可能是字符串 / ``None`` / 0（表示用默认值））。
+
+    Returns:
+        ``[MIN, MAX]`` 区间内的分钟数；非法输入回落默认 5 分钟。
+    """
+    try:
+        minutes = int(value)
+    except (TypeError, ValueError):
+        return FAST_RETRY_DEFAULT_INTERVAL_MINUTES
+    if minutes <= 0:
+        return FAST_RETRY_DEFAULT_INTERVAL_MINUTES
+    return max(
+        FAST_RETRY_MIN_INTERVAL_MINUTES,
+        min(FAST_RETRY_MAX_INTERVAL_MINUTES, minutes),
+    )
 
 
 def interval_seconds(per_minute: int) -> float:

@@ -32,6 +32,17 @@
 >   - 路径 R（默认）：每段 `images[]` 带系统板；路径 K（`link_shots`）：逐段先画首/尾帧（`SceneTask.first_frame_file/end_frame_file`），视频只提交 `first_frame`/`last_frame`；钩子 `MultiScenePipeline._get_scene_ref_images/_get_scene_keyframes`
 >   - 逐场景补图：`POST /api/tasks/{id}/scene-refs`（**仅**暂停在 `references` 检查点时可用；409/422/额度）；稿件 `pause_for_scene_refs` 自动把 `references` 加进 `pause_points`
 >   - 前端共享组件 `frontend/src/components/shared/RefImagesInput.vue`；上传单文件上限 `AGNES_UPLOAD_MAX_MB`（默认 10）；单测 `tests/test_ref_slots.py`，回归 `docs/dev/regression_test_plan.md` §十八 `MR*`
+> - 快速重试自动接力（v8.4）：`docs/plans/v8.4/fast_retry_chain_PRD.md`（一轮到期后回常规节奏重试 X 分钟，满 X 分钟的下一个忙信号处自动再开一轮）
+>   - 参数「两轮间隔 X」：任务级 `POST /api/tasks/{id}/fast-retry` 的 `interval_minutes` + 全局 `POST /api/config/fast-retry`；默认 5 分钟（1–60）
+>   - 状态 `models/task.py::FastRetryConfig` 的 `interval_minutes` / `chain_pending` / `chain_started_at` / `rounds`；接力判定 `core/pipelines/__init__.py::_PipelineFastRetryHook._chain_due`；单测 `tests/test_fast_retry_chain.py`
+>   - 单测 `tests/test_fast_retry_chain.py`，回归 `docs/dev/regression_test_plan.md` §二十一 `FC*`
+> - 长任务模式（v8.3）：`docs/plans/v8.3/long_task_mode_PRD.md`（方案 + 错误分类表）+ `docs/plans/v8.3/system_design.md`（增量契约）
+>   - 开关与超时配置在进度页「快速重试」面板同一区域（`frontend/src/components/FastRetryPanel.vue`），默认 60 分钟（5–480）
+>   - 口径：**只延长忙轨预算**（累计忙轨等待时长，跨段累计），间隔与次数计算不变；故障轨 / 轮询 / 图片 / Chat 一律不动
+>   - 状态 `models/task.py::LongTaskConfig`（`BaseTaskState.long_task`）；钩子 `core/api/long_task.py` + `core/pipelines/__init__.py::_PipelineLongTaskHook`（默认 `None` = 零回归）
+>   - 错误分类唯一出处 `core/api/error_taxonomy.py::ERROR_RULES`（`retryable` + `reason` + `message_key`，未知一律按可重试处理）；不可重试错误抛 `core/api/agnes_video.py::UpstreamFatalError`
+>   - 全局默认：设置页「长任务模式」区块（`core/config.py::get/set_long_task_config`，`POST /api/config/long-task`，`AGNES_LONG_TASK_ENABLED` / `AGNES_LONG_TASK_MINUTES`），新建视频任务在 `TaskManager.create()` 时应用一次；进度页只负责开启，关闭走设置页
+>   - 端点 `POST /api/tasks/{id}/long-task`；单测 `tests/test_long_task.py`，回归 `docs/dev/regression_test_plan.md` §二十 `LT*`
 > - 优化路线图：`docs/plans/v6.0/optimization_roadmap.md`（合并版，现行唯一路线图，计划 v6 版本线内完成；已取代并废弃 `docs/plans/v5.0/optimization_roadmap.md`）
 > - 待调研存档：`docs/plans/optimization-research/README.md`
 > - 发版规范：`docs/dev/release_process.md`（版本号规则 + 新增内容规范 + 发布流程）

@@ -286,6 +286,10 @@ try:
         # 持续 3 分钟覆盖「队列短时拥塞」的典型窗口，到期自动回到常规忙轨。
         agnes_fast_retry_per_minute: int = 30
         agnes_fast_retry_minutes: int = 3
+        # v8.3：长任务模式的全局默认（设置页那一份）。默认关闭——开启后新建的
+        # 视频任务会自动带上长任务模式与默认超时（只延长忙轨预算，节奏不变）。
+        agnes_long_task_enabled: bool = False
+        agnes_long_task_minutes: int = 60
 
         # ── CORS（PR #33 吸收 Phase 2：可配置跨源白名单）──
         # 供独立本地伴侣工具（如 agnes-simple-ui）从浏览器跨源调用本服务 API。
@@ -343,6 +347,12 @@ except ImportError:  # pragma: no cover - pydantic-settings 为必备依赖，�
             )
             self.agnes_fast_retry_minutes = int(
                 os.environ.get("AGNES_FAST_RETRY_MINUTES", "3")
+            )
+            self.agnes_long_task_enabled = os.environ.get(
+                "AGNES_LONG_TASK_ENABLED", "0"
+            ).strip().lower() in ("1", "true", "on")
+            self.agnes_long_task_minutes = int(
+                os.environ.get("AGNES_LONG_TASK_MINUTES", "60")
             )
             self.agnes_cors_origins = os.environ.get("AGNES_CORS_ORIGINS", "")
             _cors_enabled = os.environ.get("AGNES_CORS_ENABLED", "").strip().lower()
@@ -1077,6 +1087,8 @@ def set_watermark_config(enabled: bool = None, language: str = None):
 
 #: 默认不自动开启：保持 v7.7 的行为（连续 2 次忙信号后由用户手动点开关）。
 DEFAULT_FAST_RETRY_AUTO = False
+#: v8.3：长任务模式全局默认（设置页未显式配置时的兜底）
+DEFAULT_LONG_TASK_ENABLED = False
 
 
 def get_fast_retry_config() -> dict:
@@ -1096,6 +1108,8 @@ def get_fast_retry_config() -> dict:
     # 导入 agnes_video 等，后者反向 import core.config），顶层导入会炸。
     from core.api.fast_retry import clamp_params
 
+    from core.api.fast_retry import clamp_interval_minutes
+
     settings = get_settings()
     raw = load_config().get("fast_retry") or {}
     x, y = clamp_params(
@@ -1106,11 +1120,14 @@ def get_fast_retry_config() -> dict:
         "auto": bool(raw.get("auto", DEFAULT_FAST_RETRY_AUTO)),
         "per_minute": x,
         "minutes": y,
+        # v8.4：两轮快速重试之间的常规节奏间隔 X（分钟）
+        "interval_minutes": clamp_interval_minutes(raw.get("interval_minutes")),
     }
 
 
 def set_fast_retry_config(
-    auto: bool = None, per_minute: int = None, minutes: int = None
+    auto: bool = None, per_minute: int = None, minutes: int = None,
+    interval_minutes: int = None,
 ) -> dict:
     """写入快速重试的全局设置（``None`` = 保留原值）。
 
@@ -1118,11 +1135,12 @@ def set_fast_retry_config(
         auto: 是否「到条件自动开启」。
         per_minute: 每分钟重试次数（1–120，越界自动收敛）。
         minutes: 持续分钟数（1–30，越界自动收敛）。
+        interval_minutes: 两轮之间的常规节奏间隔（1–60，越界自动收敛）。
 
     Returns:
-        写入后的完整设置（``{"auto", "per_minute", "minutes"}``）。
+        写入后的完整设置（``{"auto", "per_minute", "minutes", "interval_minutes"}``）。
     """
-    from core.api.fast_retry import clamp_params
+    from core.api.fast_retry import clamp_interval_minutes, clamp_params
 
     settings = get_settings()
     config = load_config()
@@ -1140,8 +1158,68 @@ def set_fast_retry_config(
         ),
         "per_minute": x,
         "minutes": y,
+        "interval_minutes": clamp_interval_minutes(
+            interval_minutes if interval_minutes is not None
+            else cur.get("interval_minutes")
+        ),
     }
     config["fast_retry"] = entry
+    save_config(config)
+    return dict(entry)
+
+
+def get_long_task_config() -> dict:
+    """返回「长任务模式」的全局默认设置（v8.3 设置页里的那一份）。
+
+    与任务级 ``BaseTaskState.long_task`` 的分工：
+    - 本设置**跨任务**生效——``enabled=True`` 时，新建的视频任务自动带上
+      长任务模式与 ``minutes`` 超时（用户仍可在进度页开启/查看状态）；
+    - 任务级状态记录本次的累计等待、到期与收尾原因。
+
+    Returns:
+        ``{"enabled": bool, "minutes": int}``；``minutes`` 未显式配置时回退
+        环境变量 ``AGNES_LONG_TASK_MINUTES``（默认 60）。
+    """
+    from core.api.long_task import clamp_timeout_minutes
+
+    settings = get_settings()
+    raw = load_config().get("long_task") or {}
+    # 未显式配置时：环境变量（AGNES_LONG_TASK_ENABLED）优先于代码常量
+    default_enabled = bool(DEFAULT_LONG_TASK_ENABLED or settings.agnes_long_task_enabled)
+    return {
+        "enabled": bool(raw.get("enabled", default_enabled)),
+        "minutes": clamp_timeout_minutes(
+            raw.get("minutes", settings.agnes_long_task_minutes)
+        ),
+    }
+
+
+def set_long_task_config(enabled: bool = None, minutes: int = None) -> dict:
+    """写入长任务模式的全局默认设置（``None`` = 保留原值）。
+
+    Args:
+        enabled: 是否让新建的视频任务默认开启长任务模式。
+        minutes: 默认超时分钟数（5–480，越界自动收敛）。
+
+    Returns:
+        写入后的完整设置（``{"enabled", "minutes"}``）。
+    """
+    from core.api.long_task import clamp_timeout_minutes
+
+    settings = get_settings()
+    config = load_config()
+    cur = config.get("long_task") or {}
+    entry = {
+        "enabled": (
+            bool(enabled) if enabled is not None
+            else bool(cur.get("enabled", DEFAULT_LONG_TASK_ENABLED))
+        ),
+        "minutes": clamp_timeout_minutes(
+            minutes if minutes is not None
+            else cur.get("minutes", settings.agnes_long_task_minutes)
+        ),
+    }
+    config["long_task"] = entry
     save_config(config)
     return dict(entry)
 

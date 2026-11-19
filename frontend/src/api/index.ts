@@ -36,7 +36,8 @@ async function request<T = any>(url: string, options?: RequestInit): Promise<T> 
 
 // ── 配置 ──
 export function getConfig() {
-  return request('/api/config')
+  // 配置是保存后要立刻读回的用户设置，禁止浏览器启发式缓存（否则刷新可能拿到旧值）
+  return request('/api/config', { cache: 'no-store' })
 }
 export function saveApiKey(apiKey: string) {
   const form = new FormData()
@@ -156,11 +157,13 @@ export function saveFastRetryConfig(opts: {
   auto: boolean
   perMinute?: number
   minutes?: number
+  intervalMinutes?: number
 }) {
   const form = new FormData()
   form.append('auto', String(opts.auto))
   if (opts.perMinute) form.append('per_minute', String(opts.perMinute))
   if (opts.minutes) form.append('minutes', String(opts.minutes))
+  if (opts.intervalMinutes) form.append('interval_minutes', String(opts.intervalMinutes))
   return apiFetch('/api/config/fast-retry', { method: 'POST', body: form })
     .then((r) => r.json())
 }
@@ -226,14 +229,42 @@ export function deleteTask(taskId: string) {
 // v8.0：remember=true 表示「以后自动」（同时写入设置页的全局 auto + 参数）
 export function setFastRetry(
   taskId: string,
-  opts: { enabled: boolean; perMinute?: number; minutes?: number; remember?: boolean },
+  opts: {
+    enabled: boolean
+    perMinute?: number
+    minutes?: number
+    remember?: boolean
+    intervalMinutes?: number
+  },
 ) {
   const form = new FormData()
   form.append('enabled', String(opts.enabled))
   if (opts.perMinute) form.append('per_minute', String(opts.perMinute))
   if (opts.minutes) form.append('minutes', String(opts.minutes))
   if (opts.remember) form.append('remember', 'true')
+  if (opts.intervalMinutes) form.append('interval_minutes', String(opts.intervalMinutes))
   return apiFetch('/api/tasks/' + taskId + '/fast-retry', { method: 'POST', body: form })
+    .then((r) => r.json())
+}
+
+// v8.3 长任务模式全局默认（设置页）：开启后新建视频任务自动带上
+export function saveLongTaskConfig(opts: { enabled: boolean; minutes?: number }) {
+  const form = new FormData()
+  form.append('enabled', String(opts.enabled))
+  if (opts.minutes) form.append('minutes', String(opts.minutes))
+  return apiFetch('/api/config/long-task', { method: 'POST', body: form })
+    .then((r) => r.json())
+}
+
+// v8.3 长任务模式：把忙轨次数封顶换成累计等待时长封顶（节奏不变）
+export function setLongTask(
+  taskId: string,
+  opts: { enabled: boolean; timeoutMinutes?: number },
+) {
+  const form = new FormData()
+  form.append('enabled', String(opts.enabled))
+  if (opts.timeoutMinutes) form.append('timeout_minutes', String(opts.timeoutMinutes))
+  return apiFetch('/api/tasks/' + taskId + '/long-task', { method: 'POST', body: form })
     .then((r) => r.json())
 }
 

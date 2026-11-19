@@ -8,7 +8,7 @@ import { useArtifacts } from './useArtifacts'
 import { useToast } from './useToast'
 import { getRetryCount, bumpRetryCount, clearRetryCount } from '@/utils/feedback'
 import { queueFullWindowHint } from '@/utils/retryWindows'
-import type { TaskState, StepDef, FastRetryState } from '@/types'
+import type { TaskState, StepDef, FastRetryState, LongTaskState } from '@/types'
 
 const POLL_INTERVAL = 30000
 // v8.0：快速模式期间提高轮询频率，让「已重试次数」实时跳动（后端 1s 粒度落盘）
@@ -47,6 +47,8 @@ const retryCount = ref(0)
 const needsResume = ref(false)
 // v7.7 快速重试模式：后端连续遇到 2 次 503 后置 available，用户开启后 enabled
 const fastRetry = ref<FastRetryState | null>(null)
+// v8.3 长任务模式：忙轨次数封顶 → 累计等待时长封顶（默认 60 分钟）
+const longTask = ref<LongTaskState | null>(null)
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null
 // 轮询代际：stopPolling / 切换任务时 +1，旧代际的回调不再续排
@@ -291,6 +293,7 @@ function unmountProgressPage() {
   retryCount.value = 0
   liveFailedStep.value = ''
   fastRetry.value = null
+  longTask.value = null
 }
 
 // v7.7 快速重试模式：开启 / 关闭（参数范围与「是否已可开启」由后端校验）
@@ -300,11 +303,14 @@ async function setFastRetryMode(
   perMinute?: number,
   minutes?: number,
   remember = false,
+  intervalMinutes?: number,
 ) {
   const taskId = appState.currentTaskId
   if (!taskId) return
   try {
-    const d = await api.setFastRetry(taskId, { enabled, perMinute, minutes, remember })
+    const d = await api.setFastRetry(taskId, {
+      enabled, perMinute, minutes, remember, intervalMinutes,
+    })
     if (d?.detail) {
       showToast(t('fastRetry.failed') + ': ' + d.detail, 4000)
       return
@@ -318,6 +324,24 @@ async function setFastRetryMode(
     reschedulePolling(taskId)
   } catch (e: any) {
     showToast(t('fastRetry.failed') + (e.message ? ': ' + e.message : ''), 3500)
+  }
+}
+
+// v8.3 长任务模式：开启 / 关闭（保持现有重试频率，只延长总等待预算）
+async function setLongTaskMode(enabled: boolean, timeoutMinutes?: number) {
+  const taskId = appState.currentTaskId
+  if (!taskId) return
+  try {
+    const d = await api.setLongTask(taskId, { enabled, timeoutMinutes })
+    if (d?.detail) {
+      showToast(t('longTask.failed') + ': ' + d.detail, 4000)
+      return
+    }
+    if (d?.long_task) longTask.value = d.long_task
+    // 立即刷新一次，避免等 30s 轮询才看到开关状态
+    await pollTaskProgress(taskId)
+  } catch (e: any) {
+    showToast(t('longTask.failed') + (e.message ? ': ' + e.message : ''), 3500)
   }
 }
 
@@ -335,6 +359,8 @@ async function pollTaskProgress(taskId: string) {
     progressPct.value = Math.round((state.current_progress || 0) * 100)
     // v7.7：快速重试状态（available 出现开关、enabled 显示进行中、finished_reason 提示收尾）
     fastRetry.value = (state as any).fast_retry || null
+    // v8.3：长任务模式状态（开关 / 累计等待 / 到期原因）
+    longTask.value = (state as any).long_task || null
     if (state.current_message) {
       // 0.8：后端消息最终由 v-html 渲染，必须转义
       // v7.0：有结构化 key 时用前端 22 语言文案渲染（后端只有 zh/en 兜底句）
@@ -516,6 +542,8 @@ export function useProgress() {
     connectionLost,
     fastRetry,
     setFastRetryMode,
+    longTask,
+    setLongTaskMode,
     retryFailedTask,
     resumeTask,
     showProgress,

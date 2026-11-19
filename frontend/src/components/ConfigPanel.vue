@@ -59,9 +59,15 @@ const {
   fastRetryAuto,
   fastRetryPerMinute,
   fastRetryMinutes,
+  fastRetryIntervalMinutes,
   fastRetrySaveStatus,
   syncFastRetrySettings,
   saveFastRetrySettings,
+  longTaskEnabled,
+  longTaskMinutes,
+  longTaskSaveStatus,
+  syncLongTaskSettings,
+  saveLongTaskSettings,
   isRegression,
   wsDisplayName,
   renderWorkspaces,
@@ -143,12 +149,13 @@ const collapsed = reactive<Record<string, boolean>>({
   model: true,
   workspace: true,
   retry: true,
+  longTask: true,
   privacy: true,
 })
 
 function initCollapse() {
   const prefs = getCollapsePrefs()
-  const keys = ['apikey', 'model', 'workspace', 'retry', 'privacy']
+  const keys = ['apikey', 'model', 'workspace', 'retry', 'longTask', 'privacy']
   keys.forEach((k) => {
     const manual = prefs[k + '_manual']
     if (manual !== undefined) {
@@ -398,8 +405,12 @@ function openEditProvider(p: any) {
 
 loadTextProviders()
 initCollapse()
-// v8.0：把 /api/config.fast_retry 回填到设置页表单（App 启动时已拉取）
-syncFastRetrySettings()
+// v8.0 / v8.3：把 /api/config 的 fast_retry / long_task 回填到设置页表单。
+// 注意：/api/config 是 App 启动时**异步**拉取的，而本组件 setup 早于它返回
+// （子 setup → 父 onMounted），所以这里的回填必须用 watch 而不是一次性调用，
+// 否则刷新/重启后开关会停在默认值（看似「保存无效」）。
+watch(() => appState.fastRetrySettings, syncFastRetrySettings, { deep: true, immediate: true })
+watch(() => appState.longTaskSettings, syncLongTaskSettings, { deep: true, immediate: true })
 </script>
 
 <template>
@@ -1036,12 +1047,90 @@ syncFastRetrySettings()
             class="field w-24"
           />
         </label>
+        <!-- v8.4：两轮之间的常规节奏间隔 X（到期后常规重试 X 分钟再自动开下一轮） -->
+        <label>
+          <span class="label">{{ t('fastRetry.interval') }}</span>
+          <input
+            v-model.number="fastRetryIntervalMinutes"
+            type="number"
+            min="1"
+            max="60"
+            step="1"
+            class="field w-24"
+          />
+        </label>
         <button class="btn btn-primary btn-sm" data-track="save_fast_retry" @click="saveFastRetrySettings">{{ t('save') }}</button>
         <span v-if="fastRetrySaveStatus === 'ok'" class="text-[11.5px] text-success">
           {{ t('fastRetry.autoSaved') }}
         </span>
       </div>
       <p class="hint mt-2">{{ t('fastRetry.autoScope') }}</p>
+    </div>
+  </div>
+
+  <!-- 长任务模式（v8.3：全局默认，新任务创建时应用） -->
+  <div class="panel mb-4 overflow-hidden">
+    <div
+      v-if="collapsed.longTask"
+      class="panel-head collapse-header cursor-pointer"
+      role="button"
+      tabindex="0"
+      :aria-expanded="!collapsed.longTask"
+      data-track="toggle_settings_section" data-track-params='{"section":"longTask"}' @click="toggleConfigPanel('longTask')"
+    >
+      <div class="flex min-w-0 items-baseline gap-2.5">
+        <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">05</span>
+        <span class="shrink-0 text-[12.5px] font-medium text-ink-2">{{ t('longTask.settingsTitle') }}</span>
+        <span class="truncate text-[10.5px] text-muted">
+          {{ longTaskEnabled
+            ? tf('longTask.autoOnShort', { y: longTaskMinutes })
+            : t('longTask.autoOffShort') }}
+        </span>
+      </div>
+      <span class="mono text-[11px] text-muted">＋</span>
+    </div>
+    <div v-else class="px-4 pb-4 pt-3.5">
+      <div class="mb-3 flex items-center justify-between gap-3 border-b border-rule pb-3">
+        <h2 class="panel-title">
+          <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">05</span>
+          {{ t('longTask.settingsTitle') }}
+        </h2>
+        <div class="flex items-center gap-1">
+          <span class="chip" :class="longTaskEnabled ? 'chip-success' : ''">
+            {{ longTaskEnabled
+              ? tf('longTask.autoOnShort', { y: longTaskMinutes })
+              : t('longTask.autoOffShort') }}
+          </span>
+          <button class="btn btn-quiet btn-xs" data-track="toggle_settings_section" data-track-params='{"section":"longTask"}' @click="toggleConfigPanel('longTask')">−</button>
+        </div>
+      </div>
+
+      <label class="flex cursor-pointer select-none items-start gap-3">
+        <input v-model="longTaskEnabled" type="checkbox" class="check mt-0.5" data-track="toggle_long_task_default" />
+        <span>
+          <span class="block text-[12.5px] font-medium text-ink">{{ t('longTask.defaultLabel') }}</span>
+          <span class="mt-0.5 block text-[11px] leading-relaxed text-muted">{{ t('longTask.defaultHint') }}</span>
+        </span>
+      </label>
+
+      <div class="mt-3 flex flex-wrap items-end gap-3">
+        <label>
+          <span class="label">{{ t('longTask.timeout') }}</span>
+          <input
+            v-model.number="longTaskMinutes"
+            type="number"
+            min="5"
+            max="480"
+            step="5"
+            class="field w-24"
+          />
+        </label>
+        <button class="btn btn-primary btn-sm" data-track="save_long_task" @click="saveLongTaskSettings">{{ t('save') }}</button>
+        <span v-if="longTaskSaveStatus === 'ok'" class="text-[11.5px] text-success">
+          {{ t('longTask.saved') }}
+        </span>
+      </div>
+      <p class="hint mt-2">{{ t('longTask.scope') }}</p>
     </div>
   </div>
 
@@ -1056,7 +1145,7 @@ syncFastRetrySettings()
       data-track="toggle_settings_section" data-track-params='{"section":"privacy"}' @click="toggleConfigPanel('privacy')"
     >
       <div class="flex min-w-0 items-baseline gap-2.5">
-        <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">05</span>
+        <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">06</span>
         <span class="shrink-0 text-[12.5px] font-medium text-ink-2">{{ t('privacyTitle') }}</span>
         <span class="truncate text-[10.5px] text-muted">
           {{ gaOptOut ? t('gaStatOff') : t('gaStatOn') }}
@@ -1067,7 +1156,7 @@ syncFastRetrySettings()
     <div v-else class="px-4 pb-4 pt-3.5">
       <div class="mb-3 flex items-center justify-between gap-3 border-b border-rule pb-3">
         <h2 class="panel-title">
-          <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">05</span>
+          <span class="mono text-[9.5px] tracking-[0.08em] text-muted/70">06</span>
           {{ t('privacyTitle') }}
         </h2>
         <div class="flex items-center gap-1">

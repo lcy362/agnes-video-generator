@@ -49,7 +49,11 @@ export const appState = reactive({
   workingDirSource: 'config' as string,
   watermarkEnabled: false,
   // v8.0：快速重试全局设置（设置页控制「到条件自动开启」+ 频率）
-  fastRetrySettings: { auto: false, per_minute: 30, minutes: 3 } as FastRetrySettings,
+  fastRetrySettings: {
+    auto: false, per_minute: 30, minutes: 3, interval_minutes: 5,
+  } as FastRetrySettings,
+  // v8.3：长任务模式全局默认（设置页那份；新任务创建时应用）
+  longTaskSettings: { enabled: false, minutes: 60 } as { enabled: boolean; minutes: number },
   agnesDomain: 'com' as string,
   models: { text: '', image: '', video: '', text_provider: '' },
   modelListCache: { text: [] as string[], image: [] as string[], video: [] as string[] },

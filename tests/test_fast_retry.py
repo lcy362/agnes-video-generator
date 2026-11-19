@@ -744,12 +744,14 @@ def test_global_settings_persist_and_clamp(tmp_path, monkeypatch):
     assert config_mod.get_fast_retry_config()["auto"] is False
 
     entry = config_mod.set_fast_retry_config(auto=True, per_minute=999, minutes=0)
-    assert entry == {"auto": True, "per_minute": 120, "minutes": 1}
+    assert entry == {"auto": True, "per_minute": 120, "minutes": 1,
+                     "interval_minutes": 5}      # v8.4：两轮间隔默认 5 分钟
     assert config_mod.get_fast_retry_config() == entry
 
     # 只改 auto，x / y 保持上一次的值
     again = config_mod.set_fast_retry_config(auto=False)
-    assert again == {"auto": False, "per_minute": 120, "minutes": 1}
+    assert again == {"auto": False, "per_minute": 120, "minutes": 1,
+                      "interval_minutes": 5}
 
 
 class TestFastRetryRemember:
@@ -763,9 +765,11 @@ class TestFastRetryRemember:
 
         saved = {}
 
-        def fake_set(auto=None, per_minute=None, minutes=None):
-            saved.update({"auto": auto, "per_minute": per_minute, "minutes": minutes})
-            return {"auto": True, "per_minute": per_minute, "minutes": minutes}
+        def fake_set(auto=None, per_minute=None, minutes=None, interval_minutes=None):
+            saved.update({"auto": auto, "per_minute": per_minute, "minutes": minutes,
+                          "interval_minutes": interval_minutes})
+            return {"auto": True, "per_minute": per_minute, "minutes": minutes,
+                    "interval_minutes": interval_minutes or 5}
 
         monkeypatch.setattr(config_mod, "set_fast_retry_config", fake_set, raising=False)
         monkeypatch.setattr(
@@ -787,7 +791,8 @@ class TestFastRetryRemember:
         assert body["fast_retry"]["auto"] is False        # 本次是用户手动开启
         assert body["fast_retry"]["auto_off"] is False
         assert body["fast_retry_settings"]["auto"] is True
-        assert saved == {"auto": True, "per_minute": 20, "minutes": 2}
+        assert saved == {"auto": True, "per_minute": 20, "minutes": 2,
+                        "interval_minutes": 5}   # v8.4：remember 也带上两轮间隔
 
     def test_disable_sets_auto_off_to_suppress_auto(self, monkeypatch):
         """手动关闭 → auto_off=True（本轮不再被自动模式重新拉起）。"""

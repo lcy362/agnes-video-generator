@@ -294,6 +294,8 @@ async def resume_task(task_id: str):
         if cfg is not None and (
             cfg.available or cfg.enabled or cfg.consecutive_busy or cfg.attempts
             or cfg.started_at or cfg.auto or cfg.auto_off
+            # v8.4：接力等待状态也要参与判定，避免「上轮到期后停在等待接力」
+            or cfg.chain_pending or cfg.rounds
         ):
             cfg.available = False
             cfg.enabled = False
@@ -305,6 +307,10 @@ async def resume_task(task_id: str):
             # 否则上一轮关过自动模式的任务续传后也不会再自动开启。
             cfg.auto = False
             cfg.auto_off = False
+            # v8.4：续传是新一次运行，接力轮次与到期等待一并清零
+            cfg.chain_pending = False
+            cfg.chain_started_at = ""
+            cfg.rounds = 0
             try:
                 tm.update_state()
             except Exception as e:
@@ -313,6 +319,23 @@ async def resume_task(task_id: str):
                     safe_log(task_id), e,
                 )
             logger.info("[Resume] Task %s: fast_retry state reset for a new run", safe_log(task_id))
+
+        # v8.3：长任务模式续传 = 新一轮预算（保留开关与超时配置，只清计时与收尾原因），
+        # 否则上一次跑满一小时的等待会让续传任务一启动就到期。
+        lt = getattr(state, "long_task", None)
+        if lt is not None and (lt.waited_s or lt.started_at or lt.finished_reason or lt.last_reason):
+            lt.waited_s = 0.0
+            lt.started_at = ""
+            lt.finished_reason = ""
+            lt.last_reason = ""
+            try:
+                tm.update_state()
+            except Exception as e:
+                logger.warning(
+                    "[Resume] reset long_task failed for task %s: %s",
+                    safe_log(task_id), e,
+                )
+            logger.info("[Resume] Task %s: long_task budget reset for a new run", safe_log(task_id))
 
         logger.info("[Resume] Starting resume for task %s, type=%s, status=%s",
                     safe_log(task_id), state.task_type, state.status)
@@ -446,6 +469,7 @@ async def set_fast_retry(
     per_minute: int = Form(0),
     minutes: int = Form(0),
     remember: bool = Form(False),
+    interval_minutes: int = Form(0),
 ):
     """开关「快速重试模式」（v7.7 / v8.0 增加 remember）。
 
@@ -458,6 +482,9 @@ async def set_fast_retry(
     **全局设置**并打开 ``auto``——此后任何任务连续 2 次忙信号都会自动进入快速
     重试，不用再点开关。不带该参数时行为与 v7.7 完全一致（只影响本次任务）。
 
+    v8.4：``interval_minutes``（两轮间隔 X）——一轮到期后回到常规节奏重试，
+    累计满 X 分钟自动再开一轮（直到成功 / 用户关闭 / 长任务预算耗尽）。
+
     隔离性：本端点只改任务状态里的 ``fast_retry`` 字段（+ 可选的全局设置）；
     未开启时（或任务类型没有该字段时）行为与升级前完全一致，不影响
     ``retry_policy`` 的两轨判定。
@@ -468,16 +495,21 @@ async def set_fast_retry(
         per_minute: 每分钟重试次数 x（0 = 用 ``AGNES_FAST_RETRY_PER_MINUTE``）。
         minutes: 持续分钟数 y（0 = 用 ``AGNES_FAST_RETRY_MINUTES``）。
         remember: 仅 ``enabled=True`` 有意义：把本次参数记为「以后自动」。
+        interval_minutes: 两轮快速重试之间的常规节奏间隔 X（0 = 保留当前值，
+            1–60 分钟）。
 
     Returns:
         ``{"ok": True, "task_id": ..., "fast_retry": {...最新状态...},
             "fast_retry_settings": {...全局设置...}}``
     """
     from core.api.fast_retry import (
+        FAST_RETRY_MAX_INTERVAL_MINUTES,
         FAST_RETRY_MAX_MINUTES,
         FAST_RETRY_MAX_PER_MINUTE,
+        FAST_RETRY_MIN_INTERVAL_MINUTES,
         FAST_RETRY_MIN_MINUTES,
         FAST_RETRY_MIN_PER_MINUTE,
+        clamp_interval_minutes,
     )
     from core.config import get_fast_retry_config, get_settings, set_fast_retry_config
 
@@ -508,6 +540,15 @@ async def set_fast_retry(
             ymin=FAST_RETRY_MIN_MINUTES, ymax=FAST_RETRY_MAX_MINUTES,
         ))
 
+    if interval_minutes and not (
+        FAST_RETRY_MIN_INTERVAL_MINUTES <= interval_minutes <= FAST_RETRY_MAX_INTERVAL_MINUTES
+    ):
+        raise HTTPException(status_code=422, detail=translate(
+            "fast_retry.invalid_interval", None,
+            imin=FAST_RETRY_MIN_INTERVAL_MINUTES,
+            imax=FAST_RETRY_MAX_INTERVAL_MINUTES,
+        ))
+
     x = int(per_minute or settings.agnes_fast_retry_per_minute)
     y = int(minutes or settings.agnes_fast_retry_minutes)
     x = max(FAST_RETRY_MIN_PER_MINUTE, min(FAST_RETRY_MAX_PER_MINUTE, x))
@@ -525,6 +566,11 @@ async def set_fast_retry(
         cfg.auto_off = False      # 重新开启即恢复「自动模式」资格
         cfg.per_minute = x
         cfg.minutes = y
+        if interval_minutes:
+            cfg.interval_minutes = clamp_interval_minutes(interval_minutes)
+        # 用户手动开启 = 新的一轮，清掉落期后的接力等待
+        cfg.chain_pending = False
+        cfg.chain_started_at = ""
         cfg.attempts = 0          # 每轮开启重新计数（面板展示「已发 N 次」）
         cfg.started_at = datetime.now().isoformat(timespec="seconds")
         cfg.finished_reason = ""
@@ -535,7 +581,10 @@ async def set_fast_retry(
         if remember:
             # 「永久自动」：本次参数写进全局设置并打开 auto，此后所有任务
             # 到条件直接自动开启（设置页也可单独调整）。
-            set_fast_retry_config(auto=True, per_minute=x, minutes=y)
+            set_fast_retry_config(
+                auto=True, per_minute=x, minutes=y,
+                interval_minutes=clamp_interval_minutes(cfg.interval_minutes),
+            )
             logger.info(
                 "[FastRetry] Global auto enabled via task %s (x=%d/min y=%dmin)",
                 safe_log(task_id), x, y,
@@ -546,6 +595,8 @@ async def set_fast_retry(
         # 会由 resume 的 reset 逻辑一并清零。
         cfg.auto_off = True
         cfg.auto = False
+        cfg.chain_pending = False   # v8.4：手动关闭即停止自动接力
+        cfg.chain_started_at = ""
         cfg.finished_reason = "disabled"
         msg_key, msg_params = "progress.video.fast_retry.disabled", {}
 
@@ -560,8 +611,8 @@ async def set_fast_retry(
         pipeline._emit_fast_retry(msg_key, msg_params)
 
     logger.info(
-        "[FastRetry] Task %s: enabled=%s x=%d/min y=%dmin remember=%s",
-        safe_log(task_id), enabled, x, y, remember,
+        "[FastRetry] Task %s: enabled=%s x=%d/min y=%dmin interval=%dmin remember=%s",
+        safe_log(task_id), enabled, x, y, int(cfg.interval_minutes or 0), remember,
     )
     return {
         "ok": True,
@@ -569,6 +620,98 @@ async def set_fast_retry(
         "fast_retry": cfg.model_dump(),
         "fast_retry_settings": get_fast_retry_config(),
     }
+
+
+@router.post("/api/tasks/{task_id}/long-task")
+async def set_long_task(
+    task_id: str,
+    enabled: bool = Form(...),
+    timeout_minutes: int = Form(0),
+):
+    """开关「长任务模式」（v8.3）。
+
+    与「快速重试」的分工：快速重试改**节奏**（多久打一次），本模式改**总预算**
+    （总共等多久）。开启后忙轨不再按次数封顶（默认 15 次），而是按累计等待时长
+    封顶（``timeout_minutes``，默认 60 分钟），间隔与次数计算**全部不变**；
+    明确不可重试的上游报错（401/403/404/400 参数类…）仍会立即返回最终结果。
+
+    隔离性：只改任务状态里的 ``long_task`` 字段，不影响 ``fast_retry``，
+    也不重启流水线；未开启时行为与 v8.2 完全一致。
+
+    Args:
+        task_id: 任务 id。
+        enabled: True 开启 / False 关闭。
+        timeout_minutes: 总预算分钟数（0 = 沿用当前值 / 默认 60；越界 422）。
+
+    Returns:
+        ``{"ok": True, "task_id": ..., "long_task": {...最新状态...}}``
+    """
+    from core.api.long_task import (
+        LONG_TASK_MAX_MINUTES,
+        LONG_TASK_MIN_MINUTES,
+        clamp_timeout_minutes,
+    )
+
+    dir_name = helpers.find_dir_name(task_id)
+    # 运行中优先复用流水线的 TaskManager（与 fast-retry 端点同一理由：
+    # 另建实例读改写会把流水线刚写进去的进度冲掉）
+    pipeline = app_state.active_pipelines.get(task_id)
+    tm = pipeline.task_manager if pipeline is not None else TaskManager(task_id, dir_name=dir_name)
+    state = tm.get_state() or tm.load()
+    if not state:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    cfg = getattr(state, "long_task", None)
+    if cfg is None:
+        raise HTTPException(
+            status_code=400, detail="Long task mode is not supported for this task"
+        )
+    # 图片任务没有视频提交忙轨，开了也没有意义（前端已按任务类型隐藏，这里兜底）
+    _task_type = getattr(state, "task_type", "")
+    _task_type = getattr(_task_type, "value", _task_type)   # 兼容 Enum
+    if str(_task_type) == "image":
+        raise HTTPException(
+            status_code=400, detail=translate("long_task.not_supported", None)
+        )
+
+    if timeout_minutes and not (
+        LONG_TASK_MIN_MINUTES <= timeout_minutes <= LONG_TASK_MAX_MINUTES
+    ):
+        raise HTTPException(status_code=422, detail=translate(
+            "long_task.invalid_range", None,
+            ymin=LONG_TASK_MIN_MINUTES, ymax=LONG_TASK_MAX_MINUTES,
+        ))
+
+    if enabled:
+        cfg.enabled = True
+        cfg.timeout_minutes = clamp_timeout_minutes(timeout_minutes or cfg.timeout_minutes)
+        # 每次用户开启都从 0 开始计预算（避免「关掉再开」立刻到期）
+        cfg.waited_s = 0.0
+        cfg.started_at = ""
+        cfg.finished_reason = ""
+        cfg.last_reason = ""
+        msg_key, msg_params = "progress.video.long_task.active", {
+            "y": cfg.timeout_minutes,
+        }
+    else:
+        cfg.enabled = False
+        cfg.finished_reason = "disabled"
+        msg_key, msg_params = "progress.video.long_task.disabled", {}
+
+    try:
+        tm.update_state()
+    except Exception as e:
+        logger.error("[LongTask] persist failed for task %s: %s", safe_log(task_id), e)
+        raise HTTPException(status_code=500, detail="Failed to persist long-task state")
+
+    if pipeline is not None and pipeline.state is state:
+        pipeline._emit_long_task(msg_key, msg_params)
+
+    logger.info(
+        "[LongTask] Task %s: enabled=%s timeout=%dmin waited=%.0fs",
+        safe_log(task_id), enabled, cfg.timeout_minutes, float(cfg.waited_s or 0.0),
+    )
+    return {"ok": True, "task_id": task_id, "long_task": cfg.model_dump()}
 
 
 @router.post("/api/tasks/{task_id}/mode")

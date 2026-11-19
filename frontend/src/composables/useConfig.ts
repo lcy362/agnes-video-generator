@@ -431,6 +431,8 @@ async function toggleWatermark(enabled: boolean) {
 const fastRetryAuto = ref(false)
 const fastRetryPerMinute = ref(30)
 const fastRetryMinutes = ref(3)
+// v8.4：两轮快速重试之间的常规节奏间隔 X（分钟）
+const fastRetryIntervalMinutes = ref(5)
 const fastRetrySaveStatus = ref<'idle' | 'ok' | 'error'>('idle')
 
 function syncFastRetrySettings() {
@@ -438,13 +440,17 @@ function syncFastRetrySettings() {
   fastRetryAuto.value = !!s.auto
   fastRetryPerMinute.value = s.per_minute || 30
   fastRetryMinutes.value = s.minutes || 3
+  fastRetryIntervalMinutes.value = s.interval_minutes || 5
 }
 
 async function saveFastRetrySettings(): Promise<boolean> {
   const x = Math.max(1, Math.min(120, Math.round(Number(fastRetryPerMinute.value) || 1)))
   const y = Math.max(1, Math.min(30, Math.round(Number(fastRetryMinutes.value) || 1)))
+  const iv = Math.max(1, Math.min(60, Math.round(Number(fastRetryIntervalMinutes.value) || 5)))
   try {
-    const r = await api.saveFastRetryConfig({ auto: fastRetryAuto.value, perMinute: x, minutes: y })
+    const r = await api.saveFastRetryConfig({
+      auto: fastRetryAuto.value, perMinute: x, minutes: y, intervalMinutes: iv,
+    })
     if (!r?.ok) {
       fastRetrySaveStatus.value = 'error'
       showToast(r?.detail || t('fastRetry.failed'), 4000)
@@ -455,6 +461,7 @@ async function saveFastRetrySettings(): Promise<boolean> {
       auto: !!next.auto,
       per_minute: next.per_minute || x,
       minutes: next.minutes || y,
+      interval_minutes: next.interval_minutes || iv,
     }
     syncFastRetrySettings()
     trackEvent('config_action', {
@@ -469,6 +476,50 @@ async function saveFastRetrySettings(): Promise<boolean> {
   } catch (e) {
     fastRetrySaveStatus.value = 'error'
     showToast(t('fastRetry.failed'), 4000)
+    return false
+  }
+}
+
+// ── 长任务模式全局默认（v8.3）──
+// 开启后新建的视频任务自动带上长任务模式与默认超时；进度页只能开启、不提供关闭，
+// 关闭统一走这里（与「快速重试 auto」的两层结构一致）。
+const longTaskEnabled = ref(false)
+const longTaskMinutes = ref(60)
+const longTaskSaveStatus = ref<'idle' | 'ok' | 'error'>('idle')
+
+function syncLongTaskSettings() {
+  const s = appState.longTaskSettings
+  longTaskEnabled.value = !!s.enabled
+  longTaskMinutes.value = s.minutes || 60
+}
+
+async function saveLongTaskSettings(): Promise<boolean> {
+  const y = Math.max(5, Math.min(480, Math.round(Number(longTaskMinutes.value) || 60)))
+  try {
+    const r = await api.saveLongTaskConfig({ enabled: longTaskEnabled.value, minutes: y })
+    if (!r?.ok) {
+      longTaskSaveStatus.value = 'error'
+      showToast(r?.detail || t('longTask.failed'), 4000)
+      return false
+    }
+    const next = r.long_task || { enabled: longTaskEnabled.value, minutes: y }
+    appState.longTaskSettings = {
+      enabled: !!next.enabled,
+      minutes: next.minutes || y,
+    }
+    syncLongTaskSettings()
+    trackEvent('config_action', {
+      action: 'save_long_task',
+      enabled: longTaskEnabled.value ? 'on' : 'off',
+      minutes: String(longTaskMinutes.value),
+    })
+    longTaskSaveStatus.value = 'ok'
+    setTimeout(() => (longTaskSaveStatus.value = 'idle'), 2000)
+    showToast(t('longTask.saved'), 2500)
+    return true
+  } catch (e) {
+    longTaskSaveStatus.value = 'error'
+    showToast(t('longTask.failed'), 4000)
     return false
   }
 }
@@ -580,9 +631,15 @@ export function useConfig() {
     fastRetryAuto,
     fastRetryPerMinute,
     fastRetryMinutes,
+    fastRetryIntervalMinutes,
     fastRetrySaveStatus,
     syncFastRetrySettings,
     saveFastRetrySettings,
+    longTaskEnabled,
+    longTaskMinutes,
+    longTaskSaveStatus,
+    syncLongTaskSettings,
+    saveLongTaskSettings,
     isRegression,
     wsDisplayName,
     renderWorkspaces,

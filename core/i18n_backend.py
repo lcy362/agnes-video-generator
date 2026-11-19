@@ -437,8 +437,16 @@ CATALOG: Dict[str, Dict[str, str]] = {
         "en": "Fast retry started automatically per your settings: {x} attempts/min for {y} min. Normal retry resumes on success or expiry.",
     },
     "progress.video.fast_retry.expired": {
-        "zh": "快速重试已到期（{y} 分钟），已恢复常规重试节奏。",
-        "en": "Fast retry expired after {y} min; normal retry cadence resumed.",
+        "zh": "快速重试已到期（{y} 分钟），已恢复常规重试节奏；{x} 分钟后自动再开一轮。",
+        "en": "Fast retry expired after {y} min; normal cadence resumed, next round in {x} min.",
+    },
+    "progress.video.fast_retry.chain": {
+        "zh": "常规重试已持续 {i} 分钟，自动开启第 {n} 轮快速重试（每分钟 {x} 次，持续 {y} 分钟）。",
+        "en": "Normal retry ran for {i} min; starting fast-retry round {n} ({x}/min for {y} min).",
+    },
+    "fast_retry.invalid_interval": {
+        "zh": "两轮间隔超出范围：{imin}–{imax} 分钟。",
+        "en": "Interval between rounds out of range: {imin}–{imax} minutes.",
     },
     "progress.video.fast_retry.success": {
         "zh": "快速重试命中队列，视频任务已提交成功。",
@@ -455,6 +463,61 @@ CATALOG: Dict[str, Dict[str, str]] = {
     "fast_retry.invalid_range": {
         "zh": "参数超出范围：每分钟 {xmin}–{xmax} 次，持续 {ymin}–{ymax} 分钟。",
         "en": "Parameters out of range: {xmin}–{xmax} attempts per minute, {ymin}–{ymax} minutes.",
+    },
+    # ── v8.3 长任务模式（把忙轨次数封顶换成累计等待时长封顶）──
+    # 参数：y 超时分钟数、status/code 上游原样报错、reason 错误分类 reason
+    "progress.video.long_task.active": {
+        "zh": "长任务模式已开启：保持当前重试频率，最长重试 {y} 分钟（按累计等待时长计算），成功或到期后结束。",
+        "en": "Long-task mode enabled: current retry cadence is kept, retrying for up to {y} min of accumulated waiting; ends on success or timeout.",
+    },
+    "progress.video.long_task.expired": {
+        "zh": "长任务模式已到期（累计等待 {y} 分钟），恢复常规重试上限。",
+        "en": "Long-task mode expired after {y} min of accumulated waiting; the normal retry limit is back in effect.",
+    },
+    "progress.video.long_task.disabled": {
+        "zh": "长任务模式已关闭，恢复常规重试上限。",
+        "en": "Long-task mode disabled; the normal retry limit is back in effect.",
+    },
+    "progress.video.long_task.non_retryable": {
+        "zh": "遇到无法重试的报错（{reason}），已停止重试并返回最终结果。",
+        "en": "Hit a non-retryable error ({reason}); retrying stopped and the final result was returned.",
+    },
+    "long_task.invalid_range": {
+        "zh": "超时时间超出范围：{ymin}–{ymax} 分钟。",
+        "en": "Timeout out of range: {ymin}–{ymax} minutes.",
+    },
+    "long_task.not_supported": {
+        "zh": "当前任务不支持长任务模式。",
+        "en": "Long-task mode is not supported for this task.",
+    },
+    # ── v8.3 不可重试错误的最终结果（error_taxonomy 的 message_key）──
+    "error.video.fatal_auth": {
+        "zh": "上游拒绝了本次请求：API Key 无效或无权限（HTTP {status}{code}）。重试不会成功，请在设置页检查 API Key 后重新提交。",
+        "en": "The upstream rejected the request: the API key is invalid or lacks permission (HTTP {status}{code}). Retrying will not help — check your API key in Settings and submit again.",
+    },
+    "error.video.fatal_forbidden": {
+        "zh": "上游禁止了本次请求（HTTP {status}{code}，可能是权限或区域限制）。重试不会成功，请检查账号权限或更换模型。",
+        "en": "The upstream forbids this request (HTTP {status}{code}; possibly permissions or region limits). Retrying will not help — check your account permissions or switch models.",
+    },
+    "error.video.fatal_not_found": {
+        "zh": "上游找不到对应的接口或资源（HTTP {status}{code}）。重试不会成功，请检查服务地址与模型是否可用。",
+        "en": "The upstream cannot find the endpoint or resource (HTTP {status}{code}). Retrying will not help — check the service URL and model availability.",
+    },
+    "error.video.fatal_too_large": {
+        "zh": "提交内容过大（HTTP {status}{code}）。重试不会成功，请缩短提示词或减少参考图后再试。",
+        "en": "The request payload is too large (HTTP {status}{code}). Retrying will not help — shorten the prompt or use fewer reference images.",
+    },
+    "error.video.fatal_bad_request": {
+        "zh": "上游拒绝了请求参数（HTTP {status}{code}）。重试不会成功，请检查提示词、时长与分辨率后再试。",
+        "en": "The upstream rejected the request parameters (HTTP {status}{code}). Retrying will not help — check the prompt, duration and resolution.",
+    },
+    "error.video.fatal_content": {
+        "zh": "内容未通过上游审核（HTTP {status}{code}）。重试不会成功，请修改提示词或参考图后重新提交。",
+        "en": "The content did not pass upstream moderation (HTTP {status}{code}). Retrying will not help — revise the prompt or reference images and submit again.",
+    },
+    "error.video.fatal_client": {
+        "zh": "上游拒收了本次请求（HTTP {status}{code}）。重试不会成功，请调整参数后重新提交。",
+        "en": "The upstream rejected the request (HTTP {status}{code}). Retrying will not help — adjust the parameters and submit again.",
     },
     # ── v7.8：轮询进度透传（每轮状态变化时刷新进度页文案）──
     "progress.video.polling": {

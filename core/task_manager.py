@@ -67,9 +67,44 @@ class TaskManager:
         if not self._state.created_at:
             self._state.created_at = now
         self._state.updated_at = now
+        self._apply_long_task_default()
         self._save()
         logger.info(f"[TaskManager] Created task {self.task_id}, type={self._state.task_type}")
         return self._state
+
+    def _apply_long_task_default(self) -> None:
+        """v8.3：按设置页的全局默认给新任务开启长任务模式。
+
+        只在**创建时**应用一次：之后用户在进度页的操作、到期/成功收尾都不会被
+        重新覆盖。图片任务跳过（没有视频提交忙轨）。配置读取失败绝不影响建任务。
+        """
+        state = self._state
+        cfg = getattr(state, "long_task", None)
+        if cfg is None or cfg.enabled:
+            return
+        task_type = getattr(state, "task_type", "")
+        task_type = getattr(task_type, "value", task_type)   # 兼容 Enum
+        if str(task_type) == "image":
+            return
+        try:
+            from core.config import get_long_task_config
+
+            global_cfg = get_long_task_config()
+        except Exception as e:  # 配置文件损坏 / 循环依赖：保持默认关闭
+            logger.debug(f"[LongTask] skip global default: {e}")
+            return
+        if not global_cfg.get("enabled"):
+            return
+        cfg.enabled = True
+        cfg.timeout_minutes = int(global_cfg.get("minutes") or 60)
+        cfg.waited_s = 0.0
+        cfg.started_at = ""
+        cfg.finished_reason = ""
+        cfg.last_reason = ""
+        logger.info(
+            "[LongTask] Task %s: enabled by global default (%d min)",
+            self.task_id, cfg.timeout_minutes,
+        )
 
     def load(self) -> Optional[BaseTaskState]:
         """加载任务状态。

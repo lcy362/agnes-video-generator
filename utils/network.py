@@ -30,7 +30,15 @@ from typing import List, Optional
 # describe_network_error，ImportError）。core.i18n_backend 本身只依赖标准库，
 # 惰性导入没有性能顾虑。
 
-__all__ = ["describe_network_error", "is_network_infra_error"]
+__all__ = [
+    "describe_network_error",
+    "describe_queue_full_error",
+    "queue_full_message_params",
+    "describe_fatal_error",
+    "fatal_error_message_params",
+    "fatal_error_details",
+    "is_network_infra_error",
+]
 
 # 异常链遍历深度上限（tenacity → requests → urllib3 → socket 一般 4~5 层）
 _MAX_CHAIN_DEPTH = 12
@@ -219,6 +227,69 @@ def queue_full_message_params(exc: BaseException) -> dict:
         "code": getattr(target, "queue_full_code", ""),
         "waited": max(1, round(int(getattr(target, "queue_full_waited_s", 0) or 0) / 60)),
     }
+
+
+def describe_fatal_error(exc: BaseException, lang: Optional[str] = None) -> str:
+    """把「上游明确拒绝、重试无用」的异常翻译成用户可读的最终结果（v8.3）。
+
+    与 :func:`describe_queue_full_error` 同一层：只负责**兜底句**（后端 zh/en 双基线），
+    前端优先用任务状态里的 ``current_message_key`` + ``current_message_params``
+    按自己的 22 语言渲染。
+
+    Args:
+        exc: 流水线捕获到的原始异常（可能是包装后的异常链）。
+        lang: 目标 UI 语言；``None`` 时走 ``resolve_lang``。
+
+    Returns:
+        用户可读提示；非该类型异常返回空串，调用方回退到原始异常文本。
+    """
+    from core.i18n_backend import translate
+
+    target = _find_fatal(exc)
+    if target is None:
+        return ""
+    key = getattr(target, "fatal_message_key", "") or "error.video.fatal_client"
+    return translate(
+        key, lang,
+        status=getattr(target, "fatal_status", ""),
+        code=getattr(target, "fatal_code", "") or "-",
+    )
+
+
+def fatal_error_message_params(exc: BaseException) -> dict:
+    """返回不可重试错误的插值参数（供前端 22 语言渲染）；非该类型返回空 dict。"""
+    target = _find_fatal(exc)
+    if target is None:
+        return {}
+    return {
+        "status": getattr(target, "fatal_status", ""),
+        "code": getattr(target, "fatal_code", "") or "-",
+        "reason": getattr(target, "fatal_reason", "") or "",
+    }
+
+
+def fatal_error_details(exc: BaseException) -> tuple:
+    """返回 ``(message_key, params)``；非不可重试错误返回 ``("", {})``。
+
+    流水线用它一次性拿到「前端 22 语言 key + 插值参数」，避免调用方重复遍历异常链。
+    """
+    target = _find_fatal(exc)
+    if target is None:
+        return "", {}
+    key = getattr(target, "fatal_message_key", "") or "error.video.fatal_client"
+    return key, {
+        "status": getattr(target, "fatal_status", ""),
+        "code": getattr(target, "fatal_code", "") or "-",
+        "reason": getattr(target, "fatal_reason", "") or "",
+    }
+
+
+def _find_fatal(exc: BaseException) -> Optional[BaseException]:
+    """在异常链里找不可重试错误（duck typing，避免 utils ← core.api 的导入耦合）。"""
+    for item in _chain_exceptions(exc):
+        if getattr(item, "fatal_reason", None):
+            return item
+    return None
 
 
 def _find_queue_full(exc: BaseException) -> Optional[BaseException]:
