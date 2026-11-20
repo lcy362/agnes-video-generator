@@ -49,6 +49,22 @@ def _get_khatt_text_clip():
     return _khatt_text_clip_cls
 
 
+def _clamp_vertical_pixel(v_part, video_height: int, clip_height: float):
+    """垂直坐标钳位：保留原有「底部 100px 安全区」，并额外按 clip 实际高度收一次。
+
+    只按固定 100px 收会让 h>100 的多行字幕（长句 / 阿拉伯文）越出画面底部——
+    ``bottom-80`` 把 clip 顶部算成 ``video_height - 80``，再被钳到 ``video_height - 100``，
+    131px 高的阿文两行字幕因此丢掉约 30px。加上 ``clip_height + 20`` 的上限后，
+    高字幕整体上移，单行字幕（h≈50）位置完全不变。
+    """
+    if not isinstance(v_part, (int, float)):
+        return v_part
+    limit = video_height - 100
+    if clip_height:
+        limit = min(limit, video_height - clip_height - 20)
+    return max(20, min(v_part, limit))
+
+
 class _CopyConcatSkipped(Exception):
     """内部信号：``-c copy`` fast path 不适用（探针失败/参数不一致），静默回退 moviepy。"""
 
@@ -378,9 +394,8 @@ class ConcatMixin:
                 if isinstance(h_part, (int, float)):
                     max_x = video_width - available_w
                     h_part = max(20, min(h_part, max(20, max_x)))
-                # clamp vertical pixel: ~100px safe zone at bottom for 2-line text
-                if isinstance(v_part, (int, float)):
-                    v_part = max(20, min(v_part, video_height - 100))
+                # clamp vertical pixel: 底部 100px 安全区 + clip 实际高度（防多行字幕出画）
+                v_part = _clamp_vertical_pixel(v_part, video_height, clip.h)
                 pos_tuple = (h_part, v_part)
 
                 # ── 位置去重：与现有字幕时间重叠且位置相同 → 自动错开 ──
@@ -393,8 +408,10 @@ class ConcatMixin:
                             if isinstance(alt_resolved[0], (int, float)):
                                 max_x = video_width - available_w
                                 alt_resolved = (max(20, min(alt_resolved[0], max(20, max_x))), alt_resolved[1])
-                            if isinstance(alt_resolved[1], (int, float)):
-                                alt_resolved = (alt_resolved[0], max(20, min(alt_resolved[1], video_height - 100)))
+                            alt_resolved = (
+                                alt_resolved[0],
+                                _clamp_vertical_pixel(alt_resolved[1], video_height, clip.h),
+                            )
                             conflict = any(
                                 start_s < ee2 and es2 < end_s and alt_resolved == ep2
                                 for es2, ee2, ep2 in _clip_registry
