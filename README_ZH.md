@@ -29,9 +29,9 @@ schema.org 结构化数据，供搜索引擎与 AI 引擎索引。GitHub 不会�
   "description": "完全免费、开源（MIT）的 AI 视频生成工具。用 Agnes Video 2.5 Flash 从文字或图片生成 4–12 秒 720P 视频，也能把一句话创意变成带旁白与字幕的多场景故事。无订阅、无积分、无水印、无需显卡，自托管只需一个免费的 Agnes AI API Key。",
   "url": "https://github.com/lcy362/agnes-video-generator",
   "downloadUrl": "https://github.com/lcy362/agnes-video-generator",
-  "softwareVersion": "8.2.0",
+  "softwareVersion": "8.2.1",
   "dateModified": "2026-11-23",
-  "releaseNotes": "https://github.com/lcy362/agnes-video-generator/blob/master/docs/public/release-notes/release_notes_v8.2.0.md",
+  "releaseNotes": "https://github.com/lcy362/agnes-video-generator/blob/master/docs/public/release-notes/release_notes_v8.2.1.md",
   "license": "https://opensource.org/licenses/MIT",
   "isAccessibleForFree": true,
   "screenshot": "https://raw.githubusercontent.com/lcy362/agnes-video-generator/master/images/home-zh.png",
@@ -91,7 +91,9 @@ schema.org 结构化数据，供搜索引擎与 AI 引擎索引。GitHub 不会�
 | **[FreeShortVideoStudio](https://github.com/lcy362/free-short-video-studio)** | **完全在线，浏览器内运行** | 轻量免安装、零配置，**功能建设中** | [video.lichuanyang.top/studio](https://video.lichuanyang.top/studio) · [GitHub](https://github.com/lcy362/free-short-video-studio) |
 | **[Agnes Video Generator](https://github.com/lcy362/agnes-video-generator)** —— **支持 AI Agent 驱动** | **交给 AI 编程 Agent 运行** | **最省事，而且一样完全免费** —— 装一个独立的 `agnes-video` skill：它自己装服务、出片、交付成片，失败时排查原因，还能为真正的缺陷提 PR。无积分、无订阅、不需要显卡 | [技能库仓库](https://github.com/lcy362/agnes-video-generator-skills) · [Flint](https://github.com/lcy362/flint) |
 
-## 🆕 最新版本 — v8.2.0（2026-11-19）
+## 🆕 最新版本 — v8.2.1（2026-11-23）/ v8.2.0（2026-11-19）
+
+**v8.2.1** 是维护版本：阿拉伯语字幕改用基于 HarfBuzz 的 khatt 排版（字母正确连写、从右到左、保留变音符号），多行高字幕不再越出画面，同时修正公开 API 参考与指南；无 API 变更。v8.2.0 的功能集仍为当前能力：
 
 - **六种任务类型**，22 种界面语言同步改名：**单镜头短片**（一条 4–12 秒视频，成功率高）与**多镜头故事**（1–30 个镜头拼接成故事），另有稿件长视频、数字人口播、诗词视频、简单图片。
 - **当前免费模型链**：`agnes-3.0-flash`（文本）→ `agnes-image-2.5-flash`（图片）→ `agnes-video-2.5-flash`（视频，4–12 秒、720P）→ Edge TTS（旁白）。旧的 `agnes-video-v2.0` 通道已下线。
@@ -99,7 +101,7 @@ schema.org 结构化数据，供搜索引擎与 AI 引擎索引。GitHub 不会�
 - **多参考图**（v8.1）：Flash 最多 5 张 / 2.5 最多 8 张，另支持首尾帧与参考音频；**手动模式**可在检查点暂停并编辑产物；**外部素材模式**（即梦，试验中）可导入外部生成的片段。
 - 依旧免费且自托管：断点续传、词级字幕、22 语言界面，以及独立的 [`agnes-video` Agent 技能](https://github.com/lcy362/agnes-video-generator-skills)。
 
-完整清单：**[v8.2.0 发版说明](docs/public/release-notes/release_notes_v8.2.0.md)** · [全部发版说明](docs/public/release-notes/)。
+完整清单：**[v8.2.1 发版说明](docs/public/release-notes/release_notes_v8.2.1.md)** · [v8.2.0 发版说明](docs/public/release-notes/release_notes_v8.2.0.md) · [全部发版说明](docs/public/release-notes/)。
 
 ## 🤖 或者，让 AI Agent 来操作
 

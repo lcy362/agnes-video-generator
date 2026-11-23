@@ -29,9 +29,9 @@ schema.org structured data for SEO/GEO indexing. GitHub does not execute this sc
   "description": "A completely free, open-source AI video generator (MIT). Generate 4-12s 720P clips from text or images with Agnes Video 2.5 Flash, or build narrated, auto-subtitled multi-shot stories. No subscription, no credits, no watermark, no GPU: self-host with one free Agnes AI API key.",
   "url": "https://github.com/lcy362/agnes-video-generator",
   "downloadUrl": "https://github.com/lcy362/agnes-video-generator",
-  "softwareVersion": "8.2.0",
+  "softwareVersion": "8.2.1",
   "dateModified": "2026-11-23",
-  "releaseNotes": "https://github.com/lcy362/agnes-video-generator/blob/master/docs/public/release-notes/release_notes_v8.2.0.md",
+  "releaseNotes": "https://github.com/lcy362/agnes-video-generator/blob/master/docs/public/release-notes/release_notes_v8.2.1.md",
   "license": "https://opensource.org/licenses/MIT",
   "isAccessibleForFree": true,
   "screenshot": "https://raw.githubusercontent.com/lcy362/agnes-video-generator/master/images/home.png",
@@ -91,7 +91,9 @@ schema.org structured data for SEO/GEO indexing. GitHub does not execute this sc
 | **[FreeShortVideoStudio](https://github.com/lcy362/free-short-video-studio)** | **Fully online, in the browser** | Lightweight, zero install — no setup at all, **features under active construction** | [video.lichuanyang.top/studio](https://video.lichuanyang.top/studio) · [GitHub](https://github.com/lcy362/free-short-video-studio) |
 | **[Agnes Video Generator](https://github.com/lcy362/agnes-video-generator)** — **agent-ready** | **Driven by an AI coding agent** | **Least effort, still completely free** — install the standalone `agnes-video` skill: it installs the service, generates the video, delivers the file, debugs failures and can open a PR for a real defect. No credits, no subscription, no GPU | [Skill repository](https://github.com/lcy362/agnes-video-generator-skills) · [Flint](https://github.com/lcy362/flint) |
 
-## 🆕 Latest release — v8.2.0 (2026-11-19)
+## 🆕 Latest releases — v8.2.1 (2026-11-23) / v8.2.0 (2026-11-19)
+
+**v8.2.1** is a maintenance release: Arabic subtitles now render with HarfBuzz-based khatt shaping (joined letters, right-to-left, tashkeel preserved), tall multi-line subtitles stay inside the frame, and the published API reference and guides are corrected. No API changes. The v8.2.0 feature set remains current:
 
 - **Six task types**, renamed in all 22 UI languages: **Single-shot clip** (one 4–12 s clip, high success rate) and **Multi-shot story** (1–30 shots stitched into a story), plus Manuscript video, Digital anchor, Poetry video and Simple image.
 - **Free model chain today**: `agnes-3.0-flash` (text) → `agnes-image-2.5-flash` (image) → `agnes-video-2.5-flash` (video, 4–12 s, 720P) → Edge TTS (narration). The old `agnes-video-v2.0` channel has been retired.
@@ -99,7 +101,7 @@ schema.org structured data for SEO/GEO indexing. GitHub does not execute this sc
 - **Multi reference images** (v8.1): up to 5 images on Flash / 8 on 2.5, first/last frames and reference audio. **Manual mode** pauses at checkpoints so you can edit artifacts; **external asset mode** (Jimeng, experimental) imports clips produced elsewhere.
 - Still free and self-hosted: checkpoint resume, word-level subtitles, a 22-language Web UI and the standalone [`agnes-video` agent skill](https://github.com/lcy362/agnes-video-generator-skills).
 
-Full list: **[v8.2.0 release notes](docs/public/release-notes/release_notes_v8.2.0.md)** · [all release notes](docs/public/release-notes/).
+Full list: **[v8.2.1 release notes](docs/public/release-notes/release_notes_v8.2.1.md)** · [v8.2.0 release notes](docs/public/release-notes/release_notes_v8.2.0.md) · [all release notes](docs/public/release-notes/).
 
 ## 🤖 Or Let an AI Agent Drive It
 
