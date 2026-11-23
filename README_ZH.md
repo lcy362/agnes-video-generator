@@ -26,7 +26,7 @@ schema.org 结构化数据，供搜索引擎与 AI 引擎索引。GitHub 不会�
   "alternateName": ["免费 AI 视频生成器", "免费 AI 短视频工具"],
   "applicationCategory": "MultimediaApplication",
   "operatingSystem": "Linux, macOS, Windows",
-  "description": "完全免费、开源（MIT）的 AI 视频生成工具。用 Agnes Video 2.5 Flash 从文字或图片生成 4–12 秒 720P 视频，也能把一句话创意变成带旁白与字幕的多场景故事。无订阅、无积分、无水印、无需显卡，自托管只需一个免费的 Agnes AI API Key。",
+  "description": "完全免费、开源（MIT）的 AI 视频生成工具，有两种独立、都已正式可用的方式：网页版（无需任何安装、一键使用）与下载版（功能更丰富，一条命令装好）；另有 agnes-video Agent 技能可代跑全流程。用 Agnes Video 2.5 Flash 从文字或图片生成 4–12 秒 720P 视频，也能把一句话创意变成带旁白与字幕的多场景故事。无订阅、无积分、无水印、无需显卡，只需一个免费的 Agnes AI API Key。",
   "url": "https://github.com/lcy362/agnes-video-generator",
   "downloadUrl": "https://github.com/lcy362/agnes-video-generator",
   "softwareVersion": "8.2.1",
@@ -36,7 +36,7 @@ schema.org 结构化数据，供搜索引擎与 AI 引擎索引。GitHub 不会�
   "isAccessibleForFree": true,
   "screenshot": "https://raw.githubusercontent.com/lcy362/agnes-video-generator/master/images/home-zh.png",
   "softwareRequirements": "Python 3.10+；Docker 与 npm 安装已内置 ffmpeg",
-  "keywords": "免费AI视频生成器, 免费AI视频生成工具, 免费AI短视频, AI视频生成软件, 文生视频, 图生视频, Agnes Video, Agnes Video 2.5 Flash, 无水印AI视频, 无需订阅的AI视频工具, 开源视频生成器, 自托管AI视频, Runway开源替代, Pika开源替代",
+  "keywords": "免费AI视频生成器, 免费AI视频生成工具, 免费AI短视频, AI视频生成软件, 文生视频, 图生视频, Agnes Video, Agnes Video 2.5 Flash, 无水印AI视频, 无需订阅的AI视频工具, 开源视频生成器, 自托管AI视频, 一条命令安装, 零安装网页版, Agent技能, Runway开源替代, Pika开源替代",
   "featureList": [
     "免费的文生视频与图生视频：Agnes Video 2.5 Flash（4–12 秒，720P）",
     "六种任务类型：单镜头短片、多镜头故事、稿件长视频、数字人口播、诗词视频、简单图片",
@@ -44,7 +44,7 @@ schema.org 结构化数据，供搜索引擎与 AI 引擎索引。GitHub 不会�
     "最多 8 张参考图、首尾帧与参考音频",
     "手动模式检查点、断点续传与试验中的外部素材导入",
     "长任务模式、快速重试自动接力与不可重试错误分类",
-    "22 语言界面、MIT 协议、自托管，只需免费 Agnes AI API Key"
+    "22 语言界面、MIT 协议；网页版 / 下载版两种独立方式"
   ],
   "offers": {
     "@type": "Offer",
@@ -73,7 +73,7 @@ schema.org 结构化数据，供搜索引擎与 AI 引擎索引。GitHub 不会�
 > 本项目在国内 Gitee 设有镜像仓库（[gitee.com/sandgrid/agnes-video-generator](https://gitee.com/sandgrid/agnes-video-generator)），便于国内访问加速；**GitHub 为项目主仓库**，Issue / PR / Star 均在 GitHub 提交。
 > This project is also mirrored on Gitee for faster access in mainland China; the GitHub repository is the primary home for issues, PRs and stars.
 
-> **完全免费的 AI 视频生成器 / 免费 AI 短视频工具** — 基于 Agnes AI 免费模型：无订阅、无积分、无水印、无需高端显卡。用 `agnes-video-2.5-flash` 从文字或图片生成 **4–12 秒、720P 的免费 AI 短视频**，也能把一句话创意变成**带旁白配音与字幕的多镜头故事**（1–30 个镜头）。六种任务类型、断点续传、手动模式、多参考图与长任务模式，所有 AI 计算在云端完成，普通笔记本就能跑。**[在线体验 →](https://video.lichuanyang.top)**
+> **完全免费的 AI 视频生成器 / 免费 AI 短视频工具** — 基于 Agnes AI 免费模型：无订阅、无积分、无水印、无需高端显卡。用 `agnes-video-2.5-flash` 从文字或图片生成 **4–12 秒、720P 的免费 AI 短视频**，也能把一句话创意变成**带旁白配音与字幕的多镜头故事**（1–30 个镜头）。六种任务类型、断点续传、手动模式、多参考图与长任务模式，所有 AI 计算在云端完成，普通笔记本就能跑。**两种独立、都已正式可用的方式：网页版（无需安装、一键使用）· 下载版（功能更丰富）；另有 Agent 技能可用。** **[在线使用 →](https://video.lichuanyang.top)**
 
 > "解决的办法不是压制 AI，而是让它变成一种更平权的能力，让每个人都知道如何借 AI 创造更多。这也是我们公司很重要的愿景，让世界级的 AI 属于每一个人。我们能做的可能微不足道，但这个愿景非常长久、持久。"
 >
@@ -81,15 +81,19 @@ schema.org 结构化数据，供搜索引擎与 AI 引擎索引。GitHub 不会�
 
 **[🌐 官网](https://video.lichuanyang.top)** | **[📝 博客文章（中文）](https://lichuanyang.top/posts/22470/)** | **[📝 Blog (English)](https://lichuanyang.top/en/posts/22470/)**
 
-> **🖥️ 在线体验 — 免安装：** 打开 [video.lichuanyang.top](https://video.lichuanyang.top) 即可在浏览器中使用 **单镜头短片**（原「简单视频」）模式。输入提示词，立刻生成免费的 AI 视频。
+> **🖥️ 网页端直接使用 — 免安装：** 打开 [video.lichuanyang.top](https://video.lichuanyang.top) 即可在浏览器里使用三 tab 在线创作台，输入提示词立刻生成免费的 AI 视频。这是正式可用的成品，不是体验版或 Beta。
 
-## 🚀 三种使用方式 — 均完全免费
+## 🚀 两种独立方式 — 另有 Agent 技能
 
-| 项目 | 运行方式 | 功能定位 | 链接 |
-|------|---------|---------|------|
-| **[Agnes Video Generator](https://github.com/lcy362/agnes-video-generator)**（本项目） | **下载后本地运行** | **功能更强大** —— TTS 配音、自动字幕、数字人、图生视频、关键帧动画、文章成片、断点续传等 | [GitHub](https://github.com/lcy362/agnes-video-generator) |
-| **[FreeShortVideoStudio](https://github.com/lcy362/free-short-video-studio)** | **完全在线，浏览器内运行** | 轻量免安装、零配置，**功能建设中** | [video.lichuanyang.top/studio](https://video.lichuanyang.top/studio) · [GitHub](https://github.com/lcy362/free-short-video-studio) |
-| **[Agnes Video Generator](https://github.com/lcy362/agnes-video-generator)** —— **支持 AI Agent 驱动** | **交给 AI 编程 Agent 运行** | **最省事，而且一样完全免费** —— 装一个独立的 `agnes-video` skill：它自己装服务、出片、交付成片，失败时排查原因，还能为真正的缺陷提 PR。无积分、无订阅、不需要显卡 | [技能库仓库](https://github.com/lcy362/agnes-video-generator-skills) · [Flint](https://github.com/lcy362/flint) |
+> 官网呈现**两种独立方式**：**网页版**（无需安装、一键使用）与**下载版**（功能更丰富，一条命令装好）。两条都是已上线的免费成品，不是「体验版 → 完整版」的升级阶梯。下表的 `agnes-video` Agent 技能是**补充渠道**（想让 AI Agent 跑完全流程时很方便），不是官网上的第三个并列入口；所有方式共享同一套免费 Agnes AI 模型与 MIT 代码。
+
+| 方式 | 是什么 | 你实际要做什么 | 链接 |
+|------|--------|--------------|------|
+| **① 下载版**（源产品 · 自托管完整版） | 部署在自己机器上的完整开源应用：TTS 配音、自动字幕、数字人、图生视频、关键帧、文章成片、断点续传、22 语言 Web 界面 | **自托管，但安装很简单**：`npx free-short-video` / Docker / `start.sh` 一条命令启动，之后全程图形界面操作。**不需要强动手能力，也不需要命令行经验** | [GitHub](https://github.com/lcy362/agnes-video-generator) · [安装指南](https://video.lichuanyang.top/zh/guides/getting-started) |
+| **② 网页版**（在线创作台） | 浏览器内三 tab 工作台（图像 / 单镜头短片 / 多镜头故事），直接生成并导出 MP4 | **零安装、零配置、无需注册、无需部署**：打开页面就能用。已正式上线、可直接出片，不是 Beta、不是在建项目 | [video.lichuanyang.top/zh/demo](https://video.lichuanyang.top/zh/demo) · [/zh/studio](https://video.lichuanyang.top/zh/studio) |
+| **③ `agnes-video` Agent 技能**（补充渠道） | AI Agent 跑完**全流程**：装服务、生成视频、交付成片、排查失败，还能为真正的缺陷提 PR | **一条命令装好技能**，之后只描述想要的结果，不用记命令和参数 | [技能库仓库](https://github.com/lcy362/agnes-video-generator-skills) · [Flint](https://github.com/lcy362/flint) |
+
+**一句话**：两种独立方式——想马上出片就用网页版（零安装、一键使用），想要更丰富的功能就用一条命令装好的下载版；两者都不需要强动手能力。另有 Agent 技能可代跑全流程。
 
 ## 🆕 最新版本 — v8.2.1（2026-11-23）/ v8.2.0（2026-11-19）
 
@@ -99,7 +103,7 @@ schema.org 结构化数据，供搜索引擎与 AI 引擎索引。GitHub 不会�
 - **当前免费模型链**：`agnes-3.0-flash`（文本）→ `agnes-image-2.5-flash`（图片）→ `agnes-video-2.5-flash`（视频，4–12 秒、720P）→ Edge TTS（旁白）。旧的 `agnes-video-v2.0` 通道已下线。
 - **长任务模式**：免费上游队列繁忙时，可按累计等待时长（默认 60 分钟，5–480 可调）继续重试，而不是固定次数用完就停；**快速重试**支持自动接力下一轮；无效 Key、参数被拒、内容审核等确定性错误会立即失败并给出具体原因。
 - **多参考图**（v8.1）：Flash 最多 5 张 / 2.5 最多 8 张，另支持首尾帧与参考音频；**手动模式**可在检查点暂停并编辑产物；**外部素材模式**（即梦，试验中）可导入外部生成的片段。
-- 依旧免费且自托管：断点续传、词级字幕、22 语言界面，以及独立的 [`agnes-video` Agent 技能](https://github.com/lcy362/agnes-video-generator-skills)。
+- 三条线依旧全部免费：断点续传、词级字幕、22 语言界面，以及独立的 [`agnes-video` Agent 技能](https://github.com/lcy362/agnes-video-generator-skills)。自托管只是选项之一，一条命令即可装好。
 
 完整清单：**[v8.2.1 发版说明](docs/public/release-notes/release_notes_v8.2.1.md)** · [v8.2.0 发版说明](docs/public/release-notes/release_notes_v8.2.0.md) · [全部发版说明](docs/public/release-notes/)。
 
@@ -189,7 +193,7 @@ Agnes Video Generator 完全免费且开源，**本项目绝不会提供付费�
 
 我们相信 Bruce Yang 说的那句话——AI 应该是一种更平权的能力。世界级的 AI 应该属于每一个人，而不是只属于付得起账单的人。
 
-坦白讲，Agnes 的视频模型现在还不够完美：生成的画面有时不够稳定，复杂动作偶尔会变形，免费共享队列也可能繁忙。但它**完全免费、没有按用户配额**（v8.2.0 起可用长任务模式与自动接力的快速重试应对排队），而且迭代速度很快。我们选择跟它一起成长，而不是等着一个「完美」的商业方案出现。如果你也认同这个想法，那么这个项目就是为你准备的——你只需要一个免费的 [Agnes AI](https://platform.agnes-ai.com) API Key 和一台能跑 Python 的普通电脑，就可以零成本开始 AI 视频创作。
+坦白讲，Agnes 的视频模型现在还不够完美：生成的画面有时不够稳定，复杂动作偶尔会变形，免费共享队列也可能繁忙。但它**完全免费、没有按用户配额**（v8.2.0 起可用长任务模式与自动接力的快速重试应对排队），而且迭代速度很快。我们选择跟它一起成长，而不是等着一个「完美」的商业方案出现。如果你也认同这个想法，那么这个项目就是为你准备的——你只需要一个免费的 [Agnes AI](https://platform.agnes-ai.com) API Key，再从三条线里任选一条：浏览器打开即用（零安装）、让 AI Agent 跑完全流程（装一个技能），或用一条命令装好的自托管完整版。三条都不需要高配机器或强动手能力。
 
 ### 对比：免费 AI 视频生成器与商业 AI 视频工具
 
@@ -212,7 +216,7 @@ Agnes Video Generator 完全免费且开源，**本项目绝不会提供付费�
 
 **免费 AI 视频生成器真的免费吗？** 是的。本项目 MIT 开源，没有付费档、积分包或按秒计费。所有模型调用走 Agnes AI 的免费模型，你只需在 [Agnes AI](https://platform.agnes-ai.com) 申请一个免费 API Key。
 
-**「免注册、无限制」是真的吗？需要信用卡吗？** 本项目本身无需注册账号、无需订阅、无需信用卡，装在自己机器上即可。调用上游模型需要一个免费的 Agnes AI API Key；项目侧不保存你的 Key，也不设按用户配额。
+**「免注册、无限制」是真的吗？需要信用卡吗？** 本项目本身无需注册账号、无需订阅、无需信用卡。网页端零安装打开即用，Agent 技能跑完全流程，自托管版一条命令装好——三条都不需要技术门槛。调用上游模型需要一个免费的 Agnes AI API Key；项目侧不保存你的 Key，也不设按用户配额。
 
 **免费 AI 视频生成工具支持文生视频、图生视频吗？** 支持。单镜头短片可用文字、图片、首尾帧，Flash 最多 5 张参考图（2.5 最多 8 张）以及参考音频；一键预设为 `agnes-video-2.5-flash` / 5 秒 / 16:9 / 720P。
 
@@ -264,4 +268,4 @@ cp .env.example .env    # 然后编辑其中的 AGNES_API_KEY
 - **[FreeShortVideoStudio](https://github.com/lcy362/free-short-video-studio)** —— 完全在线、浏览器内运行的视频工作台。
 - **[Flint](https://github.com/lcy362/flint)** —— 本地优先的 AI Skills（技能）管理器：集中归档、打标、去重，并通过 symlink/复制部署到任意 Agent 或项目目录。如果对你有帮助，欢迎点个 Star！⭐
 
-**关键词**：免费AI视频生成器, 免费AI视频生成工具, 免费AI视频生成软件, 免费AI视频生成网站, 免费AI短视频, AI视频生成无限制, 文字转视频AI, 图生视频, 无水印AI视频, Agnes Video, Agnes Video 2.5 Flash, Agnes Video Generator GitHub, 开源视频生成器, 自托管AI视频, 无需订阅的AI视频工具, 零成本AI视频, 自动字幕, Runway开源替代
+**关键词**：免费AI视频生成器, 免费AI视频生成工具, 免费AI视频生成软件, 免费AI视频生成网站, 免费AI短视频, AI视频生成无限制, 文字转视频AI, 图生视频, 无水印AI视频, Agnes Video, Agnes Video 2.5 Flash, Agnes Video Generator GitHub, 开源视频生成器, 自托管AI视频, 一条命令安装, 零安装网页版, Agent技能, 无需订阅的AI视频工具, 零成本AI视频, 自动字幕, Runway开源替代
