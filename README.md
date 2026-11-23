@@ -95,15 +95,16 @@ schema.org structured data for SEO/GEO indexing. GitHub does not execute this sc
 
 **In one sentence:** two independent editions — start in one click with the Web Version (zero install), or install the Downloadable Version with one command for more features; neither requires technical skills. An agent skill can also run the whole pipeline for you.
 
-## 🆕 Latest releases — v8.2.1 (2026-11-23) / v8.2.0 (2026-11-19)
+## 🆕 Latest release — v8.2.1 (2026-11-23) / v8.2.0 (2026-11-19)
 
-**v8.2.1** is a maintenance release: Arabic subtitles now render with HarfBuzz-based khatt shaping (joined letters, right-to-left, tashkeel preserved), tall multi-line subtitles stay inside the frame, and the published API reference and guides are corrected. No API changes. The v8.2.0 feature set remains current:
+> **Featured update: common failure cases fully optimised — a much higher video generation success rate.** Same wording as the [featured update on the website](https://video.lichuanyang.top/en/releases).
 
-- **Six task types**, renamed in all 22 UI languages: **Single-shot clip** (one 4–12 s clip, high success rate) and **Multi-shot story** (1–30 shots stitched into a story), plus Manuscript video, Digital anchor, Poetry video and Simple image.
-- **Free model chain today**: `agnes-3.0-flash` (text) → `agnes-image-2.5-flash` (image) → `agnes-video-2.5-flash` (video, 4–12 s, 720P) → Edge TTS (narration). The old `agnes-video-v2.0` channel has been retired.
-- **Long task mode**: when the free upstream queue is saturated, optionally wait with a cumulative busy-queue budget (60 minutes by default, 5–480) instead of a fixed retry count. **Fast retry** can chain rounds automatically, and provably fatal errors (invalid key, rejected parameter, moderation block) now fail fast with a specific reason.
-- **Multi reference images** (v8.1): up to 5 images on Flash / 8 on 2.5, first/last frames and reference audio. **Manual mode** pauses at checkpoints so you can edit artifacts; **external asset mode** (Jimeng, experimental) imports clips produced elsewhere.
-- Still free across all three options: checkpoint resume, word-level subtitles, a 22-language Web UI and the standalone [`agnes-video` agent skill](https://github.com/lcy362/agnes-video-generator-skills). Self-hosting is optional and installs with one command.
+This round targets the failure cases people hit most often: a saturated free queue, a mismatched key, interrupted runs and polling timeouts now each have an automatic path and a clear manual exit. At the centre is **Fast retry mode** in the browser workspace — instead of clicking retry and hoping, it claims a slot as soon as the free queue frees one up.
+
+- **503 / `video_queue_full` has a built-in fix:** Fast retry mode opens after two consecutive busy signals and probes 30 times per minute for 3 minutes by default, with both values adjustable. An upstream 503 creates no task, consumes no quota and triggers no per-key rate limit, so probing faster is free and safe.
+- **Chained, not a lucky click:** when a round ends, the next one starts automatically after the gap (5 min by default) with the same parameters. **Long task mode** runs retries within a total wait budget (60 min by default) with no attempt cap, until success or a manual stop; the progress panel shows attempts sent, time left and budget used.
+- **Other common failures have clear exits too:** 401 distinguishes a key that does not match the domain instead of a generic error; interrupted runs resume from the last checkpoint without resubmitting finished scenes or reference images; the failure panel copies diagnostic info in one click and opens a pre-filled GitHub Issue.
+- **Try it now in the Web Version** — no install, no GPU and no credit card; your free Agnes AI API key stays in browser localStorage. The **Downloadable Version** ships the same reliability fixes, plus HarfBuzz khatt shaping for Arabic subtitles (joined letters, right-to-left, tashkeel preserved), tall subtitles kept inside the frame and corrected API docs. No API changes.
 
 Full list: **[v8.2.1 release notes](docs/public/release-notes/release_notes_v8.2.1.md)** · [v8.2.0 release notes](docs/public/release-notes/release_notes_v8.2.0.md) · [all release notes](docs/public/release-notes/).
 
@@ -203,7 +204,7 @@ Making AI videos today has an absurdly high barrier. Overseas services like Runw
 
 We believe what Bruce Yang said — AI should be a more equitable capability. World-class AI should belong to everyone, not just those who can afford the bill.
 
-To be honest, Agnes's video model isn't perfect yet. The generated frames are sometimes unstable, complex actions occasionally deform, and the free shared queue can be busy. But it is **completely free with no per-user quota** (v8.2.0 adds long task mode and auto-chained fast retry for busy queues), and it iterates fast. We choose to grow with it rather than wait for a "perfect" commercial solution. If you share this mindset, then this project is for you — all you need is a free [Agnes AI](https://platform.agnes-ai.com) API key and one of the three routes above — a browser tab (nothing to install), an AI agent (one skill), or the one-command self-hosted app on an ordinary computer. No route requires a powerful machine or strong technical skills.
+To be honest, Agnes's video model isn't perfect yet. The generated frames are sometimes unstable, complex actions occasionally deform, and the free shared queue can be busy. But it is **completely free with no per-user quota** (v8.2.0 adds long task mode and auto-chained fast retry for busy queues), and it iterates fast. We choose to grow with it rather than wait for a "perfect" commercial solution. If you share this mindset, then this project is for you — all you need is a free [Agnes AI](https://platform.agnes-ai.com) API key and either of the two editions above — the Web Version in a browser tab (nothing to install) or the Downloadable Version on an ordinary computer (one command). Neither requires a powerful machine or strong technical skills; an agent skill is also available to run the whole pipeline.
 
 ### Comparison: free AI video generator vs. commercial AI video tools
 
