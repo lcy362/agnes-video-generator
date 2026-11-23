@@ -2,7 +2,27 @@
 
 ### Is Agnes Video Generator really free? Are there any hidden costs?
 
-Yes, it is **completely free**. All AI model calls (Agnes Chat, Agnes Image, Agnes Video) are free of charge with no trial period, no watermarks, and no usage limits. The only TTS integration (Microsoft Edge TTS) is also free and requires no extra API key. You only need a free API key from [Agnes AI](https://platform.agnes-ai.com) to get started.
+Yes, it is **completely free**. All AI model calls (Agnes Chat, Agnes Image, Agnes Video) are free of charge with no trial period, no watermarks, and no per-user quota. The free models share an upstream inference queue, which can be busy — that is capacity, not a paywall (see below). Edge TTS narration is also free and needs no extra API key. You only need a free API key from [Agnes AI](https://platform.agnes-ai.com) to get started.
+
+### Is this a free AI video generator with no sign up?
+
+There is no account or subscription for this project: it is an MIT-licensed app you self-host, with no credit card, no project-side signup and no per-user quota. You do need a free Agnes AI API key for the upstream models, and that key stays in your own config or environment. The free models use a shared queue (see the queue question below) — that is capacity, not a paywall.
+
+### Are the free AI videos watermark-free?
+
+Yes. The app adds no watermark and the output files stay on your machine. Commercial use depends on the upstream model's terms, so check those before publishing.
+
+### Can I make free AI short videos for YouTube Shorts, TikTok or Reels?
+
+Yes. Single-shot clip supports 21:9 / 16:9 / 4:3 / 1:1 / 3:4 / 9:16 at 720P, and Multi-shot story / Manuscript video stitch 1–30 shots into a longer narrated video with subtitles. Note the known 9:16 rotation defect on 2.5-series models; 16:9 and 3:4 are safe.
+
+### Is "Agnes Video" the same as this GitHub repository?
+
+No. [Agnes AI](https://platform.agnes-ai.com) provides the free models (`agnes-video-2.5-flash` is often called "Agnes Video"). This repository — the usual result for "agnes video generator github" — is an independent MIT-licensed app built on those models. The optional `agnes-video` agent skill lives in a separate repository.
+
+### What is long task mode, and what changed in v8.2.0?
+
+v8.2.0 (2026-11-19) turned waiting on a saturated free queue into a controllable setting: fast retry can chain rounds automatically, long task mode replaces the fixed retry cap with a cumulative wait budget (60 minutes by default), and fatal errors (bad key, rejected parameter, moderation block) stop immediately with a specific reason. Task types were also renamed to Single-shot clip and Multi-shot story. See the [release notes](release-notes/release_notes_v8.2.0.md).
 
 ### Do I need a GPU to run this AI video generator?
 
@@ -10,11 +30,11 @@ No. All AI compute runs in the cloud via Agnes AI's free API. You just need a re
 
 ### How is this different from Runway, Pika, or Sora?
 
-Unlike commercial AI video tools that charge $10–$95/month, Agnes Video Generator is completely free and open-source (MIT). It offers built-in multi-scene pipelines, AI narration, auto subtitles, and digital anchor — features that require third-party tools or manual editing elsewhere. See the [comparison table](../README.md#comparison-agnes-vs-commercial-ai-video-tools) in the README for details.
+Unlike commercial AI video tools that use subscriptions or credit / per-second billing (check each vendor's current plan), Agnes Video Generator is completely free and open-source (MIT). It offers built-in multi-scene pipelines, free AI narration, auto subtitles, and a digital anchor — features that require third-party tools or manual editing elsewhere. See the [comparison table](../../README.md) in the README for details.
 
 ### What video generation modes are supported?
 
-Six task types: **Simple Video** (single prompt, full parameter control), **Creative Video** (AI story → multi-scene video with narration), **Manuscript Video** (long text → auto-split → narrated video), **Digital Anchor** (AI anchor with lip-synced speech), **Poetry Video** (a poem → per-line scenes → recitation + timed subtitles), and **Simple Image** (text-to-image / image-to-image in one call). Additional options include text-to-video, image-to-video, keyframes animation, and image-to-image end frame generation.
+Six task types: **Single-shot clip** (formerly Simple Video; one 4–12 s clip with full parameter control), **Multi-shot story** (formerly Creative Video; AI story → 1–30 shots with narration), **Manuscript video** (long text → auto-split → narrated video), **Digital anchor** (AI anchor with TTS or model-native lip-sync audio), **Poetry video** (a poem → per-line scenes → recitation + timed subtitles), and **Simple image** (text-to-image / image-to-image in one call). The free `agnes-video-2.5-flash` model outputs 4–12 s clips at 720P; generation options include text-to-video, image-to-video, first/last frames, up to 5 reference images on Flash (8 on 2.5) and reference audio.
 
 ### Can I use my own images as references?
 
@@ -56,7 +76,7 @@ As of **v7.0**, the app handles this explicitly:
 - The progress panel names the cause and keeps the raw error visible, e.g. `Agnes 视频队列已满（HTTP 503 · video_queue_full），正在排队重试（第 3 次 / 已等 5 分钟）。建议错峰重试或稍后再试。` / `Agnes video queue is full (HTTP 503 · video_queue_full), retrying (attempt 3 / waited 5 min). Please retry later, ideally off-peak.`
 - Only when those retries are exhausted do you get a failure — and the message names Agnes, quotes the raw `HTTP 503 · video_queue_full`, and tells you to **retry later / off-peak or switch model**, instead of a generic `HTTP 503: server error`.
 
-**What you can do:** retry during off-peak hours, or add more API keys (each key has its own quota). Agnes has announced that these `503` / `video_queue_full` errors are expected to improve significantly after **2026-10-26 12:00 (UTC+8)**.
+**What you can do:** retry during off-peak hours, add more API keys (each key has its own quota), or switch on **fast retry** / **long task mode** (v8.2.0) from the progress page. Long task mode replaces the fixed retry cap with a cumulative wait budget (60 minutes by default), and fast retry can chain rounds automatically.
 
 ### I get `403 insufficient_user_quota` ("remaining: $0.000000") right at the start
 

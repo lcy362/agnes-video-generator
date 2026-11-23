@@ -10,7 +10,7 @@ export AGNES_API_KEY="your-api-key"
 
 ## 2. Choose a Video Mode
 
-### Simple Video
+### Single-shot clip (formerly Simple Video)
 
 Quick single-clip generation. **Only the prompt is required** — everything else is preset
 (free `Video 2.5 Flash` / text-to-video / 5s / 16:9 / 720P), so one click is enough:
@@ -28,7 +28,7 @@ Quick single-clip generation. **Only the prompt is required** — everything els
 | First / Last Frame | Keyframe mode: at least one of first/last frame |
 | Reference Audio | Reference mode: public http(s) audio URLs, up to 3 clips; refer to them as `<Audio 1>` |
 
-### Creative Video
+### Multi-shot story (formerly Creative Video)
 
 AI-driven multi-scene storytelling:
 
@@ -68,13 +68,23 @@ Long-form text to narrated video:
 
 ## 3. Click "Start Generating"
 
-The progress panel shows real-time generation status for each step. For Creative Video: Init → Image Analysis → Story → Script → Narration → Character Reference → End Frame Prompts → End Frame Generation → Video Generation → Audio & Subtitles → Concatenation.
+The progress panel shows real-time generation status for each step. For Multi-shot story: Init → Image Analysis → Story → Script → Narration → Character Reference → End Frame Prompts → End Frame Generation → Video Generation → Audio & Subtitles → Concatenation.
 
 ## 4. Checkpoint Resume & Task Management
 
 If the server is interrupted, restart it and find the incomplete task in the "Task List" tab. Click "Resume" to continue from the last checkpoint. Running tasks can also be stopped and resumed later.
 
-## 5. Manual Mode (v6.0)
+## 5. Busy queues, fast retry and long task mode (v8.2.0)
+
+When the free video queue is saturated, submissions are rejected with HTTP 503 `video_queue_full` before a job is created — nothing is consumed. The retry panel on the progress page offers two switches:
+
+- **Fast retry** — submit at a higher frequency for a few minutes; rounds can chain automatically after a configurable gap (default 5 minutes).
+- **Long task mode** — replace the fixed retry-count cap with a cumulative busy-queue wait budget (60 minutes by default, 5–480), shared by all segments of a multi-shot task.
+- **Fatal errors fail fast** — invalid keys, rejected parameters, missing endpoints and moderation blocks stop immediately with a specific reason instead of burning the retry budget.
+
+Task-level overrides come from the progress page; global defaults use `AGNES_LONG_TASK_ENABLED`, `AGNES_LONG_TASK_MINUTES`, `AGNES_FAST_RETRY_PER_MINUTE` and `AGNES_FAST_RETRY_MINUTES`.
+
+## 6. Manual Mode (v6.0)
 
 > Full guide: [`manual_mode_guide.md`](./manual_mode_guide.md)
 
@@ -101,9 +111,9 @@ This project is in early stage — corner cases may not be fully handled. Recomm
 2. Watch the **console logs** (the terminal running `server.py`) and be patient
 3. All key operations are logged for easy debugging
 
-### Upstream limits you should know (v7.0)
+### Upstream limits you should know (v7.0–v8.2)
 
-- **Free queue saturation**: Agnes can reject submissions for 10+ minutes with `video_queue_full`. The app keeps retrying on a dedicated track (up to 15 retries by default, `AGNES_VIDEO_BUSY_RETRY_ATTEMPTS`; the first retry fires immediately and later ones every 30–60s) and shows in the progress panel: `Agnes 视频队列已满（HTTP 503 · video_queue_full），正在排队重试（第 N 次 / 已等 X 分钟）。建议错峰重试或稍后再试。` Nothing is consumed by a rejected submit — just retry off-peak, or switch to another video model. Agnes has announced that these `503` / `video_queue_full` errors are expected to improve significantly after **2026-10-26 12:00 (UTC+8)**.
+- **Free queue saturation**: Agnes can reject submissions for 10+ minutes with `video_queue_full`. The app keeps retrying on a dedicated busy track and shows the cause in the progress panel. Nothing is consumed by a rejected submit. Since v8.2.0 you can use **fast retry** (with automatic chained rounds) or **long task mode** (a cumulative wait budget instead of a fixed retry cap) instead of only retrying off-peak — see §5.
 - **~15-minute inference hard cut-off**: if upstream aborts a job, the failure message contains the upstream wording (e.g. `inference not finished after 15 minutes (code=500)`) — waiting longer will not produce a video.
 - **Video 2.5 Flash portrait (9:16) rotation defect**: upstream returns sideways frames for this one combination. The UI warns you when you pick it; use `16:9` / `3:4`, or opt into automatic correction with `AGNES_FIX_V25_PORTRAIT_ROTATION=1`.
 - **Model capabilities ship with releases**: a model listed in the dropdown but marked `⚠` is not adapted by your current version — upgrade to use it. The running version is shown in the page footer.

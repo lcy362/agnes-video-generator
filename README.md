@@ -1,6 +1,6 @@
 # 🎬 Agnes Video Generator — Completely Free AI Video Generator
 
-[![中文](https://img.shields.io/badge/CN-中文-red)](/README_ZH.md)
+[![中文](https://img.shields.io/badge/CN-中文-red)](README_ZH.md)
 [![GitHub Stars](https://img.shields.io/github/stars/lcy362/agnes-video-generator?style=social)](https://github.com/lcy362/agnes-video-generator)
 [![License](https://img.shields.io/github/license/lcy362/agnes-video-generator)](https://github.com/lcy362/agnes-video-generator/blob/HEAD/LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10+-blue)](https://www.python.org/)
@@ -23,15 +23,29 @@ schema.org structured data for SEO/GEO indexing. GitHub does not execute this sc
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "Agnes Video Generator",
-  "alternateName": "Free AI Video Generator",
+  "alternateName": ["Free AI Video Generator", "Free Short Video"],
   "applicationCategory": "MultimediaApplication",
   "operatingSystem": "Linux, macOS, Windows",
-  "description": "A completely free, open-source AI video generator. No subscription, no high-end GPU, no usage limits — type a text idea and get narrated, auto-subtitled multi-scene AI videos. Supports text-to-video, image-to-video, keyframes animation, digital anchor and manuscript-to-video.",
+  "description": "A completely free, open-source AI video generator (MIT). Generate 4-12s 720P clips from text or images with Agnes Video 2.5 Flash, or build narrated, auto-subtitled multi-shot stories. No subscription, no credits, no watermark, no GPU: self-host with one free Agnes AI API key.",
   "url": "https://github.com/lcy362/agnes-video-generator",
   "downloadUrl": "https://github.com/lcy362/agnes-video-generator",
-  "softwareVersion": "1.0.0",
+  "softwareVersion": "8.2.0",
+  "dateModified": "2026-11-23",
+  "releaseNotes": "https://github.com/lcy362/agnes-video-generator/blob/master/docs/public/release-notes/release_notes_v8.2.0.md",
   "license": "https://opensource.org/licenses/MIT",
-  "keywords": "free AI video generator, AI video generation, text to video, AI video creator, open source video generator, AI narration, auto subtitles, multi-scene video, Runway alternative, Pika alternative",
+  "isAccessibleForFree": true,
+  "screenshot": "https://raw.githubusercontent.com/lcy362/agnes-video-generator/master/images/home.png",
+  "softwareRequirements": "Python 3.10+; ffmpeg is bundled in the Docker and npm installs",
+  "keywords": "free AI video generator, free AI video, free short video generator, AI video generator, text to video AI, image to video AI, Agnes Video, Agnes Video 2.5 Flash, AI video without watermark, no subscription AI video tool, open source AI video generator, self-hosted AI video, Runway alternative, Pika alternative",
+  "featureList": [
+    "Free text-to-video and image-to-video with Agnes Video 2.5 Flash (4-12s, 720P)",
+    "Six task types: Single-shot clip, Multi-shot story, Manuscript video, Digital anchor, Poetry video, Simple image",
+    "Multi-shot stories with AI screenwriting, free TTS narration and word-level subtitles",
+    "Up to 8 reference images, first/last frames and reference audio",
+    "Manual mode checkpoints, checkpoint resume and experimental external asset import",
+    "Long task mode, fast retry with auto chaining and fatal-error classification",
+    "22-language Web UI, MIT licensed, self-hosted with a free Agnes AI API key"
+  ],
   "offers": {
     "@type": "Offer",
     "price": "0",
@@ -46,7 +60,9 @@ schema.org structured data for SEO/GEO indexing. GitHub does not execute this sc
     "sameAs": [
       "https://github.com/lcy362",
       "https://gitee.com/sandgrid/agnes-video-generator",
-      "https://video.lichuanyang.top/"
+      "https://video.lichuanyang.top/",
+      "https://www.npmjs.com/package/free-short-video",
+      "https://hub.docker.com/r/lcy362/free-short-video"
     ]
   }
 }
@@ -57,7 +73,7 @@ schema.org structured data for SEO/GEO indexing. GitHub does not execute this sc
 > This project is also mirrored on [Gitee](https://gitee.com/sandgrid/agnes-video-generator) for faster access in mainland China. The **GitHub repository is the primary home** of this project — issues, PRs, and stars are managed there.
 > 本项目在国内 Gitee 设有镜像仓库，便于国内访问加速；**GitHub 为项目主仓库**，Issue / PR / Star 均在 GitHub 提交。
 
-> **Completely free AI video generator** — Built on Agnes AI's free models, no subscription, no high-end GPU, no usage limits. Type in a text idea and automatically generate multi-scene AI videos with narration and subtitles. Supports text-to-video, image-to-video, keyframes animation, digital anchor, and more. All AI compute runs in the cloud — a regular laptop is all you need. **[Try it online →](https://video.lichuanyang.top)**
+> **Completely free AI video generator** — Built on Agnes AI's free models: no subscription, no credits, no watermark, no high-end GPU. Generate a **free 4–12 s, 720P AI short video** from text or images with `agnes-video-2.5-flash`, or turn one idea into a **narrated, auto-subtitled multi-shot story** (1–30 shots). Six task types, checkpoint resume, manual mode, multi reference images and long task mode for busy queues. All AI compute runs in the cloud — a regular laptop is all you need. **[Try it online →](https://video.lichuanyang.top)**
 
 > "The solution is not to suppress AI, but to make it a more equitable capability, so that everyone knows how to create more with AI. This is a very important vision for our company — to make world-class AI belong to everyone. What we can do may be insignificant, but this vision is very long-term and enduring."
 >
@@ -65,7 +81,7 @@ schema.org structured data for SEO/GEO indexing. GitHub does not execute this sc
 
 **[🌐 Official Website](https://video.lichuanyang.top)** | **[📝 Blog (中文)](https://lichuanyang.top/posts/22470/)** | **[📝 Blog (English)](https://lichuanyang.top/en/posts/22470/)**
 
-> **🖥️ Try it now — no install needed:** Visit [video.lichuanyang.top](https://video.lichuanyang.top) and experience **Simple Video** mode directly in your browser. Just enter a prompt and generate a free AI video instantly.
+> **🖥️ Try it now — no install needed:** Visit [video.lichuanyang.top](https://video.lichuanyang.top) and use **Single-shot clip** (formerly Simple Video) directly in your browser. Enter a prompt and generate a free AI video instantly.
 
 ## 🚀 Three Ways to Use — All Completely Free
 
@@ -74,6 +90,16 @@ schema.org structured data for SEO/GEO indexing. GitHub does not execute this sc
 | **[Agnes Video Generator](https://github.com/lcy362/agnes-video-generator)** (this project) | **Download & run locally** | **More powerful** — TTS narration, auto subtitles, digital anchor, image-to-video, keyframes animation, manuscript-to-video, checkpoint resume & more | [GitHub](https://github.com/lcy362/agnes-video-generator) |
 | **[FreeShortVideoStudio](https://github.com/lcy362/free-short-video-studio)** | **Fully online, in the browser** | Lightweight, zero install — no setup at all, **features under active construction** | [video.lichuanyang.top/studio](https://video.lichuanyang.top/studio) · [GitHub](https://github.com/lcy362/free-short-video-studio) |
 | **[Agnes Video Generator](https://github.com/lcy362/agnes-video-generator)** — **agent-ready** | **Driven by an AI coding agent** | **Least effort, still completely free** — install the standalone `agnes-video` skill: it installs the service, generates the video, delivers the file, debugs failures and can open a PR for a real defect. No credits, no subscription, no GPU | [Skill repository](https://github.com/lcy362/agnes-video-generator-skills) · [Flint](https://github.com/lcy362/flint) |
+
+## 🆕 Latest release — v8.2.0 (2026-11-19)
+
+- **Six task types**, renamed in all 22 UI languages: **Single-shot clip** (one 4–12 s clip, high success rate) and **Multi-shot story** (1–30 shots stitched into a story), plus Manuscript video, Digital anchor, Poetry video and Simple image.
+- **Free model chain today**: `agnes-3.0-flash` (text) → `agnes-image-2.5-flash` (image) → `agnes-video-2.5-flash` (video, 4–12 s, 720P) → Edge TTS (narration). The old `agnes-video-v2.0` channel has been retired.
+- **Long task mode**: when the free upstream queue is saturated, optionally wait with a cumulative busy-queue budget (60 minutes by default, 5–480) instead of a fixed retry count. **Fast retry** can chain rounds automatically, and provably fatal errors (invalid key, rejected parameter, moderation block) now fail fast with a specific reason.
+- **Multi reference images** (v8.1): up to 5 images on Flash / 8 on 2.5, first/last frames and reference audio. **Manual mode** pauses at checkpoints so you can edit artifacts; **external asset mode** (Jimeng, experimental) imports clips produced elsewhere.
+- Still free and self-hosted: checkpoint resume, word-level subtitles, a 22-language Web UI and the standalone [`agnes-video` agent skill](https://github.com/lcy362/agnes-video-generator-skills).
+
+Full list: **[v8.2.0 release notes](docs/public/release-notes/release_notes_v8.2.0.md)** · [all release notes](docs/public/release-notes/).
 
 ## 🤖 Or Let an AI Agent Drive It
 
@@ -171,26 +197,42 @@ Making AI videos today has an absurdly high barrier. Overseas services like Runw
 
 We believe what Bruce Yang said — AI should be a more equitable capability. World-class AI should belong to everyone, not just those who can afford the bill.
 
-To be honest, Agnes's video model isn't perfect yet. The generated frames are sometimes unstable, and complex actions occasionally deform. But it is **completely free with no usage limits**, and it iterates fast. We choose to grow with it rather than wait for a "perfect" commercial solution. If you share this mindset, then this project is for you — all you need is a free [Agnes AI](https://platform.agnes-ai.com) API key and an ordinary computer that can run Python to start creating AI videos at zero cost.
+To be honest, Agnes's video model isn't perfect yet. The generated frames are sometimes unstable, complex actions occasionally deform, and the free shared queue can be busy. But it is **completely free with no per-user quota** (v8.2.0 adds long task mode and auto-chained fast retry for busy queues), and it iterates fast. We choose to grow with it rather than wait for a "perfect" commercial solution. If you share this mindset, then this project is for you — all you need is a free [Agnes AI](https://platform.agnes-ai.com) API key and an ordinary computer that can run Python to start creating AI videos at zero cost.
 
-### Comparison: Agnes vs. Commercial AI Video Tools
+### Comparison: free AI video generator vs. commercial AI video tools
 
-| Feature | Agnes Video Generator | Runway Gen-3 | Pika 2.0 | OpenAI Sora | Kling 1.6 |
-|---------|:---:|:---:|:---:|:---:|:---:|
-| **Price** | Free | $15–$95/month | $10–$95/month | $20+/month (limited) | Free quota, then pay-per-second |
-| **Open Source** | ✅ Yes (MIT) | ❌ No | ❌ No | ❌ No | ❌ No |
-| **Self-Hosted** | ✅ Yes | ❌ No | ❌ No | ❌ No | ❌ No |
-| **Max Video Length** | 20s per clip, unlimited scenes | 10s per clip | 10s per clip | 20s per clip | 10s per clip |
-| **Multi-Scene Pipeline** | ✅ Built-in (Creative/Manuscript) | ❌ Manual editing | ❌ Manual editing | ❌ Manual editing | ❌ Manual editing |
-| **AI Narration (TTS)** | ✅ Free, built-in | ❌ Third-party | ❌ Third-party | ❌ Not available | ❌ Not available |
-| **Auto Subtitles** | ✅ Word-level SRT | ❌ Not available | ❌ Not available | ❌ Not available | ❌ Not available |
-| **Digital Anchor** | ✅ Built-in | ❌ No | ❌ No | ❌ No | ❌ No |
-| **Resolution Options** | 9:16 / 16:9 / 1:1 | Multiple | Multiple | Multiple | Multiple |
-| **Image-to-Video** | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Image inputs | ✅ Yes |
-| **Keyframes Animation** | ✅ Yes | ✅ Yes | ✅ Yes | ❌ Not available | ❌ Not available |
-| **Local GPU Required** | ❌ No (cloud API) | ❌ No (cloud) | ❌ No (cloud) | ❌ No (cloud) | ❌ No (cloud) |
-| **Watermark** | No watermark | Built-in watermark | Built-in watermark | C2PA metadata | Built-in watermark |
-| **Usage Limit** | No limit (16 req/min rate limit) | Billed by compute | Billed by generation | Billed by generation | Billed by generation |
+Vendor plans change frequently — check each vendor's current pricing. This project has no paid tier.
+
+| Feature | Agnes Video Generator (this repo) | Typical paid tools (Runway / Pika / Sora / Kling …) |
+|---------|:---:|:---:|
+| **Price** | Free, MIT, no paid tier in this project | Subscription or credit / per-second billing |
+| **Open source / self-hosted** | ✅ Yes | ❌ Usually no |
+| **Free clip length** | 4–12 s at 720P (`agnes-video-2.5-flash`); 1–30 shots stitched into multi-shot stories | Usually 5–20 s per clip; varies by plan |
+| **Aspect ratios** | 21:9 / 16:9 / 4:3 / 1:1 / 3:4 / 9:16 | Varies by vendor |
+| **Text-to-video / image-to-video / first+last frame** | ✅ Built in | Varies by vendor |
+| **Multi-scene pipeline, free TTS narration, word-level subtitles** | ✅ Built in | Usually manual editing or third-party tools |
+| **Digital anchor / poetry / manuscript modes** | ✅ Built in | Rare |
+| **Watermark** | No watermark added by this app | Varies; free tiers often add one |
+| **GPU** | ❌ Not needed (cloud API) | ❌ Not needed (cloud API) |
+| **Limits** | No per-user quota; local token bucket ≈16 req/min per key; the free shared queue can be busy, with auto-retry, fast retry and long task mode | Quota / credits per billing plan |
+
+## ❓ Free AI Video Generator FAQ
+
+**Is this AI video generator really free?** Yes. The app is MIT-licensed with no paid tier, no credits and no per-second billing. All model calls use Agnes AI's free models; you supply one free API key from [Agnes AI](https://platform.agnes-ai.com).
+
+**Do I need to sign up or a credit card for a free AI video generator with no sign up?** There is no account, subscription or credit card for this project — it runs on your own machine. You do need a free Agnes AI API key to call the upstream models; no key is stored on any server of this project.
+
+**Can I generate a free AI video from text or from an image?** Yes. Single-shot clip supports text-to-video, image-to-video, first/last frames, up to 5 reference images on Flash (8 on 2.5) and reference audio. The one-click preset is `agnes-video-2.5-flash` / 5 s / 16:9 / 720P.
+
+**Is the AI video without watermark?** Yes — this app adds no watermark, and the generated files stay on your machine. For commercial use, check the upstream model's terms.
+
+**Can I make free AI short videos for YouTube Shorts, TikTok or Reels?** Yes. Pick a portrait aspect ratio for a single clip, or use Multi-shot story / Manuscript video to build a longer narrated story with subtitles. Note the known upstream 9:16 rotation defect on 2.5-series models; 16:9 and 3:4 are safe.
+
+**What is the difference between Agnes Video, Agnes AI and this GitHub repository?** [Agnes AI](https://platform.agnes-ai.com) provides the free models and API keys. **Agnes Video** usually refers to those video models (`agnes-video-2.5-flash`). This repository is the independent, MIT-licensed open-source app built on them; [`agnes-video-generator-skills`](https://github.com/lcy362/agnes-video-generator-skills) is its optional AI-agent skill. If you searched "agnes video generator github", you are in the right place — GitHub is the project's primary home.
+
+**The free video queue is full — now what?** A saturated shared queue rejects submissions with HTTP 503 `video_queue_full`; nothing is consumed. Since v8.2.0 you can enable fast retry (with automatic chained rounds) or long task mode (a cumulative wait budget instead of a fixed retry count), while fatal errors fail fast with a clear reason.
+
+More answers: [FAQ](docs/public/faq.md) · [Usage guide](docs/public/usage.md) · [GitHub Wiki](https://github.com/lcy362/agnes-video-generator/wiki).
 
 ## ⚙️ Configuration
 
@@ -204,18 +246,23 @@ cp .env.example .env    # then edit AGNES_API_KEY inside
 
 > **Have more than one API key?** Set `AGNES_API_KEY`, `AGNES_API_KEY_2`, `AGNES_API_KEY_3` … (numbering must be contiguous). Rate-limit quotas scale with your key count, a `429` automatically rotates to the next key, and the concurrency limit scales along with it.
 
+> **Busy queue?** Long task mode and fast-retry defaults are configurable with `AGNES_LONG_TASK_ENABLED`, `AGNES_LONG_TASK_MINUTES`, `AGNES_FAST_RETRY_PER_MINUTE` and `AGNES_FAST_RETRY_MINUTES`, or per task from the progress page.
+
 Full walkthrough: [Getting Started → Configure API Key](docs/public/getting-started.md).
 
 ## 📚 Documentation
 
-- **[Features](docs/public/features.md)** — Creation modes, the completely free AI model chain, AI narration & smart subtitles, flexible creative controls, production-grade reliability, and the multilingual Web UI.
+- **[Features](docs/public/features.md)** — Six task types, the completely free Agnes model chain, AI narration & smart subtitles, reference images, long task mode and the 22-language Web UI.
 - **[Getting Started](docs/public/getting-started.md)** — Install and deploy in 4 ways: Manual (`start.sh`), Docker, npm (`npx free-short-video`), or AI-Agent assisted.
-- **[AI Agent Operations](docs/public/agent-operations.md)** — How to drive this project with a coding agent: install the standalone `agnes-video` skill once, then ask for outcomes — it installs the service, generates videos, diagnoses failures and can open a PR for a real defect.
-- **[Usage Guide](docs/public/usage.md)** — Configure your API key, pick a video mode, resume from checkpoints, the three chaining modes, and logs & output layout.
+- **[Usage Guide](docs/public/usage.md)** — Configure your API key, pick a task type, use long task mode / fast retry, resume from checkpoints, and find logs and outputs.
+- **[Manual Mode Guide](docs/public/manual_mode_guide.md)** — Pause at checkpoints, edit artifacts, then continue.
+- **[AI Agent Operations](docs/public/agent-operations.md)** — Drive this project with a coding agent: install the standalone `agnes-video` skill once, then ask for outcomes — it installs the service, generates videos, diagnoses failures and can open a PR for a real defect.
 - **[Architecture](docs/public/architecture.md)** — Project structure and tech stack.
 - **[API Reference](docs/public/api.md)** — Full REST endpoint list (progress via polling, no WebSocket).
-- **[FAQ](docs/public/faq.md)** — Frequently asked questions.
+- **[FAQ](docs/public/faq.md)** — Frequently asked questions about free AI video generation.
 - **[About & License](docs/public/about.md)** — Acknowledgments and the MIT license.
+- **[Release notes](docs/public/release-notes/)** — What changed in v8.2.0 and earlier releases.
+- **[GitHub Wiki](https://github.com/lcy362/agnes-video-generator/wiki)** — 22-language guides, prompt examples and the learning center.
 
 ## 🌐 Related Projects
 
@@ -225,4 +272,4 @@ More projects by the same author:
 - **[FreeShortVideoStudio](https://github.com/lcy362/free-short-video-studio)** — Fully online, in-browser video studio.
 - **[Flint](https://github.com/lcy362/flint)** — Local-first AI skills manager: centralize, tag, deduplicate and deploy your Skills into any agent or project directory. If it helps you, a star is very welcome! ⭐
 
-**Keywords**: free AI video generator, AI video generation tool, text to video AI, free AI video maker, AI video creator, open source video generator, Agnes AI, text-to-video, image-to-video, keyframes video, AI narration, auto subtitles, multi-scene video, zero cost AI video, no subscription AI video tool, digital anchor, self-hosted AI video generator, open source alternative to Runway
+**Keywords**: free AI video generator, free AI video, free short video generator, free AI video maker, free AI short video, AI video generator without watermark, text to video AI, image to video AI, Agnes Video, Agnes Video 2.5 Flash, Agnes Video Generator GitHub, open source AI video generator, self-hosted AI video, no subscription AI video tool, Runway alternative, Pika alternative, AI narration, auto subtitles

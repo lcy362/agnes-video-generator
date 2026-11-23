@@ -53,7 +53,7 @@ def main() -> int:
     # Docker Hub caps the short `description` at 100 bytes. Exceeding it
     # rejects the ENTIRE PATCH (including full_description), so we keep this
     # concise and defensively truncate on a character boundary just in case.
-    desc = "free-short-video — Self-hosted AI video generator with subtitles"
+    desc = "Free AI video generator — self-hosted, open source, no subscription, no GPU."
     while len(desc.encode("utf-8")) > 100:
         desc = desc[:-1]
 

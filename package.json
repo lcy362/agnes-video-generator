@@ -1,7 +1,7 @@
 {
   "name": "free-short-video",
   "version": "0.0.0",
-  "description": "Free AI short-video generator — run the full free-short-video service locally with one command. Text-to-video, image generation, Edge-TTS narration, subtitles, and compositing, all free. Official site: https://video.lichuanyang.top",
+  "description": "Completely free, open-source AI video generator: text-to-video, image-to-video and multi-shot stories with narration and subtitles. Self-host with one free Agnes AI API key; no subscription, no credits, no GPU. Official site: https://video.lichuanyang.top",
   "bin": {
     "free-short-video": "bin/cli.js",
     "fsv": "bin/cli.js"
@@ -13,14 +13,23 @@
     "start": "node bin/cli.js"
   },
   "keywords": [
-    "video",
-    "short-video",
-    "ai",
+    "free-ai-video-generator",
+    "free-short-video",
+    "free-ai-video",
+    "ai-video-generator",
     "text-to-video",
-    "image-generation",
+    "image-to-video",
+    "agnes-video",
+    "agnes-video-2-5-flash",
+    "short-video",
+    "multi-scene-video",
+    "digital-anchor",
     "tts",
-    "subtitle",
-    "generator",
+    "subtitles",
+    "image-generation",
+    "open-source",
+    "self-hosted",
+    "no-watermark",
     "free"
   ],
   "author": "",

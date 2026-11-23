@@ -37,10 +37,9 @@ python3 -m venv .venv
 # 方式 1：环境变量
 export AGNES_API_KEY="your-api-key"
 
-# 方式 2：通过 API 设置（等同于在 Web UI 中填写）
+# 方式 2：通过 API 设置（等同于在 Web UI 中填写；端点接收表单数据）
 curl -X POST http://localhost:8765/api/config \
-  -H "Content-Type: application/json" \
-  -d '{"api_key": "your-api-key"}'
+  -F 'api_key=your-api-key'
 ```
 
 > **⚠️ 让 Key 与站点匹配（避免 `401` / "无效的令牌"）。** Agnes 各站点接口独立，`401` 几乎都是 Key 被发到了错误的站点：
@@ -56,7 +55,7 @@ curl -X POST http://localhost:8765/api/config \
 
 **第三步 — 创建第一个视频**
 
-打开 `http://localhost:8765`，选择视频模式（简单 / 创意 / 稿件 / 数字人），输入创意描述，点击"开始生成视频"。
+打开 `http://localhost:8765`，从六种任务类型中选择——**单镜头短片**（原「简单视频」）、**多镜头故事**（原「创意长视频」）、稿件长视频、数字人口播、诗词视频、简单图片，输入创意描述后点击"开始生成视频"。
 
 ## 方式 B：Docker 部署（无需安装 Python/FFmpeg）
 

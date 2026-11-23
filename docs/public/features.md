@@ -4,10 +4,12 @@
 
 | Mode | Description | Best For |
 |------|-------------|----------|
-| **Simple Video** | Single prompt → single AI video. Full control over all parameters (generation mode, duration, resolution, seed, negative prompt). Also supports image-to-video and keyframes mode. | Quick single-clip AI video |
-| **Creative Video** | Full AI pipeline: idea → story → script → character reference → multi-scene video → narration → subtitles → final output. 10-step pipeline, fully automated. | Storytelling, creative videos |
-| **Manuscript Video** | Paste a long article or script → auto-split by reading duration → per-segment AI video → unified TTS narration + subtitle overlay → final output. 5-step pipeline. | Explainers, course content, vlogs |
-| **Digital Anchor** | AI-generated digital anchor (or upload custom image) → dynamic anchor clip → TTS narration → subtitle positioning → looped concatenation. Optional reference image for appearance consistency. | Virtual anchors, product presentations, news broadcasts |
+| **Single-shot clip** (formerly Simple Video) | One prompt → one 4–12 s AI video. Full parameter control (model, generation mode, duration, aspect ratio, seed, negative prompt); supports text-to-video, image-to-video, first/last frames, reference images and reference audio. The one-click preset is free `agnes-video-2.5-flash` / 5 s / 16:9 / 720P. | Quick free AI clips |
+| **Multi-shot story** (formerly Creative Video) | Full AI pipeline: idea → story → script → character reference → 1–30 shots → narration → subtitles → final video. | Storytelling, short films |
+| **Manuscript video** | Paste a long article or script → auto-split by reading duration → per-segment AI video → unified TTS narration + subtitle overlay → final video. | Explainers, course content, vlogs |
+| **Digital anchor** | AI-generated anchor (or your own image) → anchor clip → TTS narration → subtitles → looped concatenation, with `post_stitch` audio or model-native lip-sync audio. | Virtual anchors, product pitches, news |
+| **Poetry video** | A poem → per-line scenes (the original verse becomes narration) → t2v clips + recitation + timed subtitles → final video. | Classical poetry, mood films |
+| **Simple image** | One Agnes Image API call for text-to-image / image-to-image, including reference images. | Cover art, reference plates |
 
 ## 🆓 Completely Free AI Model Chain
 
@@ -24,7 +26,7 @@ All AI API calls share a token-bucket rate limiter (shared bucket defaults to 20
 
 ## 🎙️ AI Narration & Smart Subtitles
 
-Both Creative Video and Manuscript Video support:
+Both Multi-shot story and Manuscript video support:
 
 - **Free TTS narration**: Based on Microsoft Edge TTS, with a dynamic voice catalog grouped by the 22 UI languages (voice preview + cross-language compatibility checks) and adjustable speech rate
 - **Word-level fine-grained subtitles**: SRT subtitles generated from TTS word-level timestamps, one entry every 2-3 seconds, with precise audio-video sync
@@ -39,9 +41,17 @@ Both Creative Video and Manuscript Video support:
 - **Image-to-image end frames** — Auto-generate scene end frames via img2img from your reference image
 - **Three video chaining modes** — `keyframes` (first+last frame interpolation, recommended) / `ti2vid` (inter-scene transition frames) / `none` (independent scenes)
 - **Aspect-ratio based output** — 21:9 / 16:9 / 4:3 / 1:1 / 3:4 / 9:16 (default 16:9; 2.5 Flash renders at 720P)
-- **One-click simple video** — Type a prompt and go: free 2.5 Flash / 5s / 16:9 / 720P preset; paid tiers are labelled and require confirmation
+- **One-click single-shot clip** — Type a prompt and go: free 2.5 Flash / 5s / 16:9 / 720P preset; paid tiers are labelled and require confirmation
 - **Flexible duration** — Custom scene duration
 - **Smart manuscript splitting** — Splits by period/question mark/exclamation mark, greedily merges into 5-12 second segments based on reading speed (~4 chars/sec), preserves long sentences, auto-merges short sentences forward
+
+## 🆕 Recent capabilities (v7.6–v8.2)
+
+- **Multi reference images** (v8.1): up to 5 images on Flash / 8 on 2.5, merged from the character plate, style plate, transition stills and per-scene images; per-scene top-ups are possible at the `references` checkpoint.
+- **Native first/last frames and reference audio**: the 2.5-series API accepts `first_frame` / `last_frame`, `images[]` and public-URL `audios[]`.
+- **Manual mode & external assets**: pause at checkpoints to edit artifacts, or import clips produced elsewhere (Jimeng workflow, experimental) with `concat_videos_keep_audio`.
+- **Long task mode** (v8.2): a cumulative busy-queue wait budget (60 minutes by default, 5–480) instead of a fixed retry count; **fast retry** can chain rounds automatically, and provably fatal upstream errors are classified and fail fast.
+- **AI agent skill**: one standalone skill installs the service, creates videos, delivers files, diagnoses failures and — with your agreement — fixes a real defect and opens a PR.
 
 ## 🔧 Production-Grade Reliability
 
