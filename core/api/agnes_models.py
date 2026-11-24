@@ -1,6 +1,8 @@
 """core.api.agnes_models — 拉取 Agnes 可用模型列表（v5.0）
 
-封装 GET /v1/models?all=true，按模型 ID 前缀分组为 text/image/video 三类。
+封装 GET /v1/models?all=true，按模型 ID 前缀分组为 text/image/video 三类，
+并剔除 ``DEPRECATED_MODELS``（已公告下线，如 agnes-2.5-flash）与
+``NON_CHAT_MODELS``（sys1 决策模型，只认 /v1/systemone）。
 接口失败（网络/鉴权/非 200）时回退到硬编码默认列表，保证 UI 始终可用。
 """
 
@@ -12,6 +14,8 @@ from core.config import (
     DEFAULT_IMAGE_MODEL,
     DEFAULT_TEXT_MODEL,
     DEFAULT_VIDEO_MODEL,
+    DEPRECATED_MODELS,
+    NON_CHAT_MODELS,
     get_base_url_for_key,
 )
 
@@ -19,15 +23,13 @@ logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 20
 
-# 分组失败时的兜底列表
+# 分组失败时的兜底列表（只放当前可用的模型；已下线的 2.5 Flash 不再进兜底，
+# 否则接口失败时 UI 会推荐一个即将 4xx 的模型）
 _FALLBACK = {
-    "text": [DEFAULT_TEXT_MODEL, "agnes-2.5-flash"],
+    "text": [DEFAULT_TEXT_MODEL],
     "image": [DEFAULT_IMAGE_MODEL, "agnes-image-2.1-flash", "agnes-image-2.0-flash"],
     "video": [DEFAULT_VIDEO_MODEL],
 }
-
-# 已废弃、应从可选列表中剔除的模型 ID（如 agnes-2.0-flash，官方已迁移至新版本）
-_DEPRECATED_MODELS = {"agnes-2.0-flash"}
 
 
 def _classify(model_id: str) -> str:
@@ -71,7 +73,9 @@ def fetch_available_models(api_key: str) -> dict:
         grouped = {"text": [], "image": [], "video": []}
         for item in data.get("data", []):
             mid = item.get("id")
-            if not mid or mid in _DEPRECATED_MODELS:
+            # 剔除已公告下线（如 2.5 Flash）与非 Chat 兼容（sys1 决策模型）的 ID，
+            # 避免用户在「文本模型」下拉里选中后必然失败
+            if not mid or mid in DEPRECATED_MODELS or mid in NON_CHAT_MODELS:
                 continue
             grouped[_classify(mid)].append(mid)
         # 任一分类为空则补回默认，避免 UI 空下拉

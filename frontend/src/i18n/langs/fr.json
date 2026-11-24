@@ -12,7 +12,7 @@
   "clearEnvHint": "La clé API est définie via la variable AGNES_API_KEY et ne peut pas être supprimée depuis l'interface.",
   "modelTitle": "Sélection du modèle",
   "modelHint": "Choisissez les modèles Agnes de texte, image et vidéo utilisés pour la génération.",
-  "modelBetaHint": "agnes-2.5-flash est en bêta : nécessite une clé API avec accès bêta, sinon les appels échoueront.",
+  "modelBetaHint": "Le modèle sélectionné est en bêta : nécessite une clé API avec accès bêta, sinon les appels échoueront.",
   "modelBetaTag": " (bêta)",
   "modelTagText": "Texte",
   "modelTagImage": "Image",

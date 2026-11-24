@@ -50,7 +50,7 @@
   "modelSync": "I-refresh ang Listahan",
   "modelSyncIdle": "Hindi naka-sync",
   "modelSaved": "Nai-save na",
-  "modelBetaHint": "Ang agnes-2.5-flash ay nasa beta: nangangailangan ng API Key na may beta access, kung hindi ay mabibigo ang mga tawag.",
+  "modelBetaHint": "Ang napiling modelo ay nasa beta: nangangailangan ng API Key na may beta access, kung hindi ay mabibigo ang mga tawag.",
   "modelBetaTag": " (Beta)",
   "modelTagText": "Teksto",
   "modelTagImage": "Larawan",

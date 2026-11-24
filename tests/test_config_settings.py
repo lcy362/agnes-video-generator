@@ -137,6 +137,27 @@ def test_get_selected_models_uses_settings(conf_file):
     assert result["text"] == config.DEFAULT_TEXT_MODEL
 
 
+@pytest.mark.parametrize("bad", ["agnes-2.5-flash", "agnes-2.0-flash", "agnes-sys1-1.0"])
+def test_get_selected_models_normalizes_unusable_text_model(conf_file, bad):
+    """旧配置指向已下线 / 非 Chat 模型 → 读取时回退默认，避免上线后持续 4xx。"""
+    conf_file({"models": {"text": bad}})
+    assert config.get_selected_models()["text"] == config.DEFAULT_TEXT_MODEL
+
+
+def test_set_selected_models_rejects_deprecated_text_model(conf_file):
+    """提交已下线模型（前端旧缓存 / 手工请求）→ 落盘前归一到默认。"""
+    conf_file({})
+    result = config.set_selected_models(text="agnes-2.5-flash")
+    assert result["text"] == config.DEFAULT_TEXT_MODEL
+    assert config.load_config()["models"]["text"] == config.DEFAULT_TEXT_MODEL
+
+
+def test_set_selected_models_keeps_valid_text_model(conf_file):
+    conf_file({})
+    result = config.set_selected_models(text="agnes-2.5-pro")
+    assert result["text"] == "agnes-2.5-pro"
+
+
 def test_get_agnes_domain_uses_settings(conf_file):
     assert config.get_agnes_domain() == "com"
     conf_file({"agnes_domain": "cn"})

@@ -50,7 +50,7 @@
   "modelSync": "تحديث القائمة",
   "modelSyncIdle": "غير متزامن",
   "modelSaved": "تم الحفظ",
-  "modelBetaHint": "agnes-2.5-flash قيد الإصدار التجريبي: يتطلب مفتاح API مع صلاحية تجريبية، وإلا ستفشل الاستدعاءات.",
+  "modelBetaHint": "النموذج المحدد قيد الإصدار التجريبي: يتطلب مفتاح API مع صلاحية تجريبية، وإلا ستفشل الاستدعاءات.",
   "modelBetaTag": " (تجريبي)",
   "modelTagText": "نص",
   "modelTagImage": "صورة",

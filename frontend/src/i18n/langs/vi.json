@@ -50,7 +50,7 @@
   "modelSync": "Làm mới danh sách",
   "modelSyncIdle": "Chưa đồng bộ",
   "modelSaved": "Đã lưu",
-  "modelBetaHint": "agnes-2.5-flash đang beta: cần API Key có quyền truy cập beta, nếu không lệnh gọi sẽ thất bại.",
+  "modelBetaHint": "Mô hình đã chọn đang beta: cần API Key có quyền truy cập beta, nếu không lệnh gọi sẽ thất bại.",
   "modelBetaTag": " (Beta)",
   "modelTagText": "Văn bản",
   "modelTagImage": "Ảnh",

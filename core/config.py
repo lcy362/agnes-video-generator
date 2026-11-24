@@ -1260,18 +1260,56 @@ DEFAULT_MODELS = {
     "video": DEFAULT_VIDEO_MODEL,
 }
 
+#: 官方已公告下线 / 已废弃的模型（唯一出处，模型列表与选中值归一都读它）。
+#: - ``agnes-2.0-flash``：已被 2.5 Flash 取代；
+#: - ``agnes-2.5-flash``：官方公告 2026-11-30 下线，迁移目标 ``agnes-3.0-flash``
+#:   （见 https://www.agnes-ai.cn/zh-Hans/docs/agnes-25-flash）。
+#: 新旧 config.json 里若仍指向这些 ID，读取时自动归一到默认文本模型。
+DEPRECATED_MODELS = frozenset({"agnes-2.0-flash", "agnes-2.5-flash"})
+
+#: 非 Chat Completions 兼容的模型：决策模型 ``agnes-sys1-1.0`` 只认
+#: ``POST /v1/systemone``（body 为 ``state`` + ``questions``），误选为文本模型
+#: 会让所有文本调用 400，故从可选列表剔除。
+NON_CHAT_MODELS = frozenset({"agnes-sys1-1.0"})
+
+
+def _normalize_text_model(model: Optional[str]) -> str:
+    """把文本模型归一到可用值。
+
+    已下线 / 非 Chat 兼容的 ID 回退到 :data:`DEFAULT_TEXT_MODEL`，
+    避免旧 config.json 在官方下线后持续 4xx（用户只能手动改配置才能恢复）。
+
+    Args:
+        model: config.json 中的文本模型 ID（可为空）。
+
+    Returns:
+        可直接提交给 Chat API 的模型 ID。
+    """
+    value = (model or "").strip()
+    if not value:
+        return DEFAULT_TEXT_MODEL
+    if value in DEPRECATED_MODELS or value in NON_CHAT_MODELS:
+        logger.warning(
+            "[Config] 文本模型 %s 已下线或非 Chat 兼容，回退到 %s",
+            value,
+            DEFAULT_TEXT_MODEL,
+        )
+        return DEFAULT_TEXT_MODEL
+    return value
+
 
 def get_selected_models() -> dict:
     """返回当前选中的模型配置。
 
     Returns:
         {"text": str, "image": str, "video": str}
-        缺省值回退到 Agnes 三个 API 客户端的默认模型。
+        缺省值回退到 Agnes 三个 API 客户端的默认模型；文本模型额外过滤
+        已下线 / 非 Chat 兼容的 ID（见 :func:`_normalize_text_model`）。
     """
     settings = load_settings()
     m = settings.models or {}
     return {
-        "text": m.get("text") or DEFAULT_TEXT_MODEL,
+        "text": _normalize_text_model(m.get("text")),
         "image": m.get("image") or DEFAULT_IMAGE_MODEL,
         "video": m.get("video") or DEFAULT_VIDEO_MODEL,
     }
@@ -1281,7 +1319,8 @@ def set_selected_models(text: str = None, image: str = None, video: str = None) 
     """保存选中的模型配置。
 
     Args:
-        text:  文本（chat）模型名，None 表示不修改
+        text:  文本（chat）模型名，None 表示不修改；已下线 / 非 Chat 兼容的 ID
+               会先归一到 :data:`DEFAULT_TEXT_MODEL` 再落盘
         image: 图像模型名，None 表示不修改
         video: 视频模型名，None 表示不修改
 
@@ -1291,7 +1330,8 @@ def set_selected_models(text: str = None, image: str = None, video: str = None) 
     config = load_config()
     m = config.get("models", {}) or {}
     if text is not None:
-        m["text"] = text
+        # 落盘前归一：前端旧缓存 / 手工请求仍可能提交已下线的 2.5 Flash
+        m["text"] = _normalize_text_model(text)
     if image is not None:
         m["image"] = image
     if video is not None:

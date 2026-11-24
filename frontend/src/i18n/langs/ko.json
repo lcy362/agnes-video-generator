@@ -12,7 +12,7 @@
   "clearEnvHint": "API Key가 환경변수 AGNES_API_KEY로 설정되어 있어 화면에서 삭제할 수 없습니다.",
   "modelTitle": "모델 선택",
   "modelHint": "생성에 사용할 Agnes 텍스트, 이미지, 비디오 모델을 선택하세요.",
-  "modelBetaHint": "agnes-2.5-flash 는 베타 버전입니다. 베타 접근 권한이 있는 API 키가 필요하며, 그렇지 않으면 호출이 실패합니다.",
+  "modelBetaHint": "선택한 모델은 베타 버전입니다. 베타 접근 권한이 있는 API 키가 필요하며, 그렇지 않으면 호출이 실패합니다.",
   "modelBetaTag": " (베타)",
   "modelTagText": "텍스트",
   "modelTagImage": "이미지",

@@ -51,7 +51,24 @@ class TestFetchAvailableModels:
         resp.status_code = 500
         monkeypatch.setattr(agnes_models.requests, "get", lambda *a, **k: resp)
         out = agnes_models.fetch_available_models("sk-test")
-        assert out["text"] == [agnes_models.DEFAULT_TEXT_MODEL, "agnes-2.5-flash"]
+        # 兜底列表不再包含已公告下线的 agnes-2.5-flash
+        assert out["text"] == [agnes_models.DEFAULT_TEXT_MODEL]
+
+    def test_filters_deprecated_and_non_chat_models(self, monkeypatch):
+        """2.5 Flash（已公告下线）与 sys1（非 Chat 兼容）不得出现在可选列表。"""
+        resp = requests.Response()
+        resp.status_code = 200
+        resp._content = (
+            b'{"data": ['
+            b'{"id": "agnes-2.5-flash"}, {"id": "agnes-3.0-flash"}, '
+            b'{"id": "agnes-2.5-pro"}, {"id": "agnes-sys1-1.0"}, '
+            b'{"id": "agnes-image-2.5-flash"}, {"id": "agnes-video-2.5-flash"}]}'
+        )
+        monkeypatch.setattr(agnes_models.requests, "get", lambda *a, **k: resp)
+        out = agnes_models.fetch_available_models("sk-test")
+        assert out["text"] == ["agnes-3.0-flash", "agnes-2.5-pro"]
+        assert out["image"] == ["agnes-image-2.5-flash"]
+        assert out["video"] == ["agnes-video-2.5-flash"]
 
     def test_request_exception_falls_back(self, monkeypatch):
         def boom(*a, **k):

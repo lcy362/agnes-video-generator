@@ -50,7 +50,7 @@
   "modelSync": "Listeyi Yenile",
   "modelSyncIdle": "Senkronize edilmedi",
   "modelSaved": "Kaydedildi",
-  "modelBetaHint": "agnes-2.5-flash beta sürümündedir: beta erişimi olan bir API anahtarı gerekir, aksi halde çağrılar başarısız olur.",
+  "modelBetaHint": "Seçili model beta sürümündedir: beta erişimi olan bir API anahtarı gerekir, aksi halde çağrılar başarısız olur.",
   "modelBetaTag": " (Beta)",
   "modelTagText": "Metin",
   "modelTagImage": "Görüntü",

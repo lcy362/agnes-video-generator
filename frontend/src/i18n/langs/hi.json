@@ -50,7 +50,7 @@
   "modelSync": "सूची रीफ़्रेश करें",
   "modelSyncIdle": "सिंक नहीं",
   "modelSaved": "सहेजा गया",
-  "modelBetaHint": "agnes-2.5-flash बीटा में है: बीटा एक्सेस वाली API कुंजी चाहिए, अन्यथा कॉल विफल होंगी।",
+  "modelBetaHint": "चयनित मॉडल बीटा में है: बीटा एक्सेस वाली API कुंजी चाहिए, अन्यथा कॉल विफल होंगी।",
   "modelBetaTag": " (बीटा)",
   "modelTagText": "टेक्स्ट",
   "modelTagImage": "इमेज",

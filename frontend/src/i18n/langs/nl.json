@@ -12,7 +12,7 @@
   "clearEnvHint": "De API-sleutel is ingesteld via omgevingsvariabele AGNES_API_KEY en kan niet uit de UI worden gewist.",
   "modelTitle": "Modelselectie",
   "modelHint": "Selecteer de tekst-, beeld- en videomodellen van Agnes die voor generatie worden gebruikt.",
-  "modelBetaHint": "agnes-2.5-flash is in bèta: vereist een API-sleutel met bèta-toegang, anders mislukken de aanroepen.",
+  "modelBetaHint": "Het geselecteerde model is in bèta: vereist een API-sleutel met bèta-toegang, anders mislukken de aanroepen.",
   "modelBetaTag": " (bèta)",
   "modelTagText": "Tekst",
   "modelTagImage": "Afbeelding",

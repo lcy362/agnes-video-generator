@@ -12,7 +12,7 @@
   "clearEnvHint": "API Key ditetapkan melalui pembolehubah AGNES_API_KEY dan tidak boleh dipadam dari UI.",
   "modelTitle": "Pemilihan Model",
   "modelHint": "Pilih model teks, imej dan video Agnes yang digunakan untuk penjanaan.",
-  "modelBetaHint": "agnes-2.5-flash berada dalam beta: memerlukan Kunci API dengan akses beta, jika tidak panggilan akan gagal.",
+  "modelBetaHint": "Model yang dipilih berada dalam beta: memerlukan Kunci API dengan akses beta, jika tidak panggilan akan gagal.",
   "modelBetaTag": " (beta)",
   "modelTagText": "Teks",
   "modelTagImage": "Imej",
