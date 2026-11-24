@@ -15,6 +15,9 @@
 //    create_task（click 是分母，create_task 是分子）。
 // 4. 脱敏：用户创作内容（prompt/剧本/诗词/API Key 等）一律不入 GA，
 //    见 SENSITIVE_KEYS；data-track-params 只允许枚举值、数字、布尔与稳定 id。
+// 5. 高频事件必须降噪：进度页轮询（尤其快重试每秒一次）不得把「同一次上游故障」
+//    刷成多条事件。api_error 走 utils/apiErrorAggregator.ts 的「首错 + 汇总」，
+//    统计用 SUM(count)/create_task；新增高频埋点也按这个标准设计。
 import { currentLang } from '@/i18n'
 
 const GA_MEASUREMENT_ID = 'G-RQW2189QSK'

@@ -8,6 +8,7 @@ import { useArtifacts } from './useArtifacts'
 import { useToast } from './useToast'
 import { getRetryCount, bumpRetryCount, clearRetryCount } from '@/utils/feedback'
 import { queueFullWindowHint } from '@/utils/retryWindows'
+import { createApiErrorAggregator, type ApiErrorPayload } from '@/utils/apiErrorAggregator'
 import type { TaskState, StepDef, FastRetryState, LongTaskState } from '@/types'
 
 const POLL_INTERVAL = 30000
@@ -60,39 +61,40 @@ let consecutivePollFailures = 0
 const connectionLost = ref(false)
 const MAX_CONSECUTIVE_POLL_FAILURES = 3
 
-// ── GA api_error 增量上报（后端 error_collector 内存聚合的 upstream_errors）──
-// 语义：进度页首次观察到某任务的聚合时**静默建基线**（避免每次打开页面把
-// 历史错误重复上报一遍）；此后每次轮询，仅对计数增长的签名上报一次
-// api_error 事件（count=增量），GA 侧按 status_code 维度做趋势统计。
-// 签名 = status_code|model_type|api_method。
-let apiErrBaselineTaskId = ''
-const apiErrReported: Record<string, number> = {}
+// ── GA api_error 上报（v8.2.3 降噪：首错实时 + 增量汇总）──────────────────
+// 后端 error_collector 把上游报错按 status_code|model_type|api_method 内存聚合，
+// 进度页每轮轮询拿到的是**累计计数**。旧实现把「本轮增量」直接发一条事件，在快重试
+// （每秒轮询、忙轨连打）下一次队列饱和会刷成上百条——2026-11 复盘：api_error 占
+// 全部事件 26%、每任务 5.9 条，真实故障率被淹没。
+// 现在：每个签名首次增长即时上报（aggregated=false，即「首错」），其后增量攒到
+// 5 分钟 / 任务进入终态 / 页面隐藏时折成**一条**汇总（aggregated=true，count=累计增量）。
+// 统计口径随之变为 SUM(count)/create_task（count 已在 setup_ga4.py 注册为自定义指标）。
+const apiErrorAggregator = createApiErrorAggregator()
+
+function emitApiErrors(payloads: ApiErrorPayload[]) {
+  for (const p of payloads) trackEvent('api_error', { ...p })
+}
 
 function reportUpstreamErrors(state: TaskState) {
-  const errs = Array.isArray(state.upstream_errors) ? state.upstream_errors : []
-  if (state.task_id && apiErrBaselineTaskId !== state.task_id) {
-    apiErrBaselineTaskId = state.task_id
-    Object.keys(apiErrReported).forEach((k) => delete apiErrReported[k])
-    for (const e of errs) {
-      apiErrReported[`${e.status_code}|${e.model_type}|${e.api_method}`] = e.count || 0
-    }
-    return
-  }
-  for (const e of errs) {
-    const key = `${e.status_code}|${e.model_type}|${e.api_method}`
-    const seen = apiErrReported[key] || 0
-    const total = e.count || 0
-    if (total > seen) {
-      apiErrReported[key] = total
-      trackEvent('api_error', {
-        task_type: state.task_type || appState.currentTaskType,
-        status_code: String(e.status_code || 0),
-        model_type: e.model_type || '',
-        api_method: e.api_method || '',
-        count: total - seen,
-      })
-    }
-  }
+  emitApiErrors(apiErrorAggregator.observe({
+    task_id: state.task_id,
+    // 后端旧数据可能没有 task_type，沿用页面当前任务类型兜底（与旧口径一致）
+    task_type: state.task_type || appState.currentTaskType,
+    status: state.status,
+    upstream_errors: state.upstream_errors,
+  }))
+}
+
+/** 页面隐藏 / 卸载时冲掉待汇总的增量，避免关标签页丢数据 */
+function flushApiErrors() {
+  emitApiErrors(apiErrorAggregator.flush())
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushApiErrors()
+  })
+  window.addEventListener('pagehide', flushApiErrors)
 }
 
 function resetSteps(taskType: string) {

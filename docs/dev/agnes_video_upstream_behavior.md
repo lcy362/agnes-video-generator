@@ -155,7 +155,7 @@
 结论与影响：
 
 - `model_not_found` 不是「渠道暂时不可用」而是 **v2.0 已被网关除名**：忙轨 15 次重试对该模型注定耗尽，用户侧任何配置（域名/分组/Key）都无法恢复。#92（default 组用户）、#94、#95 同为此签名。
-- **维护者澄清（2026-10-14）：2.5-flash 与收费无关**，用户出路＝任务设置切 2.5-flash + 错峰重试（北京 22:00–01:00 / 06:00–09:00）。#79 行「2.5-flash 为付费模型」的归因与本口径不一致，**已于 2026-10-15 在 `docs/dev/issue_handling_process.md` §三 加注修订**（标注「存疑待复核」，原记录保留不改；可能为当时分组定价差异）。
+- **维护者澄清（2026-10-14）：2.5-flash 与收费无关**，用户出路＝任务设置切 2.5-flash + 错峰重试（北京时间以 `frontend/src/utils/retryWindows.ts` 为唯一出处；**v8.2.3 复盘已改为 21:00–24:00 / 09:00–12:00**，口径 SUM(api_error.count)/create_task)；原文的 06:00–09:00 实测是全天最差带之一）。#79 行「2.5-flash 为付费模型」的归因与本口径不一致，**已于 2026-10-15 在 `docs/dev/issue_handling_process.md` §三 加注修订**（标注「存疑待复核」，原记录保留不改；可能为当时分组定价差异）。
 - 项目侧待适配（本轮按用户决策仅记档，未改代码）：`core/config.py DEFAULT_VIDEO_MODEL`、6 条流水线默认 `video_model="agnes-video-v2.0"`、AGENTS.md / `docs/public/features*.md` / `docs/public/architecture*.md` 的「v2.0 免费」表述、`docs/dev/regression_test_plan.md` 中 v2.0 相关说明。
 - **A 类修复实施注（2026-10-15）**：上条「项目侧待适配」已随 A1 落地——`DEFAULT_VIDEO_MODEL` 改为 `agnes-video-2.5-flash`，5 条流水线默认同步，`VIDEO_MODEL_CAPABILITIES` 移除 v2.0 条目，`submit_video()` 删除 width/height/num_frames 旧协议分支（恒走 2.5 提交，`_get_frame_config`/`DURATION_PRESETS` 随之删除），`task_creation_routes` 时长校验收敛为 `VIDEO_25_DURATIONS`；AGENTS.md / `docs/public/features*` / `architecture*` 表述同步。竖屏躺倒维持现状（`AGNES_FIX_V25_PORTRAIT_ROTATION` 默认关）。
 

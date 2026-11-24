@@ -3,7 +3,8 @@
 
 Automates the parts of GA4 setup that the Admin API supports:
   1. Register custom event-scoped dimensions (task_type, mode, resolution, ...)
-  2. Mark key events (conversions): create_task, task_completed
+  2. Register custom event-scoped metrics (count — api_error 降噪后的累计条数)
+  3. Mark key events (conversions): create_task, task_completed
 
 NOT automated (Google Admin API does not support it):
   - Explore reports (must be created manually in the GA4 UI)
@@ -53,6 +54,16 @@ CUSTOM_DIMENSIONS = [
     ("status_code", "HTTP 状态码"),
     ("model_type", "模型类型"),
     ("api_method", "API 方法"),
+    # v8.2.3 api_error 降噪：首错实时 / 其后按窗口汇总（aggregated=true）
+    ("aggregated", "是否汇总事件"),
+]
+
+# 自定义指标（事件作用域）。
+# v8.2.3：api_error 改为「首错 + 汇总」后，一条汇总事件携带 count=窗口内累计报错数；
+# 不注册该指标 GA4 只会数事件条数，「每任务上游报错数」会被严重低估。
+# 统计口径：SUM(count) / create_task。
+CUSTOM_METRICS = [
+    ("count", "上报条数", "STANDARD"),
 ]
 
 # 需要标记为关键事件（转化）的自定义事件
@@ -158,7 +169,53 @@ def run(property_id: str, dry_run: bool, transport: str = "rest") -> int:
         except Exception as e:
             print(f"  [fail] 创建维度 {param} 失败：{e}")
 
-    # ── 2. 关键事件 ────────────────────────────────────────────────
+    # ── 2. 自定义指标 ──────────────────────────────────────────────
+    print("\n== 自定义指标 ==")
+    existing_metrics = {}
+    metrics_created = 0
+    try:
+        for met in client.list_custom_metrics(parent=parent):
+            existing_metrics[met.parameter_name] = met.display_name
+    except Exception as e:
+        # 读取失败不阻断后续关键事件配置：指标可能尚未被该账号/版本支持
+        print(f"[!] 读取现有指标失败（跳过指标配置）：{e}")
+        existing_metrics = None
+
+    if existing_metrics is not None:
+        from google.analytics.admin_v1beta.types import CustomMetric
+
+        for param, display, unit in CUSTOM_METRICS:
+            if param in existing_metrics:
+                print(f"  [skip] {param}（已存在：{existing_metrics[param]}）")
+                continue
+            if dry_run:
+                print(f"  [dry]  将创建指标 {param}（{display}）")
+                continue
+            try:
+                # 与维度一致地兼容不同 SDK 版本的作用域枚举命名
+                try:
+                    metric_scope = CustomMetric.MetricScope.EVENT
+                except AttributeError:
+                    metric_scope = CustomMetric.Scope.SCOPE_EVENT
+                try:
+                    measurement_unit = CustomMetric.MeasurementUnit.STANDARD
+                except AttributeError:
+                    measurement_unit = unit
+                client.create_custom_metric(
+                    parent=parent,
+                    custom_metric=CustomMetric(
+                        parameter_name=param,
+                        display_name=display,
+                        scope=metric_scope,
+                        measurement_unit=measurement_unit,
+                    ),
+                )
+                metrics_created += 1
+                print(f"  [ok]   创建指标 {param}（{display}）")
+            except Exception as e:
+                print(f"  [fail] 创建指标 {param} 失败：{e}")
+
+    # ── 3. 关键事件 ────────────────────────────────────────────────
     print("\n== 关键事件（转化）==")
     existing_keys = set()
     try:
@@ -186,7 +243,10 @@ def run(property_id: str, dry_run: bool, transport: str = "rest") -> int:
         except Exception as e:
             print(f"  [fail] 标记关键事件 {name} 失败：{e}")
 
-    print(f"\n完成：新增维度 {created} 个，新增关键事件 {created_keys} 个。")
+    print(
+        f"\n完成：新增维度 {created} 个，新增指标 {metrics_created} 个，"
+        f"新增关键事件 {created_keys} 个。"
+    )
     if dry_run:
         print("（dry-run 模式，未做任何修改；去掉 --dry-run 即可生效）")
     return 0
