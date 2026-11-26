@@ -69,23 +69,21 @@ schema.org 结构化数据，供搜索引擎与 AI 引擎索引。GitHub 不会�
 </script>
 -->
 
-> **🌏 镜像说明 / Mirror Notice**
-> 本项目在国内 Gitee 设有镜像仓库（[gitee.com/sandgrid/agnes-video-generator](https://gitee.com/sandgrid/agnes-video-generator)），便于国内访问加速；**GitHub 为项目主仓库**，Issue / PR / Star 均在 GitHub 提交。
-> This project is also mirrored on Gitee for faster access in mainland China; the GitHub repository is the primary home for issues, PRs and stars.
+<p align="center">
+  <a href="https://video.lichuanyang.top"><img alt="在官网在线试用，无需安装" src="https://img.shields.io/badge/%F0%9F%8C%90%20%E5%9C%A8%E5%AE%98%E7%BD%91%E5%9C%A8%E7%BA%BF%E8%AF%95%E7%94%A8%20%C2%B7%20%E6%97%A0%E9%9C%80%E5%AE%89%E8%A3%85-8A2BE2?style=for-the-badge&labelColor=111111"></a>
+</p>
 
-> **完全免费的 AI 视频生成器 / 免费 AI 短视频工具** — 基于 Agnes AI 免费模型：无订阅、无积分、无水印、无需高端显卡。用 `agnes-video-2.5-flash` 从文字或图片生成 **4–12 秒、720P 的免费 AI 短视频**，也能把一句话创意变成**带旁白配音与字幕的多镜头故事**（1–30 个镜头）。六种任务类型、断点续传、手动模式、多参考图与长任务模式，所有 AI 计算在云端完成，普通笔记本就能跑。**两种独立、都已正式可用的方式：网页版（无需安装、一键使用）· 下载版（功能更丰富）；另有 Agent 技能可用。** **[在线使用 →](https://video.lichuanyang.top)**
+<p align="center">
+  <b>官网可以在线试用，打开就能用，不用安装。</b><br>
+  进入 <a href="https://video.lichuanyang.top"><b>video.lichuanyang.top</b></a>，在浏览器里输入提示词，直接生成并导出免费 AI 视频。无需注册、无需显卡、不用自己部署。这是已上线的网页版成品，不是体验版或 Beta。<br>
+  <sub><a href="https://lichuanyang.top/posts/22470/">博客文章（中文）</a> · <a href="https://lichuanyang.top/en/posts/22470/">Blog (English)</a></sub>
+</p>
 
-> "解决的办法不是压制 AI，而是让它变成一种更平权的能力，让每个人都知道如何借 AI 创造更多。这也是我们公司很重要的愿景，让世界级的 AI 属于每一个人。我们能做的可能微不足道，但这个愿景非常长久、持久。"
->
-> —— Bruce Yang，Agnes AI 创始人
-
-**[🌐 官网](https://video.lichuanyang.top)** | **[📝 博客文章（中文）](https://lichuanyang.top/posts/22470/)** | **[📝 Blog (English)](https://lichuanyang.top/en/posts/22470/)**
-
-> **🖥️ 网页端直接使用 — 免安装：** 打开 [video.lichuanyang.top](https://video.lichuanyang.top) 即可在浏览器里使用三 tab 在线创作台，输入提示词立刻生成免费的 AI 视频。这是正式可用的成品，不是体验版或 Beta。
+> **完全免费的 AI 视频生成器 / 免费 AI 短视频工具** — 基于 Agnes AI 免费模型：无订阅、无积分、无水印、无需高端显卡。用 `agnes-video-2.5-flash` 从文字或图片生成 **4–12 秒、720P 的免费 AI 短视频**，也能把一句话创意变成**带旁白配音与字幕的多镜头故事**（1–30 个镜头）。六种任务类型、断点续传、手动模式、多参考图与长任务模式，所有 AI 计算在云端完成，普通笔记本就能跑。**两种独立方式：上面的网页版（无需安装）与下载版（功能更丰富，一条命令装好）。**
 
 ## 🚀 两种独立方式 — 另有 Agent 技能
 
-> 官网呈现**两种独立方式**：**网页版**（无需安装、一键使用）与**下载版**（功能更丰富，一条命令装好）。两条都是已上线的免费成品，不是「体验版 → 完整版」的升级阶梯。下表的 `agnes-video` Agent 技能是**补充渠道**（想让 AI Agent 跑完全流程时很方便），不是官网上的第三个并列入口；所有方式共享同一套免费 Agnes AI 模型与 MIT 代码。
+> **网页版**（打开官网即用）和**下载版**（功能更丰富，一条命令装好）都是已上线的免费成品。表中第 ③ 行的 Agent 技能是补充渠道，方便让 AI Agent 跑完全流程，不是官网上的第三个入口。
 
 | 方式 | 是什么 | 你实际要做什么 | 链接 |
 |------|--------|--------------|------|
@@ -93,7 +91,7 @@ schema.org 结构化数据，供搜索引擎与 AI 引擎索引。GitHub 不会�
 | **② 网页版**（在线创作台） | 浏览器内三 tab 工作台（图像 / 单镜头短片 / 多镜头故事），直接生成并导出 MP4 | **零安装、零配置、无需注册、无需部署**：打开页面就能用。已正式上线、可直接出片，不是 Beta、不是在建项目 | [video.lichuanyang.top/zh/demo](https://video.lichuanyang.top/zh/demo) · [/zh/studio](https://video.lichuanyang.top/zh/studio) |
 | **③ `agnes-video` Agent 技能**（补充渠道） | AI Agent 跑完**全流程**：装服务、生成视频、交付成片、排查失败，还能为真正的缺陷提 PR | **一条命令装好技能**，之后只描述想要的结果，不用记命令和参数 | [技能库仓库](https://github.com/lcy362/agnes-video-generator-skills) · [Flint](https://github.com/lcy362/flint) |
 
-**一句话**：两种独立方式——想马上出片就用网页版（零安装、一键使用），想要更丰富的功能就用一条命令装好的下载版；两者都不需要强动手能力。另有 Agent 技能可代跑全流程。
+国内镜像：[Gitee](https://gitee.com/sandgrid/agnes-video-generator)。Issue、PR 和 Star 仍在 GitHub。
 
 ## 🆕 最新版本 — v8.2.1（2026-11-23）/ v8.2.0（2026-11-19）
 

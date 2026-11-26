@@ -69,23 +69,21 @@ schema.org structured data for SEO/GEO indexing. GitHub does not execute this sc
 </script>
 -->
 
-> **🌏 Mirror Notice / 镜像说明**
-> This project is also mirrored on [Gitee](https://gitee.com/sandgrid/agnes-video-generator) for faster access in mainland China. The **GitHub repository is the primary home** of this project — issues, PRs, and stars are managed there.
-> 本项目在国内 Gitee 设有镜像仓库，便于国内访问加速；**GitHub 为项目主仓库**，Issue / PR / Star 均在 GitHub 提交。
+<p align="center">
+  <a href="https://video.lichuanyang.top"><img alt="Try it online on the official site — no install" src="https://img.shields.io/badge/%F0%9F%8C%90%20Try%20it%20online%20on%20the%20official%20site%20%E2%80%94%20no%20install-8A2BE2?style=for-the-badge&labelColor=111111"></a>
+</p>
 
-> **Completely free AI video generator** — Built on Agnes AI's free models: no subscription, no credits, no watermark, no high-end GPU. Generate a **free 4–12 s, 720P AI short video** from text or images with `agnes-video-2.5-flash`, or turn one idea into a **narrated, auto-subtitled multi-shot story** (1–30 shots). Six task types, checkpoint resume, manual mode, multi reference images and long task mode for busy queues. All AI compute runs in the cloud — a regular laptop is all you need. **Two independent, production-ready editions: the Web Version (no install, one click) and the Downloadable Version (more features); an agent skill is also available.** **[Try it online →](https://video.lichuanyang.top)**
+<p align="center">
+  <b>The official website is live — try it in the browser, nothing to install.</b><br>
+  Open <a href="https://video.lichuanyang.top"><b>video.lichuanyang.top</b></a>, type a prompt, and export a free AI video. No signup, no GPU, no server of your own. This is the finished Web Version, not a demo.<br>
+  <sub><a href="https://lichuanyang.top/posts/22470/">博客文章（中文）</a> · <a href="https://lichuanyang.top/en/posts/22470/">Blog (English)</a></sub>
+</p>
 
-> "The solution is not to suppress AI, but to make it a more equitable capability, so that everyone knows how to create more with AI. This is a very important vision for our company — to make world-class AI belong to everyone. What we can do may be insignificant, but this vision is very long-term and enduring."
->
-> — Bruce Yang, Founder of Agnes AI
-
-**[🌐 Official Website](https://video.lichuanyang.top)** | **[📝 Blog (中文)](https://lichuanyang.top/posts/22470/)** | **[📝 Blog (English)](https://lichuanyang.top/en/posts/22470/)**
-
-> **🖥️ Use it in your browser — no install needed:** Visit [video.lichuanyang.top](https://video.lichuanyang.top) and use the live three-tab online creator directly in your browser. Enter a prompt and generate a free AI video instantly. This is the finished product, not a demo or beta.
+> **Completely free AI video generator** — Built on Agnes AI's free models: no subscription, no credits, no watermark, no high-end GPU. Generate a **free 4–12 s, 720P AI short video** from text or images with `agnes-video-2.5-flash`, or turn one idea into a **narrated, auto-subtitled multi-shot story** (1–30 shots). Six task types, checkpoint resume, manual mode, multi reference images and long task mode for busy queues. All AI compute runs in the cloud — a regular laptop is all you need. **Two independent editions: the Web Version above (no install) and the Downloadable Version (more features, one command).**
 
 ## 🚀 Two Independent Editions — Plus an Agent Skill
 
-> The website presents **two independent editions**: the **Web Version** (no install, one click) and the **Downloadable Version** (more features, one-command install). Both are finished, free products, not a "demo → full version" ladder. The `agnes-video` agent skill below is a supplementary channel — handy when you want an AI agent to run the entire pipeline — but it is not a third button on the site. All options share the same free Agnes AI models and MIT codebase.
+> **Web Version** (no install, open the site) and **Downloadable Version** (more features, one command) are both finished and free. The agent skill in row ③ is an extra way to let an AI agent run the pipeline — not a third button on the site.
 
 | Way | What it is | What you actually need to do | Link |
 |-----|------------|------------------------------|------|
@@ -93,7 +91,7 @@ schema.org structured data for SEO/GEO indexing. GitHub does not execute this sc
 | **② Web Version** (Online Creator / FreeShortVideo Studio) | The live three-tab online creator — image, single-shot clip and multi-shot story — generates and exports an MP4 in a browser tab | **No install, no signup, no setup, no server of your own**: open the page and generate. Production-ready and publicly usable, not a beta or a work in progress | [video.lichuanyang.top/demo](https://video.lichuanyang.top/en/demo) · [/studio](https://video.lichuanyang.top/en/studio) |
 | **③ `agnes-video` agent skill** (supplementary channel) | An AI agent runs the **entire pipeline**: installs the service, generates the video, delivers the file, diagnoses failures and can open a PR for a real defect | Install one skill with one command, then just describe the outcome — no commands or flags to remember | [Skill repository](https://github.com/lcy362/agnes-video-generator-skills) · [Flint](https://github.com/lcy362/flint) |
 
-**In one sentence:** two independent editions — start in one click with the Web Version (zero install), or install the Downloadable Version with one command for more features; neither requires technical skills. An agent skill can also run the whole pipeline for you.
+Mainland China mirror: [Gitee](https://gitee.com/sandgrid/agnes-video-generator). Issues, PRs and stars stay on GitHub.
 
 ## 🆕 Latest release — v8.2.1 (2026-11-23) / v8.2.0 (2026-11-19)
 
