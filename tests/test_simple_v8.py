@@ -116,6 +116,39 @@ async def test_keyframe_payload_native(api):
     assert captured["first_frame"].endswith("first.png")
     assert captured["last_frame"].endswith("last.png")
     assert "images" not in captured and "audios" not in captured
+    # 上游要求 keyframe 输出跟随输入帧，携带 aspect_ratio 会被 400 拒绝
+    assert "aspect_ratio" not in captured
+
+
+@pytest.mark.asyncio
+async def test_keyframe_payload_no_aspect_ratio_single_frame(api):
+    """仅首帧 / 仅尾帧同样不得携带 aspect_ratio。"""
+    inst, captured = api
+    await inst.submit_video(prompt="转身", first_frame="/tmp/first.png")
+    assert captured["mode"] == "keyframe"
+    assert "aspect_ratio" not in captured
+
+    captured.clear()
+    await inst.submit_video(prompt="转身", last_frame="/tmp/last.png")
+    assert captured["mode"] == "keyframe"
+    assert "aspect_ratio" not in captured
+
+
+@pytest.mark.asyncio
+async def test_reference_payload_keeps_aspect_ratio(api, monkeypatch):
+    """reference 模式（含 keyframe 降级路径）仍保留 aspect_ratio。"""
+    inst, captured = api
+    await inst.submit_video(
+        prompt="参考 <Picture 1>", reference_image_paths=["/tmp/a.png"],
+    )
+    assert captured["mode"] == "reference"
+    assert captured["aspect_ratio"] == "16:9"
+
+    captured.clear()
+    monkeypatch.setenv("AGNES_KEYFRAME_NATIVE", "0")
+    await inst.submit_video(prompt="转身", first_frame="/tmp/first.png")
+    assert captured["mode"] == "reference"
+    assert captured["aspect_ratio"] == "16:9"
 
 
 @pytest.mark.asyncio

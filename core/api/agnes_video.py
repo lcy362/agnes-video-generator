@@ -1661,8 +1661,13 @@ class AgnesVideoAPI:
 
     @staticmethod
     def _apply_keyframe_payload(payload: dict, first: str, last: str) -> str:
-        """原生 keyframe 模式：只提交 first_frame / last_frame。"""
+        """原生 keyframe 模式：只提交 first_frame / last_frame。
+
+        上游要求输出跟随输入帧比例：keyframe 模式携带 ``aspect_ratio`` 会触发
+        HTTP 400 ``invalid_request``（``data.param=aspect_ratio``），必须剔除。
+        """
         payload["mode"] = "keyframe"
+        payload.pop("aspect_ratio", None)
         if first:
             payload["first_frame"] = first
         if last:

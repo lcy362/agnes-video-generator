@@ -419,6 +419,17 @@ export AGNES_KEYFRAME_NATIVE=0   # 回落 reference 多图降级（旧行为）
    吸附到 32 倍数，如 720×1280 → 736×1312），所以首帧与用户原图**不是像素级
    一致**——需要绝对像素保真时只能接受这一上游限制，或改走外部素材导入。
 
+### 上游收紧（2026-11-27，Issue #119）：keyframe 禁止携带 `aspect_ratio`
+
+11-12 实测时 keyframe 携带 `aspect_ratio` 仍成功（输出跟随首尾帧比例），
+此后上游改为**拒绝**：`HTTP 400 {"code":"invalid_request","message":"keyframe mode
+cannot set aspect_ratio; output follows the input image","data":{"param":"aspect_ratio"}}`，
+且为 fatal（不重试即可确定失败）。`reference` / `text` 模式不受影响。
+
+本项目适配：`AgnesVideoAPI._apply_keyframe_payload` 提交前 `payload.pop("aspect_ratio")`
+（keyframe 输出本来就跟随输入帧，移除该字段无副作用）；降级 reference 路径仍保留。
+单测见 `tests/test_simple_v8.py::test_keyframe_payload_*`。
+
 ## 10. 复测方法
 
 无需启动本项目服务，直接复放上游调用即可（与官网 demo 同链路）：
